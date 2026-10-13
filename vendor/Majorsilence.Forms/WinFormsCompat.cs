@@ -3751,8 +3751,15 @@ namespace Majorsilence.Forms
 
             static bool IsSpring (MenuItem item) => item is ToolStripStatusLabel label && label.Spring;
 
-            static int Width (MenuItem item)
-                => item is ToolStripItem tsi && tsi.Size.Width > 0 ? tsi.Size.Width : DefaultItemWidth;
+            int Width (MenuItem item)
+            {
+                item.ParentControl = this;
+                if (item is ToolStripItem { AutoSize: false } fixedItem && fixedItem.Size.Width > 0)
+                    return fixedItem.Size.Width;
+                var measured = TextMeasurer.MeasureText(item.Text ?? "", Theme.UIFont,
+                    LogicalToDeviceUnits(Theme.FontSize - 1));
+                return Math.Max(1, DeviceToLogicalUnits((int)Math.Ceiling(measured.Width)) + 8);
+            }
 
             OnLayoutCompletedCore ();
         }

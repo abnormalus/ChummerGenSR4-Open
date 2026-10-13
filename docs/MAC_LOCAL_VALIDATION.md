@@ -54,3 +54,13 @@ Regression checks cover disabled/enabled Unwired, review flags, case-insensitive
 Chummer enables `Form.CenterModalDialogsOnRootOwner` so modal prompts, including nested dialogs and legacy screen-centered/manual dialogs, open over the main Chummer window. ScreenBounds now measures native desktop coordinates on Retina rather than framebuffer pixels. Three selector designers also explicitly use CenterParent. Position checks cover a moved root owner, nested dialogs, and Retina coordinate conversion.
 
 Native Mac verification: typed `control`, selected its match with Down, clicked OK, and observed `Codeslinger (Control Device)` immediately in the character quality list. Review entries have readable red italic text and source labels. Test edits were made to an isolated fixture and were not saved to user characters.
+
+### Equipment scrolling and review display
+
+Tree views measure expanded equipment names and show a horizontal scrollbar when the text exceeds the viewport. Horizontal trackpad gestures pan labels; collapsing a long branch resets the offset, and expansion restores the bar. Node bounds move with the text so selection and expansion hit testing remain aligned. Vertical and horizontal viewport sizes account for both bars.
+
+StatusStrip now measures AutoSize labels from the text it renders, instead of retaining designer widths. Nuyen values, including negative and large amounts, grow to fit. Fixed-size labels retain their assigned size.
+
+Choice captions omit book names. Character Options.BookEnabled still filters sources using the character preference settings. Review-required choices remain red in creation and career quality trees; coloring derives from the saved quality/action name each time a node renders, including after reloading. Changing to an ordinary action clears the review color.
+
+Creation and career content containers now fill their available panels so nested equipment pages cannot grow below the window. Empty child toolbars are hidden after their commands merge into the main toolbar. Full-builder checks verify the scrollbar lies within the visible character content.

@@ -85,6 +85,11 @@ namespace Chummer
                 var coreChoices = DetailChoices.ForQuality(choiceCharacter, "Codeslinger");
                 Check(coreChoices.Length == 23 && !coreChoices.Any(item => item.Name == "Corrupt Data"),
                     "Codeslinger hides Unwired actions when its source is disabled");
+                Check(coreChoices.All(item => !item.ToString().Contains("SR4A") && !item.ToString().Contains("Unwired")),
+                    "choice display hides sourcebook metadata while settings still filter the list");
+                Check(DetailChoices.RequiresReview("Codeslinger", "Control Device") &&
+                    !DetailChoices.RequiresReview("Codeslinger", "Hack on the Fly"),
+                    "review styling follows the saved action name");
                 Check(coreChoices.Count(item => item.Review) == 5, "all five review-required actions retain their styling flag");
                 choiceCharacter.Options.Books.Add("UN");
                 Check(DetailChoices.ForQuality(choiceCharacter, "Codeslinger").Length == 26,
@@ -172,6 +177,47 @@ namespace Chummer
                     foreach (double scale in new[] { 1.0, 2.0 })
                     {
                         Application.UiScale = scale;
+                        using (var equipmentForm = new Form { Width = 400, Height = 240 })
+                        {
+                            var equipmentTree = new TreeView { Dock = DockStyle.Fill };
+                            var equipmentRoot = new TreeNode("Selected Gear");
+                            equipmentRoot.Nodes.Add(new TreeNode("Certified Credstick, Standard (Rating 1) (A long editable equipment detail that must remain accessible)"));
+                            equipmentRoot.Expand();
+                            equipmentTree.Nodes.Add(equipmentRoot);
+                            equipmentForm.Controls.Add(equipmentTree);
+                            equipmentForm.Show();
+                            byte[] before = HeadlessRenderer.CapturePng(equipmentForm, 400, 240);
+                            var horizontal = Field<HorizontalScrollBar>(equipmentTree, "hscrollbar");
+                            Check(horizontal.Bottom <= equipmentTree.Height && horizontal.Top >= equipmentTree.Height - horizontal.Height - 5,
+                                "horizontal scrollbar stays at the bottom of the equipment viewport at scale " + scale);
+                            Check(horizontal.Visible && horizontal.Maximum >= horizontal.LargeChange,
+                                "long equipment names enable horizontal scrolling at scale " + scale);
+                            horizontal.Value = horizontal.Maximum - horizontal.LargeChange + 1;
+                            byte[] after = HeadlessRenderer.CapturePng(equipmentForm, 400, 240);
+                            Check(!before.SequenceEqual(after) && equipmentRoot.Bounds.Left < 0,
+                                "horizontal scrollbar moves equipment labels at scale " + scale);
+                            equipmentRoot.Collapse();
+                            HeadlessRenderer.CapturePng(equipmentForm, 400, 240);
+                            Check(!horizontal.Visible && horizontal.Value == 0,
+                                "collapsing long equipment resets horizontal scrolling at scale " + scale);
+                            equipmentRoot.Expand();
+                            HeadlessRenderer.CapturePng(equipmentForm, 400, 240);
+                            Check(horizontal.Visible, "equipment expansion restores scrolling at scale " + scale);
+                        }
+                        using (var statusForm = new Form { Width = 800, Height = 120 })
+                        {
+                            var status = new StatusStrip();
+                            var amount = new ToolStripStatusLabel { Text = "0¥", Size = new System.Drawing.Size(23, 19) };
+                            status.Items.Add(amount);
+                            statusForm.Controls.Add(status);
+                            statusForm.Show();
+                            HeadlessRenderer.CapturePng(statusForm, 1600, 240);
+                            int smallWidth = amount.Bounds.Width;
+                            amount.Text = "3,875,000¥";
+                            HeadlessRenderer.CapturePng(statusForm, 1600, 240);
+                            Check(amount.Bounds.Width > smallWidth && amount.Bounds.Width > 23,
+                                "Nuyen status label grows to show the full amount at scale " + scale);
+                        }
                         using var spinnerForm = new Form { Width = 600, Height = 120 };
                         var spinner = new NumericUpDown { Left = 20, Top = 20, Width = 100, Height = 24, Value = 40 };
                         spinnerForm.Controls.Add(spinner);
@@ -332,6 +378,27 @@ namespace Chummer
                 Check(detailQuality.Extra == "Hack on the Fly" && character.Improvements.Any(item =>
                     item.SourceName == detailQuality.InternalId && item.ImprovedName == "Hack on the Fly"),
                     "editing quality detail also updates its stored improvement");
+                using (var reviewForm = new Form { Width = 500, Height = 180 })
+                {
+                    var reviewTree = new TreeView { Dock = DockStyle.Fill, HideSelection = false };
+                    var node = new TreeNode(detailQuality.DisplayName) { Tag = detailQuality.InternalId };
+                    reviewTree.Nodes.Add(node);
+                    reviewForm.Controls.Add(reviewTree);
+                    PromptDetails.Attach(reviewForm, character, reviewTree,
+                        id => character.Qualities.FirstOrDefault(item => item.InternalId == id), null, () => {});
+                    PromptDetails.Apply(character, detailQuality, "Control Device");
+                    node.Text = detailQuality.DisplayName;
+                    reviewTree.SelectedNode = node;
+                    reviewForm.Show();
+                    HeadlessRenderer.CapturePng(reviewForm, 1000, 360);
+                    Check(node.ForeColor == System.Drawing.Color.Red,
+                        "selected review-required Codeslinger remains red in the quality list");
+                    PromptDetails.Apply(character, detailQuality, "Hack on the Fly");
+                    node.Text = detailQuality.DisplayName;
+                    HeadlessRenderer.CapturePng(reviewForm, 1000, 360);
+                    Check(node.ForeColor == System.Drawing.Color.Empty,
+                        "changing to an ordinary action clears the review coloring");
+                }
                 var gearXml = XmlManager.Instance.Load("gear.xml");
                 foreach (string gearName in new[] { "Fake SIN", "Fake License", "Certified Credstick, Standard" })
                 {
@@ -390,6 +457,17 @@ namespace Chummer
                         "character save retains UTF-16 little-endian encoding");
 
                     File.WriteAllBytes(Path.Combine(output, "creation.png"), HeadlessRenderer.CapturePng(main, 1200, 850));
+                    Field<TabControl>(creation, "tabCharacterTabs").SelectedTab = Field<TabPage>(creation, "tabStreetGear");
+                    Field<TabControl>(creation, "tabStreetGearTabs").SelectedTab = Field<TabPage>(creation, "tabGear");
+                    File.WriteAllBytes(Path.Combine(output, "equipment-layout.png"), HeadlessRenderer.CapturePng(main, 1200, 850));
+                    var gearTree = Field<TreeView>(creation, "treGear");
+                    var gearBar = Field<HorizontalScrollBar>(gearTree, "hscrollbar");
+                    var gearTabs = Field<TabControl>(creation, "tabStreetGearTabs");
+                    var gearPosition = (System.Drawing.Point)typeof(Control).GetMethod("GetPositionInForm", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(gearTree, null);
+                    Check(gearPosition.Y + gearBar.Bottom <= creation.ClientSize.Height,
+                        "equipment scrollbar remains within the visible character content");
+                    Check(gearTabs.Bottom <= gearTabs.Parent.ClientRectangle.Bottom && gearTree.Bottom <= gearTree.Parent.ClientRectangle.Bottom,
+                        "nested equipment tabs and tree fit within the character viewport");
                     Check(main.MdiChildren.Length == 1, "creation hosted as MDI child");
                 }
                 character.FileName = Path.Combine(output, "creation.chum");

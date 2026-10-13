@@ -18,6 +18,7 @@ namespace Majorsilence.Forms
         private bool show_item_images = true;
         private bool virtual_mode;
         private readonly VerticalScrollBar vscrollbar;
+        private readonly HorizontalScrollBar hscrollbar;
 
         // Reused across paints to avoid per-frame List<> allocation.
         private readonly List<TreeNode> _layoutItems = new ();
@@ -46,6 +47,11 @@ namespace Majorsilence.Forms
             });
 
             vscrollbar.ValueChanged += VerticalScrollBar_ValueChanged;
+            hscrollbar = Controls.AddImplicitControl (new HorizontalScrollBar {
+                Minimum = 0, Maximum = 0, SmallChange = 20, LargeChange = 1,
+                Visible = false, Dock = DockStyle.None
+            });
+            hscrollbar.ValueChanged += (_, _) => Invalidate ();
         }
 
         /// <summary>
@@ -778,9 +784,17 @@ namespace Majorsilence.Forms
         {
             _layoutItems.Clear ();
 
+            int contentWidth = 0;
             int totalVisible = 0;    // all visible nodes excluding root
             foreach (var item in root_item.GetVisibleItems ()) {
                 if (totalVisible == 0) { totalVisible++; continue; }  // skip the synthetic root
+
+                var font = item.NodeFont is { } custom ? custom.GetSKTypeface () : GetEffectiveFont ();
+                int fontSize = item.NodeFont is { } sized ? (int)Math.Round(sized.PixelSize) : LogicalToDeviceUnits(Theme.FontSize);
+                int textWidth = (int)Math.Ceiling(TextMeasurer.MeasureText(item.Text ?? "", font, fontSize).Width);
+                int decorations = item.IndentLevel * (Indent > 0 ? Indent : 18) +
+                    (ShowDropdownGlyph ? 10 : 0) + (ShowItemImages ? 16 : 0) + (CheckBoxes ? 20 : 0) + 12;
+                contentWidth = Math.Max(contentWidth, textWidth + LogicalToDeviceUnits(decorations));
 
                 // Items below the scroll offset are still counted but not added to the page.
                 if (totalVisible > top_index)
@@ -789,12 +803,32 @@ namespace Majorsilence.Forms
                 totalVisible++;
             }
 
+            UpdateVerticalScrollBar (totalVisible - 1);
+            int viewportWidth = DeviceClientRectangle.Width - (vscrollbar.Visible ? vscrollbar.ScaledWidth : 0);
+            hscrollbar.Visible = Scrollable && contentWidth > viewportWidth;
+            UpdateVerticalScrollBar (totalVisible - 1);
+            viewportWidth = DeviceClientRectangle.Width - (vscrollbar.Visible ? vscrollbar.ScaledWidth : 0);
+            if (hscrollbar.Visible) {
+                var viewport = DeviceClientRectangle;
+                hscrollbar.SetBounds(DeviceToLogicalUnits(viewport.Left),
+                    DeviceToLogicalUnits(viewport.Bottom) - hscrollbar.Height,
+                    DeviceToLogicalUnits(viewportWidth), hscrollbar.Height);
+                hscrollbar.Maximum = Math.Max(0, DeviceToLogicalUnits(contentWidth) - 1);
+                hscrollbar.LargeChange = Math.Max(1, DeviceToLogicalUnits(viewportWidth));
+                hscrollbar.Value = Math.Min(hscrollbar.Value, Math.Max(0, hscrollbar.Maximum - hscrollbar.LargeChange + 1));
+            } else hscrollbar.Value = 0;
             UpdateVerticalScrollBar (totalVisible - 1);  // -1 to exclude root
 
             var client_rect = DeviceClientRectangle;
 
             if (vscrollbar.Visible)
                 client_rect.Width -= (client_rect.Width - vscrollbar.ScaledLeft + 1);
+
+            if (hscrollbar.Visible) {
+                client_rect.Height -= hscrollbar.ScaledHeight;
+                client_rect.Width = Math.Max(client_rect.Width, contentWidth);
+                client_rect.X -= LogicalToDeviceUnits(hscrollbar.Value);
+            }
 
             // Push the whole stack up by the sub-row scroll offset; item[top_index] is then partly
             // clipped at the top and one extra row peeks in at the bottom (drawn by TreeViewRenderer).
@@ -1007,7 +1041,10 @@ namespace Majorsilence.Forms
         /// ordinary paint or it is not a formatting hook. Mirrors
         /// <c>DataGridView.RaiseRowFormatting</c>, which exists for exactly this reason.
         /// </remarks>
-        protected internal virtual void RaiseNodeFormatting (TreeNode item) { }
+        /// <summary>Raised before a node is drawn so model-dependent colors can be refreshed.</summary>
+        public event TreeViewEventHandler? NodeFormatting;
+        protected internal virtual void RaiseNodeFormatting (TreeNode item)
+            => NodeFormatting?.Invoke(this, new TreeViewEventArgs(item));
 
         /// <inheritdoc cref="OnDrawNode"/>
         protected internal virtual void RaiseDrawNode (TreeViewDrawEventArgs e)
@@ -1241,8 +1278,13 @@ namespace Majorsilence.Forms
         {
             base.OnScrollGesture (e);
 
-            if (!vscrollbar.Visible)
+            if (!vscrollbar.Visible && !hscrollbar.Visible)
                 return;
+            if (hscrollbar.Visible && e.Delta.X != 0) {
+                hscrollbar.Value = Math.Clamp(hscrollbar.Value + e.Delta.X, 0,
+                    Math.Max(0, hscrollbar.Maximum - hscrollbar.LargeChange + 1));
+                e.Handled = true;
+            }
 
             // This control scrolls itself; don't also pan a scrollable ancestor (RaiseScrollGesture).
             e.Handled = true;
@@ -1300,6 +1342,7 @@ namespace Majorsilence.Forms
         {
             if (shiftPx == 0 || (NeedsPaint && !_skipNextRepaint) || BackgroundImage is not null || CurrentStyle.Border.HasRadius)
                 return false;
+            if (hscrollbar.Visible) return false;
             if (BackBufferPixels is not { } buffer || buffer.Width != ScaledSize.Width || buffer.Height != ScaledSize.Height)
                 return false;
 
@@ -1481,7 +1524,7 @@ namespace Majorsilence.Forms
         {
             // Scrollable says whether the tree is ALLOWED a bar; the item count says whether it NEEDS
             // one. See the property's remarks -- it is the fifth of this family found dead.
-            if (!Scrollable || Items.Count == 0 || ScaledItemHeight * childCount <= ScaledHeight) {
+            if (!Scrollable || Items.Count == 0 || ScaledItemHeight * childCount <= ScaledHeight - (hscrollbar?.Visible == true ? hscrollbar.ScaledHeight : 0)) {
                 vscrollbar.Visible = false;
                 top_index = 0;
                 _scrollOffsetPx = 0;
@@ -1537,7 +1580,7 @@ namespace Majorsilence.Forms
         // (border excluded), not ScaledHeight (the full control including its border) -- ListBox uses
         // the equivalent ClientRectangle.Height for the same reason: overcounting here understates
         // vscrollbar.Maximum/LargeChange, shrinking the usable scroll range and the thumb's travel.
-        private int VisibleItemCount => DeviceClientRectangle.Height / ScaledItemHeight;
+        private int VisibleItemCount => Math.Max(0, DeviceClientRectangle.Height - (hscrollbar?.Visible == true ? hscrollbar.ScaledHeight : 0)) / ScaledItemHeight;
 
         /// <inheritdoc/>
         public class TreeViewControlStyle : ControlStyle

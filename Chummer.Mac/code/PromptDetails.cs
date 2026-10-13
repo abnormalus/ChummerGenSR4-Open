@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Xml;
+using System.Drawing;
 using Majorsilence.Forms;
 
 namespace Chummer
@@ -51,6 +52,16 @@ namespace Chummer
         internal static void Attach(Form owner, Character character, TreeView tree, Func<string, Quality> findQuality,
             Func<string, Gear> findGear, Action changed, params ContextMenuStrip[] menus)
         {
+            if (findQuality != null)
+                tree.NodeFormatting += (_, args) =>
+                {
+                    var node = args.Node;
+                    var quality = node.Tag == null ? null : findQuality(node.Tag.ToString());
+                    if (quality == null) return;
+                    if (DetailChoices.RequiresReview(quality.Name, quality.Extra)) node.ForeColor = Color.Red;
+                    else if (node.ForeColor == Color.Red) node.ForeColor = Color.Empty;
+                };
+
             bool Eligible()
             {
                 string id = tree.SelectedNode?.Tag?.ToString();

@@ -28,3 +28,5 @@ A regression check failed at scale 2 before the forwarding correction. Final che
 Searchable detail combos opt into `KeepInputFocusOnDropDown`: their popup uses the existing nonactivating popup path, keeping subsequent typing in the edit field. The default remains unchanged for other combos.
 
 ListBox item insertion no longer shifts provisional focus zero past the last item when rebuilding an empty list; empty lists ignore keyboard navigation. This fixes arrow-key crashes after narrowing a searchable combo. Chummer opts into root-owner modal centering; ScreenBounds converts logical size using native screen coordinate scale for Retina placement.
+
+TreeView now supports horizontal scrolling for expanded text, with translated node bounds, trackpad X gestures, and scrollbar placement within the viewport. StatusStrip AutoSize items measure current rendered text. TreeView exposes its existing pre-render node-formatting hook as an event so Chummer can retain review colors from model data.

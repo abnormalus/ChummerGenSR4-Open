@@ -319,7 +319,7 @@ namespace Majorsilence.Forms.Renderers
             var show_image = control.ShowItemImages;
 
             if (!show_glyph && !show_image)
-                return new Rectangle (GetIndentStart (control, item), item.Bounds.Top, item.Bounds.Width - GetIndentStart (control, item), item.Bounds.Height);
+                return new Rectangle (GetIndentStart (control, item), item.Bounds.Top, item.Bounds.Right - GetIndentStart (control, item), item.Bounds.Height);
 
             // One of these will be valid because we handled the other case above
             var padding = control.LogicalToDeviceUnits (6);

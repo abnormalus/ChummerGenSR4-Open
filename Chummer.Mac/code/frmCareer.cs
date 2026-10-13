@@ -69,6 +69,10 @@ namespace Chummer
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
             treQualities.ShowLines = false;
+            splitMain.Dock = DockStyle.Fill;
+            tabCharacterTabs.Dock = DockStyle.Fill;
+            tabInfo.Dock = DockStyle.Fill;
+            tabStreetGearTabs.Dock = DockStyle.Fill;
             Action detailChanged = () => { _blnIsDirty = true; UpdateCharacterInfo(); UpdateWindowTitle(); };
             PromptDetails.Attach(this, _objCharacter, treQualities,
                 id => _objFunctions.FindQuality(id, _objCharacter.Qualities), null, detailChanged, cmsQuality);
@@ -1164,6 +1168,7 @@ namespace Chummer
 			// Merge the ToolStrips.
 			ToolStripManager.RevertMerge("toolStrip");
 			ToolStripManager.Merge(toolStrip, "toolStrip");
+                if (toolStrip.Items.Count == 0) toolStrip.Visible = false;
 
 			// If this is a Sprite, re-label the Mental Attribute Labels.
 			if (_objCharacter.Metatype.EndsWith("Sprite"))
@@ -1519,6 +1524,7 @@ namespace Chummer
 			// Merge the ToolStrips.
 			ToolStripManager.RevertMerge("toolStrip");
 			ToolStripManager.Merge(toolStrip, "toolStrip");
+                if (toolStrip.Items.Count == 0) toolStrip.Visible = false;
 		}
 
 		private void frmCareer_Shown(object sender, EventArgs e)
