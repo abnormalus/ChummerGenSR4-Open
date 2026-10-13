@@ -1,5 +1,7 @@
 # Local UI-library corrections
 
+Native screen conversion is separate from framebuffer scaling. WindowBase.ScreenCoordinateScaling derives the native mapping from backend PointToScreen; Control's point and rectangle conversions use it. Retina macOS screen points are 1x while the framebuffer is 2x. Using framebuffer scale doubled menu-anchor offsets, as shown in user screenshots. Regression coverage simulates that independent 2x/1x mapping and checks the inverse conversion.
+
 MenuDropDown now assigns every current item to its dropdown before layout. Entries added after the first opening (including the generated MDI character list) previously retained the parent menu bar or no owner, producing incorrect preferred sizes and clipped menus. Reopening with late entries is tested at scales 1 and 2. Native Mac validation shows the complete Window character entry and direct activation.
 
 NativeFileDialogs exposes owner-aware Avalonia file pickers. Synchronous save requests use the existing modal dispatcher loop rather than blocking the UI thread with Task.Wait.

@@ -2203,11 +2203,9 @@ namespace Majorsilence.Forms
                 // hit tests) has to agree on one screen space.
                 var window_location = window.ClientOriginOnScreen;
 
-                // Logical in, desktop out: the accumulated offset is in logical units and the window's
-                // Location is in desktop ones, so scale by the real display factor. Deliberately
-                // DesktopScaling and not Scaling -- Scaling carries Application.UiScale, and zooming the
-                // app must not move where its windows think they are on the desktop.
-                var scale = window.DesktopScaling;
+                // Native screen units need not be framebuffer pixels: Retina macOS
+                // uses desktop points. Use the backend's mapping for this offset.
+                var scale = window.ScreenCoordinateScaling;
                 point = new Point ((int)Math.Round (point.X * scale), (int)Math.Round (point.Y * scale));
 
                 window_location.Offset (point);

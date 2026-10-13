@@ -86,7 +86,7 @@ namespace Majorsilence.Forms
             if (window is null)
                 return delta;
 
-            var scale = window.DesktopScaling;
+            var scale = window.ScreenCoordinateScaling;
 
             return scale is 0 or 1
                 ? delta
@@ -104,7 +104,7 @@ namespace Majorsilence.Forms
         public Rectangle RectangleToScreen (Rectangle rect)
         {
             var origin = PointToScreen (rect.Location);
-            var scale = FindWindow ()?.DesktopScaling ?? 1;
+            var scale = FindWindow ()?.ScreenCoordinateScaling ?? 1;
 
             return scale is 0 or 1
                 ? new Rectangle (origin, rect.Size)
@@ -117,7 +117,7 @@ namespace Majorsilence.Forms
         public Rectangle RectangleToClient (Rectangle rect)
         {
             var origin = PointToClient (rect.Location);
-            var scale = FindWindow ()?.DesktopScaling ?? 1;
+            var scale = FindWindow ()?.ScreenCoordinateScaling ?? 1;
 
             return scale is 0 or 1
                 ? new Rectangle (origin, rect.Size)

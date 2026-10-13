@@ -27,4 +27,6 @@ Open and Save As use the Avalonia native storage provider with the visible main 
 
 The character serializer remains unchanged, including UTF-16 little-endian XML, atomic replacement, and backups. Cancellation preserves filename and dirty state. Expected file errors are displayed without discarding the character. Native Mac Open and Save As were exercised with a test character; the 399 upstream fixture round trips passed.
 
-Window-menu clipping is corrected for dynamically added character entries. Automated pointer-move checks select each top menu label at scales 1 and 2. The user's remaining top-bar hover offset has not yet been reproduced interactively and requires manual confirmation in this preview.
+Window-menu clipping is corrected for dynamically added character entries. Automated pointer-move checks select each top menu label at scales 1 and 2.
+
+User screenshots exposed a separate popup-placement issue: offsets were doubled on Retina macOS because Control.PointToScreen multiplied native desktop coordinates by framebuffer scale. Screen-coordinate conversion now measures the backend's native mapping independently of render scale; PointToClient and rectangle conversions use the same mapping. A regression backend with 2x framebuffer scale and 1x native screen coordinates verifies placement and round trips. Hosted input checks and all 399 fixtures pass.

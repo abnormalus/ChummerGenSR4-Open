@@ -13,6 +13,12 @@ namespace Chummer
 {
     internal static class MacSmokeTests
     {
+        public class RetinaScreenBackend : DispatchProxy
+        {
+            public Majorsilence.Forms.Backends.IWindowBackend Inner;
+            protected override object Invoke(MethodInfo method, object[] arguments)
+                => method.Name == "get_Scaling" ? 2.0 : method.Invoke(Inner, arguments);
+        }
         private static T Field<T>(object instance, string name) =>
             (T)instance.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(instance);
         private static void Check(bool condition, string message)
@@ -43,6 +49,24 @@ namespace Chummer
                 foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data"), "*.xml"))
                     XmlManager.Instance.Load(Path.GetFileName(file));
                 Console.WriteLine("PASS ruleset XML loads");
+
+                using (var screenForm = new Form { Width = 600, Height = 200 })
+                {
+                    var backendField = typeof(Form).BaseType.GetField("Backend", BindingFlags.NonPublic | BindingFlags.Instance);
+                    var nativeBackend = (Majorsilence.Forms.Backends.IWindowBackend)backendField.GetValue(screenForm);
+                    var retinaBackend = DispatchProxy.Create<Majorsilence.Forms.Backends.IWindowBackend, RetinaScreenBackend>();
+                    ((RetinaScreenBackend)(object)retinaBackend).Inner = nativeBackend;
+                    backendField.SetValue(screenForm, retinaBackend);
+                    var anchor = new Button { Left = 180, Top = 24, Width = 100, Height = 30 };
+                    screenForm.Controls.Add(anchor);
+                    screenForm.Show();
+                    var local = new System.Drawing.Point(13, 7);
+                    var expected = nativeBackend.PointToScreen(new System.Drawing.Point(anchor.Left + local.X, anchor.Top + local.Y));
+                    Check(anchor.PointToScreen(local) == expected,
+                        "Retina screen placement uses desktop points rather than framebuffer pixels");
+                    Check(anchor.PointToClient(expected) == local,
+                        "Retina screen-to-control conversion reverses native placement");
+                }
 
                 double originalScale = Application.UiScale;
                 try

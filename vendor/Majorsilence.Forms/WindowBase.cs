@@ -2546,6 +2546,18 @@ namespace Majorsilence.Forms
         /// </remarks>
         public double DesktopScaling => PresentationWindow.Backend.Scaling;
 
+        // Screen coordinates are native desktop units. On macOS those units are
+        // points even on Retina, whereas the framebuffer uses physical pixels.
+        // Ask the backend for its screen mapping instead of assuming those scales match.
+        internal double ScreenCoordinateScaling {
+            get {
+                var backend = PresentationWindow.Backend;
+                var origin = backend.PointToScreen (System.Drawing.Point.Empty);
+                var sample = backend.PointToScreen (new System.Drawing.Point (100, 0));
+                return (sample.X - origin.X) / 100.0;
+            }
+        }
+
         /// <summary>
         /// The window's rectangle on the desktop, in the desktop pixels <see cref="Location"/> and
         /// <see cref="Screen"/> use. <see cref="Size"/> is logical, so it is scaled by the display
