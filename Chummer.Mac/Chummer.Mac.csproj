@@ -13,7 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Majorsilence.Forms" Version="26.11.4" />
-    <PackageReference Include="Majorsilence.Forms.Avalonia" Version="26.11.4" />
+    <ProjectReference Include="../vendor/Majorsilence.Forms.Avalonia/Majorsilence.Forms.Avalonia.csproj" />
     <PackageReference Include="Majorsilence.Forms.Headless" Version="26.11.4" />
     <PackageReference Include="System.Resources.Extensions" Version="10.0.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.0" />

@@ -16,19 +16,6 @@
           "Topten.RichTextKit": "0.4.167"
         }
       },
-      "Majorsilence.Forms.Avalonia": {
-        "type": "Direct",
-        "requested": "[26.11.4, )",
-        "resolved": "26.11.4",
-        "contentHash": "sM1GjTxcYzYDaH45/QFrxEV3pJmocLt+SLhUKmoxBeWje6dxPpGENHV/F0b0bt3uuar7rX7K1FKm0hfJL4Xq8A==",
-        "dependencies": {
-          "Avalonia": "12.1.1",
-          "Avalonia.Controls.WebView": "12.0.1",
-          "Avalonia.Desktop": "12.1.1",
-          "Avalonia.Skia": "12.1.1",
-          "Majorsilence.Forms": "26.11.4"
-        }
-      },
       "Majorsilence.Forms.Headless": {
         "type": "Direct",
         "requested": "[26.11.4, )",
@@ -290,6 +277,16 @@
           "SkiaSharp": "2.88.7",
           "SkiaSharp.HarfBuzz": "2.88.7",
           "SkiaSharp.NativeAssets.Linux": "2.88.7"
+        }
+      },
+      "majorsilence.forms.avalonia": {
+        "type": "Project",
+        "dependencies": {
+          "Avalonia": "[12.1.1, )",
+          "Avalonia.Controls.WebView": "[12.0.1, )",
+          "Avalonia.Desktop": "[12.1.1, )",
+          "Avalonia.Skia": "[12.1.1, )",
+          "Majorsilence.Forms": "[26.11.4, )"
         }
       }
     },

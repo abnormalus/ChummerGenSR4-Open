@@ -8,3 +8,7 @@ Imported the standalone Mac port from ChummerGenSR4-0.1.501 into the upstream-ba
 - Direct execution from the Codex sandbox aborted in HIServices _RegisterApplication during Avalonia native startup. GUI automation briefly observed a Chummer window, but subsequent window inspection failed; interactive startup is not confirmed.
 
 Next check: open artifacts/mac/ChummerSR4.app manually in Finder outside the agent launch context and verify the window remains open. If it fails, collect that launch's crash report. Earlier MAC_VALIDATION.txt and migration reports are supplied historical results, not evidence of this local run.
+
+## Retina correction
+
+User confirmed normal Finder launch stays open. The main-window framebuffer metadata caused extra Retina magnification and click misalignment. Added a pinned, locally corrected Avalonia backend under vendor/; core dependency unchanged. Interactive New toolbar and Select Setting OK clicks now match their painted centers. Release build and all 399 offscreen fixture checks passed again; locally signed app is artifacts/retina-fixed/ChummerSR4.app. BP dialog spinner arrow placement still needs correction.

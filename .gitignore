@@ -56,3 +56,5 @@
 artifacts/
 .local-dotnet/
 .local-nuget/
+
+.DS_Store
