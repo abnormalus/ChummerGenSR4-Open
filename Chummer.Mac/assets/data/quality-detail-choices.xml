@@ -1,0 +1,30 @@
+<detailChoices>
+<choices quality="Codeslinger">
+  <choice name="Analyze Icon/Node" source="SR4" book="SR4A" review="false" />
+  <choice name="Capture Wireless Signal" source="SR4" book="SR4A" review="false" />
+  <choice name="Control Device" source="SR4" book="SR4A" review="true" />
+  <choice name="Crash Node" source="SR4" book="SR4A" review="false" />
+  <choice name="Crash Program" source="SR4" book="SR4A" review="false" />
+  <choice name="Data Search" source="SR4" book="SR4A" review="false" />
+  <choice name="Detect Hidden Node" source="SR4" book="SR4A" review="false" />
+  <choice name="Disarm Data Bomb" source="SR4" book="SR4A" review="false" />
+  <choice name="Edit" source="SR4" book="SR4A" review="false" />
+  <choice name="Hack on the Fly" source="SR4" book="SR4A" review="false" />
+  <choice name="Initiate Cryptanalysis" source="SR4" book="SR4A" review="false" />
+  <choice name="Intercept Traffic" source="SR4" book="SR4A" review="false" />
+  <choice name="Jam Signals" source="SR4" book="SR4A" review="true" />
+  <choice name="Matrix Attack" source="SR4" book="SR4A" review="false" />
+  <choice name="Probing the Target" source="SR4" book="SR4A" review="false" />
+  <choice name="Redirect Trace" source="SR4" book="SR4A" review="false" />
+  <choice name="Repair Icon" source="SR4" book="SR4A" review="false" />
+  <choice name="Set Data Bomb" source="SR4" book="SR4A" review="false" />
+  <choice name="Spoof Command" source="SR4" book="SR4A" review="false" />
+  <choice name="Trace User" source="SR4" book="SR4A" review="false" />
+  <choice name="Corrupt Data" source="UN" book="Unwired" review="false" />
+  <choice name="Disarm Program" source="UN" book="Unwired" review="false" />
+  <choice name="Disinfect" source="UN" book="Unwired" review="false" />
+  <choice name="Matrix Full Defense" source="SR4" book="SR4A" review="true" />
+  <choice name="Observe in Detail" source="SR4" book="SR4A" review="true" />
+  <choice name="Detect Wireless Nodes" source="SR4" book="SR4A" review="true" />
+</choices>
+</detailChoices>

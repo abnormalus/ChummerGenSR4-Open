@@ -591,6 +591,10 @@ namespace Majorsilence.Forms
         /// </summary>
         /// <remarks>Always false for <see cref="ComboBoxStyle.Simple"/>, whose list is never dropped: it
         /// is showing all the time inside the control, and setting this opens nothing.</remarks>
+        /// <summary>Keep the keyboard in the editable field while showing a searchable drop-down.</summary>
+        /// <remarks>Set before the first drop-down is opened. Other combo boxes keep their existing activation behavior.</remarks>
+        public bool KeepInputFocusOnDropDown { get; set; }
+
         public bool DroppedDown {
             get => !IsSimple && (popup?.Visible == true || native_picker_open);
             set {
@@ -612,7 +616,7 @@ namespace Majorsilence.Forms
                     // The suggestions and the drop-down are never open together (LST-07).
                     CloseSuggestions ();
 
-                    popup ??= new PopupWindow (window) { AccessibleOwner = this };
+                    popup ??= new PopupWindow (window, activates: !KeepInputFocusOnDropDown) { AccessibleOwner = this };
 
                     popup.Controls.Add (popup_listbox);
                     popup.Size = ComputePopupSize ();

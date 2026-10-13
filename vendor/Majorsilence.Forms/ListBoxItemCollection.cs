@@ -180,7 +180,8 @@ namespace Majorsilence.Forms
                     SelectedIndexes[i]++;
             }
 
-            if (focused_index >= insertedIndex)
+            // An empty list has a provisional focus of zero, not an existing item to shift.
+            if (focused_index >= insertedIndex && focused_index < Count - 1)
                 focused_index++;
         }
 

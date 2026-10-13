@@ -79,6 +79,53 @@ namespace Chummer
                     Check(editPrompt.SelectedValue == "Later detail", "shared prompt accepts edited detail");
                 }
 
+                var choiceCharacter = new Character();
+                choiceCharacter.Options.Books.Clear();
+                choiceCharacter.Options.Books.Add("SR4");
+                var coreChoices = DetailChoices.ForQuality(choiceCharacter, "Codeslinger");
+                Check(coreChoices.Length == 23 && !coreChoices.Any(item => item.Name == "Corrupt Data"),
+                    "Codeslinger hides Unwired actions when its source is disabled");
+                Check(coreChoices.Count(item => item.Review) == 5, "all five review-required actions retain their styling flag");
+                choiceCharacter.Options.Books.Add("UN");
+                Check(DetailChoices.ForQuality(choiceCharacter, "Codeslinger").Length == 26,
+                    "Codeslinger includes Unwired actions when enabled");
+                using (var choicesPrompt = new frmSelectText { AutoAcceptPrefilled = false })
+                {
+                    choicesPrompt.ConfigureChoices(choiceCharacter, "Codeslinger");
+                    choicesPrompt.Show();
+                    var combo = Field<ComboBox>(choicesPrompt, "detailChoices");
+                    var input = (TextBox)typeof(ComboBox).GetField("edit", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(combo);
+                    input.Text = "hack";
+                    Check(combo.DroppedDown, "typing into the editable region opens filtered results");
+                    var popup = typeof(ComboBox).GetField("popup", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(combo);
+                    Check(!(bool)typeof(PopupWindow).GetProperty("ShowsActivated", BindingFlags.NonPublic | BindingFlags.Instance)
+                        .GetValue(popup), "searchable results do not activate and steal typing from the input");
+                    Check(combo.Items.Count == 1 && combo.Items[0].ToString().StartsWith("Hack on the Fly"),
+                        "Codeslinger typing narrows the list case-insensitively");
+                    typeof(Control).GetMethod("RaiseKeyDown", BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Invoke(combo, new object[] { new KeyEventArgs(Keys.Down) });
+                    Check(combo.SelectedIndex == 0, "Down selects the first filtered match without an out-of-range focus");
+                    Field<Button>(choicesPrompt, "cmdOK").PerformClick();
+                    Check(choicesPrompt.SelectedValue == "Hack on the Fly", "Codeslinger stores only the action name in the existing detail field");
+                }
+
+                using (var genericPrompt = new frmSelectText { AutoAcceptPrefilled = false })
+                {
+                    genericPrompt.ConfigureChoices(new[] { new DetailChoice { Name = "Pollen" },
+                        new DetailChoice { Name = "Dust", Review = true } });
+                    genericPrompt.Show();
+                    var combo = Field<ComboBox>(genericPrompt, "detailChoices");
+                    combo.SelectedIndex = 0;
+                    combo.Text = "pol";
+                    Check(combo.Items.Count == 1 && combo.Items[0].ToString() == "Pollen",
+                        "generic detail picker can filter new text after an earlier selection");
+                    combo.Text = "";
+                    Check(combo.Items.Count == 2, "clearing a detail filter restores all choices");
+                    Field<Button>(genericPrompt, "cmdOK").PerformClick();
+                    Check(genericPrompt.SelectedValue == PromptDetails.Placeholder,
+                        "blank searchable detail retains the shared placeholder behavior");
+                }
+
                 using (var screenForm = new Form { Width = 600, Height = 200 })
                 {
                     var backendField = typeof(Form).BaseType.GetField("Backend", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -93,8 +140,30 @@ namespace Chummer
                     var expected = nativeBackend.PointToScreen(new System.Drawing.Point(anchor.Left + local.X, anchor.Top + local.Y));
                     Check(anchor.PointToScreen(local) == expected,
                         "Retina screen placement uses desktop points rather than framebuffer pixels");
+                    var screenBounds = (System.Drawing.Rectangle)typeof(Form).BaseType.GetProperty("ScreenBounds",
+                        BindingFlags.NonPublic | BindingFlags.Instance).GetValue(screenForm);
+                    Check(screenBounds.Width == nativeBackend.ClientSize.Width,
+                        "dialog centering measures Retina window size in native desktop points");
                     Check(anchor.PointToClient(expected) == local,
                         "Retina screen-to-control conversion reverses native placement");
+                }
+
+                using (var centerOwner = new Form { Width = 600, Height = 400, Location = new System.Drawing.Point(120, 80),
+                    StartPosition = FormStartPosition.Manual })
+                using (var firstDialog = new Form { Width = 200, Height = 100, StartPosition = FormStartPosition.CenterScreen })
+                using (var nestedDialog = new Form { Width = 100, Height = 80, StartPosition = FormStartPosition.Manual })
+                {
+                    Form.CenterModalDialogsOnRootOwner = true;
+                    centerOwner.Show();
+                    var firstTask = firstDialog.ShowDialogAsync(centerOwner);
+                    Check(firstDialog.Location == new System.Drawing.Point(320, 230),
+                        "legacy screen-centered dialog opens centered on the moved Chummer owner");
+                    firstDialog.Location = new System.Drawing.Point(50, 50);
+                    var nestedTask = nestedDialog.ShowDialogAsync(firstDialog);
+                    Check(nestedDialog.Location == new System.Drawing.Point(370, 240),
+                        "nested dialogs center on the Chummer root window");
+                    nestedDialog.DialogResult = DialogResult.Cancel;
+                    firstDialog.DialogResult = DialogResult.Cancel;
                 }
 
                 double originalScale = Application.UiScale;

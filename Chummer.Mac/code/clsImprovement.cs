@@ -1205,6 +1205,8 @@ namespace Chummer
 
 					// Display the Select Text window and record the value that was entered.
 					frmSelectText frmPickText = new frmSelectText();
+                    if (objImprovementSource == Improvement.ImprovementSource.Quality)
+                        frmPickText.ConfigureChoices(_objCharacter, strFriendlyName);
 					frmPickText.Description = LanguageManager.Instance.GetString("String_Improvement_SelectText").Replace("{0}", strFriendlyName);
 
 					if (_strLimitSelection != "")

@@ -529,7 +529,7 @@ namespace Chummer
             this.MinimizeBox = false;
             this.Name = "frmSelectVehicle";
             this.ShowInTaskbar = false;
-            this.StartPosition = Majorsilence.Forms.FormStartPosition.CenterScreen;
+            this.StartPosition = Majorsilence.Forms.FormStartPosition.CenterParent;
             this.Tag = "Title_SelectVehicle";
             this.Text = "Select a Vehicle";
             this.Load += new System.EventHandler(this.frmSelectVehicle_Load);

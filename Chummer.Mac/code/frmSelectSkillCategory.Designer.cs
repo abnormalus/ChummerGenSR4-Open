@@ -75,7 +75,7 @@ namespace Chummer
 			this.FormBorderStyle = Majorsilence.Forms.FormBorderStyle.FixedDialog;
 			this.Name = "frmSelectSkillCategory";
 			this.ShowInTaskbar = false;
-			this.StartPosition = Majorsilence.Forms.FormStartPosition.CenterScreen;
+			this.StartPosition = Majorsilence.Forms.FormStartPosition.CenterParent;
 			this.Tag = "Title_SelectSkillCategory";
 			this.Text = "Select a Skill Category";
 			this.Load += new System.EventHandler(this.frmSelectSkillCategory_Load);

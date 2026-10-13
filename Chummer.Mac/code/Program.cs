@@ -16,6 +16,7 @@ namespace Chummer
         [STAThread]
         static void Main(string[] args)
         {
+            Form.CenterModalDialogsOnRootOwner = true;
             if (args.Length > 0 && args[0] == "--smoke-test")
             {
                 Environment.Exit(MacSmokeTests.Run(args));

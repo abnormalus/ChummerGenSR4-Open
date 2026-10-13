@@ -1098,8 +1098,17 @@ namespace Majorsilence.Forms
             Invalidate ();
         }
 
+        /// <summary>Center modal dialogs over their root owner, irrespective of legacy start-position settings.</summary>
+        public static bool CenterModalDialogsOnRootOwner { get; set; }
+
         internal override void SetWindowStartupLocation (WindowBase? owner = null)
         {
+            if (Modal && CenterModalDialogsOnRootOwner && owner != null) {
+                while (owner is Form ownerForm && ownerForm.Owner != null)
+                    owner = ownerForm.Owner.PresentationWindow;
+                CenterToParent (owner);
+                return;
+            }
             // Upstream's AdjustFormPosition, run as the window is first shown (Form.cs). CenterParent
             // with no owner falls back to the screen there too -- it used to leave the window wherever
             // the OS put it.

@@ -42,3 +42,15 @@ A license picker that accepts a forced value during Load exposed a Form.ShowDial
 Native Retina validation: double-clicking Codeslinger opens the prefilled Edit Detail window; clearing its field and accepting displays Codeslinger (<placeholder>) and marks the character dirty. Right-click shows Notes and Edit Detail. The test used an isolated smoke-test character. Captured double-click dispatch and tree-node context-menu forwarding are covered at scales 1 and 2 with restored and maximized MDI children.
 
 TreeNode.Text now invalidates the cached TreeView image when renamed. Regression checks compare the rendered frame before/after changing a detail without extra pointer events. Native validation confirms accepting DRUGS immediately updates the selected listing. Quality lists disable connector lines in both creation and career to prevent branches crossing text while glyphs are hidden. All 399 fixture checks pass.
+
+### Searchable quality details
+
+Codeslinger uses the supplied SR4A/Unwired action list. Choices are filtered by the character's enabled books (`SR4`, `UN`), and review-required entries are red, italic, and explicitly labelled. Selecting an item stores its plain name in the existing Extra/improvement fields. Blank input still becomes `<placeholder>`; existing/custom details remain editable.
+
+`frmSelectText.ConfigureChoices(IEnumerable<DetailChoice>)` is the reusable picker entry point, independent of quality names and source rules. `DetailChoices.ForQuality` supplies data-backed choices from `data/quality-detail-choices.xml`; add a `choices quality="…"` group with `choice` rows (`name`, optional `source`, `book`, `review`) to enable the same picker for another quality. Sources are filtered each time the prompt opens. Qualities without a group retain free text. Allergies have not been assigned a curated choice list yet.
+
+Regression checks cover disabled/enabled Unwired, review flags, case-insensitive search, editing after selection, restoring the full list, placeholder handling, plain-name storage, and a separate sample list using the same picker.
+
+Chummer enables `Form.CenterModalDialogsOnRootOwner` so modal prompts, including nested dialogs and legacy screen-centered/manual dialogs, open over the main Chummer window. ScreenBounds now measures native desktop coordinates on Retina rather than framebuffer pixels. Three selector designers also explicitly use CenterParent. Position checks cover a moved root owner, nested dialogs, and Retina coordinate conversion.
+
+Native Mac verification: typed `control`, selected its match with Down, clicked OK, and observed `Codeslinger (Control Device)` immediately in the character quality list. Review entries have readable red italic text and source labels. Test edits were made to an isolated fixture and were not saved to user characters.

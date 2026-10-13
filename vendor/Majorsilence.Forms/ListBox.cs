@@ -457,6 +457,7 @@ namespace Majorsilence.Forms
         // add/remove pairs -- announces its change, without each one having to remember to (LST-04).
         private void KeyDownCore (KeyEventArgs e)
         {
+            if (Items.Count == 0) return;
             // In "None" mode, the focus goes up and down
             // In "MultiSimple" mode, the focus goes up and down, and space selects or deselects
             // MultiColumn (W6 mechanisms): Left/Right cross to the neighbouring column, one row's

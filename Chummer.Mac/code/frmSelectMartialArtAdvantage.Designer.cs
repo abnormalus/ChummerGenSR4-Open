@@ -94,7 +94,7 @@ namespace Chummer
 			this.MinimizeBox = false;
 			this.Name = "frmSelectMartialArtAdvantage";
 			this.ShowInTaskbar = false;
-			this.StartPosition = Majorsilence.Forms.FormStartPosition.CenterScreen;
+			this.StartPosition = Majorsilence.Forms.FormStartPosition.CenterParent;
 			this.Tag = "Title_SelectMartialArtAdvantage";
 			this.Text = "Select an Advantage";
 			this.Load += new System.EventHandler(this.frmSelectMartialArtAdvantage_Load);

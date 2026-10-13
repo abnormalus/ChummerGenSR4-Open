@@ -2560,15 +2560,15 @@ namespace Majorsilence.Forms
         }
 
         /// <summary>
-        /// The window's rectangle on the desktop, in the desktop pixels <see cref="Location"/> and
-        /// <see cref="Screen"/> use. <see cref="Size"/> is logical, so it is scaled by the display
-        /// factor -- not by <see cref="Application.UiScale"/>, as the desktop does not zoom with the app.
+        /// The window's rectangle in the native desktop units Location and Screen use.
+        /// macOS desktop points differ from Retina framebuffer pixels; use the backend's
+        /// coordinate conversion rather than the framebuffer display scale.
         /// </summary>
         internal System.Drawing.Rectangle ScreenBounds => new System.Drawing.Rectangle (
             Backend.Location,
             new System.Drawing.Size (
-                (int) Math.Round (Backend.ClientSize.Width * DesktopScaling),
-                (int) Math.Round (Backend.ClientSize.Height * DesktopScaling)));
+                (int) Math.Round (Backend.ClientSize.Width * ScreenCoordinateScaling),
+                (int) Math.Round (Backend.ClientSize.Height * ScreenCoordinateScaling)));
 
         internal void SetCursor (Cursor cursor) => current_cursor = cursor;
 
