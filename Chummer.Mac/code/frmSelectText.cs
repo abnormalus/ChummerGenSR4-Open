@@ -17,7 +17,7 @@ namespace Chummer
 
 		private void cmdOK_Click(object sender, EventArgs e)
         {
-            _strReturnValue = txtValue.Text;
+            _strReturnValue = PromptDetails.Normalize(txtValue.Text);
             this.DialogResult = DialogResult.OK;
         }
 
@@ -29,12 +29,13 @@ namespace Chummer
 		private void frmSelectText_Shown(object sender, EventArgs e)
 		{
 			// If the field is pre-populated, immediately click OK.
-			if (txtValue.Text != "")
+            if (AutoAcceptPrefilled && txtValue.Text != "")
 				cmdOK_Click(sender, e);
 		}		
 		#endregion
 
 		#region Properties
+        public bool AutoAcceptPrefilled { get; set; } = true;
 		/// <summary>
 		/// Value that was entered in the dialogue.
 		/// </summary>

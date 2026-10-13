@@ -68,6 +68,11 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
+            Action detailChanged = () => { _blnIsDirty = true; UpdateCharacterInfo(); UpdateWindowTitle(); };
+            PromptDetails.Attach(this, _objCharacter, treQualities,
+                id => _objFunctions.FindQuality(id, _objCharacter.Qualities), null, detailChanged, cmsQuality);
+            PromptDetails.Attach(this, _objCharacter, treGear, null,
+                id => _objFunctions.FindGear(id, _objCharacter.Gear), detailChanged, cmsGear, cmsGearPlugin);
 			_tsCredstickDeposit = new ToolStripMenuItem("Deposit Nuyen") { Tag = "Menu_CredstickDeposit" };
 			_tsCredstickWithdraw = new ToolStripMenuItem("Withdraw Nuyen") { Tag = "Menu_CredstickWithdraw" };
 			_tsCredstickDeposit.Click += tsCredstickDeposit_Click;

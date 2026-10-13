@@ -1125,7 +1125,8 @@ namespace Majorsilence.Forms
         /// <summary>Displays the window to the user modally, preventing interaction with other windows until closed.</summary>
         public Task<DialogResult> ShowDialogAsync (Form? parent)
         {
-            dialog_task = new TaskCompletionSource<DialogResult> ();
+            var completion = new TaskCompletionSource<DialogResult> ();
+            dialog_task = completion;
 
             // Clear the previous answer before showing, as upstream does (Form.ShowDialog sets
             // _dialogResult = None up front). There used to be an "already decided, return it" check
@@ -1160,7 +1161,9 @@ namespace Majorsilence.Forms
             else
                 base.ShowDialog (parent);
 
-            return dialog_task.Task;
+            // A Load handler may complete the dialog and clear dialog_task before
+            // ShowDialog returns. Retain this invocation's completed task locally.
+            return completion.Task;
         }
 
         /// <summary>Gets a value indicating a focus rectangle should be drawn on the selected control.</summary>

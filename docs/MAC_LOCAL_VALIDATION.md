@@ -30,3 +30,13 @@ The character serializer remains unchanged, including UTF-16 little-endian XML, 
 Window-menu clipping is corrected for dynamically added character entries. Automated pointer-move checks select each top menu label at scales 1 and 2.
 
 User screenshots exposed a separate popup-placement issue: offsets were doubled on Retina macOS because Control.PointToScreen multiplied native desktop coordinates by framebuffer scale. Screen-coordinate conversion now measures the backend's native mapping independently of render scale; PointToClient and rectangle conversions use the same mapping. A regression backend with 2x framebuffer scale and 1x native screen coordinates verifies placement and round trips. Hosted input checks and all 399 fixtures pass.
+
+## Editable prompted details
+
+The shared free-text prompt returns the literal <placeholder> on accepted blank or whitespace-only input. Cancel still cancels. The editable restricted-item picker used for licenses follows the same rule. Qualities and gear with free-text or restricted-item details expose Edit Detail in their context menu and on double-click, in both creation and career. ID/credstick items without a prompted detail edit their existing GearName field. Numeric and fixed-choice selectors retain their existing value types.
+
+Edits update the item's existing Extra/GearName fields and matching Text/Restricted improvement records. No character-file fields or encoding were changed. Checks cover blank acceptance, prefilled editing, quality/SIN/license/credstick edits, save/reopen persistence, and all 399 existing fixtures. Older qualities with empty saved bonus XML resolve edit eligibility through the rules definition.
+
+A license picker that accepts a forced value during Load exposed a Form.ShowDialogAsync null result-task crash. Retaining the invocation's completion task locally fixes creation and reopening of those license details.
+
+Native Retina validation: double-clicking Codeslinger opens the prefilled Edit Detail window; clearing its field and accepting displays Codeslinger (<placeholder>) and marks the character dirty. Right-click shows Notes and Edit Detail. The test used an isolated smoke-test character. Captured double-click dispatch and tree-node context-menu forwarding are covered at scales 1 and 2 with restored and maximized MDI children.

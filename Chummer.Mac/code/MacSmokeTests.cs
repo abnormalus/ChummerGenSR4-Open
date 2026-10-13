@@ -49,6 +49,21 @@ namespace Chummer
                 foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data"), "*.xml"))
                     XmlManager.Instance.Load(Path.GetFileName(file));
                 Console.WriteLine("PASS ruleset XML loads");
+                using (var blankPrompt = new frmSelectText { AutoAcceptPrefilled = false, SelectedValue = "  " })
+                {
+                    blankPrompt.Show();
+                    Field<Button>(blankPrompt, "cmdOK").PerformClick();
+                    Check(blankPrompt.SelectedValue == PromptDetails.Placeholder,
+                        "blank shared free-text prompt accepts the literal placeholder");
+                }
+                using (var editPrompt = new frmSelectText { AutoAcceptPrefilled = false, SelectedValue = PromptDetails.Placeholder })
+                {
+                    editPrompt.Show();
+                    Check(editPrompt.DialogResult != DialogResult.OK, "prefilled detail editor stays open for editing");
+                    Field<TextBox>(editPrompt, "txtValue").Text = "Later detail";
+                    Field<Button>(editPrompt, "cmdOK").PerformClick();
+                    Check(editPrompt.SelectedValue == "Later detail", "shared prompt accepts edited detail");
+                }
 
                 using (var screenForm = new Form { Width = 600, Height = 200 })
                 {
@@ -166,6 +181,36 @@ namespace Chummer
                         windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
                             .Invoke(mdiParent, new object[] { MouseButtons.Left, x, y, Keys.None });
                         Check(clicks == 1, "outer window routes hosted press and captured release at scale " + scale + " in " + state);
+                        var detailTree = new TreeView { Left = 140, Top = 70, Width = 110, Height = 70 };
+                        using var nodeMenu = new ContextMenuStrip();
+                        nodeMenu.Items.Add("Edit Detail");
+                        var detailNode = new TreeNode("Detail") { ContextMenuStrip = nodeMenu };
+                        detailTree.Nodes.Add(detailNode);
+                        mdiChild.Controls.Add(detailTree);
+                        int doubleClicks = 0;
+                        bool menuOpened = false;
+                        detailTree.NodeMouseDoubleClick += (_, _) => doubleClicks++;
+                        nodeMenu.Opening += (_, _) => menuOpened = true;
+                        HeadlessRenderer.CapturePng(mdiParent, 1000, 600);
+                        var rowCenter = mdiParent.PointToClient(detailTree.PointToScreen(new System.Drawing.Point(
+                            (int)((detailNode.Bounds.Left + detailNode.Bounds.Width / 2) / detailTree.Scaling),
+                            (int)((detailNode.Bounds.Top + detailNode.Bounds.Height / 2) / detailTree.Scaling))));
+                        int rowX = (int)Math.Round(rowCenter.X * mdiParent.Scaling);
+                        int rowY = (int)Math.Round(rowCenter.Y * mdiParent.Scaling);
+                        for (int press = 0; press < 2; press++)
+                        {
+                            windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                                .Invoke(mdiParent, new object[] { MouseButtons.Left, rowX, rowY, Keys.None });
+                            windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                                .Invoke(mdiParent, new object[] { MouseButtons.Left, rowX, rowY, Keys.None });
+                        }
+                        Check(doubleClicks == 1, "hosted tree receives double-click at scale " + scale + " in " + state);
+                        windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Right, rowX, rowY, Keys.None });
+                        windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Right, rowX, rowY, Keys.None });
+                        Check(menuOpened, "tree node context menu opens at scale " + scale + " in " + state);
+                        nodeMenu.Hide();
 
                     }
                 }
@@ -192,6 +237,38 @@ namespace Chummer
                     Check(character.Metatype == "Human", "metatype selection creates a Human");
                 }
                 using (var dialog = new frmSelectWeapon(character)) Capture(dialog, output, "weapon-dialog");
+                var qualityXml = XmlManager.Instance.Load("qualities.xml");
+                var detailQuality = new Quality(character);
+                detailQuality.Create(qualityXml.SelectSingleNode("/chummer/qualities/quality[name='Codeslinger']"),
+                    character, QualitySource.Selected, new TreeNode(), new System.Collections.Generic.List<Weapon>(),
+                    new System.Collections.Generic.List<TreeNode>(), PromptDetails.Placeholder);
+                character.Qualities.Add(detailQuality);
+                Check(detailQuality.Extra == PromptDetails.Placeholder && PromptDetails.CanEdit(detailQuality),
+                    "quality stores an editable placeholder");
+                PromptDetails.Apply(character, detailQuality, "Hack on the Fly");
+                Check(detailQuality.Extra == "Hack on the Fly" && character.Improvements.Any(item =>
+                    item.SourceName == detailQuality.InternalId && item.ImprovedName == "Hack on the Fly"),
+                    "editing quality detail also updates its stored improvement");
+                var gearXml = XmlManager.Instance.Load("gear.xml");
+                foreach (string gearName in new[] { "Fake SIN", "Fake License", "Certified Credstick, Standard" })
+                {
+                    var detailGear = new Gear(character);
+                    detailGear.Create(gearXml.SelectSingleNode("/chummer/gears/gear[name='" + gearName + "']"),
+                        character, new TreeNode(), 1, new System.Collections.Generic.List<Weapon>(),
+                        new System.Collections.Generic.List<TreeNode>(), PromptDetails.Placeholder);
+                    character.Gear.Add(detailGear);
+                    Check(PromptDetails.CanEdit(detailGear), gearName + " supports later detail editing");
+                    PromptDetails.Apply(character, detailGear, "Updated detail");
+                    Check(detailGear.DisplayName.Contains("Updated detail"), gearName + " displays edited detail");
+                    if (gearName == "Fake SIN") PromptDetails.Apply(character, detailGear, " ");
+                }
+                using (var licensePrompt = new frmSelectItem { Character = character, AllowAutoSelect = false })
+                {
+                    licensePrompt.Show();
+                    Field<ComboBox>(licensePrompt, "cboAmmo").Text = "  ";
+                    Field<Button>(licensePrompt, "cmdOK").PerformClick();
+                    Check(licensePrompt.SelectedItem == PromptDetails.Placeholder, "blank license detail accepts placeholder");
+                }
                 using (var dialog = new frmSelectArmor(character)) Capture(dialog, output, "armor-dialog");
                 using (var dialog = new frmSelectGear(character)) Capture(dialog, output, "gear-dialog");
                 using (var dialog = new frmSelectCyberware(character)) Capture(dialog, output, "cyberware-dialog");
@@ -235,6 +312,12 @@ namespace Chummer
                 character.Save();
                 var loaded = new Character { FileName = character.FileName };
                 Check(loaded.Load(), "new character reloads");
+                Check(loaded.Qualities.Any(item => item.InternalId == detailQuality.InternalId && item.Extra == "Hack on the Fly" &&
+                    PromptDetails.CanEdit(item)), "edited quality detail survives save/load and remains editable");
+                Check(loaded.Gear.Any(item => item.Name == "Fake SIN" && item.Extra == PromptDetails.Placeholder) &&
+                    loaded.Gear.Any(item => item.Name == "Fake License" && item.Extra == "Updated detail") &&
+                    loaded.Gear.Any(item => item.Name == "Certified Credstick, Standard" && item.GearName == "Updated detail"),
+                    "placeholder, license detail, and credstick name survive the existing file format");
                 Check(loaded.Name == character.Name && loaded.BOD.Value == 4 && !loaded.Created,
                     "creation identity and attributes survive save");
 

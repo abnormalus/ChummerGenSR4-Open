@@ -1,5 +1,9 @@
 # Local UI-library corrections
 
+Hosted capture releases now retain the computed click count, and double-click matching requires the same mouse button. Previously every captured MDI release was forced to a single click. TreeNode.ContextMenuStrip now aliases the actual ContextMenu used by right-click dispatch. Together these corrections enable quality/gear detail editing by double-click and context menu. Pointer-routing checks cover restored/maximized MDI children at scales 1 and 2.
+
+Form.ShowDialogAsync retains its completion source in a local variable. A Load handler can accept and close a dialog synchronously, clearing the dialog_task field before the show call returns. Returning that cleared field's Task crashed forced license selection and reapplying saved license improvements. The quality/gear persistence suite now exercises this path.
+
 Native screen conversion is separate from framebuffer scaling. WindowBase.ScreenCoordinateScaling derives the native mapping from backend PointToScreen; Control's point and rectangle conversions use it. Retina macOS screen points are 1x while the framebuffer is 2x. Using framebuffer scale doubled menu-anchor offsets, as shown in user screenshots. Regression coverage simulates that independent 2x/1x mapping and checks the inverse conversion.
 
 MenuDropDown now assigns every current item to its dropdown before layout. Entries added after the first opening (including the generated MDI character list) previously retained the parent menu bar or no owner, producing incorrect preferred sizes and clipped menus. Reopening with late entries is tested at scales 1 and 2. Native Mac validation shows the complete Window character entry and direct activation.

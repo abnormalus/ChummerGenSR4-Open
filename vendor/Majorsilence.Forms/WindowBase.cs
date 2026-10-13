@@ -17,6 +17,7 @@ namespace Majorsilence.Forms
 
         private DateTime last_click_time;
         private System.Drawing.Point last_click_point;
+        private MouseButtons last_click_button;
         // The cursor being shown: the hovered control's (SetCursor, RefreshHoverCursor) or the window's own.
         private Cursor? current_cursor;
         // The window's own Cursor property. Kept apart from current_cursor because hovering a control
@@ -395,8 +396,8 @@ namespace Majorsilence.Forms
 
         // Whether a press or release at this point falls within the double-click time and distance of the
         // last click. Read-only, so the press can ask without consuming the click the release records.
-        private bool CompletesDoubleClick (System.Drawing.Point point)
-            => DateTime.Now.Subtract (last_click_time).TotalMilliseconds < DOUBLE_CLICK_TIME && PointInDoubleClickRange (point);
+        private bool CompletesDoubleClick (System.Drawing.Point point, MouseButtons button)
+            => button == last_click_button && DateTime.Now.Subtract (last_click_time).TotalMilliseconds < DOUBLE_CLICK_TIME && PointInDoubleClickRange (point);
 
         // Control.ModifierKeys is the keyboard state of the last real input event, recorded here where
         // the backend hands that event in. Upstream reads GetKeyState live (Control.cs ModifierKeys); no
@@ -407,12 +408,13 @@ namespace Majorsilence.Forms
 
         private MouseEventArgs BuildMouseClickArgs (MouseButtons buttons, System.Drawing.Point point, Keys keyData)
         {
-            var click_count = CompletesDoubleClick (point) ? 2 : 1;
+            var click_count = CompletesDoubleClick (point, buttons) ? 2 : 1;
 
             var e = new MouseEventArgs (buttons, click_count, point.X, point.Y, System.Drawing.Point.Empty, keyData: keyData);
 
             last_click_time = click_count > 1 ? DateTime.MinValue : DateTime.Now;
             last_click_point = click_count > 1 ? System.Drawing.Point.Empty : point;
+            last_click_button = buttons;
 
             return e;
         }
@@ -1645,7 +1647,7 @@ namespace Majorsilence.Forms
 
             // The second press of a double-click is a MouseDown with Clicks == 2, the press-time way to
             // detect one: upstream WM_LBUTTONDBLCLK calls WmMouseDown (ref m, button, 2) (Control.cs WndProc).
-            var clicks = CompletesDoubleClick (new System.Drawing.Point (lx, ly)) ? 2 : 1;
+            var clicks = CompletesDoubleClick (new System.Drawing.Point (lx, ly), button) ? 2 : 1;
             var ev = new MouseEventArgs (button, clicks, lx, ly, System.Drawing.Point.Empty, keyData: keys);
             // Only a press the window dispatches starts a press its release can end (EVT-19).
             Control.BeginPress ();
@@ -1694,10 +1696,9 @@ namespace Majorsilence.Forms
             // then routed straight back to the still-captured control, re-firing its Click. Found
             // running ReportDesigner: clicking the report-warnings button opened its dialog, and
             // clicking OK on that dialog opened another copy instead of closing it.
-            if (RoutedToCaptureHolder (button, 1, keys, static (c, e) => { c.RaiseMouseUp (e); c.RaiseClick (e); }))
-                return;
-
             var ev = BuildMouseClickArgs (button, new System.Drawing.Point (lx, ly), keys);
+            if (RoutedToCaptureHolder (button, ev.Clicks, keys, static (c, e) => { c.RaiseMouseUp (e); c.RaiseClick (e); }))
+                return;
 
             // RaiseClick decides at the target whether this release is a Click or, for the second release
             // of a double-click, a DoubleClick -- one or the other, as upstream does (EVT-01). After

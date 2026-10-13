@@ -103,7 +103,10 @@ namespace Majorsilence.Forms
     public partial class TreeNode
     {
         /// <summary>Gets or sets the context menu shown when this node is right-clicked.</summary>
-        public virtual ContextMenuStrip? ContextMenuStrip { get; set; }
+        public virtual ContextMenuStrip? ContextMenuStrip {
+            get => ContextMenu as ContextMenuStrip;
+            set => ContextMenu = value;
+        }
 
         /// <summary>Gets or sets the image list key for this node's state image.</summary>
         public string StateImageKey { get; set; } = string.Empty;

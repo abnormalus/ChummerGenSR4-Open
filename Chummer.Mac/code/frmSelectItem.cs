@@ -486,6 +486,7 @@ namespace Chummer
 		{
 			get
 			{
+                if (_strMode == "Restricted") return PromptDetails.Normalize(cboAmmo.Text);
 				try
 				{
 					return cboAmmo.SelectedValue.ToString();
