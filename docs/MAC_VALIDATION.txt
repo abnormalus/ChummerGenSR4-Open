@@ -1,0 +1,25 @@
+PASS English language loaded
+PASS embedded toolbar image decoded
+PASS ruleset XML loads
+PASS render main
+PASS Karma creation method selection
+PASS metatype selection creates a Human
+PASS render weapon-dialog
+PASS render armor-dialog
+PASS render gear-dialog
+PASS render cyberware-dialog
+PASS render quality-dialog
+PASS render spell-dialog
+PASS attribute calculation
+PASS creation spinner updates rule model
+PASS creation toolbar saves character
+PASS creation hosted as MDI child
+PASS new character reloads
+PASS creation identity and attributes survive save
+PASS career character reloads
+PASS career balances and ledger survive save
+PASS render career
+PASS history chart fits the ledger viewport
+PASS HTML character sheet transformation
+PASS upstream fixture round trips: 399
+SMOKE TESTS PASSED

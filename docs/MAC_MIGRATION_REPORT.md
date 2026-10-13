@@ -1,0 +1,253 @@
+# Majorsilence.Forms migration report
+
+- **Input:** `/workspace/scratch/12f99cb13551/work/ChummerGenSR4-0.1.501/Chummer.Mac`
+- **Output:** _(in place)_
+- **Backend:** Avalonia
+- **Reference mode:** Package
+- **Target framework:** preserve version, drop -windows suffix
+- **Mode:** write
+
+## Summary
+
+- Files scanned: **233**
+- Files changed: **226**
+- Manual-review items: **2**
+
+## Changed files (226)
+
+- `[proj]` Chummer.Mac.csproj
+- `[src]` Properties/Resources.Designer.cs
+- `[src]` code/frmSelectPower.Designer.cs
+- `[src]` code/frmDiceHits.cs
+- `[src]` code/frmCreateImprovement.Designer.cs
+- `[src]` code/frmSelectSkillGroup.cs
+- `[src]` code/frmExport.cs
+- `[src]` code/Program.cs
+- `[src]` code/frmSelectWeapon.Designer.cs
+- `[src]` code/frmSelectWeaponCategory.cs
+- `[src]` code/frmSelectProgram.Designer.cs
+- `[src]` code/frmOptions.Designer.cs
+- `[src]` code/frmSelectSpell.cs
+- `[src]` code/frmSelectQuantity.cs
+- `[src]` code/frmAbout.Designer.cs
+- `[src]` code/frmCareer.cs
+- `[src]` code/frmCreateCyberwareSuite.Designer.cs
+- `[src]` code/frmSelectPower.cs
+- `[src]` code/frmSelectPACKSKit.cs
+- `[src]` code/frmSelectMentorSpirit.Designer.cs
+- `[src]` code/frmReload.cs
+- `[src]` code/frmSelectSetting.cs
+- `[src]` code/frmSelectLifestyle.Designer.cs
+- `[src]` code/frmCreate.Designer.cs
+- `[src]` code/clsUnique.cs
+- `[src]` code/frmCreateSpell.Designer.cs
+- `[src]` code/frmSelectQuality.Designer.cs
+- `[src]` code/frmCreateSpell.cs
+- `[src]` code/frmSelectSkillCategory.cs
+- `[src]` code/frmSelectMetamagic.Designer.cs
+- `[src]` code/frmSelectText.cs
+- `[src]` code/frmSelectSide.cs
+- `[src]` code/frmExport.Designer.cs
+- `[src]` code/frmSelectCalendarStart.Designer.cs
+- `[src]` code/frmMetatype.Designer.cs
+- `[src]` code/frmUpdate.cs
+- `[src]` code/PetControl.Designer.cs
+- `[src]` code/frmUpdate.Designer.cs
+- `[src]` code/frmSelectCritterPower.cs
+- `[src]` code/frmSelectExoticSkill.cs
+- `[src]` code/frmPrintMultiple.cs
+- `[src]` code/frmSelectArmorMod.Designer.cs
+- `[src]` code/frmSellItem.Designer.cs
+- `[src]` code/SkillGroupControl.cs
+- `[src]` code/frmViewer.Designer.cs
+- `[src]` code/frmSelectQuality.cs
+- `[src]` code/frmSelectMetamagic.cs
+- `[src]` code/frmSelectMartialArtManeuver.cs
+- `[src]` code/frmSelectBP.cs
+- `[src]` code/frmSelectCritterPower.Designer.cs
+- `[src]` code/frmSelectItem.cs
+- `[src]` code/frmSelectExoticSkill.Designer.cs
+- `[src]` code/frmSelectNumber.cs
+- `[src]` code/frmSelectNexus.Designer.cs
+- `[src]` code/ContactControl.cs
+- `[src]` code/frmSelectItem.Designer.cs
+- `[src]` code/frmSelectCalendarStart.cs
+- `[src]` code/SkillControl.cs
+- `[src]` code/frmSelectArmorMod.cs
+- `[src]` code/frmExpense.Designer.cs
+- `[src]` code/clsCommon.cs
+- `[src]` code/frmSelectText.Designer.cs
+- `[src]` code/frmSelectArmor.cs
+- `[src]` code/frmSelectQuantity.Designer.cs
+- `[src]` code/frmNaturalWeapon.cs
+- `[src]` code/SpiritControl.Designer.cs
+- `[src]` code/frmSelectCyberware.Designer.cs
+- `[src]` code/frmSelectMartialArtAdvantage.cs
+- `[src]` code/SpiritControl.cs
+- `[src]` code/frmSelectVehicleMod.Designer.cs
+- `[src]` code/frmSelectAdvancedLifestyle.cs
+- `[src]` code/frmCareer.Designer.cs
+- `[src]` code/frmNotes.Designer.cs
+- `[src]` code/frmMain.cs
+- `[src]` code/frmDiceHits.Designer.cs
+- `[src]` code/frmHistory.cs
+- `[src]` code/clsLanguageManager.cs
+- `[src]` code/clsCharacter.cs
+- `[src]` code/frmSelectWeaponCategories.cs
+- `[src]` code/frmSelectContactConnection.cs
+- `[src]` code/frmOptions.cs
+- `[src]` code/frmSelectLifestyle.cs
+- `[src]` code/frmCreate.cs
+- `[src]` code/frmSelectMartialArtAdvantage.Designer.cs
+- `[src]` code/frmSelectAdvancedLifestyle.Designer.cs
+- `[src]` code/frmSelectVehicle.cs
+- `[src]` code/frmAbout.cs
+- `[src]` code/frmLifestyleNuyen.cs
+- `[src]` code/frmSelectWeapon.cs
+- `[src]` code/frmDiceRoller.cs
+- `[src]` code/frmSelectSkillGroup.Designer.cs
+- `[src]` code/frmTest.cs
+- `[src]` code/frmSelectMartialArt.cs
+- `[src]` code/frmSelectAttribute.cs
+- `[src]` code/frmSelectVehicleMod.cs
+- `[src]` code/frmSelectSpellCategory.Designer.cs
+- `[src]` code/frmViewer.cs
+- `[src]` code/frmSelectWeaponAccessory.cs
+- `[src]` code/frmPrintMultiple.Designer.cs
+- `[src]` code/clsOptions.cs
+- `[src]` code/clsEquipment.cs
+- `[src]` code/frmSelectCyberwareSuite.Designer.cs
+- `[src]` code/frmSelectCyberware.cs
+- `[src]` code/frmSelectArmor.Designer.cs
+- `[src]` code/PowerControl.Designer.cs
+- `[src]` code/PowerControl.cs
+- `[src]` code/frmHistory.Designer.cs
+- `[src]` code/frmMetatype.cs
+- `[src]` code/SkillGroupControl.Designer.cs
+- `[src]` code/frmSelectGear.cs
+- `[src]` code/frmSelectVehicle.Designer.cs
+- `[src]` code/frmCreateImprovement.cs
+- `[src]` code/frmSelectSkill.cs
+- `[src]` code/frmCreateCyberwareSuite.cs
+- `[src]` code/PetControl.cs
+- `[src]` code/frmNotes.cs
+- `[src]` code/frmSelectCyberwareSuite.cs
+- `[src]` code/frmSelectSpellCategory.cs
+- `[src]` code/frmSelectWeaponCategory.Designer.cs
+- `[src]` code/clsListItems.cs
+- `[src]` code/clsImprovement.cs
+- `[src]` code/frmTest.Designer.cs
+- `[src]` code/frmSelectMartialArt.Designer.cs
+- `[src]` code/frmSellItem.cs
+- `[src]` code/clsXmlManager.cs
+- `[src]` code/frmLifestyleNuyen.Designer.cs
+- `[src]` code/frmSelectMentorSpirit.cs
+- `[src]` code/frmCreatePACKSKit.cs
+- `[src]` code/ContactControl.Designer.cs
+- `[src]` code/frmSelectContactConnection.Designer.cs
+- `[src]` code/frmSelectSpell.Designer.cs
+- `[src]` code/frmSelectSetting.Designer.cs
+- `[src]` code/SplitButton.cs
+- `[src]` code/frmNaturalWeapon.Designer.cs
+- `[src]` code/frmSelectProgramOption.Designer.cs
+- `[src]` code/frmSelectProgramOption.cs
+- `[src]` code/frmMain.Designer.cs
+- `[src]` code/SkillControl.Designer.cs
+- `[src]` code/frmSelectNumber.Designer.cs
+- `[src]` code/frmSelectPACKSKit.Designer.cs
+- `[src]` code/frmSelectNexus.cs
+- `[src]` code/frmExpense.cs
+- `[src]` code/frmSelectGear.Designer.cs
+- `[src]` code/frmSelectSide.Designer.cs
+- `[src]` code/frmSelectSkill.Designer.cs
+- `[src]` code/frmSelectBP.Designer.cs
+- `[src]` code/frmDiceRoller.Designer.cs
+- `[src]` code/frmCreatePACKSKit.Designer.cs
+- `[src]` code/frmSelectWeaponAccessory.Designer.cs
+- `[src]` code/frmSelectMartialArtManeuver.Designer.cs
+- `[src]` code/frmSelectProgram.cs
+- `[src]` code/frmSelectSkillCategory.Designer.cs
+- `[src]` code/frmReload.Designer.cs
+- `[src]` code/frmSelectAttribute.Designer.cs
+- `[src]` code/controllers/clsMainController.cs
+- `[resx]` Properties/Resources.resx
+- `[resx]` code/frmSelectPACKSKit.resx
+- `[resx]` code/frmSelectExoticSkill.resx
+- `[resx]` code/frmSelectMartialArtAdvantage.resx
+- `[resx]` code/frmDiceHits.resx
+- `[resx]` code/SkillControl.resx
+- `[resx]` code/ContactControl.resx
+- `[resx]` code/frmTest.resx
+- `[resx]` code/frmSelectWeapon.resx
+- `[resx]` code/frmSelectMartialArtManeuver.resx
+- `[resx]` code/frmSelectCalendarStart.resx
+- `[resx]` code/frmCreateImprovement.resx
+- `[resx]` code/PowerControl.resx
+- `[resx]` code/frmSelectMetamagic.resx
+- `[resx]` code/frmCreateSpell.resx
+- `[resx]` code/frmViewer.resx
+- `[resx]` code/frmDiceRoller.resx
+- `[resx]` code/frmNaturalWeapon.resx
+- `[resx]` code/frmSelectSpellCategory.resx
+- `[resx]` code/frmPrintMultiple.resx
+- `[resx]` code/frmSelectVehicleMod.resx
+- `[resx]` code/frmSelectText.resx
+- `[resx]` code/frmMain.resx
+- `[resx]` code/frmNotes.resx
+- `[resx]` code/frmMetatype.resx
+- `[resx]` code/frmSelectSkillCategory.resx
+- `[resx]` code/frmSelectLifestyle.resx
+- `[resx]` code/frmOptions.resx
+- `[resx]` code/frmLifestyleNuyen.resx
+- `[resx]` code/frmSelectArmorMod.resx
+- `[resx]` code/SkillGroupControl.resx
+- `[resx]` code/frmSelectQuality.resx
+- `[resx]` code/frmHistory.resx
+- `[resx]` code/frmSelectContactConnection.resx
+- `[resx]` code/frmSelectMartialArt.resx
+- `[resx]` code/frmSelectAdvancedLifestyle.resx
+- `[resx]` code/frmExport.resx
+- `[resx]` code/frmSelectAttribute.resx
+- `[resx]` code/frmSelectCyberware.resx
+- `[resx]` code/frmSelectProgram.resx
+- `[resx]` code/frmSelectArmor.resx
+- `[resx]` code/SpiritControl.resx
+- `[resx]` code/frmSellItem.resx
+- `[resx]` code/frmSelectCyberwareSuite.resx
+- `[resx]` code/frmSelectNumber.resx
+- `[resx]` code/frmSelectVehicle.resx
+- `[resx]` code/frmSelectSkill.resx
+- `[resx]` code/frmSelectSetting.resx
+- `[resx]` code/PetControl.resx
+- `[resx]` code/frmCreateCyberwareSuite.resx
+- `[resx]` code/frmCreate.resx
+- `[resx]` code/frmSelectNexus.resx
+- `[resx]` code/frmSelectPower.resx
+- `[resx]` code/frmSelectQuantity.resx
+- `[resx]` code/frmSelectCritterPower.resx
+- `[resx]` code/frmExpense.resx
+- `[resx]` code/frmSelectSide.resx
+- `[resx]` code/frmAbout.resx
+- `[resx]` code/frmSelectItem.resx
+- `[resx]` code/frmSelectWeaponAccessory.resx
+- `[resx]` code/frmReload.resx
+- `[resx]` code/frmUpdate.resx
+- `[resx]` code/frmSelectGear.resx
+- `[resx]` code/frmSelectSpell.resx
+- `[resx]` code/frmCareer.resx
+- `[resx]` code/frmCreatePACKSKit.resx
+- `[resx]` code/frmSelectProgramOption.resx
+- `[resx]` code/frmSelectMentorSpirit.resx
+- `[resx]` code/frmSelectBP.resx
+- `[resx]` code/frmSelectSkillGroup.resx
+- `[resx]` code/frmSelectWeaponCategory.resx
+
+## Manual review (2)
+
+These could not be converted automatically and need a human:
+
+- code/clsSettingsStore.cs: uses 'Registry' (Windows registry), which has no cross-platform equivalent — it compiles anywhere but only works on Windows; review manually
+- code/clsSettingsStore.cs: uses 'RegistryKey' (Windows registry), which has no cross-platform equivalent — it compiles anywhere but only works on Windows; review manually
+
+---
+_Generated by majorsilence-migrate. Review the changes and build before committing._

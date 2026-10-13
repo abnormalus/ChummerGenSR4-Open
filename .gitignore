@@ -49,3 +49,10 @@
 *.svclog
 *.scc
 
+
+# Mac build outputs
+**/bin/
+**/obj/
+artifacts/
+.local-dotnet/
+.local-nuget/
