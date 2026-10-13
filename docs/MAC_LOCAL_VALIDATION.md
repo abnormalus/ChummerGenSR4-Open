@@ -40,3 +40,5 @@ Edits update the item's existing Extra/GearName fields and matching Text/Restric
 A license picker that accepts a forced value during Load exposed a Form.ShowDialogAsync null result-task crash. Retaining the invocation's completion task locally fixes creation and reopening of those license details.
 
 Native Retina validation: double-clicking Codeslinger opens the prefilled Edit Detail window; clearing its field and accepting displays Codeslinger (<placeholder>) and marks the character dirty. Right-click shows Notes and Edit Detail. The test used an isolated smoke-test character. Captured double-click dispatch and tree-node context-menu forwarding are covered at scales 1 and 2 with restored and maximized MDI children.
+
+TreeNode.Text now invalidates the cached TreeView image when renamed. Regression checks compare the rendered frame before/after changing a detail without extra pointer events. Native validation confirms accepting DRUGS immediately updates the selected listing. Quality lists disable connector lines in both creation and career to prevent branches crossing text while glyphs are hidden. All 399 fixture checks pass.

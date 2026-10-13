@@ -68,6 +68,7 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
+            treQualities.ShowLines = false;
             Action detailChanged = () => { _blnIsDirty = true; UpdateCharacterInfo(); UpdateWindowTitle(); };
             PromptDetails.Attach(this, _objCharacter, treQualities,
                 id => _objFunctions.FindQuality(id, _objCharacter.Qualities), null, detailChanged, cmsQuality);

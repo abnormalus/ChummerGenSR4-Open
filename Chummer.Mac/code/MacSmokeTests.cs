@@ -49,6 +49,20 @@ namespace Chummer
                 foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data"), "*.xml"))
                     XmlManager.Instance.Load(Path.GetFileName(file));
                 Console.WriteLine("PASS ruleset XML loads");
+                using (var refreshForm = new Form { Width = 400, Height = 140 })
+                {
+                    var refreshTree = new TreeView { Dock = DockStyle.Fill };
+                    var refreshNode = new TreeNode("Addiction (Mild) (<placeholder>)");
+                    refreshTree.Nodes.Add(refreshNode);
+                    refreshForm.Controls.Add(refreshTree);
+                    refreshForm.Show();
+                    byte[] beforeEdit = HeadlessRenderer.CapturePng(refreshForm, 800, 280);
+                    refreshNode.Text = "Addiction (Mild) (DRUGS)";
+                    Check((bool)typeof(Control).GetProperty("NeedsPaint", BindingFlags.NonPublic | BindingFlags.Instance)
+                        .GetValue(refreshTree), "changing a tree detail immediately requests a redraw");
+                    byte[] afterEdit = HeadlessRenderer.CapturePng(refreshForm, 800, 280);
+                    Check(!beforeEdit.SequenceEqual(afterEdit), "edited detail appears in the next frame without mouse interaction");
+                }
                 using (var blankPrompt = new frmSelectText { AutoAcceptPrefilled = false, SelectedValue = "  " })
                 {
                     blankPrompt.Show();
@@ -288,6 +302,7 @@ namespace Chummer
                 {
                     creation.MdiParent = main;
                     creation.Show();
+                    Check(!Field<TreeView>(creation, "treQualities").ShowLines, "creation quality list does not draw connector lines");
                     Field<NumericUpDown>(creation, "nudBOD").Value = 4;
                     Check(character.BOD.Value == 4, "creation spinner updates rule model");
                     string pathBeforeCancel = character.FileName;
@@ -338,6 +353,7 @@ namespace Chummer
                     && careerCharacter.ExpenseEntries.Count == 2, "career balances and ledger survive save");
                 using (var career = new frmCareer(careerCharacter))
                 {
+                    Check(!Field<TreeView>(career, "treQualities").ShowLines, "career quality list does not draw connector lines");
                     Capture(career, output, "career");
                     Field<TabControl>(career, "tabCharacterTabs").SelectedTab = Field<TabPage>(career, "tabKarma");
                     File.WriteAllBytes(Path.Combine(output, "career-ledger.png"), HeadlessRenderer.CapturePng(career, 1200, 850));

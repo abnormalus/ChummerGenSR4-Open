@@ -473,10 +473,21 @@ namespace Majorsilence.Forms
             }
         }
 
+        private string text = string.Empty;
+
         /// <summary>
         /// Gets or sets the text of the item.
         /// </summary>
-        public string Text { get; set; } = string.Empty;
+        public string Text {
+            get => text;
+            set {
+                value ??= string.Empty;
+                if (text == value)
+                    return;
+                text = value;
+                Invalidate ();
+            }
+        }
 
         /// <summary>
         /// Gets the TreeView that contains this item.

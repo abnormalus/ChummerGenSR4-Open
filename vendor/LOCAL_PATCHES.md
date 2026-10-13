@@ -1,5 +1,7 @@
 # Local UI-library corrections
 
+TreeNode.Text now invalidates its owning TreeView when changed. It previously updated the model without dirtying the cached control image, leaving edited quality/gear text stale until another interaction. A rendered-frame regression checks that an accepted detail change appears without mouse interaction. Quality trees also disable connector lines in creation and career, matching their flat grouped presentation and avoiding connectors crossing text when branch glyphs are hidden.
+
 Hosted capture releases now retain the computed click count, and double-click matching requires the same mouse button. Previously every captured MDI release was forced to a single click. TreeNode.ContextMenuStrip now aliases the actual ContextMenu used by right-click dispatch. Together these corrections enable quality/gear detail editing by double-click and context menu. Pointer-routing checks cover restored/maximized MDI children at scales 1 and 2.
 
 Form.ShowDialogAsync retains its completion source in a local variable. A Load handler can accept and close a dialog synchronously, clearing the dialog_task field before the show call returns. Returning that cleared field's Task crashed forced license selection and reapplying saved license improvements. The quality/gear persistence suite now exercises this path.
