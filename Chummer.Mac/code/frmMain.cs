@@ -13,11 +13,35 @@ namespace Chummer
 	public partial class frmMain : Form
 	{
 		private frmDiceRoller _frmRoller;
+        private ToolStripMenuItem _mnuSaveCharacter;
+        private ToolStripMenuItem _mnuSaveCharacterAs;
 
 		#region Control Events
 		public frmMain()
 		{
 			InitializeComponent();
+            _mnuSaveCharacter = new ToolStripMenuItem { Name = "nativeSaveCharacter", Text = "&Save", Tag = "Menu_FileSave", Enabled = false };
+            _mnuSaveCharacterAs = new ToolStripMenuItem { Name = "nativeSaveCharacterAs", Text = "Save &As…", Tag = "Menu_FileSaveAs", Enabled = false };
+            _mnuSaveCharacter.Image = Properties.Resources.disk;
+            _mnuSaveCharacterAs.Image = Properties.Resources.disk;
+            _mnuSaveCharacter.Click += (_, _) =>
+            {
+                if (ActiveMdiChild is frmCreate creation) creation.SaveCharacter();
+                else if (ActiveMdiChild is frmCareer career) career.SaveCharacter();
+            };
+            _mnuSaveCharacterAs.Click += (_, _) =>
+            {
+                if (ActiveMdiChild is frmCreate creation) creation.SaveCharacterAs();
+                else if (ActiveMdiChild is frmCareer career) career.SaveCharacterAs();
+            };
+            fileMenu.DropDownItems.Insert(3, _mnuSaveCharacter);
+            fileMenu.DropDownItems.Insert(4, _mnuSaveCharacterAs);
+            MdiChildActivate += (_, _) =>
+            {
+                bool hasCharacter = ActiveMdiChild is frmCreate || ActiveMdiChild is frmCareer;
+                _mnuSaveCharacter.Enabled = hasCharacter;
+                _mnuSaveCharacterAs.Enabled = hasCharacter;
+            };
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 
 			// If Automatic Updates are enabled, check for updates immediately.
@@ -497,20 +521,19 @@ namespace Chummer
 		/// <summary>
 		/// Show the Open File dialogue, then load the selected character.
 		/// </summary>
-		private void OpenFile(object sender, EventArgs e)
-		{
-			OpenFileDialog openFileDialog = new OpenFileDialog();
-			openFileDialog.Filter = "Chummer Files (*.chum)|*.chum|All Files (*.*)|*.*";
-			openFileDialog.Multiselect = true;
-
-			if (openFileDialog.ShowDialog(this) == DialogResult.OK)
-			{
-				foreach (string strFileName in openFileDialog.FileNames)
-				{
-					LoadCharacter(strFileName);
-				}
-			}
-		}
+        private async void OpenFile(object sender, EventArgs e)
+        {
+            try
+            {
+                foreach (string path in await CharacterFileDialogs.OpenAsync(this))
+                    LoadCharacter(path);
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException ||
+                                          error is System.Xml.XmlException || error is ArgumentException)
+            {
+                CharacterFileDialogs.ShowError(this, "Open Character", error);
+            }
+        }
 
 		/// <summary>
 		/// Load a Character and open the correct window.
@@ -521,7 +544,7 @@ namespace Chummer
 		/// <param name="blnClearFileName">Whether or not the name of the save file should be cleared.</param>
 		public void LoadCharacter(string strFileName, bool blnIncludeInMRU = true, string strNewName = "", bool blnClearFileName = false)
 		{
-			if (File.Exists(strFileName) && strFileName.EndsWith("chum"))
+			if (File.Exists(strFileName) && string.Equals(Path.GetExtension(strFileName), ".chum", StringComparison.OrdinalIgnoreCase))
 			{
 				bool blnLoaded = false;
 				Character objCharacter = new Character();

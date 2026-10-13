@@ -20,3 +20,11 @@ Corrected the shared numeric control's logical arrow-strip geometry and renderer
 ## Character creation mouse routing
 
 Fixed repeated logical-coordinate conversion at the MDI handoff and the hosted form's screen origin/scale used during mouse capture. Root-window press and captured release checks pass at scales 1 and 2, in both restored and maximized child windows. All 399 fixture round trips passed again. Interactive native Retina checks confirmed Body 1 → 2 with 10 BP spent and the Add Quality button opening its dialog. Latest package: artifacts/character-controls-fixed/ChummerSR4.app.
+
+## Native character file dialogs
+
+Open and Save As use the Avalonia native storage provider with the visible main window as owner. File menu Save and Save As dispatch to the active character and display save icons. Suggested filenames use the alias, or chummer-yyyyMMdd-HHmmss.chum. Dialogs start in Documents/chummer until a successful open or save remembers another folder; the preference is persisted in the existing settings store. Regular Save keeps the selected filename.
+
+The character serializer remains unchanged, including UTF-16 little-endian XML, atomic replacement, and backups. Cancellation preserves filename and dirty state. Expected file errors are displayed without discarding the character. Native Mac Open and Save As were exercised with a test character; the 399 upstream fixture round trips passed.
+
+Window-menu clipping is corrected for dynamically added character entries. Automated pointer-move checks select each top menu label at scales 1 and 2. The user's remaining top-bar hover offset has not yet been reproduced interactively and requires manual confirmation in this preview.

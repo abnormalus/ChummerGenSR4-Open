@@ -12,7 +12,7 @@ if [[ -e "$chummer_app" ]]; then
 fi
 "$chummer_dotnet" publish "$chummer_root/Chummer.Mac/Chummer.Mac.csproj" \
     -c Release -r osx-arm64 --self-contained true \
-    -p:PublishSingleFile=false -p:PublishTrimmed=false \
+    -p:PublishSingleFile=false -p:PublishTrimmed=false -p:UsedAvaloniaProducts= \
     -o "$chummer_output/publish"
 mkdir -p "$chummer_app/Contents/MacOS" "$chummer_app/Contents/Resources"
 cp -R "$chummer_output/publish/." "$chummer_app/Contents/MacOS/"

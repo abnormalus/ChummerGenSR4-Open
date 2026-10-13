@@ -50,11 +50,11 @@ namespace Chummer
                     foreach (double scale in new[] { 1.0, 2.0 })
                     {
                         Application.UiScale = scale;
-                        using var spinnerForm = new Form { Width = 240, Height = 120 };
+                        using var spinnerForm = new Form { Width = 600, Height = 120 };
                         var spinner = new NumericUpDown { Left = 20, Top = 20, Width = 100, Height = 24, Value = 40 };
                         spinnerForm.Controls.Add(spinner);
                         spinnerForm.Show();
-                        HeadlessRenderer.CapturePng(spinnerForm, 480, 240);
+                        HeadlessRenderer.CapturePng(spinnerForm, 1200, 240);
                         var increment = (System.Drawing.Rectangle)typeof(NumericUpDown)
                             .GetMethod("GetIncrementArea", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(spinner, null);
                         Check(increment.Left == 82 && increment.Width == 18,
@@ -67,6 +67,37 @@ namespace Chummer
                         windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
                             .Invoke(spinnerForm, new object[] { MouseButtons.Left, x, y, Keys.None });
                         Check(spinner.Value == 41, "spinner arrow click increments at scale " + scale);
+                        var menuBar = new MenuStrip();
+                        spinnerForm.Controls.Add(menuBar);
+                        foreach (string caption in new[] { "File", "Tools", "Window", "Help" }) menuBar.Items.Add(caption);
+                        HeadlessRenderer.CapturePng(spinnerForm, 1200, 240);
+                        foreach (MenuItem item in ((Menu)menuBar).Items)
+                        {
+                            int hoverX = (int)((menuBar.Left + item.Bounds.Left + item.Bounds.Width / 2) * scale);
+                            int hoverY = (int)((menuBar.Top + item.Bounds.Top + item.Bounds.Height / 2) * scale);
+                            windowType.GetMethod("HandlePointerMoved", BindingFlags.NonPublic | BindingFlags.Instance)
+                                .Invoke(spinnerForm, new object[] { MouseButtons.None, hoverX, hoverY, Keys.None });
+                            Check(item.Hovered, "top menu hover aligns with " + item.Text + " at scale " + scale);
+                        }
+
+                        using var menu = new ContextMenuStrip();
+                        menu.Items.Add("First command");
+                        menu.Show(spinner, new System.Drawing.Point(0, 24));
+                        menu.Hide();
+                        var added = menu.Items.Add("Character added after first opening");
+                        menu.Show(spinner, new System.Drawing.Point(0, 24));
+                        var dropdown = (MenuDropDown)menu;
+                        var popup = (PopupWindow)typeof(MenuDropDown).GetField("popup",
+                            BindingFlags.NonPublic | BindingFlags.Instance).GetValue(dropdown);
+                        Check(added.Bounds.Height > 0 && added.Bounds.Bottom < popup.Size.Height,
+                            "reopened menu includes late entries without clipping at scale " + scale);
+                        typeof(MenuBase).GetMethod("OnMouseMove", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(dropdown, new object[] { new MouseEventArgs(MouseButtons.None, 0,
+                                added.Bounds.Left + 5, added.Bounds.Top + added.Bounds.Height / 2, 0) });
+                        Check(dropdown.GetItemAtLocation(new System.Drawing.Point(added.Bounds.Left + 5,
+                            added.Bounds.Top + added.Bounds.Height / 2)) == added,
+                            "menu hover hit area matches late entry at scale " + scale);
+                        menu.Hide();
                     }
                 }
                 finally { Application.UiScale = originalScale; }
@@ -143,6 +174,14 @@ namespace Chummer
                 using (var dialog = new frmSelectQuality(character)) Capture(dialog, output, "quality-dialog");
                 using (var dialog = new frmSelectSpell(character)) Capture(dialog, output, "spell-dialog");
                 character.BOD.Value = 3;
+                var namingTime = new DateTime(2026, 10, 13, 14, 5, 9);
+                character.Alias = "";
+                Check(CharacterFileDialogs.SuggestedFileName(character, namingTime) == "chummer-20261013-140509.chum",
+                    "blank alias suggests timestamped Chummer filename");
+                character.Alias = "Runner.Name";
+                Check(CharacterFileDialogs.SuggestedFileName(character, namingTime) == "Runner.Name.chum",
+                    "alias with punctuation retains character extension");
+                character.Alias = "";
                 Check(character.BOD.TotalValue == 3, "attribute calculation");
                 using (var creation = new frmCreate(character))
                 {
@@ -150,9 +189,21 @@ namespace Chummer
                     creation.Show();
                     Field<NumericUpDown>(creation, "nudBOD").Value = 4;
                     Check(character.BOD.Value == 4, "creation spinner updates rule model");
+                    string pathBeforeCancel = character.FileName;
+                    bool dirtyBeforeCancel = Field<bool>(creation, "_blnIsDirty");
+                    var saveAsMenu = Field<ToolStripMenuItem>(main, "_mnuSaveCharacterAs");
+                    Check(saveAsMenu.Enabled, "main File menu enables Save As for an active character");
+                    saveAsMenu.PerformClick();
+                    Check(character.FileName == pathBeforeCancel &&
+                        Field<bool>(creation, "_blnIsDirty") == dirtyBeforeCancel,
+                        "cancelled native Save As preserves file path and unsaved state");
                     character.FileName = Path.Combine(output, "toolbar-save.chum");
                     Field<ToolStripButton>(creation, "tsbSave").PerformClick();
                     Check(File.Exists(character.FileName), "creation toolbar saves character");
+                    byte[] savedBytes = File.ReadAllBytes(character.FileName);
+                    Check(savedBytes.Length > 2 && savedBytes[0] == 0xff && savedBytes[1] == 0xfe,
+                        "character save retains UTF-16 little-endian encoding");
+
                     File.WriteAllBytes(Path.Combine(output, "creation.png"), HeadlessRenderer.CapturePng(main, 1200, 850));
                     Check(main.MdiChildren.Length == 1, "creation hosted as MDI child");
                 }

@@ -23534,7 +23534,7 @@ namespace Chummer
 		/// <summary>
 		/// Save the Character.
 		/// </summary>
-		private bool SaveCharacter()
+		internal bool SaveCharacter()
 		{
 			bool blnSaved = false;
 
@@ -23543,12 +23543,12 @@ namespace Chummer
 				blnSaved = SaveCharacterAs();
 			else
 			{
-				_objCharacter.Save();
+				if (!CharacterFileDialogs.TrySave(this, _objCharacter, _objCharacter.FileName)) return false;
 				_blnIsDirty = false;
 				blnSaved = true;
 				GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
 			}
-			UpdateWindowTitle(false);
+			if (blnSaved) UpdateWindowTitle(false);
 
 			return blnSaved;
 		}
@@ -23556,31 +23556,17 @@ namespace Chummer
 		/// <summary>
 		/// Save the Character using the Save As dialogue box.
 		/// </summary>
-		private bool SaveCharacterAs()
+		internal bool SaveCharacterAs()
 		{
 			bool blnSaved = false;
 
-			SaveFileDialog saveFileDialog = new SaveFileDialog();
-			saveFileDialog.Filter = "Chummer Files (*.chum)|*.chum|All Files (*.*)|*.*";
+            string path = CharacterFileDialogs.ChooseSavePath(this, _objCharacter);
+            if (path == null) return false;
+            if (!CharacterFileDialogs.TrySave(this, _objCharacter, path)) return false;
+            _blnIsDirty = false;
+            blnSaved = true;
+            GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
 
-			string strShowFileName = "";
-			string[] strFile = _objCharacter.FileName.Split(Path.DirectorySeparatorChar);
-			strShowFileName = strFile[strFile.Length - 1];
-
-			if (strShowFileName == "")
-				strShowFileName = _objCharacter.Alias;
-
-			saveFileDialog.FileName = strShowFileName;
-
-			if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
-			{
-				string strFileName = saveFileDialog.FileName;
-				_objCharacter.FileName = strFileName;
-				_objCharacter.Save();
-				_blnIsDirty = false;
-				blnSaved = true;
-				GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
-			}
 			UpdateWindowTitle(false);
 
 			return blnSaved;

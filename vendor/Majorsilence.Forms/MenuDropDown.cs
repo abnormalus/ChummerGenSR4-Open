@@ -111,6 +111,12 @@ namespace Majorsilence.Forms
         /// <inheritdoc/>
         protected override void LayoutItems ()
         {
+            // Window-list entries and application commands can be inserted after the
+            // dropdown is constructed. Measure and paint all entries in this strip's
+            // coordinate space, including those added on a subsequent opening.
+            foreach (var item in Items)
+                item.ParentControl = this;
+
             var visible_items = Items.Where (i => i.Visible).ToList ();
 
             if (visible_items.Count == 0)

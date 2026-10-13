@@ -1,5 +1,9 @@
 # Local UI-library corrections
 
+MenuDropDown now assigns every current item to its dropdown before layout. Entries added after the first opening (including the generated MDI character list) previously retained the parent menu bar or no owner, producing incorrect preferred sizes and clipped menus. Reopening with late entries is tested at scales 1 and 2. Native Mac validation shows the complete Window character entry and direct activation.
+
+NativeFileDialogs exposes owner-aware Avalonia file pickers. Synchronous save requests use the existing modal dispatcher loop rather than blocking the UI thread with Task.Wait.
+
 Source: Majorsilence.Forms 26.11.4, Git commit 2999abd025b324890f385fa505d07d065fef30cb. License and third-party attributions are retained alongside the source. The application uses locally compiled desktop backend and core projects; drawing primitives and headless backend remain pinned packages. The enum and drawing resource shims are built and embedded using the upstream targets. Standalone project files target net10.0 and pin original dependency versions.
 
 - Avalonia window host: tag the physical framebuffer at 96 DPI to avoid repeated Retina magnification.
