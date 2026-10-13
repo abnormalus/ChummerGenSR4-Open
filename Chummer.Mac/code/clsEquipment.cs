@@ -11971,7 +11971,7 @@ namespace Chummer
 
 				if (_strGearName != "")
 				{
-					strReturn += " (\"" + _strGearName + "\")";
+					strReturn += _strCategory == "ID/Credsticks" ? " (" + _strGearName + ")" : " (\"" + _strGearName + "\")";
 				}
 
 				return strReturn;
