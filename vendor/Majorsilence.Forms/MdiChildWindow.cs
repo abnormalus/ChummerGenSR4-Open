@@ -56,6 +56,8 @@ namespace Majorsilence.Forms
         private int Border => ChromeMerged ? 0 : FrameBorder;
         private int Caption => ChromeMerged ? 0 : CaptionHeight;
 
+        internal Point ContentOrigin => new Point (Border, Border + Caption);
+
         /// <summary>The logical size available to the child form's content (interior minus chrome).</summary>
         public Size ContentSize => new Size (
             Math.Max (0, Width - 2 * Border),
@@ -437,10 +439,13 @@ namespace Majorsilence.Forms
             ForwardToChild (e, c => c.HandlePointerWheel (e.Button, InteriorX (e), InteriorY (e), e.DeltaPoint, e.Modifiers));
         }
 
-        // e.X/e.Y are in this frame's logical coordinates (see OnMouseDown); the child's client area
-        // starts one border in and one caption down.
-        private int InteriorX (MouseEventArgs e) => e.X - Border;
-        private int InteriorY (MouseEventArgs e) => e.Y - (Border + Caption);
+        // Events reaching this frame are logical, but HandlePointer* is a device-pixel entry point.
+        // Subtract the logical frame chrome, then convert to the child's device pixels so its
+        // boundary conversion does not divide an already-logical position a second time.
+        private int InteriorX (MouseEventArgs e)
+            => (int) Math.Round ((e.X - Border) * ChildForm.Scaling);
+        private int InteriorY (MouseEventArgs e)
+            => (int) Math.Round ((e.Y - Border - Caption) * ChildForm.Scaling);
 
         private void ForwardToChild (MouseEventArgs e, Action<Form> dispatch)
         {

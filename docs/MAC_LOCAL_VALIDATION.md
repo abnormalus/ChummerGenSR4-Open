@@ -16,3 +16,7 @@ User confirmed normal Finder launch stays open. The main-window framebuffer meta
 ## Numeric spinner correction
 
 Corrected the shared numeric control's logical arrow-strip geometry and renderer conversion. Arrow clicks passed at scales 1 and 2; all 399 fixture round trips passed. The packaged app was inspected in the native character-creation window and arrows no longer overlap the values. The current package is artifacts/spinner-fixed/ChummerSR4.app. Local library source and attribution are in vendor/LOCAL_PATCHES.md.
+
+## Character creation mouse routing
+
+Fixed repeated logical-coordinate conversion at the MDI handoff and the hosted form's screen origin/scale used during mouse capture. Root-window press and captured release checks pass at scales 1 and 2, in both restored and maximized child windows. All 399 fixture round trips passed again. Interactive native Retina checks confirmed Body 1 → 2 with 10 BP spent and the Add Quality button opening its dialog. Latest package: artifacts/character-controls-fixed/ChummerSR4.app.

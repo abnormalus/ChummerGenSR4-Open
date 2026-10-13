@@ -1499,6 +1499,10 @@ namespace Majorsilence.Forms
         /// </remarks>
         internal System.Drawing.Point ClientOriginOnScreen {
             get {
+                if (this is Form { MdiHost: { } mdi })
+                    return mdi.PointToScreen (mdi.ContentOrigin);
+                if (this is Form { PanelHost: { } panel })
+                    return panel.PointToScreen (System.Drawing.Point.Empty);
                 try {
                     return Backend.PointToScreen (System.Drawing.Point.Empty);
                 } catch (System.Exception) {
@@ -2531,7 +2535,7 @@ namespace Majorsilence.Forms
         /// whole UI scales from -- <c>Control.DeviceDpi</c> is derived from it and every
         /// <c>LogicalToDeviceUnits</c> conversion follows.
         /// </remarks>
-        public double Scaling => Backend.Scaling * Application.UiScale;
+        public double Scaling => DesktopScaling * Application.UiScale;
 
         /// <summary>Gets the current scale factor of the desktop.</summary>
         /// <remarks>
@@ -2540,7 +2544,7 @@ namespace Majorsilence.Forms
         /// coordinates to desktop ones through <c>DesktopScaling / Scaling</c>, so keeping this
         /// unzoomed makes that ratio undo the zoom exactly.
         /// </remarks>
-        public double DesktopScaling => Backend.Scaling;
+        public double DesktopScaling => PresentationWindow.Backend.Scaling;
 
         /// <summary>
         /// The window's rectangle on the desktop, in the desktop pixels <see cref="Location"/> and

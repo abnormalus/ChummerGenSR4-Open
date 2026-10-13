@@ -71,6 +71,51 @@ namespace Chummer
                 }
                 finally { Application.UiScale = originalScale; }
 
+                try
+                {
+                    foreach (double scale in new[] { 1.0, 2.0 })
+                    foreach (FormWindowState state in new[] { FormWindowState.Normal, FormWindowState.Maximized })
+                    {
+                        Application.UiScale = scale;
+                        using var mdiParent = new Form { Width = 500, Height = 300, IsMdiContainer = true };
+                        var mdiMenu = new MenuStrip { Dock = DockStyle.Top };
+                        mdiParent.MainMenuStrip = mdiMenu;
+                        mdiParent.Controls.Add(mdiMenu);
+                        mdiParent.Show();
+                        using var mdiChild = new Form { Width = 260, Height = 160, MdiParent = mdiParent };
+                        var button = new Button { Left = 40, Top = 40, Width = 80, Height = 28, Text = "Click" };
+                        int clicks = 0;
+                        button.Click += (_, _) => clicks++;
+                        mdiChild.Controls.Add(button);
+                        mdiChild.Show();
+                        mdiChild.WindowState = state;
+                        HeadlessRenderer.CapturePng(mdiParent, 1000, 600);
+                        var frame = (Control)typeof(Form).GetField("MdiHost", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .GetValue(mdiChild);
+                        int border = (int)frame.GetType().GetProperty("Border", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(frame);
+                        int caption = (int)frame.GetType().GetProperty("Caption", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(frame);
+                        var click = new MouseEventArgs(MouseButtons.Left, 1, border + button.Left + 40,
+                            border + caption + button.Top + 14, 0);
+                        frame.GetType().GetMethod("OnMouseDown", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(frame, new object[] { click });
+                        frame.GetType().GetMethod("OnMouseUp", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(frame, new object[] { click });
+                        Check(clicks == 1, "hosted child button click at scale " + scale + " in " + state);
+                        clicks = 0;
+                        var center = mdiParent.PointToClient(button.PointToScreen(new System.Drawing.Point(40, 14)));
+                        int x = (int)Math.Round(center.X * mdiParent.Scaling);
+                        int y = (int)Math.Round(center.Y * mdiParent.Scaling);
+                        var windowType = typeof(Form).BaseType;
+                        windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Left, x, y, Keys.None });
+                        windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Left, x, y, Keys.None });
+                        Check(clicks == 1, "outer window routes hosted press and captured release at scale " + scale + " in " + state);
+
+                    }
+                }
+                finally { Application.UiScale = originalScale; }
+
                 using var main = new frmMain();
                 Capture(main, output, "main");
                 var karmaBuild = new Character();
