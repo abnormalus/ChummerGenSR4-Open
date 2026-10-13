@@ -1,0 +1,94 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    
+    <IsTrimmable Condition=" '$(TargetFramework)' != 'netstandard2.0' ">true</IsTrimmable>
+    <IsAotCompatible Condition=" '$(TargetFramework)' != 'netstandard2.0' ">true</IsAotCompatible>
+    
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Majorsilence.Forms</PackageId>
+    <Description>Cross-platform WinForms for .NET. A Windows Forms compatibility layer that runs your existing WinForms apps on Windows, macOS, Linux, mobile and the browser — the same Form, controls, event handlers and *.Designer.cs files, with no rewrite. Requires a backend package (Majorsilence.Forms.Avalonia for desktop).</Description>
+    <PackageTags>winforms;windows-forms;system-windows-forms;cross-platform;winforms-compatibility;winforms-alternative;migration;gui;ui;desktop;linux;macos;android;ios;wasm;skiasharp;avalonia;uno;dotnet</PackageTags>
+    <PackageOutputPath>../../nupkg</PackageOutputPath>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+    
+    <PackageReference Include="Topten.RichTextKit" Version="0.4.167" />
+    <PackageReference Include="System.Formats.Nrbf" Version="9.0.0" />
+    <PackageReference Include="System.Resources.Extensions" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    
+    <PackageReference Include="Majorsilence.Forms.Drawing.Common" Version="26.11.4" /></ItemGroup>
+
+  
+  <ItemGroup>
+    <ProjectReference Include="..\Majorsilence.Forms.WinFormsEnumShims\Majorsilence.Forms.WinFormsEnumShims.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\Majorsilence.Forms.DrawingShims\Majorsilence.Forms.DrawingShims.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="EmbedWinFormsEnumShims" BeforeTargets="AssignTargetPaths">
+    <MSBuild Projects="..\Majorsilence.Forms.WinFormsEnumShims\Majorsilence.Forms.WinFormsEnumShims.csproj" Targets="Build" Properties="TargetFramework=$(TargetFramework);Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_WinFormsEnumShimsBuildOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <EmbeddedResource Include="@(_WinFormsEnumShimsBuildOutput)" Condition="'%(Extension)' == '.dll'">
+        <LogicalName>Majorsilence.Forms.WinFormsEnumShims.dll</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+
+  
+  <Target Name="EmbedDrawingShims" BeforeTargets="AssignTargetPaths">
+    <MSBuild Projects="..\Majorsilence.Forms.DrawingShims\Majorsilence.Forms.DrawingShims.csproj" Targets="Build" Properties="TargetFramework=$(TargetFramework);Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_DrawingShimsBuildOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <EmbeddedResource Include="@(_DrawingShimsBuildOutput)" Condition="'%(Extension)' == '.dll'">
+        <LogicalName>Majorsilence.Forms.DrawingShims.dll</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+
+  
+  <ItemGroup>
+    </ItemGroup>
+
+  <ItemGroup>
+    
+    <InternalsVisibleTo Include="Majorsilence.Forms.Avalonia" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.Gtk4" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.Headless" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.Terminal" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.Uno" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.WinForms" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.WindowsUIAutomation" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.Wpf" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.Tests" />
+    <InternalsVisibleTo Include="Majorsilence.Forms.Telerik" />
+  </ItemGroup>
+
+  <ItemGroup>
+    
+    <EmbeddedResource Include="SpellCheck/en_US.words.gz" />
+  </ItemGroup>
+
+  <PropertyGroup><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><Version>26.11.4</Version><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile></PropertyGroup></Project>

@@ -44,6 +44,33 @@ namespace Chummer
                     XmlManager.Instance.Load(Path.GetFileName(file));
                 Console.WriteLine("PASS ruleset XML loads");
 
+                double originalScale = Application.UiScale;
+                try
+                {
+                    foreach (double scale in new[] { 1.0, 2.0 })
+                    {
+                        Application.UiScale = scale;
+                        using var spinnerForm = new Form { Width = 240, Height = 120 };
+                        var spinner = new NumericUpDown { Left = 20, Top = 20, Width = 100, Height = 24, Value = 40 };
+                        spinnerForm.Controls.Add(spinner);
+                        spinnerForm.Show();
+                        HeadlessRenderer.CapturePng(spinnerForm, 480, 240);
+                        var increment = (System.Drawing.Rectangle)typeof(NumericUpDown)
+                            .GetMethod("GetIncrementArea", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(spinner, null);
+                        Check(increment.Left == 82 && increment.Width == 18,
+                            "spinner arrow strip keeps logical bounds at scale " + scale);
+                        int x = (int)((spinner.Left + increment.Left + increment.Width / 2) * scale);
+                        int y = (int)((spinner.Top + increment.Top + increment.Height / 2) * scale);
+                        var windowType = typeof(Form).BaseType;
+                        windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(spinnerForm, new object[] { MouseButtons.Left, x, y, Keys.None });
+                        windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(spinnerForm, new object[] { MouseButtons.Left, x, y, Keys.None });
+                        Check(spinner.Value == 41, "spinner arrow click increments at scale " + scale);
+                    }
+                }
+                finally { Application.UiScale = originalScale; }
+
                 using var main = new frmMain();
                 Capture(main, output, "main");
                 var karmaBuild = new Character();

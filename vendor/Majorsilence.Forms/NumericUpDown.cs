@@ -1,0 +1,408 @@
+using System.Drawing;
+using Majorsilence.Forms.Renderers;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a NumericUpDown spin box control.
+    /// </summary>
+    /// <remarks>
+    /// Derives from <see cref="UpDownBase"/>, as upstream (SMP-36). It derived from
+    /// <see cref="Control"/>, so <c>(UpDownBase)nud</c> threw, <c>if (c is UpDownBase)</c> sweeps missed
+    /// every spin box, and the members <c>UpDownBase</c> already declared had to be re-declared here.
+    /// </remarks>
+    public partial class NumericUpDown : UpDownBase, System.ComponentModel.ISupportInitialize
+    {
+        private decimal current_value;
+        private decimal minimum;
+        private decimal maximum = 100;
+        private int decimal_places;
+        private bool increment_area_hot;
+        private bool decrement_area_hot;
+
+        /// <summary>Initializes a new instance of the NumericUpDown class.</summary>
+        public NumericUpDown ()
+        {
+            SetControlBehavior (ControlBehaviors.InvalidateOnTextChanged);
+
+            // An ordinary child, and FIRST, so Controls[0] is the buttons -- the order WinForms' UpDownBase
+            // establishes and the order themers index against. See the UpDownButtons remarks.
+            up_down_buttons = new UpDownButtons (this);
+            Controls.Add (up_down_buttons);
+        }
+
+        private readonly UpDownButtons up_down_buttons;
+
+        /// <summary>Keeps the buttons child over the strip the renderer draws the buttons in.</summary>
+        /// <remarks>Its bounds are derived, not stored: the strip is a function of the control's size, so
+        /// anything that resizes the control has to move it, and a layout pass is the one place that
+        /// reliably runs for all of them.</remarks>
+        protected override void OnLayout (LayoutEventArgs e)
+        {
+            base.OnLayout (e);
+
+            up_down_buttons?.SetBounds (ButtonStripLeft, 0, ButtonWidth, Height);
+        }
+
+        // The designer's ((ISupportInitialize)nud).BeginInit () reached two empty methods here while
+        // the public pair sat beside them (SMP-35); both routes are now the same pair.
+        void System.ComponentModel.ISupportInitialize.BeginInit () => BeginInit ();
+        void System.ComponentModel.ISupportInitialize.EndInit () => EndInit ();
+
+        // Upstream NumericUpDown._initializing: Value is neither range-checked nor shown while set,
+        // because designer code assigns Value before the Maximum that admits it. EndInit constrains.
+        private bool initializing;
+
+        // Upstream NumericUpDown.Constrain.
+        private decimal Constrain (decimal value) => Math.Min (Math.Max (value, minimum), maximum);
+
+        /// <summary>Gets or sets the number of decimal places shown.</summary>
+        public int DecimalPlaces {
+            get => decimal_places;
+            set {
+                if (decimal_places != value) {
+                    decimal_places = Math.Max (0, value);
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>Gets or sets the maximum value.</summary>
+        public decimal Maximum {
+            get => maximum;
+            set {
+                if (maximum != value) {
+                    maximum = value;
+                    minimum = Math.Min (minimum, maximum);
+
+                    // Through Value, as upstream's Maximum setter does, so a value the new range moves
+                    // raises ValueChanged and redraws its text instead of changing silently.
+                    Value = Constrain (current_value);
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>Gets or sets the minimum value.</summary>
+        public decimal Minimum {
+            get => minimum;
+            set {
+                if (minimum != value) {
+                    minimum = value;
+                    maximum = Math.Max (minimum, maximum);
+                    Value = Constrain (current_value);
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>Gets or sets the current value.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value is outside
+        /// <see cref="Minimum"/>..<see cref="Maximum"/>, except between <see cref="BeginInit"/> and
+        /// <see cref="EndInit"/>.</exception>
+        /// <remarks>
+        /// Throws rather than clamps, as upstream's setter does (Controls/UpDown/NumericUpDown.cs):
+        /// a stale out-of-range value from a load routine must not be saved back as a different number
+        /// (SMP-34). The user's paths -- the buttons, the keys, a typed value -- constrain first.
+        /// </remarks>
+        public decimal Value {
+            get => current_value;
+            set {
+                if (current_value != value) {
+                    if (!initializing && (value < minimum || value > maximum))
+                        throw new ArgumentOutOfRangeException (nameof (value), value, $"'{value}' is not a valid value for 'Value'. 'Value' should be between 'Minimum' and 'Maximum'.");
+
+                    current_value = value;
+
+                    // The framework's write of the displayed text, flagged as such (ChangingText).
+                    // Not while initializing: upstream's UpdateEditText waits for EndInit, in case the
+                    // value is not yet valid.
+                    if (!initializing)
+                        SetFrameworkText (FormatValue (value));
+                    Invalidate ();
+                    OnValueChanged (EventArgs.Empty);
+                }
+            }
+        }
+
+        /// <summary>Gets or sets whether the thousands separator is shown.</summary>
+        public bool ThousandsSeparator { get; set; }
+
+        /// <summary>Gets or sets whether the value is displayed in hexadecimal format.</summary>
+        public bool Hexadecimal { get; set; }
+
+        private decimal increment = 1;
+
+        /// <summary>Gets or sets the value by which to increment or decrement the NumericUpDown.</summary>
+        public decimal Increment {
+            get => increment;
+            set {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException (nameof (value), value, "Increment cannot be negative.");
+
+                increment = value;
+            }
+        }
+
+        /// <summary>Raised when the value changes.</summary>
+        public event EventHandler? ValueChanged;
+
+        /// <summary>Raises the ValueChanged event.</summary>
+        protected virtual void OnValueChanged (EventArgs e) => ValueChanged?.Invoke (this, e);
+
+        /// <summary>Gets or sets the border drawn around the control. Declared here because
+        /// System.Windows.Forms puts it on UpDownBase, which this control does not derive from.</summary>
+        /// <remarks>
+        /// Deliberately hides <see cref="Panel.BorderStyle"/> rather than overriding it (the base is not
+        /// virtual): this one also drives <c>Style.Border.Width</c>, which is what makes the border
+        /// actually appear. Hiding is flagged here rather than left for the compiler to warn about.
+        /// </remarks>
+        public new BorderStyle BorderStyle {
+            get => border_style;
+            set {
+                if (border_style == value)
+                    return;
+
+                border_style = value;
+                Style.Border.Width = value == BorderStyle.None ? 0 : 1;
+                PerformLayout ();
+                Invalidate ();
+            }
+        }
+
+        private BorderStyle border_style = BorderStyle.Fixed3D;
+
+        // System.Windows.Forms declares these on UpDownBase, which this control cannot derive from here
+        // (it is a Control, painting its own edit area rather than hosting a child TextBox). A themed
+        // subclass overrides them to repaint when the edit area gains or loses focus, so they have to
+        // exist and be raised, or the subclass simply fails to compile. `source` is the edit surface --
+        // this control itself, since there is no separate TextBox to hand back.
+
+        /// <summary>Raises the equivalent of UpDownBase's TextBox GotFocus notification.</summary>
+        protected virtual void OnTextBoxGotFocus (object source, EventArgs e) { }
+
+        /// <summary>Raises the equivalent of UpDownBase's TextBox LostFocus notification.</summary>
+        protected virtual void OnTextBoxLostFocus (object source, EventArgs e) { }
+
+        /// <summary>Raises the equivalent of UpDownBase's TextBox TextChanged notification.</summary>
+        protected virtual void OnTextBoxTextChanged (object source, EventArgs e) { }
+
+        /// <inheritdoc/>
+        protected override void OnGotFocus (EventArgs e)
+        {
+            base.OnGotFocus (e);
+            OnTextBoxGotFocus (this, e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnLostFocus (EventArgs e)
+        {
+            // Before the base, so a handler reading Value in a LostFocus or Validating handler sees the
+            // number the user typed rather than the one from before they typed it (SMP-32).
+            CommitEditText ();
+            base.OnLostFocus (e);
+            OnTextBoxLostFocus (this, e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnTextChanged (EventArgs e)
+        {
+            base.OnTextChanged (e);
+            OnTextBoxTextChanged (this, e);
+        }
+
+        /// <summary>Increments the value by the amount of the Increment property.</summary>
+        public override void UpButton ()
+        {
+            decimal new_value;
+
+            try {
+                new_value = Constrain (current_value + Increment);
+            } catch (OverflowException) {
+                new_value = maximum;
+            }
+
+            Value = new_value;
+        }
+
+        /// <summary>Decrements the value by the amount of the Increment property.</summary>
+        public override void DownButton ()
+        {
+            decimal new_value;
+
+            try {
+                new_value = Constrain (current_value - Increment);
+            } catch (OverflowException) {
+                new_value = minimum;
+            }
+
+            Value = new_value;
+        }
+
+        /// <summary>Increments the value by the Increment amount.</summary>
+        public void PerformIncrement () => UpButton ();
+
+        /// <summary>Decrements the value by the Increment amount.</summary>
+        public void PerformDecrement () => DownButton ();
+
+        // The strip's x follows UpDownAlign (SMP-33): it was always Width - ButtonWidth, so
+        // UpDownAlign = Left stored a value and moved nothing.
+        internal int ButtonStripLeft => UpDownAlign == LeftRightAlignment.Left ? 0 : Width - ButtonWidth;
+
+        internal Rectangle GetIncrementArea () => new Rectangle (ButtonStripLeft, 0, ButtonWidth, Height / 2);
+        internal Rectangle GetDecrementArea () => new Rectangle (ButtonStripLeft, Height / 2, ButtonWidth, Height - Height / 2);
+        internal int ButtonWidth => 18;
+
+        /// <inheritdoc/>
+        protected override Padding DefaultPadding => new Padding (3, 0, 0, 0);
+
+        /// <inheritdoc/>
+        protected override Size DefaultSize => new Size (120, 23);
+
+        /// <summary>
+        /// Gets the height the control needs to fit one line of text at the current font, as
+        /// <c>System.Windows.Forms.UpDownBase.PreferredHeight</c> does.
+        /// </summary>
+        public override int PreferredHeight
+            => TextMeasurer.LogicalLineHeight (this)
+                + Padding.Top + Padding.Bottom + 4;   // 4px matches the default border/inset
+
+        /// <summary>
+        /// The control's height is fixed by its font, so report that as the preferred one.
+        /// </summary>
+        /// <remarks>
+        /// Same defect and same fix as <see cref="TextBoxBase.GetPreferredSizeCore"/> -- see the long
+        /// comment there. The base reports only bounds that were explicitly SET, so an unsized
+        /// NumericUpDown reported a preferred height of zero and Krypton's <c>KryptonNumericUpDown</c>,
+        /// which takes its own height from the control it hosts, collapsed to a 3px sliver.
+        /// </remarks>
+        internal override Size GetPreferredSizeCore (Size proposedSize)
+        {
+            var preferred = base.GetPreferredSizeCore (proposedSize);
+
+            // The height ALWAYS comes from the font, not only when the base reports zero. The base is a
+            // Panel since SMP-36, and a Panel sizes itself to its children -- this control's only child
+            // is its button strip, whose height is the control's own, so the base now answers with a
+            // small non-zero number and the old `<= 0` guard stopped firing. A spin box's height is a
+            // line of text either way.
+            preferred.Height = PreferredHeight;
+
+            return preferred;
+        }
+
+        /// <inheritdoc/>
+        public new static ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle,
+            (style) => style.Border.Width = 1);
+
+        /// <inheritdoc/>
+        protected override void OnMouseClick (MouseEventArgs e)
+        {
+            // UpButton/DownButton, not `Value ± 1`: those are the methods that apply Increment, and
+            // the mouse path never called them -- so a control stepping by 0.01 for currency or by 5
+            // for quantities moved by 1 when the user clicked its arrow. Silent data corruption in the
+            // control whose whole job is numeric entry, and invisible to any test that drives
+            // UpButton directly (SMP-31, P0).
+            if (GetIncrementArea ().Contains (e.Location))
+                UpButton ();
+            else if (GetDecrementArea ().Contains (e.Location))
+                DownButton ();
+
+            base.OnMouseClick (e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnMouseMove (MouseEventArgs e)
+        {
+            var new_inc = GetIncrementArea ().Contains (e.Location);
+            var new_dec = GetDecrementArea ().Contains (e.Location);
+
+            if (new_inc != increment_area_hot || new_dec != decrement_area_hot) {
+                increment_area_hot = new_inc;
+                decrement_area_hot = new_dec;
+                Invalidate ();
+            }
+
+            base.OnMouseMove (e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnMouseLeave (EventArgs e)
+        {
+            if (increment_area_hot || decrement_area_hot) {
+                increment_area_hot = false;
+                decrement_area_hot = false;
+                Invalidate ();
+            }
+
+            base.OnMouseLeave (e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnPaint (PaintEventArgs e)
+        {
+            base.OnPaint (e);
+            RenderManager.Render (this, e);
+        }
+
+        /// <inheritdoc/>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+
+        /// <summary>Gets whether the increment button area is hot-tracked.</summary>
+        internal bool IncrementAreaHot => increment_area_hot;
+
+        /// <summary>Gets whether the decrement button area is hot-tracked.</summary>
+        internal bool DecrementAreaHot => decrement_area_hot;
+
+        /// <summary>The up/down buttons, as a real child control.</summary>
+        /// <remarks>
+        /// WinForms' <c>UpDownBase</c> owns two child controls -- the up/down buttons and an edit box --
+        /// and adds the BUTTONS first, so <c>Controls[0]</c> is the buttons. That is not an incidental
+        /// detail: it is the documented way to theme one of these, and real code hooks
+        /// <c>Controls[0].Paint</c> to draw its own arrows and calls <c>Controls[0].PointToClient</c> to
+        /// hit-test them. This control drew itself with no children at all, so that idiom found nothing
+        /// and threw before the control existed.
+        ///
+        /// This child deliberately does NOT paint and does NOT hit-test on its own. It occupies the button
+        /// strip, forwards the mouse to the owner's existing logic, and leaves the owner's renderer drawing
+        /// the whole control exactly as before -- so the idiom works with no change to how a
+        /// NumericUpDown looks or behaves. A themer's Paint handler runs after the owner has painted
+        /// (children paint last), which is where they want to draw anyway.
+        /// </remarks>
+        private sealed class UpDownButtons : Control
+        {
+            private readonly NumericUpDown owner;
+
+            internal UpDownButtons (NumericUpDown owner)
+            {
+                this.owner = owner;
+
+                // Transparent so the owner's rendering of the buttons shows through: this child exists to
+                // be addressable, not to take over drawing.
+                SetControlBehavior (ControlBehaviors.Transparent, true);
+                SetControlBehavior (ControlBehaviors.Selectable, false);
+            }
+
+            // The owner hit-tests in ITS coordinates, so translate before handing the event over.
+            private MouseEventArgs ToOwner (MouseEventArgs e)
+                => new MouseEventArgs (e.Button, e.Clicks, e.X + Left, e.Y + Top, e.Delta);
+
+            protected override void OnMouseClick (MouseEventArgs e)
+            {
+                owner.OnMouseClick (ToOwner (e));
+                base.OnMouseClick (e);
+            }
+
+            protected override void OnMouseMove (MouseEventArgs e)
+            {
+                owner.OnMouseMove (ToOwner (e));
+                base.OnMouseMove (e);
+            }
+
+            protected override void OnMouseLeave (EventArgs e)
+            {
+                owner.OnMouseLeave (e);
+                base.OnMouseLeave (e);
+            }
+        }
+    }
+}

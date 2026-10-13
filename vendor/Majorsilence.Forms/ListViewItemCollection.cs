@@ -1,0 +1,155 @@
+using System;
+﻿using System.Collections.ObjectModel;
+using SkiaSharp;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a collection of ListViewItems.
+    /// </summary>
+    public class ListViewItemCollection : Collection<ListViewItem>
+    {
+        private readonly ListView owner;
+
+        internal ListViewItemCollection (ListView owner)
+        {
+            this.owner = owner;
+        }
+
+        /// <summary>Gets the item at an index; in virtual mode this asks
+        /// <see cref="ListView.RetrieveVirtualItem"/> for the index first (W6 mechanisms).</summary>
+        /// <remarks>Hides the base indexer, which cannot be overridden: every read through this
+        /// collection's own type resolves the slot, and the base's enumerator hands out whatever each
+        /// slot holds, which is how the layout and the renderer see placeholders they then resolve.</remarks>
+        public new ListViewItem this[int index] {
+            get {
+                owner.ResolveVirtualItem (index);
+                return base[index];
+            }
+            set => base[index] = value;
+        }
+
+        // The slot's current occupant without resolving it, and whether it is still a placeholder.
+        internal ListViewItem RawAt (int index) => base[index];
+
+        internal bool PlaceholderAt (int index) => base[index].IsVirtualPlaceholder;
+
+        // In virtual mode the application supplies items on demand and this collection is only a set of
+        // slots; upstream throws on every mutation but the control's own.
+        private void GuardVirtual ()
+        {
+            if (owner.VirtualMode && !owner.VirtualFill)
+                throw new InvalidOperationException ("Items cannot be added to or removed from a ListView in VirtualMode; set VirtualListSize and handle RetrieveVirtualItem.");
+        }
+
+        /// <summary>
+        /// Adds a range of items to the collection. Mirrors WinForms ListView.ListViewItemCollection.AddRange.
+        /// </summary>
+        public void AddRange (params ListViewItem[] items)
+        {
+            Guard.ThrowIfNull (items);
+
+            foreach (var item in items)
+                Add (item);
+        }
+
+        /// <summary>
+        /// Adds a new ListViewItem to the collection with the specified text.
+        /// </summary>
+        public ListViewItem Add (string text)
+        {
+            var item = new ListViewItem {
+                Text = text
+            };
+
+            Add (item);
+
+            return item;
+        }
+
+        /// <summary>
+        /// Adds a new ListViewItem to the collection with the specified text and image.
+        /// </summary>
+        public ListViewItem Add (string text, SKBitmap image)
+        {
+            var item = new ListViewItem { Text = text };
+            item.SetImageSK (image);
+            Add (item);
+            return item;
+        }
+
+        /// <summary>Adds a new ListViewItem to the collection with the specified text and Majorsilence.Forms.Drawing.Image (WinForms compatibility overload).</summary>
+        public ListViewItem Add (string text, Majorsilence.Forms.Drawing.Image image)
+        {
+            var item = new ListViewItem { Text = text, Image = image };
+            Add (item);
+            return item;
+        }
+
+        /// <summary>Adds a new ListViewItem with text and image index.</summary>
+        public ListViewItem Add (string text, int imageIndex)
+        {
+            var item = new ListViewItem { Text = text, ImageIndex = imageIndex };
+            Add (item);
+            return item;
+        }
+
+        /// <summary>Finds items whose Name matches the specified key.</summary>
+        public ListViewItem[] Find (string key, bool searchAllSubItems)
+            => this.Where (i => string.Equals (i.Name, key, StringComparison.OrdinalIgnoreCase)).ToArray ();
+
+        /// <summary>Returns the item with the specified key, or null.</summary>
+        public ListViewItem? this[string key]
+            => this.FirstOrDefault (i => string.Equals (i.Name, key, StringComparison.OrdinalIgnoreCase));
+
+        /// <inheritdoc/>
+        protected override void ClearItems ()
+        {
+            GuardVirtual ();
+
+            foreach (var item in Items)
+                item.Parent = null;
+
+            base.ClearItems ();
+
+            owner.Invalidate ();
+        }
+
+        /// <inheritdoc/>
+        protected override void InsertItem (int index, ListViewItem item)
+        {
+            GuardVirtual ();
+            base.InsertItem (index, item);
+
+            item.Parent = owner;
+            owner.Invalidate ();
+        }
+
+        /// <inheritdoc/>
+        protected override void RemoveItem (int index)
+        {
+            GuardVirtual ();
+
+            var item = RawAt (index);
+
+            base.RemoveItem (index);
+
+            item.Parent = null;
+            owner.Invalidate ();
+        }
+
+        /// <inheritdoc/>
+        protected override void SetItem (int index, ListViewItem item)
+        {
+            var old_item = this.ElementAtOrDefault (index);
+
+            if (old_item != null)
+                old_item.Parent = null;
+
+            base.SetItem (index, item);
+
+            item.Parent = owner;
+            owner.Invalidate ();
+        }
+    }
+}

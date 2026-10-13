@@ -1,0 +1,238 @@
+﻿using System.ComponentModel;
+using System.Collections.ObjectModel;
+using System.Linq;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a collection of DataGridViewColumn objects in a DataGridView control.
+    /// </summary>
+    public partial class DataGridViewColumnCollection : Collection<DataGridViewColumn>
+    {
+        /// <summary>Adds a column and returns its index.</summary>
+        /// <remarks>System.Windows.Forms returns the new column's index here, and callers use it to
+        /// address the cell they just created; Collection&lt;T&gt;.Add returns void, so this hides it.</remarks>
+        public new int Add (DataGridViewColumn column)
+        {
+            base.Add (column);
+            return Count - 1;
+        }
+
+        /// <summary>Moves a column to a new display position. Mirrors Telerik's Columns.Move.</summary>
+        public void Move (int fromIndex, int toIndex)
+        {
+            if (fromIndex == toIndex || fromIndex < 0 || fromIndex >= Count || toIndex < 0 || toIndex >= Count)
+                return;
+            var item = this[fromIndex];
+            RemoveAt (fromIndex);
+            Insert (toIndex, item);
+        }
+
+        private readonly DataGridView owner;
+
+        // True for a read-only projection of the grid's columns -- what SelectedColumns hands back.
+        // The columns in it already belong to `owner`, so re-owning them is meaningless, and raising
+        // ColumnAdded/OnColumnsChanged for each one would mean that merely READING SelectedColumns
+        // fired the grid's column events and forced a relayout.
+        private readonly bool is_projection;
+
+        /// <summary>
+        /// Initializes a new instance of the DataGridViewColumnCollection class.
+        /// </summary>
+        internal DataGridViewColumnCollection (DataGridView owner)
+        {
+            this.owner = owner;
+        }
+
+        /// <summary>
+        /// Initializes a projection of an existing grid's columns -- a collection that carries columns
+        /// owned by <paramref name="owner"/> without acting as that grid's column list.
+        /// </summary>
+        internal DataGridViewColumnCollection (DataGridView owner, bool projection)
+        {
+            this.owner = owner;
+            is_projection = projection;
+        }
+
+        /// <summary>
+        /// Returns the column with the specified name (header text or Name property), or null.
+        /// </summary>
+        public DataGridViewColumn? this[string name] {
+            get {
+                foreach (var col in this)
+                    if (string.Equals (col.Name, name, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals (col.HeaderText, name, StringComparison.OrdinalIgnoreCase))
+                        return col;
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Returns true if a column with the given name exists.
+        /// </summary>
+        public bool Contains (string name) => this[name] is not null;
+
+        /// <summary>Removes the column with the specified name, if present. Mirrors WinForms.</summary>
+        public void Remove (string name)
+        {
+            var column = this[name];
+
+            if (column is not null)
+                Remove (column);
+        }
+
+        /// <summary>Returns the first column matching the given element states (visibility etc.). Mirrors Telerik's Columns.GetFirstColumn.</summary>
+        /// <summary>Returns the first column matching the include states and matching none of the exclude states.</summary>
+        public DataGridViewColumn? GetFirstColumn (DataGridViewElementStates includeFilter, DataGridViewElementStates excludeFilter)
+        {
+            foreach (var col in this) {
+                if (includeFilter == DataGridViewElementStates.Visible && !col.Visible)
+                    continue;
+                if (excludeFilter == DataGridViewElementStates.Visible && col.Visible)
+                    continue;
+                if (excludeFilter == DataGridViewElementStates.Frozen && col.Frozen)
+                    continue;
+
+                return col;
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns the first column matching the given element states (visibility etc.). Mirrors Telerik's Columns.GetFirstColumn.</summary>
+        public DataGridViewColumn? GetFirstColumn (DataGridViewElementStates states)
+        {
+            foreach (var col in this)
+                if (states != DataGridViewElementStates.Visible || col.Visible)
+                    return col;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Adds a column with the specified header text to the collection.
+        /// </summary>
+        public DataGridViewColumn Add (string headerText)
+        {
+            var column = owner.CreateColumnInstance (headerText);
+            Add (column);
+            return column;
+        }
+
+        /// <summary>
+        /// Adds a column with the specified internal name and header text, and returns its index.
+        /// </summary>
+        /// <remarks>
+        /// Returns the index, as upstream's <c>int Add (string? columnName, string? headerText)</c> does
+        /// (<c>DataGridViewColumnCollection.cs</c>): it returned the column, so
+        /// <c>int c = grid.Columns.Add ("Id", "ID");</c> did not compile (DGV-04).
+        /// </remarks>
+        public int Add (string name, string headerText)
+        {
+            var column = owner.CreateColumnInstance (headerText);
+            column.Name = name;
+            return Add (column);
+        }
+
+        /// <summary>
+        /// Adds a column with the specified header text and width to the collection.
+        /// </summary>
+        public DataGridViewColumn Add (string headerText, int width)
+        {
+            var column = owner.CreateColumnInstance (headerText);
+            column.Width = width;
+            Add (column);
+            return column;
+        }
+
+        /// <summary>
+        /// Adds a range of columns to the collection.
+        /// </summary>
+        public void AddRange (params DataGridViewColumn[] columns)
+        {
+            Guard.ThrowIfNull (columns);
+
+            foreach (var column in columns)
+                Add (column);
+        }
+
+        /// <inheritdoc/>
+        protected override void ClearItems ()
+        {
+            if (is_projection) {
+                base.ClearItems ();
+                return;
+            }
+
+            var removedColumns = System.Linq.Enumerable.ToArray (this);
+            foreach (var column in this)
+                column.SetOwner (null);
+
+            base.ClearItems ();
+            owner.OnColumnsChanged ();
+
+            foreach (var column in removedColumns)
+                owner.RaiseColumnRemoved (column);
+
+            CollectionChanged?.Invoke (this, new CollectionChangeEventArgs (CollectionChangeAction.Refresh, null));
+        }
+
+        /// <inheritdoc/>
+        protected override void InsertItem (int index, DataGridViewColumn item)
+        {
+            if (is_projection) {
+                base.InsertItem (index, item);
+                return;
+            }
+
+            item.SetOwner (owner);
+            base.InsertItem (index, item);
+            owner.OnColumnsChanged ();
+
+            // OnColumnsChanged is the internal relayout notification; this is the public WinForms
+            // event, which derived grids override to decorate the new column.
+            owner.RaiseColumnAdded (item);
+            CollectionChanged?.Invoke (this, new CollectionChangeEventArgs (CollectionChangeAction.Add, item));
+        }
+
+        /// <inheritdoc/>
+        protected override void RemoveItem (int index)
+        {
+            var removed = index >= 0 && index < Count ? this[index] : null;
+            if (is_projection) {
+                base.RemoveItem (index);
+                return;
+            }
+
+            var removedColumn = this[index];
+            var renumber = removedColumn.DisplayIndex != index || this.Any (c => c.DisplayIndex != c.Index);
+            this[index].SetOwner (null);
+            removedColumn.SetDisplayIndexInternal (-1);
+            base.RemoveItem (index);
+            owner.OnColumnsChanged ();
+
+            // The display order stays dense once a column has been moved (W6 mechanisms).
+            if (renumber)
+                owner.RenumberDisplayOrder ();
+
+            owner.RaiseColumnRemoved (removedColumn);
+
+            if (removed is not null)
+                CollectionChanged?.Invoke (this, new CollectionChangeEventArgs (CollectionChangeAction.Remove, removed));
+        }
+
+        /// <inheritdoc/>
+        protected override void SetItem (int index, DataGridViewColumn item)
+        {
+            if (is_projection) {
+                base.SetItem (index, item);
+                return;
+            }
+
+            this[index].SetOwner (null);
+            item.SetOwner (owner);
+            base.SetItem (index, item);
+            owner.OnColumnsChanged ();
+        }
+    }
+}

@@ -1,0 +1,5289 @@
+﻿using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>Represents a method that contains no parameters and does not return a value. Used with Control.Invoke().</summary>
+    public delegate void MethodInvoker ();
+
+    /// <summary>
+    /// Provides information that accessibility clients use to adjust the user interface.
+    /// Stub in Majorsilence.Forms.
+    /// </summary>
+    public partial class AccessibleObject
+    {
+        /// <summary>Gets or sets the accessible object name.</summary>
+        public virtual string? Name { get; set; }
+
+        /// <summary>Gets or sets the accessible description.</summary>
+        public virtual string? Description { get; set; }
+
+        /// <summary>Gets the accessible role.</summary>
+        public virtual AccessibleRole Role => AccessibleRole.Default;
+
+        /// <summary>Gets the parent accessible object.</summary>
+        public virtual AccessibleObject? Parent => null;
+
+        /// <summary>Gets the number of accessible children.</summary>
+        public virtual int GetChildCount () => 0;
+
+        /// <summary>Gets the child accessible object at the specified index.</summary>
+        public virtual AccessibleObject? GetChild (int index) => null;
+
+        /// <summary>Gets the bounds of the accessible object.</summary>
+        public virtual System.Drawing.Rectangle Bounds => System.Drawing.Rectangle.Empty;
+    }
+
+    /// <summary>
+    /// Provides a low-level encapsulation of a window handle and associated Windows message processing.
+    /// Stub in Majorsilence.Forms — all operations are no-ops.
+    /// </summary>
+    public partial class NativeWindow
+    {
+        /// <summary>Gets the handle to the window. Always IntPtr.Zero in Majorsilence.Forms.</summary>
+        public IntPtr Handle => IntPtr.Zero;
+
+        /// <summary>
+        /// Returns the NativeWindow associated with the specified handle. Every handle here is
+        /// IntPtr.Zero (see <see cref="Handle"/>), so there is no real registry to look up -- but
+        /// returning null, as upstream does for an unrecognized handle, would turn the common
+        /// subclassing idiom (<c>NativeWindow.FromHandle(h).DefWndProc(ref m)</c>, used to invoke the
+        /// default window procedure) into a guaranteed NullReferenceException instead of the no-op the
+        /// rest of this type already is for everything else. A fresh instance -- whose own members are
+        /// all equally inert -- keeps that idiom a no-op instead, per the stub policy.
+        /// </summary>
+        public static NativeWindow FromHandle (IntPtr handle) => new ();
+
+        /// <summary>Assigns a handle to this NativeWindow. No-op stub in Majorsilence.Forms.</summary>
+        public virtual void AssignHandle (IntPtr handle) { }
+
+        /// <summary>Creates a window with the specified creation parameters. No-op stub in Majorsilence.Forms.</summary>
+        public virtual void CreateHandle (CreateParams cp) { }
+
+        /// <summary>Destroys the associated window handle. No-op stub in Majorsilence.Forms.</summary>
+        public virtual void DestroyHandle () { }
+
+        /// <summary>Releases the associated window handle. No-op stub in Majorsilence.Forms.</summary>
+        public virtual void ReleaseHandle () { }
+
+        /// <summary>Processes messages sent to the window. No-op stub in Majorsilence.Forms.</summary>
+        protected virtual void WndProc (ref Message m) { }
+    }
+
+    /// <summary>Encapsulates the information needed to create a window. Stub in Majorsilence.Forms.</summary>
+    public class CreateParams
+    {
+        /// <summary>Gets or sets the window class name.</summary>
+        public string? ClassName { get; set; }
+
+        /// <summary>Gets or sets the window caption.</summary>
+        public string? Caption { get; set; }
+
+        /// <summary>Gets or sets the window styles.</summary>
+        public int Style { get; set; }
+
+        /// <summary>Gets or sets the extended window styles.</summary>
+        public int ExStyle { get; set; }
+
+        /// <summary>Gets or sets the class style bits.</summary>
+        public int ClassStyle { get; set; }
+
+        /// <summary>Gets or sets the left edge of the initial window position.</summary>
+        public int X { get; set; }
+
+        /// <summary>Gets or sets the top edge of the initial window position.</summary>
+        public int Y { get; set; }
+
+        /// <summary>Gets or sets the width of the initial window.</summary>
+        public int Width { get; set; }
+
+        /// <summary>Gets or sets the height of the initial window.</summary>
+        public int Height { get; set; }
+
+        /// <summary>Gets or sets the parent window handle.</summary>
+        public IntPtr Parent { get; set; }
+
+        /// <summary>Gets or sets extra parameter data.</summary>
+        public object? Param { get; set; }
+    }
+
+    /// <summary>Represents a data binding between a control property and a data source property.</summary>
+    public partial class Binding
+    {
+        /// <summary>Initializes a new Binding. It attaches when added to a control's <see cref="Control.DataBindings"/>.</summary>
+        public Binding (string propertyName, object? dataSource, string? dataMember, bool formattingEnabled = false)
+        {
+            PropertyName = propertyName;
+            DataSource = dataSource;
+            BindingMemberInfo = new BindingMemberInfo (dataMember ?? string.Empty);
+            FormattingEnabled = formattingEnabled;   // the parameter used to be accepted and dropped
+        }
+
+        /// <summary>Initializes a new Binding with an explicit <see cref="DataSourceUpdateMode"/> --
+        /// the shape designer-generated <c>DataBindings.Add</c> calls emit.</summary>
+        public Binding (string propertyName, object? dataSource, string? dataMember, bool formattingEnabled,
+            DataSourceUpdateMode dataSourceUpdateMode)
+            : this (propertyName, dataSource, dataMember, formattingEnabled)
+        {
+            DataSourceUpdateMode = dataSourceUpdateMode;
+        }
+
+        /// <summary>Gets the control property name.</summary>
+        public string PropertyName { get; }
+
+        /// <summary>Gets the data source.</summary>
+        public object? DataSource { get; }
+
+        /// <summary>Gets binding member information.</summary>
+        public BindingMemberInfo BindingMemberInfo { get; }
+
+        /// <summary>Gets or sets the format string applied to the value shown in the control.</summary>
+        /// <remarks>Changing it on a live binding re-shows the value through the new format, as
+        /// upstream's setter does (<c>PushData</c>, Binding.cs); null is stored as empty.</remarks>
+        public string FormatString {
+            get => format_string;
+            set {
+                value ??= string.Empty;
+
+                if (value == format_string)
+                    return;
+
+                format_string = value;
+
+                if (IsBinding)
+                    PushValue ();
+            }
+        }
+
+        private string format_string = string.Empty;
+
+        /// <summary>Gets or sets when the data source is updated from the bound control.</summary>
+        /// <remarks>Changing this on a live binding re-subscribes it: the mode decides WHICH event on the
+        /// component is watched, so it cannot just be stored once the binding is attached.</remarks>
+        public DataSourceUpdateMode DataSourceUpdateMode {
+            get => data_source_update_mode;
+            set {
+                if (data_source_update_mode == value)
+                    return;
+
+                data_source_update_mode = value;
+                ResubscribeToTarget ();
+            }
+        }
+
+        private DataSourceUpdateMode data_source_update_mode = DataSourceUpdateMode.OnValidation;
+
+        /// <summary>Gets or sets the value substituted when the data source holds DBNull.</summary>
+        /// <remarks>Changing it on a live binding whose source value is null re-shows the new
+        /// substitute, as upstream's setter does (Binding.cs); a non-null source value is left alone.</remarks>
+        public object? NullValue {
+            get => null_value;
+            set {
+                if (Equals (null_value, value))
+                    return;
+
+                null_value = value;
+
+                if (IsBinding && SourceHoldsNull ())
+                    PushValue ();
+            }
+        }
+
+        private object? null_value;
+
+        /// <summary>Gets or sets the culture used when formatting the bound value.</summary>
+        /// <remarks>Changing it on a live binding re-shows the value in the new culture, as upstream's
+        /// setter does (<c>PushData</c>, Binding.cs).</remarks>
+        public IFormatProvider? FormatInfo {
+            get => format_info;
+            set {
+                if (format_info == value)
+                    return;
+
+                format_info = value;
+
+                if (IsBinding)
+                    PushValue ();
+            }
+        }
+
+        private IFormatProvider? format_info;
+
+        // Format/Parse, ReadValue/WriteValue and the whole live-binding mechanism are in
+        // BindingRuntime.cs. They used to be discarding stubs (`add { } remove { } }`, empty WriteValue),
+        // which meant every binding in every migrated form silently did nothing.
+    }
+
+    /// <summary>Provides data for Binding.Format and Binding.Parse events.</summary>
+    public class ConvertEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ConvertEventArgs (object? value, Type? desiredType) { Value = value; DesiredType = desiredType; }
+
+        /// <summary>Gets or sets the value to convert.</summary>
+        public object? Value { get; set; }
+
+        /// <summary>Gets the desired target type.</summary>
+        public Type? DesiredType { get; }
+    }
+
+    /// <summary>Represents a method that handles Binding.Format and Binding.Parse events.</summary>
+#pragma warning disable CA1711  // WinForms compat — name must match WinForms API
+    public delegate void ConvertEventHandler (object? sender, ConvertEventArgs e);
+
+    /// <summary>Represents a method that handles mouse events.</summary>
+    public delegate void MouseEventHandler (object? sender, MouseEventArgs e);
+
+    /// <summary>Represents a method that handles key press events.</summary>
+    public delegate void KeyPressEventHandler (object? sender, KeyPressEventArgs e);
+
+    /// <summary>Represents a method that handles paint events.</summary>
+    public delegate void PaintEventHandler (object? sender, PaintEventArgs e);
+
+    /// <summary>Represents a method that handles TreeView events.</summary>
+    public delegate void TreeViewEventHandler (object sender, TreeViewEventArgs e);
+
+    /// <summary>Represents a method that handles TreeView cancel events.</summary>
+    public delegate void TreeViewCancelEventHandler (object sender, TreeViewCancelEventArgs e);
+
+    /// <summary>Represents a method that handles splitter events.</summary>
+    public delegate void SplitterEventHandler (object sender, SplitterEventArgs e);
+
+    /// <summary>Represents a method that handles splitter cancel events.</summary>
+    public delegate void SplitterCancelEventHandler (object sender, SplitterCancelEventArgs e);
+
+    /// <summary>Represents a method that handles node label edit events.</summary>
+    public delegate void NodeLabelEditEventHandler (object sender, NodeLabelEditEventArgs e);
+
+    /// <summary>Represents a method that handles draw item events.</summary>
+    public delegate void DrawItemEventHandler (object sender, DrawItemEventArgs e);
+
+    /// <summary>Represents a method that handles measure item events.</summary>
+    public delegate void MeasureItemEventHandler (object sender, MeasureItemEventArgs e);
+
+    /// <summary>Represents a method that handles TabControl events.</summary>
+    public delegate void TabControlEventHandler (object sender, TabControlEventArgs e);
+
+    /// <summary>Represents a method that handles TabControl cancel events.</summary>
+    public delegate void TabControlCancelEventHandler (object sender, TabControlCancelEventArgs e);
+
+    /// <summary>Represents a method that handles drag-and-drop events.</summary>
+    public delegate void DragEventHandler (object sender, DragEventArgs e);
+
+    /// <summary>Represents a method that handles give-feedback events.</summary>
+    public delegate void GiveFeedbackEventHandler (object sender, GiveFeedbackEventArgs e);
+
+    /// <summary>Represents a method that handles query-continue-drag events.</summary>
+    public delegate void QueryContinueDragEventHandler (object sender, QueryContinueDragEventArgs e);
+#pragma warning restore CA1711
+
+    /// <summary>Provides information about a data member path.</summary>
+    public class BindingMemberInfo
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public BindingMemberInfo (string dataMember) { BindingMember = dataMember; }
+
+        /// <summary>Gets the binding member path.</summary>
+        public string BindingMember { get; }
+
+        /// <summary>Gets the field name portion of the binding member.</summary>
+        public string BindingField => BindingMember.Contains ('.') ? BindingMember.Substring (BindingMember.LastIndexOf ('.') + 1) : BindingMember;
+
+        /// <summary>Gets the path portion of the binding member.</summary>
+        public string BindingPath => BindingMember.Contains ('.') ? BindingMember.Substring (0, BindingMember.LastIndexOf ('.')) : string.Empty;
+    }
+
+    /// <summary>Represents the collection of data bindings for a control.</summary>
+    public partial class ControlBindingsCollection : System.Collections.ObjectModel.Collection<Binding>
+    {
+        private readonly IBindableComponent _control;
+
+        /// <summary>Initializes a new instance for the given bindable component.</summary>
+        /// <remarks>Takes <see cref="IBindableComponent"/>, as WinForms does -- data binding is a
+        /// component-level facility, and a bindable component that is not a Control (a ribbon group
+        /// item, say) constructs its own collection through this.</remarks>
+        public ControlBindingsCollection (IBindableComponent control)
+        {
+            _control = control;
+            BindableComponent = control;
+        }
+
+        /// <summary>Adds a new binding to the collection.</summary>
+        /// <exception cref="ArgumentNullException"><paramref name="dataSource"/> is null.</exception>
+        public Binding Add (string propertyName, object? dataSource, string? dataMember, bool formattingEnabled = false)
+        {
+            // Every upstream Add overload ends in the long one's ArgumentNullException.ThrowIfNull
+            // (dataSource) (ControlBindingsCollection.cs); the long overload here already throws (BND-17).
+            Guard.ThrowIfNull (dataSource);
+
+            var binding = new Binding (propertyName, dataSource, dataMember, formattingEnabled) {
+                // The collection's default applies to a binding added without a mode of its own (W6.2 sweep).
+                DataSourceUpdateMode = DefaultDataSourceUpdateMode,
+            };
+            Add (binding);
+            return binding;
+        }
+
+        /// <summary>Gets the control that owns this collection.</summary>
+        public IBindableComponent Control => _control;
+
+        /// <summary>Gets the binding for the specified control property name, or null.</summary>
+        public Binding? this[string propertyName]
+            => this.FirstOrDefault (b => string.Equals (b.PropertyName, propertyName, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>Gets or sets the default data source update mode.</summary>
+        public DataSourceUpdateMode DefaultDataSourceUpdateMode { get; set; }
+    }
+
+    /// <summary>Specifies when a data source is updated when binding.</summary>
+    public enum DataSourceUpdateMode
+    {
+        /// <summary>Update data source when the property changes.</summary>
+        OnPropertyChanged = 1,
+        /// <summary>Update data source when the control loses focus.</summary>
+        OnValidation = 0,
+        /// <summary>Data source is never updated automatically.</summary>
+        Never = 2,
+    }
+
+    /// <summary>Provides data for the PreviewKeyDown event.</summary>
+    public partial class PreviewKeyDownEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public PreviewKeyDownEventArgs (Keys keyData) { KeyData = keyData; }
+
+        /// <summary>Gets the key data for this event.</summary>
+        public Keys KeyData { get; }
+
+        /// <summary>Gets the key code (without modifier keys).</summary>
+        public Keys KeyCode => KeyData & Keys.KeyCode;
+
+        /// <summary>Gets the modifier keys held at the time of the event.</summary>
+        public Keys Modifiers => KeyData & Keys.Modifiers;
+
+        /// <summary>Gets whether the Alt key was held.</summary>
+        public bool Alt => (Modifiers & Keys.Alt) != 0;
+
+        /// <summary>Gets whether the Ctrl key was held.</summary>
+        public bool Control => (Modifiers & Keys.Control) != 0;
+
+        /// <summary>Gets whether the Shift key was held.</summary>
+        public bool Shift => (Modifiers & Keys.Shift) != 0;
+
+        /// <summary>Gets or sets whether the key should be treated as an input key.</summary>
+        public bool IsInputKey { get; set; }
+    }
+
+    /// <summary>Specifies the sort order for items in a PropertyGrid.</summary>
+    public enum PropertySort
+    {
+        /// <summary>Properties are not sorted.</summary>
+        NoSort = 0,
+        /// <summary>Properties are sorted alphabetically.</summary>
+        Alphabetical = 1,
+        /// <summary>Properties are sorted by category.</summary>
+        Categorized = 2,
+        /// <summary>Properties are sorted by category, then alphabetically within each category.</summary>
+        CategorizedAlphabetical = 3
+    }
+
+    /// <summary>
+    /// Provides data for the FormClosing event.
+    /// </summary>
+    /// <summary>Provides data for the Form.FormClosing event.</summary>
+    public class FormClosingEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public FormClosingEventArgs () { }
+
+        /// <summary>Initializes a new instance with a reason.</summary>
+        public FormClosingEventArgs (CloseReason closeReason, bool cancel) : base (cancel) { CloseReason = closeReason; }
+
+        /// <summary>Gets the reason the form is closing.</summary>
+        public CloseReason CloseReason { get; } = CloseReason.UserClosing;
+    }
+
+    /// <summary>Provides data for the Form.FormClosed event.</summary>
+    public class FormClosedEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public FormClosedEventArgs () { }
+
+        /// <summary>Initializes a new instance with a reason.</summary>
+        public FormClosedEventArgs (CloseReason closeReason) { CloseReason = closeReason; }
+
+        /// <summary>Gets the reason the form was closed.</summary>
+        public CloseReason CloseReason { get; } = CloseReason.UserClosing;
+    }
+
+    /// <summary>Specifies the reason the form was closed.</summary>
+    public enum CloseReason
+    {
+        /// <summary>The cause of the closure was not defined or could not be determined.</summary>
+        None = 0,
+        /// <summary>The Windows Task Manager is closing the application.</summary>
+        TaskManagerClosing = 4,
+        /// <summary>The parent form of this MDI form is closing.</summary>
+        MdiFormClosing = 2,
+        /// <summary>The user closed the form through the user interface.</summary>
+        UserClosing = 3,
+        /// <summary>The Microsoft Windows operating system is closing all applications before a system shutdown.</summary>
+        WindowsShutDown = 1,
+        /// <summary>The Application.Exit method was invoked.</summary>
+        ApplicationExitCall = 6,
+        /// <summary>The Form.Close method was called.</summary>
+        FormOwnerClosing = 5,
+    }
+
+    /// <summary>
+    /// Delegate for the FormClosed event.
+    /// </summary>
+#pragma warning disable CA1711
+    public delegate void FormClosedEventHandler (object sender, FormClosedEventArgs e);
+
+    /// <summary>
+    /// Delegate for the FormClosing event.
+    /// </summary>
+    public delegate void FormClosingEventHandler (object sender, FormClosingEventArgs e);
+
+    /// <summary>
+    /// Delegate for keyboard key events.
+    /// </summary>
+    public delegate void KeyEventHandler (object sender, KeyEventArgs e);
+#pragma warning restore CA1711
+
+
+    /// <summary>
+    /// Specifies the border style of a form.
+    /// </summary>
+    public enum FormBorderStyle
+    {
+        /// <summary>No border.</summary>
+        None,
+        /// <summary>Fixed single-line border.</summary>
+        FixedSingle,
+        /// <summary>Fixed 3D border.</summary>
+        Fixed3D,
+        /// <summary>Fixed dialog-style border.</summary>
+        FixedDialog,
+        /// <summary>Sizable border (default).</summary>
+        Sizable,
+        /// <summary>Fixed tool window border.</summary>
+        FixedToolWindow,
+        /// <summary>Sizable tool window border.</summary>
+        SizableToolWindow
+    }
+
+    /// <summary>
+    /// Specifies the size-grip style for a form.
+    /// </summary>
+    public enum SizeGripStyle
+    {
+        /// <summary>Show the size grip when applicable.</summary>
+        Auto,
+        /// <summary>Always show the size grip.</summary>
+        Show,
+        /// <summary>Never show the size grip.</summary>
+        Hide
+    }
+
+    /// <summary>Provides data for the SplitContainer.SplitterMoved event.</summary>
+    public class SplitterEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public SplitterEventArgs (int x, int y, int splitX, int splitY) { X = x; Y = y; SplitX = splitX; SplitY = splitY; }
+
+        /// <summary>Gets the x-coordinate of the mouse pointer.</summary>
+        public int X { get; }
+
+        /// <summary>Gets the y-coordinate of the mouse pointer.</summary>
+        public int Y { get; }
+
+        /// <summary>Gets the x-coordinate of the upper-left corner of the splitter.</summary>
+        public int SplitX { get; }
+
+        /// <summary>Gets the y-coordinate of the upper-left corner of the splitter.</summary>
+        public int SplitY { get; }
+    }
+
+    /// <summary>Provides data for the SplitContainer.SplitterMoving event.</summary>
+    public class SplitterCancelEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public SplitterCancelEventArgs (int mouseX, int mouseY, int splitX, int splitY)
+            { MouseCursorX = mouseX; MouseCursorY = mouseY; SplitX = splitX; SplitY = splitY; }
+
+        /// <summary>Gets the x-coordinate of the mouse pointer.</summary>
+        public int MouseCursorX { get; }
+
+        /// <summary>Gets the y-coordinate of the mouse pointer.</summary>
+        public int MouseCursorY { get; }
+
+        /// <summary>Gets or sets the x-coordinate of the upper-left corner of the splitter.</summary>
+        public int SplitX { get; set; }
+
+        /// <summary>Gets or sets the y-coordinate of the upper-left corner of the splitter.</summary>
+        public int SplitY { get; set; }
+    }
+
+    /// <summary>Specifies which panel of a SplitContainer retains its size when the container is resized.</summary>
+    public enum FixedPanel
+    {
+        /// <summary>Neither panel is fixed.</summary>
+        None,
+        /// <summary>Panel1 retains its size.</summary>
+        Panel1,
+        /// <summary>Panel2 retains its size.</summary>
+        Panel2
+    }
+
+    /// <summary>Specifies the direction in which text and other elements are laid out.</summary>
+    public enum RightToLeft
+    {
+        /// <summary>Elements are laid out from left to right.</summary>
+        No,
+        /// <summary>Elements are laid out from right to left.</summary>
+        Yes,
+        /// <summary>Inherits from the parent control.</summary>
+        Inherit
+    }
+
+    /// <summary>Specifies constants representing accessible events.</summary>
+    /// <remarks>
+    /// The values are the Win32 <c>EVENT_*</c> WinEvent codes, generated from the reference assembly
+    /// rather than transcribed: 32 of the 42 were absent here, and the ten present were only the ones
+    /// a reader is likely to check by eye.
+    /// </remarks>
+    public enum AccessibleEvents
+    {
+        /// <summary>No event. Not an upstream member; kept because existing code here uses it.</summary>
+        None = 0,
+        /// <summary>A system sound played.</summary>
+        SystemSound = 1,
+        /// <summary>An alert raised.</summary>
+        SystemAlert = 2,
+        /// <summary>The foreground window changed.</summary>
+        SystemForeground = 3,
+        /// <summary>A menu bar entered the active state.</summary>
+        SystemMenuStart = 4,
+        /// <summary>A menu bar left the active state.</summary>
+        SystemMenuEnd = 5,
+        /// <summary>A pop-up menu was shown.</summary>
+        SystemMenuPopupStart = 6,
+        /// <summary>A pop-up menu closed.</summary>
+        SystemMenuPopupEnd = 7,
+        /// <summary>A window took mouse capture.</summary>
+        SystemCaptureStart = 8,
+        /// <summary>A window released mouse capture.</summary>
+        SystemCaptureEnd = 9,
+        /// <summary>A window is being moved or resized.</summary>
+        SystemMoveSizeStart = 10,
+        /// <summary>A window finished being moved or resized.</summary>
+        SystemMoveSizeEnd = 11,
+        /// <summary>A window entered context-sensitive help mode.</summary>
+        SystemContextHelpStart = 12,
+        /// <summary>A window left context-sensitive help mode.</summary>
+        SystemContextHelpEnd = 13,
+        /// <summary>A drag-and-drop operation started.</summary>
+        SystemDragDropStart = 14,
+        /// <summary>A drag-and-drop operation ended.</summary>
+        SystemDragDropEnd = 15,
+        /// <summary>A dialog box was shown.</summary>
+        SystemDialogStart = 16,
+        /// <summary>A dialog box closed.</summary>
+        SystemDialogEnd = 17,
+        /// <summary>Scrolling started on a scroll bar.</summary>
+        SystemScrollingStart = 18,
+        /// <summary>Scrolling ended on a scroll bar.</summary>
+        SystemScrollingEnd = 19,
+        /// <summary>The user began switching windows.</summary>
+        SystemSwitchStart = 20,
+        /// <summary>The user finished switching windows.</summary>
+        SystemSwitchEnd = 21,
+        /// <summary>A window was minimized.</summary>
+        SystemMinimizeStart = 22,
+        /// <summary>A window finished being minimized.</summary>
+        SystemMinimizeEnd = 23,
+        /// <summary>An object was created.</summary>
+        Create = 0x8000,
+        /// <summary>An object was destroyed.</summary>
+        Destroy = 0x8001,
+        /// <summary>An object was shown.</summary>
+        Show = 0x8002,
+        /// <summary>An object was hidden.</summary>
+        Hide = 0x8003,
+        /// <summary>An object's children changed order.</summary>
+        Reorder = 0x8004,
+        /// <summary>An object received the keyboard focus.</summary>
+        Focus = 0x8005,
+        /// <summary>An object's selection changed to a single item.</summary>
+        Selection = 0x8006,
+        /// <summary>An item was added to the selection.</summary>
+        SelectionAdd = 0x8007,
+        /// <summary>An item was removed from the selection.</summary>
+        SelectionRemove = 0x8008,
+        /// <summary>The selection changed within a container.</summary>
+        SelectionWithin = 0x8009,
+        /// <summary>An object's state changed.</summary>
+        StateChange = 0x800A,
+        /// <summary>An object's location changed.</summary>
+        LocationChange = 0x800B,
+        /// <summary>An object's name changed.</summary>
+        NameChange = 0x800C,
+        /// <summary>An object's description changed.</summary>
+        DescriptionChange = 0x800D,
+        /// <summary>An object's value changed.</summary>
+        ValueChange = 0x800E,
+        /// <summary>An object's parent changed.</summary>
+        ParentChange = 0x800F,
+        /// <summary>An object's help text changed.</summary>
+        HelpChange = 0x8010,
+        /// <summary>An object's default action changed.</summary>
+        DefaultActionChange = 0x8011,
+        /// <summary>An object's keyboard accelerator changed.</summary>
+        AcceleratorChange = 0x8012
+    }
+
+#pragma warning disable CA1711
+    /// <summary>Delegate for the Control.HelpRequested event.</summary>
+    public delegate void HelpEventHandler (object sender, HelpEventArgs e);
+
+    /// <summary>Delegate for the Control.QueryAccessibilityHelp event.</summary>
+    public delegate void QueryAccessibilityHelpEventHandler (object sender, QueryAccessibilityHelpEventArgs e);
+#pragma warning restore CA1711
+
+    /// <summary>Provides data for the Control.HelpRequested event.</summary>
+    public class HelpEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public HelpEventArgs (System.Drawing.Point mousePos) { MousePos = mousePos; }
+
+        /// <summary>Gets the mouse cursor position at the time of the request.</summary>
+        public System.Drawing.Point MousePos { get; }
+
+        /// <summary>Gets or sets whether the event was handled.</summary>
+        public bool Handled { get; set; }
+    }
+
+    /// <summary>Provides data for the Control.QueryAccessibilityHelp event.</summary>
+    public class QueryAccessibilityHelpEventArgs : EventArgs
+    {
+        /// <summary>Gets or sets the help namespace.</summary>
+        public string? HelpNamespace { get; set; }
+
+        /// <summary>Gets or sets the help keyword.</summary>
+        public string? HelpKeyword { get; set; }
+
+        /// <summary>Gets or sets the help string.</summary>
+        public string? HelpString { get; set; }
+    }
+
+    /// <summary>Provides data for TreeView node label-edit events.</summary>
+    public partial class NodeLabelEditEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public NodeLabelEditEventArgs (TreeNode node) { Node = node; }
+
+        /// <summary>Initializes a new instance with a new label.</summary>
+        public NodeLabelEditEventArgs (TreeNode node, string? label) { Node = node; Label = label; }
+
+        /// <summary>Gets the node whose label is being edited.</summary>
+        public TreeNode Node { get; }
+
+        /// <summary>Gets the new label text, or null if the edit was cancelled.</summary>
+        public string? Label { get; }
+    }
+
+    /// <summary>Provides data for TreeView node events.</summary>
+    public class TreeViewEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public TreeViewEventArgs (TreeNode node) { Node = node; }
+
+        /// <summary>Initializes a new instance with an action.</summary>
+        public TreeViewEventArgs (TreeNode node, TreeViewAction action) { Node = node; Action = action; }
+
+        /// <summary>
+        /// Gets the tree node that raised the event. Typed TreeNode (not the base TreeNode)
+        /// to match System.Windows.Forms.TreeViewEventArgs.Node -- all nodes added through the
+        /// public TreeNode-based API are TreeNode instances in practice; raisers skip the event
+        /// for internally-created plain TreeViewItems.
+        /// </summary>
+        public TreeNode Node { get; }
+
+        /// <summary>Gets the action that raised the event.</summary>
+        public TreeViewAction Action { get; }
+    }
+
+    /// <summary>Provides data for cancelable TreeView node events.</summary>
+    public class TreeViewCancelEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public TreeViewCancelEventArgs (TreeNode node, bool cancel, TreeViewAction action) : base (cancel)
+        {
+            Node = node;
+            Action = action;
+        }
+
+        /// <summary>
+        /// Gets the tree node that raised the event. Typed TreeNode (not the base TreeNode)
+        /// to match System.Windows.Forms.TreeViewCancelEventArgs.Node -- all nodes added through
+        /// the public TreeNode-based API are TreeNode instances in practice.
+        /// </summary>
+        public TreeNode Node { get; }
+
+        /// <summary>Gets the action that caused the event.</summary>
+        public TreeViewAction Action { get; }
+    }
+
+    /// <summary>Specifies the action that raised a TreeView event.</summary>
+    public enum TreeViewAction
+    {
+        /// <summary>The event was caused by an unknown action.</summary>
+        Unknown = 0,
+        /// <summary>The event was caused by a mouse click.</summary>
+        ByMouse = 2,
+        /// <summary>The event was caused by a keyboard action.</summary>
+        ByKeyboard = 1,
+        /// <summary>The event was caused by a collapse.</summary>
+        Collapse = 3,
+        /// <summary>The event was caused by an expand.</summary>
+        Expand = 4,
+    }
+
+    /// <summary>Specifies character casing for a TextBox.</summary>
+    public enum CharacterCasing
+    {
+        /// <summary>No casing is applied.</summary>
+        Normal,
+        /// <summary>All characters are converted to uppercase.</summary>
+        Upper,
+        /// <summary>All characters are converted to lowercase.</summary>
+        Lower
+    }
+
+    /// <summary>Specifies the auto-complete mode for a TextBox.</summary>
+    public enum AutoCompleteMode
+    {
+        /// <summary>No auto-complete.</summary>
+        None,
+        /// <summary>Suggests completions.</summary>
+        Suggest,
+        /// <summary>Appends completions.</summary>
+        Append,
+        /// <summary>Suggests and appends completions.</summary>
+        SuggestAppend
+    }
+
+    /// <summary>Specifies the source for auto-complete entries.</summary>
+    public enum AutoCompleteSource
+    {
+        /// <summary>No auto-complete source.</summary>
+        None = 128,
+        /// <summary>Uses the file system.</summary>
+        FileSystem = 1,
+        /// <summary>Uses the history list.</summary>
+        HistoryList = 2,
+        /// <summary>Uses recently used URLs.</summary>
+        RecentlyUsedList = 4,
+        /// <summary>Uses all system sources.</summary>
+        AllSystemSources = 7,
+        /// <summary>Uses the file system directories.</summary>
+        FileSystemDirectories = 32,
+        /// <summary>Uses a custom list.</summary>
+        CustomSource = 64,
+        /// <summary>Uses all URLs.</summary>
+        AllUrl = 6,
+        /// <summary>The items already in the control supply the completions.</summary>
+        ListItems = 256,
+    }
+
+    /// <summary>Specifies the column header style for a ListView.</summary>
+    public enum ColumnHeaderStyle
+    {
+        /// <summary>No column headers are displayed.</summary>
+        None,
+        /// <summary>Column headers do not respond to mouse clicks.</summary>
+        Nonclickable,
+        /// <summary>Column headers respond to mouse clicks (default).</summary>
+        Clickable
+    }
+
+    /// <summary>Specifies the type of action the user must take to activate an item in a ListView.</summary>
+    public enum ItemActivation
+    {
+        /// <summary>The user must double-click to activate an item.</summary>
+        Standard,
+        /// <summary>The user must single-click to activate an item.</summary>
+        OneClick,
+        /// <summary>The user must double-click to activate an item; item changes appearance when hovered.</summary>
+        TwoClick
+    }
+
+    /// <summary>A collection of strings used for auto-complete suggestions. Stub in Majorsilence.Forms.</summary>
+    public partial class AutoCompleteStringCollection : System.Collections.Specialized.StringCollection { }
+
+    /// <summary>
+    /// The Majorsilence-native name for a tree node, kept so that code written against this library
+    /// before the two names were reconciled still compiles.
+    /// </summary>
+    /// <remarks>
+    /// This used to be the other way round: the implementation class was <c>TreeViewItem</c> and
+    /// <see cref="TreeNode"/> was a subclass of it "for easy migration". That does not work, and the
+    /// reason is worth recording. Every WinForms-shaped member -- <c>TreeView.SelectedNode</c>,
+    /// <c>TopNode</c>, <c>GetNodeAt</c>, <c>Nodes[i]</c>, <c>node.Parent</c> -- returned the base type, so
+    /// assigning any of them to the <c>TreeNode</c> variable that WinForms code declares needed a
+    /// downcast, and a cast is exactly what a migration must not require. Nor could an implicit conversion
+    /// paper over it: C# forbids a user-defined conversion to a base class.
+    ///
+    /// So <c>TreeNode</c> is now the implementation and this is the subclass. Nodes flow the compiling
+    /// direction (a TreeViewItem <i>is</i> a TreeNode), and anything typed <c>TreeNode</c> accepts one.
+    /// The one thing that no longer holds is the reverse: a member returning <c>TreeNode</c> cannot be
+    /// assigned to a <c>TreeViewItem</c> variable without a cast. Native code that declares
+    /// <c>TreeViewItem</c> variables should change them to <c>TreeNode</c>.
+    /// </remarks>
+    public class TreeViewItem : TreeNode
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public TreeViewItem () { }
+
+        /// <summary>Initializes a new instance with the specified text.</summary>
+        public TreeViewItem (string text) : base (text) { }
+
+        /// <summary>Initializes a new instance with text and child nodes.</summary>
+        public TreeViewItem (string text, params TreeNode[] children) : base (text, children) { }
+    }
+
+    /// <summary>Specifies how a container control validates its children when it loses input focus.</summary>
+    public enum AutoValidate
+    {
+        /// <summary>Implicit validation is disabled.</summary>
+        Disable,
+        /// <summary>Implicit validation is enabled (validates when focus leaves a child control).</summary>
+        EnablePreventFocusChange,
+        /// <summary>Implicit validation is enabled but allows the focus change even when validation fails.</summary>
+        EnableAllowFocusChange,
+        /// <summary>Inherited from the parent container.</summary>
+        Inherit = -1
+    }
+
+    /// <summary>Specifies the color depth (bits per pixel) used by an ImageList.</summary>
+    public enum ColorDepth
+    {
+        /// <summary>4-bit color (16 colors).</summary>
+        Depth4Bit = 4,
+        /// <summary>8-bit color (256 colors).</summary>
+        Depth8Bit = 8,
+        /// <summary>16-bit color.</summary>
+        Depth16Bit = 16,
+        /// <summary>24-bit color.</summary>
+        Depth24Bit = 24,
+        /// <summary>32-bit color with alpha.</summary>
+        Depth32Bit = 32
+    }
+
+    /// <summary>
+    /// Specifies how a form scales its contents.
+    /// </summary>
+    public enum AutoScaleMode
+    {
+        /// <summary>Scaling is disabled.</summary>
+        None,
+        /// <summary>Scale relative to the font.</summary>
+        Font,
+        /// <summary>Scale relative to the display DPI.</summary>
+        Dpi,
+        /// <summary>Inherited from the parent.</summary>
+        Inherit
+    }
+
+    /// <summary>
+    /// Specifies which buttons to display on a MessageBox.
+    /// </summary>
+    public enum MessageBoxButtons
+    {
+        /// <summary>OK button.</summary>
+        OK,
+        /// <summary>OK and Cancel buttons.</summary>
+        OKCancel,
+        /// <summary>Abort, Retry, and Ignore buttons.</summary>
+        AbortRetryIgnore,
+        /// <summary>Yes, No, and Cancel buttons.</summary>
+        YesNoCancel,
+        /// <summary>Yes and No buttons.</summary>
+        YesNo,
+        /// <summary>Retry and Cancel buttons.</summary>
+        RetryCancel,
+        /// <summary>Cancel, Try Again, and Continue buttons.</summary>
+        CancelTryContinue = 6
+    }
+
+    /// <summary>
+    /// Specifies the icon to display on a MessageBox.
+    /// </summary>
+    public enum MessageBoxIcon
+    {
+        /// <summary>No icon.</summary>
+        None = 0,
+        /// <summary>Error icon.</summary>
+        Error = 16,
+        /// <summary>Same value as Error (matches System.Windows.Forms.MessageBoxIcon.Hand).</summary>
+        Hand = 16,
+        /// <summary>Same value as Error (matches System.Windows.Forms.MessageBoxIcon.Stop).</summary>
+        Stop = 16,
+        /// <summary>Warning icon.</summary>
+        Warning = 48,
+        /// <summary>Same value as Warning (matches System.Windows.Forms.MessageBoxIcon.Exclamation).</summary>
+        Exclamation = 48,
+        /// <summary>Information icon.</summary>
+        Information = 64,
+        /// <summary>Same value as Information (matches System.Windows.Forms.MessageBoxIcon.Asterisk).</summary>
+        Asterisk = 64,
+        /// <summary>Question icon.</summary>
+        Question = 32
+    }
+
+    /// <summary>
+    /// Displays a message box with a specified message, title, buttons, and icon.
+    /// </summary>
+    /// <remarks>Every <c>Show</c> overload has a <c>ShowAsync</c> twin taking the same arguments (see
+    /// MessageBox.Async.cs). <c>Show</c> blocks the caller in a nested modal loop, which the browser target
+    /// cannot run; there it throws <see cref="PlatformNotSupportedException"/> and <c>ShowAsync</c> is the
+    /// call to make.</remarks>
+    public static partial class MessageBox
+    {
+        /// <summary>Shows a message box with the specified text.</summary>
+        public static DialogResult Show (string text)
+            => Show (text, string.Empty, MessageBoxButtons.OK, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with the specified text and caption.</summary>
+        public static DialogResult Show (string text, string caption)
+            => Show (text, caption, MessageBoxButtons.OK, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with the specified text, caption, and buttons.</summary>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons)
+            => Show (text, caption, buttons, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with the specified text, caption, buttons, and icon.</summary>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+            => Show (text, caption, buttons, icon, DefaultButton, MessageBoxOptions.None);
+
+        // Every overload lands here (W6 mechanisms). The icon, the default button and the alignment
+        // options used to be accepted and dropped: the dialog showed no glyph, put Enter on the first
+        // button whatever the caller asked, and ignored RightAlign/RtlReading.
+        private static DialogResult ShowCore (Form? owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon,
+            MessageBoxDefaultButton defaultButton, MessageBoxOptions options)
+        {
+            // Before the form exists: on a backend that cannot block (the browser) nothing should reach
+            // the screen for a call that is about to fail (issue #406).
+            BlockingModal.ThrowIfUnsupported ("MessageBox.Show", "MessageBox.ShowAsync");
+
+            var (parent, form) = Prepare (owner, text, caption, buttons, icon, defaultButton, options);
+
+            // With no open form this used to Show () and answer OK without waiting -- so a MessageBox
+            // put up before Application.Run (a startup error, a "continue?" prompt) was answered for
+            // the user. ShowDialog () is modal with or without an owner now.
+            return parent is not null ? form.ShowDialog (parent) : form.ShowDialog ();
+        }
+
+        // What Show and ShowAsync share: the owner the box is shown against and the box itself.
+        private static (Form? Parent, MessageBoxForm Form) Prepare (Form? owner, string text, string caption, MessageBoxButtons buttons,
+            MessageBoxIcon icon, MessageBoxDefaultButton defaultButton, MessageBoxOptions options)
+        {
+            // Prefer the innermost currently-shown modal dialog over the earliest-opened window: an
+            // error box raised from code running inside an already-modal dialog must appear over
+            // that dialog, not behind it against the (input-blocked, likely out-of-view) main
+            // window -- which reads as a silent hang. See Application.ModalStack.
+            var parent = owner ?? Application.ActiveModalForm ?? Application.ModalOwnerCandidates.FirstOrDefault ();
+
+            return (parent, new MessageBoxForm (caption, text, buttons, icon, defaultButton, options));
+        }
+
+        // The long Show overloads. Only the arguments this layer can act on change anything: the help
+        // file, keyword and navigator name a Windows help subsystem that is not here, and
+        // MessageBoxOptions' RTL and service-notification flags have no counterpart either. They are
+        // accepted so designer-generated and copied-over calls compile, and the dialog shown is the
+        // one the first five arguments describe.
+
+        /// <inheritdoc cref="Show(string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon,
+            MessageBoxDefaultButton defaultButton, MessageBoxOptions options, bool displayHelpButton)
+            => Show (text, caption, buttons, icon, defaultButton, options);
+
+        /// <inheritdoc cref="Show(string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon,
+            MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath)
+            => Show (text, caption, buttons, icon, defaultButton, options);
+
+        /// <inheritdoc cref="Show(string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon,
+            MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath, string keyword)
+            => Show (text, caption, buttons, icon, defaultButton, options);
+
+        /// <inheritdoc cref="Show(string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon,
+            MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath, HelpNavigator navigator)
+            => Show (text, caption, buttons, icon, defaultButton, options);
+
+        /// <inheritdoc cref="Show(string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon,
+            MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath, HelpNavigator navigator, object param)
+            => Show (text, caption, buttons, icon, defaultButton, options);
+
+        // The IWin32Window-owned forms. Control and Form both implement that interface here, so the
+        // owner is resolved rather than discarded.
+
+        /// <summary>Shows a message box owned by the given window.</summary>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons,
+            MessageBoxIcon icon, MessageBoxDefaultButton defaultButton, MessageBoxOptions options)
+            => ShowCore (OwnerForm (owner), text, caption, buttons, icon, defaultButton, options);
+
+        // A control owner means its form, as upstream, where any IWin32Window owner's window is the
+        // dialog's owner (MessageBox.cs). It used to fall through to the first open form, so a message
+        // box raised from a UserControl in a tool window was owned by -- and centred over, and disabled
+        // -- the main window instead (FRM-27). See the no-owner overload for why ActiveModalForm is
+        // preferred when the passed owner resolves to no form at all.
+        private static Form? OwnerForm (IWin32Window? owner)
+            => owner as Form ?? (owner as Control)?.FindForm ()
+                ?? Application.ActiveModalForm ?? Application.ModalOwnerCandidates.FirstOrDefault ();
+
+        /// <inheritdoc cref="Show(IWin32Window,string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons,
+            MessageBoxIcon icon, MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath)
+            => ShowCore (OwnerForm (owner), text, caption, buttons, icon, defaultButton, options);
+
+        /// <inheritdoc cref="Show(IWin32Window,string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons,
+            MessageBoxIcon icon, MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath, string keyword)
+            => ShowCore (OwnerForm (owner), text, caption, buttons, icon, defaultButton, options);
+
+        /// <inheritdoc cref="Show(IWin32Window,string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons,
+            MessageBoxIcon icon, MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath, HelpNavigator navigator)
+            => ShowCore (OwnerForm (owner), text, caption, buttons, icon, defaultButton, options);
+
+        /// <inheritdoc cref="Show(IWin32Window,string,string,MessageBoxButtons,MessageBoxIcon,MessageBoxDefaultButton,MessageBoxOptions)"/>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons,
+            MessageBoxIcon icon, MessageBoxDefaultButton defaultButton, MessageBoxOptions options, string helpFilePath,
+            HelpNavigator navigator, object param)
+            => ShowCore (OwnerForm (owner), text, caption, buttons, icon, defaultButton, options);
+
+        /// <summary>Shows a message box with the specified owner form and text.</summary>
+        public static DialogResult Show (Form owner, string text)
+            => Show (owner, text, string.Empty, MessageBoxButtons.OK, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with the specified owner form, text, and caption.</summary>
+        public static DialogResult Show (Form owner, string text, string caption)
+            => Show (owner, text, caption, MessageBoxButtons.OK, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with the specified owner form, text, caption, and buttons.</summary>
+        public static DialogResult Show (Form owner, string text, string caption, MessageBoxButtons buttons)
+            => Show (owner, text, caption, buttons, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with the specified owner form, text, caption, buttons, and icon.</summary>
+        public static DialogResult Show (Form owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+            => ShowCore (owner, text, caption, buttons, icon, DefaultButton, MessageBoxOptions.None);
+
+        /// <summary>Shows a message box with IWin32Window owner, text, caption, buttons, and icon.</summary>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+            => ShowCore (OwnerForm (owner), text, caption, buttons, icon, DefaultButton, MessageBoxOptions.None);
+
+        /// <summary>Shows a message box with IWin32Window owner.</summary>
+        public static DialogResult Show (IWin32Window owner, string text)
+            => Show (owner, text, string.Empty, MessageBoxButtons.OK, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with IWin32Window owner and caption.</summary>
+        public static DialogResult Show (IWin32Window owner, string text, string caption)
+            => Show (owner, text, caption, MessageBoxButtons.OK, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with IWin32Window owner, text, caption, and buttons.</summary>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons)
+            => Show (owner, text, caption, buttons, MessageBoxIcon.None);
+
+        /// <summary>Shows a message box with text, caption, buttons, icon, and default button. Default button is ignored in Majorsilence.Forms.</summary>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton)
+            => Show (text, caption, buttons, icon, defaultButton, MessageBoxOptions.None);
+
+        /// <summary>Shows a message box with text, caption, buttons, icon, default button, and options. Extras are ignored in Majorsilence.Forms.</summary>
+        public static DialogResult Show (string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton, MessageBoxOptions options)
+            => ShowCore (null, text, caption, buttons, icon, defaultButton, options);
+
+        /// <summary>Shows a message box with owner, text, caption, buttons, icon, and default button. Default button is ignored in Majorsilence.Forms.</summary>
+        public static DialogResult Show (IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton)
+            => ShowCore (OwnerForm (owner), text, caption, buttons, icon, defaultButton, MessageBoxOptions.None);
+
+        /// <summary>
+        /// The default button the overloads that take none use. Not an upstream member: it mirrors the
+        /// designer-side setting so an application can pick, say, the safe "No" of a Yes/No prompt once
+        /// rather than at every call (read as of W6 mechanisms).
+        /// </summary>
+        public static MessageBoxDefaultButton DefaultButton { get; set; } = MessageBoxDefaultButton.Button1;
+    }
+
+    /// <summary>Provides options for a MessageBox. Stub in Majorsilence.Forms — options are accepted but ignored.</summary>
+    [Flags]
+    public enum MessageBoxOptions
+    {
+        /// <summary>No options.</summary>
+        None = 0,
+        /// <summary>The message box is displayed on the default desktop of the interactive window station.</summary>
+        DefaultDesktopOnly = 0x20000,
+        /// <summary>The message box text is right-aligned.</summary>
+        RightAlign = 0x80000,
+        /// <summary>The message box text is displayed with right-to-left reading order.</summary>
+        RtlReading = 0x100000,
+        /// <summary>The message box is displayed on the currently active desktop.</summary>
+        ServiceNotification = 0x200000
+    }
+
+    /// <summary>Specifies the default button for a MessageBox.</summary>
+    public enum MessageBoxDefaultButton
+    {
+        /// <summary>The first button is the default.</summary>
+        Button1 = 0,
+        /// <summary>The second button is the default.</summary>
+        Button2 = 256,
+        /// <summary>The third button is the default.</summary>
+        Button3 = 512,
+        /// <summary>The fourth button is the default.</summary>
+        Button4 = 768,
+    }
+
+    /// <summary>
+    /// Base class for items that appear in a MenuStrip or StatusStrip.
+    /// </summary>
+    public partial class ToolStripItem : MenuItem
+    {
+        /// <summary>Gets or sets the name of this item.</summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the size of this item.</summary>
+        /// <remarks>
+        /// A view over <see cref="MenuItem.Bounds"/> in both directions, as upstream's is
+        /// (<c>ToolStripItem.cs:1807</c>: <c>get =&gt; Bounds.Size</c>, and a setter that writes the
+        /// size into <c>Bounds</c> via <c>SetBounds</c>).
+        ///
+        /// It used to be a store of its own, separate from the <c>Bounds</c> layout writes, which is
+        /// the rest of <c>TSM-22</c>: <see cref="Width"/>/<see cref="Height"/>/
+        /// <see cref="ToolStripItem.ContentRectangle"/> all read it, so they reported 0 for every item
+        /// laid out normally -- layout writes <c>Bounds</c> and nothing wrote this. The objection
+        /// recorded against merging them was that reading <c>Bounds</c> would answer 0 for an item that
+        /// has never been on a strip; that only held while the two were separate. Assigning here now
+        /// writes <c>Bounds</c>, so a size set before the item reaches a strip reads back unchanged.
+        ///
+        /// Honoured by <see cref="GetPreferredSize"/> when <see cref="AutoSize"/> is off, which is what
+        /// upstream does with it; with AutoSize on it is advisory, as there -- the next layout pass
+        /// measures and overwrites it.
+        /// </remarks>
+        public virtual Size Size {
+            get => Bounds.Size;
+            set {
+                if (Bounds.Size == value)
+                    return;
+
+                SetBounds (Bounds.X, Bounds.Y, value.Width, value.Height);
+                InvalidateItemLayout ();
+            }
+        }
+
+        /// <summary>Gets or sets the height of this item. Mirrors WinForms ToolStripItem.Height.</summary>
+        /// <remarks>
+        /// Reads the laid-out height, symmetric with <see cref="Width"/> and with upstream, now that
+        /// <see cref="Size"/> is a view over <c>Bounds</c> rather than a second store. Assigning runs a
+        /// layout pass, so the size reaches the box the renderer draws (<c>TSM-31</c>).
+        /// </remarks>
+        public new int Height {
+            get => Size.Height;
+            set => Size = new Size (Size.Width, value);
+        }
+
+        // The AutoSize=false rule that consumes Size already lives on the override in
+        // ToolStripPanelRowLayout.cs. What was missing is above: assigning Size (or Height) never ran
+        // a layout pass, so the rule had nothing to re-measure and the new size appeared only after
+        // some unrelated repaint (TSM-31).
+
+        /// <summary>Gets or sets the tooltip text shown for this item.</summary>
+        public string ToolTipText { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the display style for the item.</summary>
+        public ToolStripItemDisplayStyle DisplayStyle {
+            get => display_style;
+            set {
+                if (display_style == value)
+                    return;
+
+                display_style = value;
+                DisplayStyleChanged?.Invoke (this, EventArgs.Empty);
+                InvalidateItemLayout ();
+            }
+        }
+
+        private ToolStripItemDisplayStyle display_style = ToolStripItemDisplayStyle.ImageAndText;
+
+        /// <summary>Gets or sets the alignment of the item within the strip.</summary>
+        public ToolStripItemAlignment Alignment { get; set; } = ToolStripItemAlignment.Left;
+
+        // `public new bool Enabled` and `public new object? Tag` used to live here, each with a store
+        // of its own that nothing else read (TSM-01, P0). MenuItem owns both now; this class adds the
+        // EnabledChanged raise through the hook below.
+
+        /// <inheritdoc/>
+        protected override void OnEnabledChanged (EventArgs e)
+        {
+            base.OnEnabledChanged (e);
+
+            EnabledChanged?.Invoke (this, e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnVisibleChanged (EventArgs e)
+        {
+            base.OnVisibleChanged (e);
+
+            // Upstream's SetVisibleCore raises both, and application code listens for either.
+            VisibleChanged?.Invoke (this, e);
+            AvailableChanged?.Invoke (this, e);
+        }
+
+        /// <summary>
+        /// Gets or sets the image displayed on this item. Accepts <see cref="Majorsilence.Forms.Drawing.Image"/> for WinForms compatibility.
+        /// The converted <see cref="SkiaSharp.SKBitmap"/> is synced to the base class so renderers can access it.
+        /// Reading falls back to whatever <see cref="ImageIndex"/>/<see cref="ImageKey"/> names in the owning
+        /// strip's <see cref="ToolStrip.ImageList"/>, as WinForms does, when no image was assigned outright.
+        /// </summary>
+#pragma warning disable CA1416
+        public new virtual Majorsilence.Forms.Drawing.Image? Image {
+            get {
+                if (_toolStripImage is { } assigned)
+                    return assigned;
+
+                if (ImageListImage is not { } bitmap)
+                    return null;
+
+                // Wrapped once per underlying bitmap rather than per read: callers compare and dispose what
+                // this hands back, and a fresh wrapper each time would make `item.Image == item.Image` false.
+                if (!ReferenceEquals (bitmap, resolved_image_source)) {
+                    resolved_image_source = bitmap;
+                    resolved_image = bitmap;    // implicit SKBitmap -> Image
+                }
+
+                return resolved_image;
+            }
+            set {
+                _toolStripImage = value;
+                ((MenuItem)this).SetImageSK (value?.ToSKBitmap ());
+            }
+        }
+#pragma warning restore CA1416
+
+        private Majorsilence.Forms.Drawing.Image? _toolStripImage;
+
+        /// <summary>Gets or sets how the image is aligned on the item.</summary>
+        /// <remarks>Read by the strip renderer as of W6 mechanisms, with upstream's default of
+        /// <c>MiddleCenter</c>: the vertical part places the image in every <see cref="TextImageRelation"/>,
+        /// and the horizontal part places it under <see cref="TextImageRelation.Overlay"/>, where the
+        /// text does not fix its side.</remarks>
+        public ContentAlignment ImageAlign { get; set; } = ContentAlignment.MiddleCenter;
+
+        private int image_index = -1;
+        private string image_key = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the index of this item's image in the owning strip's
+        /// <see cref="ToolStrip.ImageList"/>. Setting it clears <see cref="ImageKey"/>, as WinForms does —
+        /// an item is addressed by index or by key, never both.
+        /// </summary>
+        public int ImageIndex {
+            get => image_index;
+            set {
+                if (image_index == value)
+                    return;
+
+                image_index = value;
+                image_key = string.Empty;
+
+                InvalidateImage ();
+            }
+        }
+
+        /// <summary>Gets or sets how the item's image is scaled. Mirrors WinForms
+        /// ToolStripItem.ImageScaling (the Size-typed knob is ImageScalingSize on the strip).</summary>
+        public ToolStripItemImageScaling ImageScaling { get; set; } = ToolStripItemImageScaling.SizeToFit;
+
+        /// <summary>Gets or sets the position of text relative to the image. Stub in Majorsilence.Forms.</summary>
+        public TextImageRelation TextImageRelation { get; set; } = TextImageRelation.ImageBeforeText;
+
+        /// <summary>Gets or sets whether the item auto-sizes itself. Stub in Majorsilence.Forms.</summary>
+        public bool AutoSize { get; set; } = true;
+
+        /// <summary>Gets or sets the overflow behavior. Stub in Majorsilence.Forms.</summary>
+        public ToolStripItemOverflow Overflow { get; set; } = ToolStripItemOverflow.AsNeeded;
+
+        /// <summary>Gets or sets the text align within the item. Stub in Majorsilence.Forms.</summary>
+        public virtual ContentAlignment TextAlign { get; set; } = ContentAlignment.MiddleCenter;
+
+        private RightToLeft right_to_left = RightToLeft.No;
+        private System.Drawing.Color fore_color = System.Drawing.Color.Empty;
+        private System.Drawing.Color back_color = System.Drawing.Color.Empty;
+
+        /// <summary>Gets or sets the right-to-left mode.</summary>
+        /// <remarks>Notifies on change (W6.1). Not read by layout or paint here; upstream's Inherit
+        /// resolution against the owning strip is not modelled, so the compare is on the stored value.</remarks>
+        public RightToLeft RightToLeft {
+            get => right_to_left;
+            set {
+                if (right_to_left == value)
+                    return;
+
+                right_to_left = value;
+                OnRightToLeftChanged (EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Gets or sets the foreground color of this item.</summary>
+        /// <remarks>Notifies on change (W6.1); read by the strip renderers.</remarks>
+        public virtual System.Drawing.Color ForeColor {
+            get => fore_color;
+            set {
+                if (fore_color == value)
+                    return;
+
+                fore_color = value;
+                OnForeColorChanged (EventArgs.Empty);
+                OwnerControl?.Invalidate ();
+            }
+        }
+
+        /// <summary>Gets or sets the background color of this item.</summary>
+        /// <remarks>Notifies on change (W6.1); read by the strip renderers.</remarks>
+        public virtual System.Drawing.Color BackColor {
+            get => back_color;
+            set {
+                if (back_color == value)
+                    return;
+
+                back_color = value;
+                OnBackColorChanged (EventArgs.Empty);
+                OwnerControl?.Invalidate ();
+            }
+        }
+
+        /// <summary>Gets or sets the font for this item. Stub in Majorsilence.Forms.</summary>
+        public Majorsilence.Forms.Drawing.Font? Font { get; set; }
+
+        /// <summary>
+        /// Gets or sets the key naming this item's image in the owning strip's
+        /// <see cref="ToolStrip.ImageList"/>. Setting it clears <see cref="ImageIndex"/>, as WinForms does.
+        /// </summary>
+        public string ImageKey {
+            get => image_key;
+            set {
+                value ??= string.Empty;
+
+                if (image_key == value)
+                    return;
+
+                image_key = value;
+                image_index = -1;
+
+                InvalidateImage ();
+            }
+        }
+
+        private Majorsilence.Forms.Drawing.Image? resolved_image;
+        private SkiaSharp.SKBitmap? resolved_image_source;
+
+        /// <inheritdoc/>
+        internal override SkiaSharp.SKBitmap? ImageSK => base.ImageSK ?? ImageListImage;
+
+        // The image this item's index/key names, or null. Resolved on read rather than when ImageIndex is
+        // assigned: designer code sets the index while the item is still unparented and before
+        // ImageList.ImageStream has been filled in, so anything resolved eagerly would be null forever.
+        private SkiaSharp.SKBitmap? ImageListImage {
+            get {
+                // Read through ToolBar, the single storage both it and ToolStrip.ImageList share.
+                if ((OwnerControl as ToolBar)?.ImageList is not { } list)
+                    return null;
+
+                var index = image_index;
+
+                if (index < 0 && image_key.Length > 0)
+                    index = list.Images.IndexOfKey (image_key);
+
+                return index >= 0 && index < list.Images.Count ? list.Images.GetBitmap (index) : null;
+            }
+        }
+
+        // An item's preferred size is measured from its image, so a changed image is a layout change.
+        private void InvalidateImage ()
+        {
+            resolved_image = null;
+            resolved_image_source = null;
+
+            OwnerControl?.PerformLayout ();
+            OwnerControl?.Invalidate ();
+        }
+
+        /// <summary>Gets the <see cref="ToolStrip"/> this item belongs to, or null when it is not on one.</summary>
+        /// <remarks>
+        /// Walks the owning-control chain rather than reading <c>ParentControl</c> directly: an item
+        /// added to a strip hangs off that strip's root item and has no ParentControl of its own, so
+        /// the direct read reported null for every item on a ToolStrip.
+        /// </remarks>
+        public ToolStrip? Owner => OwnerControl as ToolStrip;
+
+        /// <summary>Gets the owner item (parent ToolStripItem). Stub in Majorsilence.Forms.</summary>
+        public ToolStripItem? OwnerItem => Parent as ToolStripItem;
+
+        // PerformClick is inherited from MenuItem, which is where WinForms declares it for menu items
+        // and where this hierarchy puts the shared implementation.
+
+        /// <summary>Gets or sets the accessible role. Stub in Majorsilence.Forms.</summary>
+        public AccessibleRole AccessibleRole { get; set; } = AccessibleRole.Default;
+
+        /// <summary>Gets or sets whether this item is selected. Stub in Majorsilence.Forms.</summary>
+        public new bool Selected => Hovered;
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// On a toolbar, WinForms sizes an item to its content plus a 2px border and no padding of its
+        /// own (<c>ToolStripItem.DefaultPadding</c> is empty; the border is
+        /// <c>ToolStripItemInternalLayout</c>'s), so a 20px icon button is 24px wide. The menu padding
+        /// this used to inherit made the same button 48px, and a designer toolbar laid out for WinForms
+        /// ran out of room: its trailing items -- ReportDesigner's expression editor and zoom control --
+        /// were pushed off the end and never shown. Menus and status strips keep the menu metrics.
+        /// </remarks>
+        protected override Padding DefaultPadding
+            => IsOnPlainToolStrip ? new Padding (2)
+             // A menu bar under upstream's metrics (Menu.UpstreamFont): upstream's top-level menu item padding.
+             : OwnerControl is Menu { UpstreamFont: not null } ? new Padding (4, 0, 4, 0)
+             : base.DefaultPadding;
+
+        // A ToolStrip in its own right rather than one of the menu or status strips that derive from it.
+        internal bool IsOnPlainToolStrip => OwnerControl is ToolStrip and not (Menu or MenuDropDown or StatusStrip);
+    }
+
+    /// <summary>Specifies the overflow behavior of a ToolStripItem.</summary>
+    public enum ToolStripItemOverflow
+    {
+        /// <summary>Item never overflows.</summary>
+        Never,
+        /// <summary>Item always overflows.</summary>
+        Always,
+        /// <summary>Item overflows as needed.</summary>
+        AsNeeded
+    }
+
+    /// <summary>Specifies how a ToolStripItem displays its text and image.</summary>
+    public enum ToolStripItemDisplayStyle
+    {
+        /// <summary>Neither text nor image is shown.</summary>
+        None,
+        /// <summary>Only the text is shown.</summary>
+        Text,
+        /// <summary>Only the image is shown.</summary>
+        Image,
+        /// <summary>Both text and image are shown.</summary>
+        ImageAndText
+    }
+
+    /// <summary>
+    /// Represents a clickable button on a ToolStrip / toolbar.
+    /// </summary>
+    public partial class ToolStripButton : ToolStripItem
+    {
+        /// <summary>Gets or sets the color treated as transparent in the button image.</summary>
+        /// <remarks>The button's own value wins over the base item's; the renderer reads whichever is
+        /// set (W6 mechanisms).</remarks>
+        public new System.Drawing.Color ImageTransparentColor {
+            get => base.ImageTransparentColor;
+            set => base.ImageTransparentColor = value;
+        }
+
+        /// <summary>Initializes a new instance of the ToolStripButton class.</summary>
+        public ToolStripButton () { }
+
+        /// <summary>Initializes a new instance of the ToolStripButton class with the specified text.</summary>
+        public ToolStripButton (string text)
+        {
+            Text = text;
+        }
+
+        /// <summary>Initializes a new instance of the ToolStripButton class with text, image, and click handler.</summary>
+        public ToolStripButton (string text, SkiaSharp.SKBitmap? image, EventHandler? onClick = null)
+        {
+            Text = text;
+            ((MenuItem)this).SetImageSK (image);
+
+            if (onClick is not null)
+                Click += onClick;
+        }
+
+        /// <summary>Initializes a new instance of the ToolStripButton class with text, a Majorsilence.Forms.Drawing.Image, and click handler.</summary>
+#pragma warning disable CA1416
+        public ToolStripButton (string text, Majorsilence.Forms.Drawing.Image? image, EventHandler? onClick = null)
+            : this (text, image?.ToSKBitmap (), onClick) { }
+#pragma warning restore CA1416
+
+        /// <summary>Gets or sets whether the button is in the checked (pressed) state.</summary>
+        /// <remarks>Stored by <see cref="MenuItem.Checked"/> -- the property the renderer reads -- where
+        /// this used to keep a private field of its own, so a toggle button never looked pressed
+        /// (finding <c>TSM-06</c>).</remarks>
+        public override bool Checked {
+            get => CheckState != CheckState.Unchecked;
+            set {
+                if (Checked == value)
+                    return;
+
+                CheckState = value ? CheckState.Checked : CheckState.Unchecked;
+            }
+        }
+
+        /// <summary>Gets or sets the button's check state.</summary>
+        /// <remarks>
+        /// The storage, with <see cref="Checked"/> derived from it, as upstream
+        /// (<c>ToolStripButton.cs</c>, <c>CheckState</c>): a change raises <c>CheckedChanged</c> then
+        /// <c>CheckStateChanged</c>. It was derived from the bool, so <c>Indeterminate</c> read back
+        /// <c>Unchecked</c> (TSM-24). <see cref="MenuItem.Checked"/> is kept in step because the
+        /// renderers read it.
+        /// </remarks>
+        public CheckState CheckState {
+            get => check_state;
+            set {
+                if (check_state == value)
+                    return;
+
+                check_state = value;
+                base.Checked = value != CheckState.Unchecked;
+                OwnerControl?.Invalidate ();
+                OnCheckedChanged (EventArgs.Empty);
+                OnCheckStateChanged (EventArgs.Empty);
+            }
+        }
+
+        private CheckState check_state;
+
+        /// <summary>Raises the <see cref="CheckStateChanged"/> event.</summary>
+        protected virtual void OnCheckStateChanged (EventArgs e) => CheckStateChanged?.Invoke (this, e);
+
+        /// <summary>Raised when Checked changes.</summary>
+        public event EventHandler? CheckStateChanged;
+
+        /// <summary>Gets or sets whether clicking the button toggles its checked state.</summary>
+        public bool CheckOnClick { get; set; }
+
+        /// <inheritdoc/>
+        protected override void OnClick (EventArgs e)
+        {
+            // WinForms toggles the check state BEFORE raising Click, so a handler that reads Checked
+            // to decide what the click means sees the new value. Nothing acted on CheckOnClick here,
+            // so a latching toolbar button never latched and every Click handler saw Checked ==
+            // false. Found running ReportDesigner: the Text Box / Chart / Table / ... insert-tool
+            // buttons (CheckOnClick = true, handler reads button.Checked to arm the insert mode)
+            // did nothing.
+            if (CheckOnClick)
+                Checked = !Checked;
+
+            base.OnClick (e);
+        }
+    }
+
+    /// <summary>
+    /// Represents a non-interactive text label on a ToolStrip / toolbar.
+    /// </summary>
+    public partial class ToolStripLabel : ToolStripItem
+    {
+        /// <summary>Initializes a new instance of the ToolStripLabel class.</summary>
+        public ToolStripLabel () { }
+
+        /// <summary>Initializes a new instance of the ToolStripLabel class with the specified text.</summary>
+        public ToolStripLabel (string text)
+        {
+            Text = text;
+        }
+
+        /// <summary>Gets or sets a value indicating whether the label acts as a hyperlink. Stub in Majorsilence.Forms.</summary>
+        public bool IsLink { get; set; }
+
+        /// <summary>Gets or sets the link behavior. Stub in Majorsilence.Forms.</summary>
+        public LinkBehavior LinkBehavior { get; set; } = LinkBehavior.SystemDefault;
+
+        /// <summary>Gets or sets the color used when displaying a normal link. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color LinkColor { get; set; } = System.Drawing.Color.Blue;
+
+        /// <summary>Gets or sets the color used when displaying a visited link. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color VisitedLinkColor { get; set; } = System.Drawing.Color.Purple;
+
+        /// <summary>Gets or sets a value indicating whether the link has been visited. Stub in Majorsilence.Forms.</summary>
+        public bool LinkVisited { get; set; }
+
+        /// <summary>Forwards to the inherited <c>MouseEnter</c>; redeclared as WinForms does (it used to discard its handlers).</summary>
+        public new event EventHandler? MouseEnter {
+            add => base.MouseEnter += value;
+            remove => base.MouseEnter -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>MouseLeave</c>; redeclared as WinForms does (it used to discard its handlers).</summary>
+        public new event EventHandler? MouseLeave {
+            add => base.MouseLeave += value;
+            remove => base.MouseLeave -= value;
+        }
+    }
+
+    /// <summary>
+    /// Represents an editable text box embedded on a ToolStrip / toolbar.
+    /// </summary>
+    public partial class ToolStripTextBox : ToolStripControlHost
+    {
+        /// <summary>Initializes a new instance of the ToolStripTextBox class.</summary>
+        public ToolStripTextBox () : base (new TextBox ()) { }
+
+        /// <summary>Initializes a new instance of the ToolStripTextBox class with the specified name.</summary>
+        public ToolStripTextBox (string name) : base (new TextBox (), name) { }
+
+        /// <summary>Initializes a new instance hosting an existing TextBox.</summary>
+        public ToolStripTextBox (TextBox textBox) : base (textBox) { }
+
+        /// <summary>Gets the hosted TextBox.</summary>
+        public TextBox TextBox => (TextBox)Control;
+
+        // Text is ToolStripControlHost's: it reads and writes the hosted control, which is this
+        // TextBox. It used to be a private string on the item that the hosted control never saw, so
+        // Text and TextBox.Text were two unrelated values and the editing verbs -- Cut, Paste,
+        // SelectAll -- operated on the one Text did not report.
+
+        /// <summary>Raised when the text changes.</summary>
+        public new event EventHandler? TextChanged {
+            add => TextBox.TextChanged += value;
+            remove => TextBox.TextChanged -= value;
+        }
+
+        /// <summary>Gets or sets whether pressing Enter in the text box creates a new line.</summary>
+        public bool AcceptsReturn {
+            get => TextBox.AcceptsReturn;
+            set => TextBox.AcceptsReturn = value;
+        }
+
+        /// <summary>Gets or sets whether pressing Tab moves focus or inserts a tab character.</summary>
+        public bool AcceptsTab {
+            get => TextBox.AcceptsTab;
+            set => TextBox.AcceptsTab = value;
+        }
+
+        /// <summary>Gets or sets the maximum number of characters that can be entered.</summary>
+        public int MaxLength {
+            get => TextBox.MaxLength;
+            set => TextBox.MaxLength = value;
+        }
+
+        /// <summary>Gets or sets whether the text in the text box is read-only.</summary>
+        public bool ReadOnly {
+            get => TextBox.ReadOnly;
+            set => TextBox.ReadOnly = value;
+        }
+
+        // KeyDown, GotFocus, LostFocus and the rest of the input surface are inherited from
+        // ToolStripControlHost, which already forwards them to the hosted control.
+
+        /// <summary>Copies the current selection to the clipboard.</summary>
+        public void Cut () => TextBox.Cut ();
+
+        /// <summary>Copies the current selection to the clipboard.</summary>
+        public void Copy () => TextBox.Copy ();
+
+        /// <summary>Pastes the clipboard contents over the current selection.</summary>
+        public void Paste () => TextBox.Paste ();
+
+        /// <summary>Undoes the last edit.</summary>
+        public void Undo () => TextBox.Undo ();
+
+        /// <summary>Selects all text.</summary>
+        public void SelectAll () => TextBox.SelectAll ();
+    }
+
+    /// <summary>Hosts an arbitrary Control inside a ToolStrip. Stub in Majorsilence.Forms.</summary>
+    public partial class ToolStripControlHost : ToolStripItem
+    {
+        /// <summary>Initializes a new instance hosting the specified control.</summary>
+        public ToolStripControlHost (Control control) { Control = control; natural_size = control.Size; }
+
+        /// <summary>Initializes a new instance hosting the specified control with the given name.</summary>
+        public ToolStripControlHost (Control control, string name) { Control = control; Name = name; natural_size = control.Size; }
+
+        /// <summary>Gets the hosted control.</summary>
+        public Control Control { get; }
+
+        /// <summary>Gets or sets the hosted control's text.</summary>
+        /// <remarks>
+        /// The hosted control's, as upstream (<c>ToolStripControlHost.Text</c> gets and sets
+        /// <c>Control.Text</c>). Only <see cref="ToolStripTextBox"/> forwarded it, so
+        /// <c>toolStripComboBox1.Text</c> read the item's own caption -- empty, or a designer name the
+        /// renderer never draws for a host -- and assigning it left the combo unchanged (TSM-20). The
+        /// null test covers the base constructors, which run before <see cref="Control"/> is assigned.
+        /// </remarks>
+        public override string Text {
+            get => Control is null ? base.Text : Control.Text;
+            set {
+                if (Control is null)
+                    base.Text = value;
+                else
+                    Control.Text = value ?? string.Empty;
+            }
+        }
+
+        /// <summary>Gets or sets the size of the hosted control.</summary>
+        /// <remarks>
+        /// A set is remembered as the item's preferred size (<see cref="GetPreferredSize"/>): the strip's
+        /// layout then overwrites <c>Control.Size</c> with whatever box it hands the item, so without a
+        /// separate record a designer-set width (the resx for a ToolStripTextBox / ToolStripComboBox)
+        /// would be lost on the first layout pass and the editor would collapse to a sliver.
+        /// </remarks>
+        public override System.Drawing.Size Size {
+            get => Control.Size;
+            set {
+                PreferredSizeOverride = value;
+                Control.Size = value;
+            }
+        }
+
+        // The last size explicitly assigned to this host (via Size or the resx). Empty until one is.
+        private protected System.Drawing.Size PreferredSizeOverride { get; private set; }
+
+#pragma warning disable CS0067
+        /// <summary>Raised when the hosted control's content changes. Stub in Majorsilence.Forms.</summary>
+        public event EventHandler? ContentChanged;
+#pragma warning restore CS0067
+
+        /// <summary>Raised when the hosted control receives focus. Forwards to the hosted control.</summary>
+        public event EventHandler? GotFocus { add => Control.GotFocus += value; remove => Control.GotFocus -= value; }
+
+        /// <summary>Raised when the hosted control loses focus. Forwards to the hosted control.</summary>
+        public event EventHandler? LostFocus { add => Control.LostFocus += value; remove => Control.LostFocus -= value; }
+
+        /// <summary>Raised when a key is pressed while focus is on the hosted control. Forwards to the hosted control.</summary>
+        public event KeyEventHandler? KeyDown { add => Control.KeyDown += value; remove => Control.KeyDown -= value; }
+
+        /// <summary>Raised when a key is released while focus is on the hosted control. Forwards to the hosted control.</summary>
+        public event KeyEventHandler? KeyUp { add => Control.KeyUp += value; remove => Control.KeyUp -= value; }
+    }
+
+    /// <summary>Represents a ToolStrip-hosted drop-down control.</summary>
+    public partial class ToolStripDropDown : ContextMenu
+    {
+        // When this drop-down belongs to a menu item (ToolStripMenuItem.DropDown), it is a view onto
+        // that item rather than a menu in its own right: the item already owns the sub-item collection
+        // and the open/closed state, and WinForms treats item.DropDownItems and item.DropDown.Items as
+        // the same collection. Unowned drop-downs (a ContextMenuStrip, say) keep their own.
+        private MenuItem? OwnerMenuItem => OwnerItem;
+
+        /// <summary>Gets the items in this drop-down.</summary>
+        public new MenuItemCollection Items => OwnerMenuItem?.Items ?? base.Items;
+
+        /// <inheritdoc/>
+        public override bool Visible {
+            get => OwnerMenuItem is { } owner ? owner.IsDropDownOpened : base.Visible;
+            set {
+                if (OwnerMenuItem is not { } owner) {
+                    base.Visible = value;
+                    return;
+                }
+
+                if (value)
+                    owner.ShowDropDown ();
+                else
+                    owner.HideDropDown ();
+            }
+        }
+
+        /// <summary>Hides the drop-down.</summary>
+        /// <remarks>
+        /// Owned drop-downs forward to the owner item's real close, exactly as <see cref="Visible"/>
+        /// does. This cannot be left to the inherited method: <c>MenuDropDown.Hide</c> is a <c>new</c>
+        /// method that hides the drop-down's own popup -- and an owned drop-down's shown menu is not its
+        /// own popup but the owner's, so <c>Close(...)</c> bound to it and quietly closed nothing.
+        /// </remarks>
+        public new void Hide ()
+        {
+            if (OwnerMenuItem is { } owner)
+                owner.HideDropDown ();
+            else
+                base.Hide ();
+        }
+
+        // NOTE: Show (Point) and Show (Control, Point) are inherited from ContextMenu. Show (Point) used
+        // to be redeclared here with an empty body, which shadowed the real one; both are now real.
+    }
+
+    /// <summary>
+    /// Represents a button on a ToolStrip that displays a drop-down menu when clicked.
+    /// </summary>
+    /// <remarks>
+    /// Derives from <see cref="ToolStripDropDownItem"/>, as WinForms does. It used to derive straight from
+    /// <see cref="ToolStripItem"/> and redeclare a drop-down surface of its own -- a <c>DropDownItems</c>
+    /// that returned the button's own <c>Items</c>, a <c>ShowDropDown</c> that did nothing, and three
+    /// events with empty accessors. The consequence was that <c>DropDown</c> itself did not exist on the
+    /// button at all, so code closing a menu through <c>button.DropDown.Close(...)</c> would not compile;
+    /// with the base in place, that surface is the real one and the shadowing members are gone.
+    /// </remarks>
+    public partial class ToolStripDropDownButton : ToolStripDropDownItem
+    {
+        /// <summary>Initializes a new instance of the ToolStripDropDownButton class.</summary>
+        public ToolStripDropDownButton () { }
+
+        /// <summary>Initializes a new instance of the ToolStripDropDownButton class with the specified text.</summary>
+        public ToolStripDropDownButton (string text)
+        {
+            Text = text;
+        }
+    }
+
+    /// <summary>Represents a button with both a clickable portion and a drop-down arrow. Stub in Majorsilence.Forms.</summary>
+    public partial class ToolStripSplitButton : ToolStripDropDownButton
+    {
+        /// <summary>Initializes a new instance of the ToolStripSplitButton class.</summary>
+        public ToolStripSplitButton () { }
+
+        /// <summary>Initializes a new instance with the specified text.</summary>
+        public ToolStripSplitButton (string text) { Text = text; }
+
+        /// <summary>Initializes a new instance with the specified text and image.</summary>
+        public ToolStripSplitButton (string text, Majorsilence.Forms.Drawing.Image? image) { Text = text; Image = image; }
+
+        // Notifies on change; the event was declared and raised by nothing (W6.1).
+        private ToolStripItem? default_item;
+
+        /// <summary>Gets or sets the default item clicked when the button portion is clicked. Stub in Majorsilence.Forms.</summary>
+        public new ToolStripItem? DefaultItem {
+            get => default_item;
+            set {
+                if (ReferenceEquals (default_item, value))
+                    return;
+
+                default_item = value;
+                DefaultItemChanged?.Invoke (this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Gets the width of the drop-down button portion. Stub in Majorsilence.Forms.</summary>
+        public int DropDownButtonWidth { get; set; } = 11;
+
+        /// <summary>Raised when the button portion of the item is clicked.</summary>
+        public event EventHandler? ButtonClick;
+
+        /// <summary>Raised when the button portion of the item is double-clicked. Stub in Majorsilence.Forms.</summary>
+        public event EventHandler? ButtonDoubleClick;
+
+        // There used to be an OnClick override here raising ButtonClick for every click: the arrow half
+        // too, PerformClick too, and PerformButtonClick twice (it calls PerformClick and then
+        // OnButtonClick). The strip now raises the button half itself, after Click, from the click
+        // that actually landed on it (TSM-15).
+        internal void RaiseButtonClickFromStrip () => OnButtonClick (EventArgs.Empty);
+
+        /// <inheritdoc/>
+        /// <remarks>A double-click on the button part (not the drop-down arrow) is ButtonDoubleClick, as
+        /// upstream raises it; needs DoubleClickEnabled like every item double-click (W6).</remarks>
+        protected override void OnDoubleClick (EventArgs e)
+        {
+            base.OnDoubleClick (e);
+
+            if (e is MouseEventArgs mouse && ButtonBounds.Contains (mouse.X - Bounds.X, mouse.Y - Bounds.Y))
+                OnButtonDoubleClick (e);
+        }
+    }
+
+    /// <summary>
+    /// Represents a menu item in a MenuStrip.
+    /// </summary>
+    // WinForms: ToolStripMenuItem : ToolStripDropDownItem : ToolStripItem. The middle class exists here
+    // but nothing sat under it, so a menu item could not be passed to the ordinary
+    // `void AddItems(ToolStripDropDownItem menu)` helper that builds a submenu.
+    public partial class ToolStripMenuItem : ToolStripDropDownItem
+    {
+        /// <summary>Initializes a new instance of the ToolStripMenuItem class.</summary>
+        public ToolStripMenuItem () { }
+
+        /// <summary>Initializes a new instance with the specified text.</summary>
+        public ToolStripMenuItem (string text) { Text = text; }
+
+        /// <summary>Initializes a new instance with text, image (SKBitmap), and click handler.</summary>
+        public ToolStripMenuItem (string text, SkiaSharp.SKBitmap? image, EventHandler? onClick = null)
+        {
+            Text = text;
+            ((MenuItem)this).SetImageSK (image);
+
+            if (onClick is not null)
+                Click += onClick;
+        }
+
+        /// <summary>Initializes a new instance with text, a Majorsilence.Forms.Drawing.Image, and click handler.</summary>
+#pragma warning disable CA1416
+        public ToolStripMenuItem (string text, Majorsilence.Forms.Drawing.Image? image, EventHandler? onClick = null)
+        {
+            Text = text;
+            Image = image;
+
+            if (onClick is not null)
+                Click += onClick;
+        }
+
+        /// <summary>Initializes a new instance with text, a Majorsilence.Forms.Drawing.Image, click handler, and subitems.</summary>
+        public ToolStripMenuItem (string text, Majorsilence.Forms.Drawing.Image? image, EventHandler? onClick, params ToolStripMenuItem[] dropDownItems)
+            : this (text, image?.ToSKBitmap (), onClick)
+        {
+            foreach (var item in dropDownItems)
+                Items.Add (item);
+        }
+
+        /// <summary>Initializes a new instance with text, a Majorsilence.Forms.Drawing.Image, and subitems.</summary>
+        public ToolStripMenuItem (string text, Majorsilence.Forms.Drawing.Image? image, params ToolStripMenuItem[] dropDownItems)
+            : this (text, image?.ToSKBitmap ())
+        {
+            foreach (var item in dropDownItems)
+                Items.Add (item);
+        }
+
+        /// <summary>Initializes a new instance with text, an image, and sub-items of any item type.</summary>
+        /// <remarks>
+        /// WinForms types the params array as <c>ToolStripItem[]</c>, not <c>ToolStripMenuItem[]</c>, so a
+        /// menu built with separators in it -- the common case -- goes through this overload. Only the
+        /// narrower one existed, which made <c>new ToolStripMenuItem(text, image, sep, item, ...)</c> fail
+        /// to resolve. The <c>EventHandler</c> overload above is still preferred for a two-argument call,
+        /// so this does not change what an existing call binds to.
+        /// </remarks>
+        public ToolStripMenuItem (string text, Majorsilence.Forms.Drawing.Image? image, params ToolStripItem[] dropDownItems)
+            : this (text, image?.ToSKBitmap ())
+        {
+            foreach (var item in dropDownItems)
+                Items.Add (item);
+        }
+#pragma warning restore CA1416
+
+        // DropDown and DropDownItems are inherited: the base now creates the drop-down with
+        // OwnerItem wired (which was this type's private trick) so every ToolStripDropDownItem gets the
+        // owned-view semantics, not just menu items. The duplicate field this type kept was itself a
+        // bug -- the base's HasDropDown/Pressed read the base's field, which this override never set.
+
+        /// <summary>Gets or sets whether the item appears with a check mark. Raises CheckedChanged on change.</summary>
+        /// <inheritdoc cref="ToolStripButton.Checked" path="/remarks"/>
+        public override bool Checked {
+            get => CheckState != CheckState.Unchecked;
+            set {
+                if (Checked == value)
+                    return;
+
+                CheckState = value ? CheckState.Checked : CheckState.Unchecked;
+            }
+        }
+
+        /// <summary>Gets or sets whether clicking the item toggles its checked state.</summary>
+        public bool CheckOnClick { get; set; }
+
+        /// <inheritdoc/>
+        protected override void OnClick (EventArgs e)
+        {
+            // See ToolStripButton.OnClick: WinForms toggles Checked before raising Click when
+            // CheckOnClick is set, and nothing did that here.
+            if (CheckOnClick)
+                Checked = !Checked;
+
+            base.OnClick (e);
+        }
+
+        /// <summary>Gets or sets the shortcut key combination for this item. Stub in Majorsilence.Forms.</summary>
+        public Keys ShortcutKeys { get; set; } = Keys.None;
+
+        /// <summary>Gets or sets the string to display for the shortcut key. Stub in Majorsilence.Forms.</summary>
+        public string ShortcutKeyDisplayString { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets whether the shortcut key is shown in the menu item. Stub in Majorsilence.Forms.</summary>
+        public bool ShowShortcutKeys { get; set; } = true;
+
+        /// <summary>The shortcut text a drop-down menu shows to the right of this item's caption.</summary>
+        /// <remarks>
+        /// Empty when there is nothing to show, so the renderer has no special case. <see cref="ShortcutKeys"/>
+        /// has driven real key handling since W1.3; <see cref="ShowShortcutKeys"/> and
+        /// <see cref="ShortcutKeyDisplayString"/> are its DISPLAY half and were read by nothing, so every
+        /// ported menu showed a caption and no shortcut at all -- the accelerator worked and was invisible.
+        ///
+        /// <see cref="KeysConverter"/> already formatted a <see cref="Keys"/> the way a menu wants it
+        /// ("Ctrl+Shift+A", with Control written as Ctrl); its own comment says the text is what ends up
+        /// in a menu item. It was written for this and never called from here.
+        /// </remarks>
+        internal string ShortcutDisplayText {
+            get {
+                if (!ShowShortcutKeys)
+                    return string.Empty;
+
+                // An explicit string wins, which is the point of the property: "Del" where the key is
+                // Keys.Delete, or a localised caption.
+                if (!string.IsNullOrEmpty (ShortcutKeyDisplayString))
+                    return ShortcutKeyDisplayString;
+
+                return ShortcutKeys == Keys.None
+                    ? string.Empty
+                    : new KeysConverter ().ConvertToString (ShortcutKeys) ?? string.Empty;
+            }
+        }
+
+        /// <summary>Gets whether this item has any drop-down items.</summary>
+        public override bool HasDropDownItems => Items.Count > 0;
+
+        /// <summary>Gets or sets the check state of the item.</summary>
+        /// <remarks>
+        /// The storage, with <see cref="Checked"/> derived from it, as upstream
+        /// (<c>ToolStripMenuItem.cs</c>, <c>CheckState</c>): any change raises <c>CheckedChanged</c> and
+        /// then <c>CheckStateChanged</c>. It was derived from the bool, so a tri-state item collapsed --
+        /// <c>Indeterminate</c> read back <c>Unchecked</c> -- and <c>CheckStateChanged</c> was never
+        /// raised (TSM-24). <see cref="MenuItem.Checked"/> is kept in step because the renderers read it.
+        /// </remarks>
+        public CheckState CheckState {
+            get => check_state;
+            set {
+                if (check_state == value)
+                    return;
+
+                check_state = value;
+                base.Checked = value != CheckState.Unchecked;
+                OwnerControl?.Invalidate ();
+                CheckedChanged?.Invoke (this, EventArgs.Empty);
+                OnCheckStateChanged (EventArgs.Empty);
+            }
+        }
+
+        private CheckState check_state;
+
+        /// <summary>Raised when the Checked property changes.</summary>
+        public event EventHandler? CheckedChanged;
+
+        /// <summary>Gets or sets how <see cref="ToolStripManager.Merge(ToolStrip, ToolStrip)"/> treats this item.</summary>
+        /// <remarks>The base's value, not a second store: the merge reads the item as a
+        /// <see cref="ToolStripItem"/>, and a menu item that kept its own copy merged with the defaults (W6).</remarks>
+        public new MergeAction MergeAction {
+            get => base.MergeAction;
+            set => base.MergeAction = value;
+        }
+
+        /// <summary>Gets or sets where <see cref="MergeAction.Insert"/> puts this item.</summary>
+        /// <inheritdoc cref="MergeAction" path="/remarks"/>
+        public new int MergeIndex {
+            get => base.MergeIndex;
+            set => base.MergeIndex = value;
+        }
+    }
+
+    /// <summary>Specifies how a ToolStripMenuItem behaves when toolstrips are merged.</summary>
+    public enum MergeAction
+    {
+        /// <summary>Append to the end of the collection.</summary>
+        Append = 0,
+        /// <summary>Insert at the position specified by MergeIndex.</summary>
+        Insert = 1,
+        /// <summary>Replace the item at MergeIndex.</summary>
+        Replace = 2,
+        /// <summary>Remove the item at MergeIndex.</summary>
+        Remove = 3,
+        /// <summary>Match the item and merge its children.</summary>
+        MatchOnly = 4
+    }
+
+    /// <summary>
+    /// Represents a separator in a MenuStrip or ContextMenuStrip.
+    /// </summary>
+    public class ToolStripSeparator : ToolStripItem
+    {
+        /// <summary>Initializes a new instance of the ToolStripSeparator class.</summary>
+        public ToolStripSeparator ()
+        {
+            Padding = new Padding (3);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>Never selectable outside a designer, as upstream (<c>ToolStripSeparator.CanSelect
+        /// =&gt; DesignMode</c>): the strip does not hover-highlight it (TSM-23).</remarks>
+        public override bool CanSelect => false;
+    }
+
+    /// <summary>
+    /// Represents a combo box embedded in a MenuStrip.
+    /// </summary>
+    public partial class ToolStripComboBox : ToolStripControlHost
+    {
+        private bool _disposed;
+
+        /// <summary>Initializes a new instance of the ToolStripComboBox class.</summary>
+        public ToolStripComboBox () : base (new CompatComboBox ()) => WireSelectedIndexChanged ();
+
+        /// <summary>Initializes a new instance of the ToolStripComboBox class with the specified name.</summary>
+        public ToolStripComboBox (string name) : base (new CompatComboBox (), name) => WireSelectedIndexChanged ();
+
+        // The hosted control is the combo box; there is no second instance. It used to be a field
+        // initialised inline, which -- once this type hosts its control -- would have been a
+        // different combo from the one ToolStripControlHost lays out and paints.
+        private CompatComboBox combo_box => (CompatComboBox)Control;
+
+        private EventHandler? selected_index_changed;
+        private bool selected_index_wired;
+
+        // Wired from the constructors, once the base has created the hosted control. It has to happen
+        // there rather than on the first handler: a subclass that overrides OnSelectedIndexChanged without
+        // anyone attaching a handler -- a themed combo reacting to its own selection -- still has to be
+        // called. Guarded because both constructors run it and one may chain.
+        private void WireSelectedIndexChanged ()
+        {
+            if (selected_index_wired)
+                return;
+
+            selected_index_wired = true;
+            combo_box.SelectedIndexChanged += (o, e) => OnSelectedIndexChanged (e);
+        }
+
+        /// <summary>Raises the <see cref="SelectedIndexChanged"/> event.</summary>
+        protected virtual void OnSelectedIndexChanged (EventArgs e) => selected_index_changed?.Invoke (this, e);
+
+        /// <inheritdoc/>
+        /// <remarks>Overrides the base item's virtual rather than declaring its own Dispose(): hiding it
+        /// meant disposing through a ToolStripItem-typed reference skipped the hosted combo entirely.</remarks>
+        protected override void Dispose (bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            if (disposing)
+                combo_box.Dispose ();
+
+            base.Dispose (disposing);
+        }
+
+        /// <summary>Gets the hosted ComboBox control.</summary>
+        public CompatComboBox ComboBox => combo_box;
+
+        /// <summary>Gets or sets the selected index.</summary>
+        public int SelectedIndex {
+            get => combo_box.SelectedIndex;
+            set => combo_box.SelectedIndex = value;
+        }
+
+        /// <summary>Gets or sets the drop-down style of the underlying combo box.</summary>
+        public ComboBoxStyle DropDownStyle {
+            get => combo_box.DropDownStyle;
+            set => combo_box.DropDownStyle = value;
+        }
+
+        /// <summary>Gets the items collection of the underlying combo box.</summary>
+        public new ListBoxItemCollection Items => combo_box.Items;
+
+        /// <summary>Raised when the selected index changes.</summary>
+        /// <remarks>
+        /// Handlers land on this item rather than straight on the hosted combo, so a subclass overriding
+        /// <see cref="OnSelectedIndexChanged"/> -- which is where WinForms puts the hook, and what themed
+        /// combo boxes override to react to a selection -- runs before them and can be skipped by not
+        /// calling base. The hosted combo's own event is forwarded from the constructor.
+        /// </remarks>
+        public event EventHandler? SelectedIndexChanged {
+            add => selected_index_changed += value;
+            remove => selected_index_changed -= value;
+        }
+
+        // Validated is inherited from ToolStripControlHost, which forwards it to the hosted control.
+
+        /// <summary>Gets or sets the width of the underlying combo box.</summary>
+        public new int Width { get => combo_box.Width; set => combo_box.Width = value; }
+
+        /// <summary>Gets or sets the width of the drop-down portion of the underlying combo box.</summary>
+        public int DropDownWidth { get => combo_box.DropDownWidth; set => combo_box.DropDownWidth = value; }
+
+        /// <summary>Raised when the text of the underlying combo box changes. Delegates to the underlying ComboBox.</summary>
+        public new event EventHandler? TextChanged { add => combo_box.TextChanged += value; remove => combo_box.TextChanged -= value; }
+    }
+
+    /// <summary>
+    /// A ComboBox with basic data-binding support for WinForms compatibility.
+    /// </summary>
+    public class CompatComboBox : ComboBox
+    {
+        private object? data_source;
+        private string display_member = string.Empty;
+        private string value_member = string.Empty;
+
+        /// <summary>Gets or sets the data source for this combo box.</summary>
+        public new object? DataSource {
+            get => data_source;
+            set {
+                data_source = value;
+                RefreshItems ();
+            }
+        }
+
+        /// <summary>Gets or sets the property name to use for display.</summary>
+        public new string DisplayMember {
+            get => display_member;
+            set {
+                display_member = value ?? string.Empty;
+                RefreshItems ();
+            }
+        }
+
+        /// <summary>Gets or sets the property name to use as the value.</summary>
+        public new string ValueMember {
+            get => value_member;
+            set {
+                value_member = value ?? string.Empty;
+                RefreshItems ();
+            }
+        }
+
+        [UnconditionalSuppressMessage ("Trimming", "IL2075", Justification = "DataSource item types are not trim-safe by design — same as WinForms.")]
+        private static object? GetItemPropertyValue (object? item, string propertyName)
+            => item?.GetType ().GetProperty (propertyName)?.GetValue (item);
+
+        /// <summary>Gets or sets the selected value using ValueMember.</summary>
+        public new object? SelectedValue {
+            get {
+                if (SelectedIndex < 0 || data_source == null)
+                    return null;
+
+                var list = data_source as System.Collections.IList;
+
+                if (list == null || SelectedIndex >= list.Count)
+                    return null;
+
+                var item = list[SelectedIndex];
+
+                if (string.IsNullOrEmpty (value_member))
+                    return item;
+
+                return GetItemPropertyValue (item, value_member);
+            }
+            set {
+                if (data_source == null || value == null)
+                    return;
+
+                var list = data_source as System.Collections.IList;
+
+                if (list == null)
+                    return;
+
+                for (int i = 0; i < list.Count; i++) {
+                    var item = list[i];
+                    var item_value = string.IsNullOrEmpty (value_member)
+                        ? item
+                        : GetItemPropertyValue (item, value_member);
+
+                    if (Equals (item_value, value)) {
+                        SelectedIndex = i;
+                        return;
+                    }
+                }
+            }
+        }
+
+        [UnconditionalSuppressMessage ("Trimming", "IL2075", Justification = "DataSource item types are not trim-safe by design — same as WinForms.")]
+        private void RefreshItems ()
+        {
+            Items.Clear ();
+
+            var list = data_source as System.Collections.IList;
+
+            if (list == null)
+                return;
+
+            foreach (var item in list) {
+                string display;
+
+                if (!string.IsNullOrEmpty (display_member))
+                    display = item?.GetType ().GetProperty (display_member)?.GetValue (item)?.ToString () ?? string.Empty;
+                else
+                    display = item?.ToString () ?? string.Empty;
+
+                Items.Add (display);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A collection of ToolStripItem objects.
+    /// </summary>
+    /// <summary>Provides data for the ToolStrip.ItemAdded/ItemRemoved events.</summary>
+    public class ToolStripItemEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance for the given item.</summary>
+        public ToolStripItemEventArgs (ToolStripItem item) { Item = item; }
+
+        /// <summary>The item the event refers to.</summary>
+        public ToolStripItem Item { get; }
+    }
+
+    /// <summary>Provides data for the ToolStrip.ItemClicked event.</summary>
+    public class ToolStripItemClickedEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance for the given item.</summary>
+        public ToolStripItemClickedEventArgs (ToolStripItem clickedItem) { ClickedItem = clickedItem; }
+
+        /// <summary>The item that was clicked.</summary>
+        public ToolStripItem ClickedItem { get; }
+    }
+
+    /// <summary>Represents the method that handles ToolStrip.ItemAdded/ItemRemoved.</summary>
+    public delegate void ToolStripItemEventHandler (object? sender, ToolStripItemEventArgs e);
+
+    /// <summary>Represents the method that handles ToolStrip.ItemClicked.</summary>
+    public delegate void ToolStripItemClickedEventHandler (object? sender, ToolStripItemClickedEventArgs e);
+
+    /// <summary>
+    /// WinForms compatibility: implemented by controls hosted inside a DataGridView cell while
+    /// editing. Mirrors System.Windows.Forms.IDataGridViewEditingControl.
+    /// </summary>
+    public interface IDataGridViewEditingControl
+    {
+        /// <summary>The grid that owns the editing control.</summary>
+        DataGridView? EditingControlDataGridView { get; set; }
+
+        /// <summary>The current formatted value of the editing control.</summary>
+        object EditingControlFormattedValue { get; set; }
+
+        /// <summary>The row being edited.</summary>
+        int EditingControlRowIndex { get; set; }
+
+        /// <summary>Whether the value has changed since editing began.</summary>
+        bool EditingControlValueChanged { get; set; }
+
+        /// <summary>The cursor shown over the editing panel.</summary>
+        Cursor EditingPanelCursor { get; }
+
+        /// <summary>Whether the control should be repositioned when the value changes.</summary>
+        bool RepositionEditingControlOnValueChange { get; }
+
+        /// <summary>Applies the cell style to the editing control.</summary>
+        void ApplyCellStyleToEditingControl (DataGridViewCellStyle dataGridViewCellStyle);
+
+        /// <summary>Whether the editing control consumes the given key.</summary>
+        bool EditingControlWantsInputKey (Keys keyData, bool dataGridViewWantsInputKey);
+
+        /// <summary>Gets the formatted value of the editing control.</summary>
+        object GetEditingControlFormattedValue (DataGridViewDataErrorContexts context);
+
+        /// <summary>Prepares the control for edit (select-all etc.).</summary>
+        void PrepareEditingControlForEdit (bool selectAll);
+    }
+
+    /// <summary>Specifies whether a ToolStripItem image is scaled to fit. WinForms compatibility.</summary>
+    public enum ToolStripItemImageScaling
+    {
+        /// <summary>The image is not scaled.</summary>
+        None,
+        /// <summary>The image is scaled to the strip's image size.</summary>
+        SizeToFit,
+    }
+
+    /// <summary>Represents the collection of items in a ToolStrip.</summary>
+    /// <remarks>
+    /// The element type is <see cref="MenuItem"/> rather than <see cref="ToolStripItem"/>, which is what
+    /// these collections really hold: a menu mixes ToolStripItems with plain MenuItems and separators
+    /// (see <c>MenuItemCollection.Add(string, ...)</c> and the spell-check context menu). That is also
+    /// what lets <see cref="MenuItemCollection"/> derive from this type, so the single collection a menu
+    /// owns satisfies both names -- upstream types every strip's <c>Items</c> as this one, and code
+    /// written against WinForms passes it around accordingly.
+    /// </remarks>
+    public partial class ToolStripItemCollection : Collection<MenuItem>
+    {
+        /// <summary>Invoked when an item is added (lets the owning ToolStrip raise ItemAdded).</summary>
+        // Index-aware, because the facade and the collection it mirrors have to stay in the SAME
+        // order: layout and paint read the mirror, applications read the facade. Forwarding an insert
+        // as an Add put the item last on screen while the facade reported it first (TSM-47).
+        internal Action<int, MenuItem>? ItemInsertedCallback;
+
+        /// <summary>Invoked when an item is removed (lets the owning ToolStrip unmirror it).</summary>
+        internal Action<MenuItem>? ItemRemovedCallback;
+
+        /// <inheritdoc/>
+        protected override void InsertItem (int index, MenuItem item)
+        {
+            base.InsertItem (index, item);
+            ItemInsertedCallback?.Invoke (index, item);
+        }
+
+        /// <inheritdoc/>
+        protected override void RemoveItem (int index)
+        {
+            var item = this[index];
+            base.RemoveItem (index);
+            ItemRemovedCallback?.Invoke (item);
+        }
+
+        /// <inheritdoc/>
+        protected override void ClearItems ()
+        {
+            var removed = this.ToArray ();
+            base.ClearItems ();
+            foreach (var item in removed)
+                ItemRemovedCallback?.Invoke (item);
+        }
+
+        /// <inheritdoc/>
+        protected override void SetItem (int index, MenuItem item)
+        {
+            var old = this[index];
+            base.SetItem (index, item);
+            // Remove-then-insert at the same index: the removal shifts both lists identically, so the
+            // index is still right for the insert, and the mirror ends up with the replacement exactly
+            // where the facade has it rather than at the end.
+            ItemRemovedCallback?.Invoke (old);
+            ItemInsertedCallback?.Invoke (index, item);
+        }
+
+        /// <summary>Adds a range of items to the collection.</summary>
+        public void AddRange (IEnumerable<ToolStripItem> items)
+        {
+            foreach (var item in items)
+                Add (item);
+        }
+    }
+
+    /// <summary>
+    /// Represents a text label in a StatusStrip.
+    /// </summary>
+    public partial class ToolStripStatusLabel : ToolStripItem
+    {
+        /// <summary>Gets or sets the label width. Mirrors WinForms (wraps Size).</summary>
+        public new int Width {
+            get => Size.Width;
+            set => Size = new Size (value, Size.Height);
+        }
+
+        // `public new ToolStripItemAlignment Alignment` used to live here -- a second store for the
+        // property ToolStripItem already declares, so a label aligned right through this one stayed
+        // left as far as anything reading the item was concerned.
+
+        /// <summary>Gets or sets whether the item stretches to fill remaining strip space.</summary>
+        public bool Spring { get; set; }
+
+        /// <summary>Gets or sets the border style of the label. Stub in Majorsilence.Forms.</summary>
+        public Border3DStyle BorderStyle { get; set; } = Border3DStyle.None;
+
+        /// <summary>Gets or sets which sides of the label show a border. Stub in Majorsilence.Forms.</summary>
+        public ToolStripStatusLabelBorderSides BorderSides { get; set; } = ToolStripStatusLabelBorderSides.None;
+    }
+
+    /// <summary>Specifies which sides of a ToolStripStatusLabel display a border.</summary>
+    [System.Flags]
+    public enum ToolStripStatusLabelBorderSides
+    {
+        /// <summary>No border.</summary>
+        None = 0,
+        /// <summary>Left border.</summary>
+        Left = 1,
+        /// <summary>Right border.</summary>
+        Right = 4,
+        /// <summary>Top border.</summary>
+        Top = 2,
+        /// <summary>Bottom border.</summary>
+        Bottom = 8,
+        /// <summary>All sides.</summary>
+        All = Left | Right | Top | Bottom
+    }
+
+    /// <summary>
+    /// Represents a progress bar embedded in a StatusStrip.
+    /// </summary>
+    public partial class ToolStripProgressBar : ToolStripItem
+    {
+        // These four used to be stored on the item, disconnected from the ProgressBar the item hosts
+        // -- the same shape of bug ToolStripTextBox had. Setting Value and then calling PerformStep,
+        // which acts on the hosted bar, stepped from zero.
+
+        /// <summary>Gets or sets the current value.</summary>
+        public int Value {
+            get => ProgressBar.Value;
+            set => ProgressBar.Value = value;
+        }
+
+        /// <summary>Gets or sets the maximum value.</summary>
+        public int Maximum {
+            get => ProgressBar.Maximum;
+            set => ProgressBar.Maximum = value;
+        }
+
+        /// <summary>Gets or sets the minimum value.</summary>
+        public int Minimum {
+            get => ProgressBar.Minimum;
+            set => ProgressBar.Minimum = value;
+        }
+
+        /// <summary>Gets or sets the display style (Blocks, Continuous, or Marquee).</summary>
+        public ProgressBarStyle Style {
+            get => ProgressBar.Style;
+            set => ProgressBar.Style = value;
+        }
+    }
+
+    /// <summary>
+    /// Represents a main menu bar for a Form (legacy WinForms component). Alias for Menu.
+    /// </summary>
+    public partial class MainMenu : Menu
+    {
+        /// <summary>Initializes a new instance of the MainMenu class.</summary>
+        public MainMenu () { }
+
+        /// <summary>Initializes a new instance of the MainMenu class and adds it to the specified container.</summary>
+        public MainMenu (System.ComponentModel.IContainer container)
+        {
+            container.Add (this);
+        }
+
+        /// <summary>Clones the MainMenu. Returns a new MainMenu with no items.</summary>
+        public MainMenu CloneMenu () => new MainMenu ();
+    }
+
+    /// <summary>
+    /// Represents a menu bar docked at the top of a form. Derives from <see cref="ToolStrip"/> via
+    /// <see cref="Menu"/>, matching WinForms' MenuStrip : ToolStrip, so ToolStrip members (Renderer,
+    /// RenderMode, LayoutStyle, GripStyle, Stretch, CanOverflow, ImageScalingSize, ...) are all reachable
+    /// here. The top-docked bar layout and rendering come from <see cref="Menu"/>.
+    /// </summary>
+    public partial class MenuStrip : Menu
+    {
+        /// <summary>Initializes a new instance of the MenuStrip class.</summary>
+        public MenuStrip ()
+        {
+            // A menu bar is not draggable. Upstream's MenuStrip constructor sets exactly this, and
+            // carries [DefaultValue(ToolStripGripStyle.Hidden)] to match -- checked against
+            // dotnet/winforms rather than assumed, since ToolStrip's own default is Visible (TSM-43).
+            GripStyle = ToolStripGripStyle.Hidden;
+
+            // A menu bar spans its rafting panel's row, as upstream's Stretch default for MenuStrip has it (W6).
+            Stretch = true;
+        }
+
+        /// <summary>Gets or sets the ToolStripMenuItem that holds the MDI window list.</summary>
+        /// <remarks>Real as of W6 mechanisms: opening that item refills it with one entry per MDI child
+        /// of the strip's form, checked for the active one and activating it when clicked. The same
+        /// mechanism serves the legacy <see cref="MenuItem.MdiList"/> flag.</remarks>
+        public ToolStripMenuItem? MdiWindowListItem { get; set; }
+    }
+
+    /// <summary>
+    /// Represents a shortcut (context) menu. Derives from <see cref="ToolStrip"/> via
+    /// <see cref="ContextMenu"/>/<see cref="MenuDropDown"/>, matching WinForms' ContextMenuStrip :
+    /// ToolStripDropDownMenu : ToolStripDropDown : ToolStrip, so ToolStrip members are reachable here.
+    /// The Opening/Opened/Closing/Closed popup lifecycle comes from <see cref="ContextMenu"/>.
+    /// </summary>
+    public partial class ContextMenuStrip : ToolStripDropDown
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ContextMenuStrip () { }
+
+        /// <summary>Initializes a new instance owned by the specified container (WinForms designer overload; the container is not used).</summary>
+        public ContextMenuStrip (System.ComponentModel.IContainer container) { }
+
+        // NOTE: Show (Point) is deliberately NOT redeclared here. It used to be overridden with an empty
+        // body, which shadowed the working inherited overloads and made the most idiomatic WinForms call
+        // shape -- contextMenuStrip.Show (screenPoint) -- silently do nothing. ContextMenu.Show (Point)
+        // is now real and this type simply inherits it.
+    }
+
+    /// <summary>
+    /// Represents a toolbar strip that can contain ToolStripButton, ToolStripLabel, and other ToolStripItem types.
+    /// Maps to Majorsilence.Forms' ToolBar (MenuBase) with a ToolStripItemCollection facade.
+    /// </summary>
+    /// <remarks>
+    /// This is the base of the whole strip family, matching real WinForms: <see cref="MenuStrip"/>,
+    /// <see cref="ContextMenuStrip"/> and <see cref="StatusStrip"/> are all ToolStrip-derived, so
+    /// ToolStrip-level members (Renderer, RenderMode, LayoutStyle, GripStyle, Stretch, CanOverflow, ...)
+    /// are reachable from every one of them. <see cref="Menu"/> and <see cref="MenuDropDown"/> sit
+    /// between ToolStrip and those compat types and re-expose <c>Items</c> as a
+    /// <see cref="MenuItemCollection"/>, because that is the collection their renderers consume.
+    /// </remarks>
+    public partial class ToolStrip : ToolBar
+    {
+        private readonly ToolStripItemCollection _items;
+
+        /// <summary>Initializes a new instance of the ToolStrip class.</summary>
+        public ToolStrip ()
+        {
+            _items = CreateItemsFacade ();
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the ToolStrip class with the provided root MenuItem. Exists so
+        /// <see cref="MenuDropDown"/> (which derives from ToolStrip) can still be built around an
+        /// existing item's sub-item collection.
+        /// </summary>
+        protected ToolStrip (MenuItem root) : base (root)
+        {
+            _items = CreateItemsFacade ();
+        }
+
+        // The facade collection must forward into the base MenuBase root collection: that base
+        // collection is the ONLY one LayoutItems, ToolBarRenderer, and MenuBase's mouse
+        // hit-testing consume. Items held solely in the facade exist but never lay out, never
+        // paint, and can never be clicked -- found via a real migrated app
+        // (ReportDesigner.Forms) whose two designer ToolStrips (21 and 19 buttons) rendered as
+        // completely empty bars.
+        private ToolStripItemCollection CreateItemsFacade ()
+        {
+            var base_items = base.Items;
+
+            // The callbacks only forward now. The notifications used to live here, which is why they
+            // were dead on MenuStrip and ContextMenuStrip: Menu.Items and MenuDropDown.Items re-expose
+            // the base MenuItemCollection directly, so `contextMenuStrip.Items.Add (...)` never came
+            // through this facade at all (TSM-08). They hang off the collection every path shares
+            // instead -- see NotifyItemAdded, called from MenuItemCollection.InsertItem.
+            return new ToolStripItemCollection {
+                ItemInsertedCallback = (index, item) => base_items.Insert (index, item),
+                // An item removed while it sits in the overflow drop-down is removed from there (W6).
+                ItemRemovedCallback = item => {
+                    if (!base_items.Remove (item))
+                        overflow_button?.Items.Remove (item);
+                },
+            };
+        }
+
+        /// <summary>
+        /// Called by <see cref="MenuItemCollection"/> when an item joins this strip, whichever
+        /// collection it was added through.
+        /// </summary>
+        /// <remarks>
+        /// ItemAdded, ItemClicked and the renderer's item hook are all typed on
+        /// <see cref="ToolStripItem"/> upstream; a strip may also hold plain <see cref="MenuItem"/>s
+        /// and separators, which belong in it but have no ToolStripItem-shaped event to raise.
+        /// </remarks>
+        internal void NotifyItemAdded (MenuItem item)
+        {
+            if (item is not ToolStripItem stripItem || suppress_item_notifications)
+                return;
+
+            // A method group rather than a lambda, so removal below actually removes it: an item that
+            // is taken out and put back would otherwise raise ItemClicked once per add.
+            stripItem.Click -= RelayItemClicked;
+            stripItem.Click += RelayItemClicked;
+
+            Renderer?.InitializeItem (stripItem);
+            OnItemAdded (new ToolStripItemEventArgs (stripItem));
+        }
+
+        /// <inheritdoc cref="NotifyItemAdded"/>
+        internal void NotifyItemRemoved (MenuItem item)
+        {
+            if (item is not ToolStripItem stripItem || suppress_item_notifications)
+                return;
+
+            stripItem.Click -= RelayItemClicked;
+            OnItemRemoved (new ToolStripItemEventArgs (stripItem));
+        }
+
+        // Raised from the item's own Click, so one handler on the strip sees programmatic PerformClick
+        // as well as a real click -- upstream routes both through HandleClick.
+        private void RelayItemClicked (object? sender, EventArgs e)
+        {
+            if (sender is ToolStripItem stripItem)
+                OnItemClicked (new ToolStripItemClickedEventArgs (stripItem));
+        }
+
+        /// <summary>Raised when an item is added to the ToolStrip.</summary>
+        public event ToolStripItemEventHandler? ItemAdded;
+
+        /// <summary>Raised when an item in the ToolStrip is clicked.</summary>
+        public event ToolStripItemClickedEventHandler? ItemClicked;
+
+        /// <summary>Raises the <see cref="ItemAdded"/> event.</summary>
+        protected virtual void OnItemAdded (ToolStripItemEventArgs e) => ItemAdded?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="ItemRemoved"/> event.</summary>
+        protected virtual void OnItemRemoved (ToolStripItemEventArgs e) => ItemRemoved?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="ItemClicked"/> event.</summary>
+        protected virtual void OnItemClicked (ToolStripItemClickedEventArgs e) => ItemClicked?.Invoke (this, e);
+
+        /// <summary>Gets the collection of items in this ToolStrip.</summary>
+        public new ToolStripItemCollection Items => _items;
+
+        /// <summary>Gets or sets whether the ToolStrip can be moved. Stub in Majorsilence.Forms.</summary>
+        public bool GripVisible { get; set; } = true;
+
+        /// <summary>Gets or sets the grip style for the ToolStrip. Stub in Majorsilence.Forms.</summary>
+        public ToolStripGripStyle GripStyle { get; set; } = ToolStripGripStyle.Visible;
+
+        /// <summary>Gets or sets the text direction for the ToolStrip. Stub in Majorsilence.Forms.</summary>
+        public ToolStripTextDirection TextDirection { get; set; } = ToolStripTextDirection.Horizontal;
+
+        /// <summary>Gets or sets the image scaling size for the ToolStrip. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Size ImageScalingSize { get; set; } = new System.Drawing.Size (16, 16);
+
+        /// <summary>Gets or sets whether the ToolStrip renders in a specific style. Stub in Majorsilence.Forms.</summary>
+        public bool ShowItemToolTips { get; set; } = true;
+
+        /// <summary>Gets or sets the rendering mode for the ToolStrip.</summary>
+        /// <remarks>
+        /// Assigning <see cref="Renderer"/> moves this to <see cref="ToolStripRenderMode.Custom"/>, as in
+        /// WinForms -- that is how a theme engine saving and restoring a strip's appearance can tell a
+        /// custom renderer was in use. Setting a mode here does not swap the renderer out, which is a
+        /// deliberate difference: painting is dispatched by RenderManager on the concrete type, so the
+        /// assigned renderer stays the one whose Initialize hooks ran.
+        /// </remarks>
+        public ToolStripRenderMode RenderMode { get; set; } = ToolStripRenderMode.ManagerRenderMode;
+
+        /// <summary>
+        /// Gets or sets the renderer for the ToolStrip. Painting is still dispatched by
+        /// <see cref="Majorsilence.Forms.Renderers.RenderManager"/> keyed on the concrete type, so assigning
+        /// this does not change how the strip draws — but the renderer's
+        /// <see cref="ToolStripRenderer.Initialize"/>/<see cref="ToolStripRenderer.InitializeItem"/> hooks do
+        /// run, which is where a custom renderer sets the colours and padding that a theme depends on.
+        /// </summary>
+        public ToolStripRenderer? Renderer {
+            get => renderer;
+            set {
+                if (ReferenceEquals (renderer, value))
+                    return;
+
+                renderer = value;
+                OnRendererChanged (EventArgs.Empty);
+                RendererChanged?.Invoke (this, EventArgs.Empty);
+
+                if (value is null)
+                    return;
+
+                // A renderer of one's own IS the Custom mode -- see RenderMode above.
+                RenderMode = ToolStripRenderMode.Custom;
+
+                // Items already in the strip when the renderer arrives have to be initialized too --
+                // designer code fills Items before assigning Renderer as often as the other way round.
+                value.Initialize (this);
+
+                // OfType, not a typed foreach: Items legally holds a MenuSeparatorItem or a plain MenuItem
+                // (it is a Collection<MenuItem>), and the cast threw InvalidCastException (TSM-38).
+                foreach (var item in Items.OfType<ToolStripItem> ())
+                    value.InitializeItem (item);
+            }
+        }
+
+        private ToolStripRenderer? renderer;
+
+        /// <summary>Gets or sets whether items that do not fit move to the overflow button's drop-down.</summary>
+        /// <remarks>Read by the layout as of W6 mechanisms: with it, items past the strip's capacity --
+        /// <see cref="ToolStripItem.Overflow"/> Always first, then AsNeeded from the trailing end, Never
+        /// staying put -- move into <see cref="OverflowButton"/>'s drop-down and report
+        /// <see cref="ToolStripItemPlacement.Overflow"/>; without it they are clipped.</remarks>
+        public bool CanOverflow {
+            get => can_overflow;
+            set {
+                if (can_overflow == value)
+                    return;
+
+                can_overflow = value;
+                PerformLayout ();
+                Invalidate ();
+            }
+        }
+
+        private bool can_overflow = true;
+
+        // Notifies on change; the event was declared and raised by nothing (W6.1).
+        private ToolStripLayoutStyle layout_style = ToolStripLayoutStyle.HorizontalStackWithOverflow;
+
+        /// <summary>Gets or sets the layout style. Stub in Majorsilence.Forms.</summary>
+        public ToolStripLayoutStyle LayoutStyle {
+            get => layout_style;
+            set {
+                if (layout_style == value)
+                    return;
+
+                layout_style = value;
+                LayoutStyleChanged?.Invoke (this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Gets or sets the ImageList this strip's items index into.</summary>
+        /// <remarks>
+        /// Deliberately the same storage as <see cref="ToolBar.ImageList"/> rather than a second field of
+        /// its own. As separate properties the two silently disagreed: designer code assigns through the
+        /// ToolStrip-typed variable it declared, while item image lookup reads the base one, so every
+        /// button resolved its ImageIndex against a null list and drew with no image.
+        /// </remarks>
+        public new ImageList? ImageList {
+            get => base.ImageList;
+            set => base.ImageList = value;
+        }
+
+        /// <summary>Gets or sets whether the strip spans its rafting panel's row.</summary>
+        /// <remarks>Read by <see cref="ToolStripPanel"/>'s row layout as of W6 mechanisms: off (the ToolStrip
+        /// default) keeps the strip at its preferred extent; <see cref="MenuStrip"/> and
+        /// <see cref="StatusStrip"/> default it on, as upstream does.</remarks>
+        public bool Stretch {
+            get => stretch;
+            set {
+                if (stretch == value)
+                    return;
+
+                stretch = value;
+                Parent?.PerformLayout ();
+            }
+        }
+
+        private bool stretch;
+    }
+
+    /// <summary>Represents a panel that can host ToolStrip controls. Stub in Majorsilence.Forms.</summary>
+    public partial class ToolStripPanel : Panel
+    {
+        /// <summary>Gets or sets whether the strips in this panel can be dragged between its rows.</summary>
+        /// <remarks>Read as of W6 mechanisms: a locked panel refuses the grip drag that rafts a strip
+        /// from one row to another. <c>Join</c> still moves a strip, because that is the programmatic
+        /// path and, as upstream, is not subject to this.</remarks>
+        public bool Locked { get; set; }
+
+        /// <summary>Gets or sets the orientation of the ToolStripPanel. Stub in Majorsilence.Forms.</summary>
+        public Orientation Orientation { get; set; } = Orientation.Horizontal;
+    }
+
+    /// <summary>Represents the overflow button on a ToolStrip. Stub in Majorsilence.Forms.</summary>
+    public partial class ToolStripOverflowButton : ToolStripDropDownButton
+    {
+        /// <summary>Initializes a new instance of ToolStripOverflowButton.</summary>
+        public ToolStripOverflowButton () { }
+    }
+
+    /// <summary>
+    /// Cross-platform stand-in for dockable toolbars: a Top/Bottom/Left/Right/Content five-panel
+    /// border layout, matching real WinForms' ToolStripContainer shape (menus/toolbars docked to an
+    /// edge panel, arbitrary content filling the middle).
+    /// </summary>
+    public class ToolStripContainer : Panel
+    {
+        // The edge panels AutoSize so an empty one collapses to zero in its docked dimension
+        // (GetPreferredSize of a childless panel is 0x0) and a populated one grows to fit its
+        // toolbars -- matching real WinForms ToolStripPanel, where undocked edges take no space.
+        // Without this, each empty edge panel claimed its full Panel default size (200x100),
+        // squeezing the content and even forcing a negative height on the opposite edge.
+
+        // ToolStripPanel (not plain Panel) so an edge hosting more than one strip stacks them into
+        // rows -- a menu bar and a toolbar added to the same edge then appear one above the other,
+        // as they do in real WinForms, instead of fighting over the edge and hiding one another.
+
+        /// <summary>Gets the top ToolStripPanel.</summary>
+        public ToolStripPanel TopToolStripPanel { get; } = new ToolStripPanel { Dock = DockStyle.Top, AutoSize = true };
+
+        /// <summary>Gets the bottom ToolStripPanel.</summary>
+        public ToolStripPanel BottomToolStripPanel { get; } = new ToolStripPanel { Dock = DockStyle.Bottom, AutoSize = true };
+
+        /// <summary>Gets the left ToolStripPanel.</summary>
+        public ToolStripPanel LeftToolStripPanel { get; } = new ToolStripPanel { Dock = DockStyle.Left, AutoSize = true, Orientation = Orientation.Vertical };
+
+        /// <summary>Gets the right ToolStripPanel.</summary>
+        public ToolStripPanel RightToolStripPanel { get; } = new ToolStripPanel { Dock = DockStyle.Right, AutoSize = true, Orientation = Orientation.Vertical };
+
+        /// <summary>Gets the content panel in the center.</summary>
+        public Panel ContentPanel { get; } = new Panel { Dock = DockStyle.Fill };
+
+        /// <summary>Initializes a new instance of the ToolStripContainer class.</summary>
+        public ToolStripContainer ()
+        {
+            // Docking is processed in reverse Z-order (the layout engine walks Controls back-to-
+            // front), so the LAST control added claims its edge first, against the full remaining
+            // area; Fill must therefore be added FIRST so the edge panels added after it carve their
+            // space out of it, leaving Fill with whatever's left in the middle -- the standard
+            // border-layout construction order. Without this, the sub-panels were never parented at
+            // all (found via a real migrated app's toolbar/menu area rendering completely blank).
+            Controls.Add (ContentPanel);
+            Controls.Add (TopToolStripPanel);
+            Controls.Add (BottomToolStripPanel);
+            Controls.Add (LeftToolStripPanel);
+            Controls.Add (RightToolStripPanel);
+        }
+
+        /// <summary>Gets or sets whether the top panel is visible.</summary>
+        public bool TopToolStripPanelVisible {
+            get => TopToolStripPanel.Visible;
+            set => TopToolStripPanel.Visible = value;
+        }
+
+        /// <summary>Gets or sets whether the bottom panel is visible.</summary>
+        public bool BottomToolStripPanelVisible {
+            get => BottomToolStripPanel.Visible;
+            set => BottomToolStripPanel.Visible = value;
+        }
+
+        /// <summary>Gets or sets whether the left panel is visible.</summary>
+        public bool LeftToolStripPanelVisible {
+            get => LeftToolStripPanel.Visible;
+            set => LeftToolStripPanel.Visible = value;
+        }
+
+        /// <summary>Gets or sets whether the right panel is visible.</summary>
+        public bool RightToolStripPanelVisible {
+            get => RightToolStripPanel.Visible;
+            set => RightToolStripPanel.Visible = value;
+        }
+    }
+
+    /// <summary>Provides navigation UI for a BindingSource.</summary>
+    /// <remarks>Wired as of W4.6 (BND-11): the item properties and <see cref="BindingSource"/> were
+    /// stored-only, so every navigator on a migrated form was a row of dead buttons showing "0" and
+    /// a literal "of {0}". Assigning an item hooks its Click to the move it is named for; assigning
+    /// the source subscribes the events that keep the position and count display current.</remarks>
+    public partial class BindingNavigator : ToolStrip
+    {
+        /// <summary>Initializes a new BindingNavigator.</summary>
+        public BindingNavigator () { }
+
+        /// <summary>Initializes a new BindingNavigator, optionally adding it to a container.</summary>
+        public BindingNavigator (System.ComponentModel.IContainer container) { container.Add (this); }
+
+        /// <summary>Gets or sets the BindingSource this navigator drives and displays.</summary>
+        public BindingSource? BindingSource {
+            get => binding_source;
+            set {
+                if (ReferenceEquals (binding_source, value))
+                    return;
+
+                if (binding_source is not null) {
+                    binding_source.PositionChanged -= OnSourceChanged;
+                    binding_source.CurrentChanged -= OnSourceChanged;
+                    binding_source.ListChanged -= OnSourceListChanged;
+                }
+
+                binding_source = value;
+
+                if (binding_source is not null) {
+                    binding_source.PositionChanged += OnSourceChanged;
+                    binding_source.CurrentChanged += OnSourceChanged;
+                    binding_source.ListChanged += OnSourceListChanged;
+                }
+
+                RefreshItemsCore ();
+            }
+        }
+
+        private BindingSource? binding_source;
+
+        private void OnSourceChanged (object? sender, EventArgs e) => RefreshItemsCore ();
+
+        private void OnSourceListChanged (object? sender, System.ComponentModel.ListChangedEventArgs e)
+            => RefreshItemsCore ();
+
+        // Each item property unhooks the old item and hooks the new one to its action, so designer
+        // code that builds its own buttons and ASSIGNS them (the InitializeComponent shape) gets
+        // working navigation without calling AddStandardItems.
+        private ToolStripButton? SwapItem (ToolStripButton? oldItem, ToolStripButton? newItem, EventHandler onClick)
+        {
+            if (oldItem is not null)
+                oldItem.Click -= onClick;
+
+            if (newItem is not null)
+                newItem.Click += onClick;
+
+            RefreshItemsCore ();
+
+            return newItem;
+        }
+
+        /// <summary>Gets or sets the move-first button.</summary>
+        public ToolStripButton? MoveFirstItem {
+            get => move_first;
+            set => move_first = SwapItem (move_first, value, OnMoveFirst);
+        }
+
+        /// <summary>Gets or sets the move-previous button.</summary>
+        public ToolStripButton? MovePreviousItem {
+            get => move_previous;
+            set => move_previous = SwapItem (move_previous, value, OnMovePrevious);
+        }
+
+        /// <summary>Gets or sets the move-next button.</summary>
+        public ToolStripButton? MoveNextItem {
+            get => move_next;
+            set => move_next = SwapItem (move_next, value, OnMoveNext);
+        }
+
+        /// <summary>Gets or sets the move-last button.</summary>
+        public ToolStripButton? MoveLastItem {
+            get => move_last;
+            set => move_last = SwapItem (move_last, value, OnMoveLast);
+        }
+
+        /// <summary>Gets or sets the add-new button.</summary>
+        public ToolStripButton? AddNewItem {
+            get => add_new;
+            set => add_new = SwapItem (add_new, value, OnAddNew);
+        }
+
+        /// <summary>Gets or sets the delete button.</summary>
+        public ToolStripButton? DeleteItem {
+            get => delete_item;
+            set => delete_item = SwapItem (delete_item, value, OnDelete);
+        }
+
+        /// <summary>Gets or sets the position text box.</summary>
+        public ToolStripTextBox? PositionItem {
+            get => position_item;
+            set {
+                position_item = value;
+                RefreshItemsCore ();
+            }
+        }
+
+        /// <summary>Gets or sets the count label.</summary>
+        public ToolStripLabel? CountItem {
+            get => count_item;
+            set {
+                count_item = value;
+                RefreshItemsCore ();
+            }
+        }
+
+        private ToolStripButton? move_first;
+        private ToolStripButton? move_previous;
+        private ToolStripButton? move_next;
+        private ToolStripButton? move_last;
+        private ToolStripButton? add_new;
+        private ToolStripButton? delete_item;
+        private ToolStripTextBox? position_item;
+        private ToolStripLabel? count_item;
+
+        private void OnMoveFirst (object? sender, EventArgs e) => binding_source?.MoveFirst ();
+        private void OnMovePrevious (object? sender, EventArgs e) => binding_source?.MovePrevious ();
+        private void OnMoveNext (object? sender, EventArgs e) => binding_source?.MoveNext ();
+        private void OnMoveLast (object? sender, EventArgs e) => binding_source?.MoveLast ();
+        private void OnAddNew (object? sender, EventArgs e) => binding_source?.AddNew ();
+
+        private void OnDelete (object? sender, EventArgs e)
+        {
+            if (binding_source is { Count: > 0 })
+                binding_source.RemoveCurrent ();
+        }
+    }
+
+    /// <summary>Represents a control that allows the user to select a string from a collection by scrolling. Stub in Majorsilence.Forms.</summary>
+    /// <remarks>
+    /// Derives from <see cref="UpDownBase"/>, as upstream (SMP-37). It derived from
+    /// <see cref="NumericUpDown"/>, which meant it was painted by <c>NumericUpDownRenderer</c> -- so it
+    /// displayed the literal text <c>0</c> whatever its <see cref="Items"/> held, its arrows moved an
+    /// invisible number between 0 and 100 instead of stepping through the items, and it inherited a
+    /// nonsense public surface (<c>Minimum</c>, <c>Maximum</c>, <c>DecimalPlaces</c>, <c>Hexadecimal</c>,
+    /// <c>Increment</c>).
+    /// </remarks>
+    public partial class DomainUpDown : UpDownBase
+    {
+        private int _selectedIndex = -1;
+
+        /// <summary>Moves the selection to the previous item -- up the list, as upstream does.</summary>
+        public override void UpButton () => MoveSelection (-1);
+
+        /// <summary>Moves the selection to the next item.</summary>
+        public override void DownButton () => MoveSelection (1);
+
+        // Upstream's UpButton moves to the PREVIOUS item and DownButton to the next: the buttons move
+        // through the list in reading order, not through an index in numeric order.
+        private void MoveSelection (int delta)
+        {
+            if (Items.Count == 0)
+                return;
+
+            var next = _selectedIndex + delta;
+
+            if (next < 0)
+                next = Wrap ? Items.Count - 1 : 0;
+            else if (next >= Items.Count)
+                next = Wrap ? 0 : Items.Count - 1;
+
+            if (next == _selectedIndex)
+                return;
+
+            // SelectedIndex raises SelectedItemChanged itself now (SMP-38), so this must not again.
+            SelectedIndex = next;
+        }
+
+        /// <summary>Raises the <see cref="SelectedItemChanged"/> event.</summary>
+        protected virtual void OnSelectedItemChanged (EventArgs e) => SelectedItemChanged?.Invoke (this, e);
+
+        /// <summary>The text this control displays: the selected item, or empty.</summary>
+        internal string DisplayText => SelectedItem?.ToString () ?? string.Empty;
+
+        /// <summary>Gets the collection of items displayed in the control.</summary>
+        /// <remarks>
+        /// Typed as the nested <see cref="DomainUpDownItemCollection"/>, which is what WinForms returns and
+        /// therefore what code re-exposing this property declares. It was a <c>StringCollection</c>, so
+        /// that re-exposure did not compile -- and the nested collection type sat unused beside it.
+        /// The items are objects rather than strings, as upstream: the control shows each item's
+        /// <c>ToString()</c>, so anything can go in.
+        /// </remarks>
+        public DomainUpDownItemCollection Items => items ??= new DomainUpDownItemCollection (this);
+
+        private DomainUpDownItemCollection? items;
+
+        /// <summary>Gets or sets the index of the currently selected item.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value is less than -1 or not less than
+        /// the number of items.</exception>
+        /// <remarks>
+        /// Range-checked and raising <see cref="SelectedItemChanged"/>, as upstream's setter does
+        /// (Controls/UpDown/DomainUpDown.cs). It stored any int as -1 silently and raised nothing, so
+        /// <c>SelectedIndex = 99</c> on three items cleared the selection without telling anyone
+        /// (SMP-38).
+        /// </remarks>
+        public int SelectedIndex {
+            get => _selectedIndex;
+            set {
+                if (value < -1 || value >= Items.Count)
+                    throw new ArgumentOutOfRangeException (nameof (value), value, $"'{value}' is not a valid value for 'SelectedIndex'.");
+
+                if (value != _selectedIndex)
+                    SelectIndex (value);
+            }
+        }
+
+        // Upstream DomainUpDown.SelectIndex: the one place the selection moves, for the setter, the
+        // buttons, sorting and removal alike.
+        internal void SelectIndex (int index)
+        {
+            var changed = index != _selectedIndex;
+
+            _selectedIndex = index;
+            SetFrameworkText (index >= 0 ? Items[index]?.ToString () ?? string.Empty : string.Empty);
+            Invalidate ();
+
+            // Upstream raises it from OnChanged when the framework's text write lands.
+            if (changed)
+                OnSelectedItemChanged (EventArgs.Empty);
+        }
+
+        // Upstream DomainUpDown.SortDomainItems: sorted by ToString under the current culture, and the
+        // selection follows its item to the new position rather than staying on an index.
+        internal void SortItems ()
+        {
+            if (in_sort)
+                return;
+
+            in_sort = true;
+
+            try {
+                var selected = SelectedItem;
+
+                Items.SortCore ();
+
+                if (selected is not null) {
+                    var index = Items.IndexOf (selected);
+
+                    if (index >= 0 && index != _selectedIndex) {
+                        // The same item at a new index: no SelectedItemChanged, nothing changed for it.
+                        _selectedIndex = index;
+                        Invalidate ();
+                    }
+                }
+            } finally {
+                in_sort = false;
+            }
+        }
+
+        private bool in_sort;
+
+        /// <summary>Gets or sets the selected item.</summary>
+        public object? SelectedItem {
+            get => _selectedIndex >= 0 && _selectedIndex < Items.Count ? Items[_selectedIndex] : null;
+            set {
+                // Upstream treats null as selecting no item; an unmatched value leaves the selection.
+                if (value is null) {
+                    SelectedIndex = -1;
+                    return;
+                }
+
+                for (var i = 0; i < Items.Count; i++) {
+                    // Compared by value, not by reference: the items are objects now, so the ArrayList
+                    // indexer hands back object and `==` would have become a reference comparison that
+                    // fails for two equal strings held in different instances.
+                    if (Equals (Items[i], value)) {
+                        SelectedIndex = i;
+                        return;
+                    }
+                }
+            }
+        }
+
+        /// <summary>Raised when the selected item changes.</summary>
+        public event EventHandler? SelectedItemChanged;
+    }
+
+    /// <summary>Specifies the rendering mode for a ToolStrip.</summary>
+    public enum ToolStripRenderMode
+    {
+        /// <summary>Use the ToolStripManager renderer.</summary>
+        ManagerRenderMode = 3,
+        /// <summary>Use a custom renderer.</summary>
+        Custom = 0,
+        /// <summary>Use the system renderer.</summary>
+        System = 1,
+        /// <summary>Use the professional renderer.</summary>
+        Professional = 2,
+    }
+
+    /// <summary>Specifies the grip style of a ToolStrip.</summary>
+    public enum ToolStripGripStyle
+    {
+        /// <summary>The grip is hidden.</summary>
+        Hidden,
+        /// <summary>The grip is visible.</summary>
+        Visible
+    }
+
+    /// <summary>Specifies the text direction in a ToolStrip.</summary>
+    public enum ToolStripTextDirection
+    {
+        /// <summary>Text is horizontal (default).</summary>
+        Horizontal = 1,
+        /// <summary>Text is inherited from parent.</summary>
+        Inherit = 0,
+        /// <summary>Text is vertical going up (90° rotated).</summary>
+        Vertical90 = 2,
+        /// <summary>Text is vertical going down (270° rotated).</summary>
+        Vertical270 = 3,
+    }
+
+
+    /// <summary>Specifies the layout style for a ToolStrip.</summary>
+    public enum ToolStripLayoutStyle
+    {
+        /// <summary>Stack horizontally with overflow.</summary>
+        HorizontalStackWithOverflow = 1,
+        /// <summary>Stack vertically with overflow.</summary>
+        VerticalStackWithOverflow = 2,
+        /// <summary>Stack horizontally without overflow.</summary>
+        StackWithOverflow = 0,
+        /// <summary>Flow layout.</summary>
+        Flow = 3,
+        /// <summary>Table layout.</summary>
+        Table = 4,
+    }
+
+    /// <summary>
+    /// Handles one of <see cref="ToolStripRenderer"/>'s render events.
+    /// </summary>
+    /// <remarks>
+    /// WinForms declares a separate handler delegate per render event; a single generic one carries
+    /// the same information with far less surface, and binds the same way at a call site.
+    /// </remarks>
+    public delegate void ToolStripRenderEventHandler<TEventArgs> (object sender, TEventArgs e) where TEventArgs : EventArgs;
+
+    /// <summary>
+    /// Base class for drawing <see cref="ToolStrip"/> chrome. Subclass and override the
+    /// <c>OnRender*</c> methods, or hook the <c>Render*</c> events, to theme toolbars and menus.
+    /// </summary>
+    /// <remarks>
+    /// Each <c>Draw*</c> method raises its event and then calls the matching <c>OnRender*</c>, so both
+    /// extension routes see every paint. The base <c>OnRender*</c> implementations do nothing on
+    /// purpose: this layer paints ToolStrips through its own theme, and a base that also painted would
+    /// draw underneath a subclass that paints.
+    /// </remarks>
+    public abstract class ToolStripRenderer
+    {
+        /// <summary>
+        /// Returns a greyed-out copy of an image, for an item that is disabled.
+        /// </summary>
+        public static Majorsilence.Forms.Drawing.Image? CreateDisabledImage (Majorsilence.Forms.Drawing.Image? normalImage)
+        {
+            if (normalImage is null)
+                return null;
+
+            // Standard luminance-preserving desaturation, then lightened, which is what a disabled
+            // toolbar glyph looks like in every WinForms theme.
+            var disabled = new Majorsilence.Forms.Drawing.Bitmap (normalImage.Width, normalImage.Height);
+            var source = new Majorsilence.Forms.Drawing.Bitmap (normalImage);
+            for (var y = 0; y < normalImage.Height; y++)
+                for (var x = 0; x < normalImage.Width; x++) {
+                    var c = source.GetPixel (x, y);
+                    var grey = (int)Math.Round (c.R * 0.299 + c.G * 0.587 + c.B * 0.114);
+                    grey = MathCompat.Clamp ((grey + 255) / 2, 0, 255);
+                    disabled.SetPixel (x, y, Color.FromArgb (c.A, grey, grey, grey));
+                }
+            source.Dispose ();
+            return disabled;
+        }
+
+        /// <summary>
+        /// Called once when this renderer is attached to a <see cref="ToolStrip"/>, before anything is
+        /// drawn. A custom renderer uses it to set the strip-wide appearance it cannot express per-item
+        /// (padding, back colour, the auto-size behaviour of the whole strip).
+        /// </summary>
+        protected internal virtual void Initialize (ToolStrip toolStrip) { }
+
+        /// <summary>
+        /// Called once per item as it joins a <see cref="ToolStrip"/> this renderer is attached to. The
+        /// per-item companion to <see cref="Initialize"/> — where a renderer sets fore/back colours and
+        /// padding that would otherwise have to be repeated in every paint.
+        /// </summary>
+        protected internal virtual void InitializeItem (ToolStripItem item) { }
+
+        /// <summary>Occurs when an arrow glyph is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripArrowRenderEventArgs>? RenderArrow;
+
+        /// <summary>Draws an arrow glyph.</summary>
+        public void DrawArrow (ToolStripArrowRenderEventArgs e)
+        {
+            RenderArrow?.Invoke (this, e);
+            OnRenderArrow (e);
+        }
+
+        /// <summary>Override to draw an arrow glyph.</summary>
+        protected virtual void OnRenderArrow (ToolStripArrowRenderEventArgs e) { }
+
+        /// <summary>Occurs when a ToolStrip's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripRenderEventArgs>? RenderToolStripBackground;
+
+        /// <summary>Draws a ToolStrip's background.</summary>
+        public void DrawToolStripBackground (ToolStripRenderEventArgs e)
+        {
+            RenderToolStripBackground?.Invoke (this, e);
+            OnRenderToolStripBackground (e);
+        }
+
+        /// <summary>Override to draw a ToolStrip's background.</summary>
+        protected virtual void OnRenderToolStripBackground (ToolStripRenderEventArgs e) { }
+
+        /// <summary>Occurs when a ToolStrip's border is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripRenderEventArgs>? RenderToolStripBorder;
+
+        /// <summary>Draws a ToolStrip's border.</summary>
+        public void DrawToolStripBorder (ToolStripRenderEventArgs e)
+        {
+            RenderToolStripBorder?.Invoke (this, e);
+            OnRenderToolStripBorder (e);
+        }
+
+        /// <summary>Override to draw a ToolStrip's border.</summary>
+        protected virtual void OnRenderToolStripBorder (ToolStripRenderEventArgs e) { }
+
+        /// <summary>Occurs when a ToolStrip's move grip is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripGripRenderEventArgs>? RenderGrip;
+
+        /// <summary>Draws a ToolStrip's move grip.</summary>
+        public void DrawGrip (ToolStripGripRenderEventArgs e)
+        {
+            RenderGrip?.Invoke (this, e);
+            OnRenderGrip (e);
+        }
+
+        /// <summary>Override to draw a ToolStrip's move grip.</summary>
+        protected virtual void OnRenderGrip (ToolStripGripRenderEventArgs e) { }
+
+        /// <summary>Occurs when the image margin of a drop-down is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripRenderEventArgs>? RenderImageMargin;
+
+        /// <summary>Draws the image margin of a drop-down.</summary>
+        public void DrawImageMargin (ToolStripRenderEventArgs e)
+        {
+            RenderImageMargin?.Invoke (this, e);
+            OnRenderImageMargin (e);
+        }
+
+        /// <summary>Override to draw the image margin of a drop-down.</summary>
+        protected virtual void OnRenderImageMargin (ToolStripRenderEventArgs e) { }
+
+        /// <summary>Occurs when an item's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderItemBackground;
+
+        /// <summary>Draws an item's background.</summary>
+        public void DrawItemBackground (ToolStripItemRenderEventArgs e)
+        {
+            RenderItemBackground?.Invoke (this, e);
+            OnRenderItemBackground (e);
+        }
+
+        /// <summary>Override to draw an item's background.</summary>
+        protected virtual void OnRenderItemBackground (ToolStripItemRenderEventArgs e) { }
+
+        /// <summary>Occurs when an item's check mark is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemImageRenderEventArgs>? RenderItemCheck;
+
+        /// <summary>Draws an item's check mark.</summary>
+        public void DrawItemCheck (ToolStripItemImageRenderEventArgs e)
+        {
+            RenderItemCheck?.Invoke (this, e);
+            OnRenderItemCheck (e);
+        }
+
+        /// <summary>Override to draw an item's check mark.</summary>
+        protected virtual void OnRenderItemCheck (ToolStripItemImageRenderEventArgs e) { }
+
+        /// <summary>Occurs when an item's image is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemImageRenderEventArgs>? RenderItemImage;
+
+        /// <summary>Draws an item's image.</summary>
+        public void DrawItemImage (ToolStripItemImageRenderEventArgs e)
+        {
+            RenderItemImage?.Invoke (this, e);
+            OnRenderItemImage (e);
+        }
+
+        /// <summary>Override to draw an item's image.</summary>
+        protected virtual void OnRenderItemImage (ToolStripItemImageRenderEventArgs e) { }
+
+        /// <summary>Occurs when an item's text is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemTextRenderEventArgs>? RenderItemText;
+
+        /// <summary>Draws an item's text.</summary>
+        public void DrawItemText (ToolStripItemTextRenderEventArgs e)
+        {
+            RenderItemText?.Invoke (this, e);
+            OnRenderItemText (e);
+        }
+
+        /// <summary>Override to draw an item's text.</summary>
+        protected virtual void OnRenderItemText (ToolStripItemTextRenderEventArgs e) { }
+
+        /// <summary>Occurs when a button's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderButtonBackground;
+
+        /// <summary>Draws a button's background.</summary>
+        public void DrawButtonBackground (ToolStripItemRenderEventArgs e)
+        {
+            RenderButtonBackground?.Invoke (this, e);
+            OnRenderButtonBackground (e);
+        }
+
+        /// <summary>Override to draw a button's background.</summary>
+        protected virtual void OnRenderButtonBackground (ToolStripItemRenderEventArgs e) { }
+
+        /// <summary>Occurs when a drop-down button's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderDropDownButtonBackground;
+
+        /// <summary>Draws a drop-down button's background.</summary>
+        public void DrawDropDownButtonBackground (ToolStripItemRenderEventArgs e)
+        {
+            RenderDropDownButtonBackground?.Invoke (this, e);
+            OnRenderDropDownButtonBackground (e);
+        }
+
+        /// <summary>Override to draw a drop-down button's background.</summary>
+        protected virtual void OnRenderDropDownButtonBackground (ToolStripItemRenderEventArgs e) { }
+
+        /// <summary>Occurs when the overflow button's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderOverflowButtonBackground;
+
+        /// <summary>Draws the overflow button's background.</summary>
+        public void DrawOverflowButtonBackground (ToolStripItemRenderEventArgs e)
+        {
+            RenderOverflowButtonBackground?.Invoke (this, e);
+            OnRenderOverflowButtonBackground (e);
+        }
+
+        /// <summary>Override to draw the overflow button's background.</summary>
+        protected virtual void OnRenderOverflowButtonBackground (ToolStripItemRenderEventArgs e) { }
+
+        /// <summary>Occurs when a split button's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderSplitButtonBackground;
+
+        /// <summary>Draws a split button's background.</summary>
+        public void DrawSplitButton (ToolStripItemRenderEventArgs e)
+        {
+            RenderSplitButtonBackground?.Invoke (this, e);
+            OnRenderSplitButtonBackground (e);
+        }
+
+        /// <summary>Override to draw a split button's background.</summary>
+        protected virtual void OnRenderSplitButtonBackground (ToolStripItemRenderEventArgs e) { }
+
+        /// <summary>Occurs when a label's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderLabelBackground;
+
+        /// <summary>Draws a label's background.</summary>
+        public void DrawLabelBackground (ToolStripItemRenderEventArgs e)
+        {
+            RenderLabelBackground?.Invoke (this, e);
+            OnRenderLabelBackground (e);
+        }
+
+        /// <summary>Override to draw a label's background.</summary>
+        protected virtual void OnRenderLabelBackground (ToolStripItemRenderEventArgs e) { }
+
+        /// <summary>Occurs when a menu item's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderMenuItemBackground;
+
+        /// <summary>Draws a menu item's background.</summary>
+        public void DrawMenuItemBackground (ToolStripItemRenderEventArgs e)
+        {
+            RenderMenuItemBackground?.Invoke (this, e);
+            OnRenderMenuItemBackground (e);
+        }
+
+        /// <summary>Override to draw a menu item's background.</summary>
+        protected virtual void OnRenderMenuItemBackground (ToolStripItemRenderEventArgs e) { }
+
+        /// <summary>Occurs when a separator is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripSeparatorRenderEventArgs>? RenderSeparator;
+
+        /// <summary>Draws a separator.</summary>
+        public void DrawSeparator (ToolStripSeparatorRenderEventArgs e)
+        {
+            RenderSeparator?.Invoke (this, e);
+            OnRenderSeparator (e);
+        }
+
+        /// <summary>Override to draw a separator.</summary>
+        protected virtual void OnRenderSeparator (ToolStripSeparatorRenderEventArgs e) { }
+
+        /// <summary>Occurs when a StatusStrip's sizing grip is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripRenderEventArgs>? RenderStatusStripSizingGrip;
+
+        /// <summary>Draws a StatusStrip's sizing grip.</summary>
+        public void DrawStatusStripSizingGrip (ToolStripRenderEventArgs e)
+        {
+            RenderStatusStripSizingGrip?.Invoke (this, e);
+            OnRenderStatusStripSizingGrip (e);
+        }
+
+        /// <summary>Override to draw a StatusStrip's sizing grip.</summary>
+        protected virtual void OnRenderStatusStripSizingGrip (ToolStripRenderEventArgs e) { }
+
+        /// <summary>Occurs when a content panel's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripContentPanelRenderEventArgs>? RenderToolStripContentPanelBackground;
+
+        /// <summary>Draws a content panel's background.</summary>
+        public void DrawToolStripContentPanelBackground (ToolStripContentPanelRenderEventArgs e)
+        {
+            RenderToolStripContentPanelBackground?.Invoke (this, e);
+            OnRenderToolStripContentPanelBackground (e);
+        }
+
+        /// <summary>Override to draw a content panel's background.</summary>
+        protected virtual void OnRenderToolStripContentPanelBackground (ToolStripContentPanelRenderEventArgs e) { }
+
+        /// <summary>Occurs when a ToolStrip panel's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripPanelRenderEventArgs>? RenderToolStripPanelBackground;
+
+        /// <summary>Draws a ToolStrip panel's background.</summary>
+        public void DrawToolStripPanelBackground (ToolStripPanelRenderEventArgs e)
+        {
+            RenderToolStripPanelBackground?.Invoke (this, e);
+            OnRenderToolStripPanelBackground (e);
+        }
+
+        /// <summary>Override to draw a ToolStrip panel's background.</summary>
+        protected virtual void OnRenderToolStripPanelBackground (ToolStripPanelRenderEventArgs e) { }
+
+        /// <summary>Occurs when a status label's background is drawn.</summary>
+        public event ToolStripRenderEventHandler<ToolStripItemRenderEventArgs>? RenderToolStripStatusLabelBackground;
+
+        /// <summary>Draws a status label's background.</summary>
+        public void DrawToolStripStatusLabelBackground (ToolStripItemRenderEventArgs e)
+        {
+            RenderToolStripStatusLabelBackground?.Invoke (this, e);
+            OnRenderToolStripStatusLabelBackground (e);
+        }
+
+        /// <summary>Override to draw a status label's background.</summary>
+        protected virtual void OnRenderToolStripStatusLabelBackground (ToolStripItemRenderEventArgs e) { }
+    }
+
+    /// <summary>Provides a professional-style renderer for ToolStrip. Stub in Majorsilence.Forms.</summary>
+    public partial class ToolStripProfessionalRenderer : ToolStripRenderer
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ToolStripProfessionalRenderer () { }
+
+        /// <summary>Initializes a new instance that paints from the given colour table.</summary>
+        public ToolStripProfessionalRenderer (ProfessionalColorTable professionalColorTable)
+        {
+            ColorTable = professionalColorTable;
+        }
+
+        /// <summary>Gets or sets whether rounded borders are used.</summary>
+        /// <remarks>Read as of W6 mechanisms: the strip border this renderer draws along the bottom of a
+        /// <see cref="ToolStrip"/> has its two bottom corners cut when this is on, the shape upstream's
+        /// professional renderer gives a docked toolbar; off, the corners are square.</remarks>
+        public bool RoundedEdges { get; set; } = true;
+
+        /// <inheritdoc/>
+        /// <remarks>Draws the bottom border of a plain <see cref="ToolStrip"/> in the colour table's
+        /// <c>ToolStripBorder</c>; menu and status strips, drop-downs and the panels keep their own
+        /// chrome, as upstream's <c>OnRenderToolStripBorder</c> leaves them.</remarks>
+        protected override void OnRenderToolStripBorder (ToolStripRenderEventArgs e)
+        {
+            if (e.ToolStrip is null || e.ToolStrip is MenuStrip || e.ToolStrip is StatusStrip || e.ToolStrip is ToolStripDropDown)
+                return;
+
+            var bounds = e.AffectedBounds;
+
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                return;
+
+            // A Graphics line excludes its end point, so the runs are drawn to Right, and the single
+            // corner pixels are filled rather than drawn as zero-length lines.
+            using var pen = new Majorsilence.Forms.Drawing.Pen (ColorTable.ToolStripBorder);
+            using var brush = new Majorsilence.Forms.Drawing.SolidBrush (ColorTable.ToolStripBorder);
+            var bottom = bounds.Bottom - 1;
+
+            if (!RoundedEdges) {
+                e.Graphics.DrawLine (pen, bounds.Left, bottom, bounds.Right, bottom);
+                return;
+            }
+
+            // Cut corners: the line stops two pixels short of each end and a diagonal pixel joins it
+            // to the edge one row up, leaving the corner pixel itself unpainted.
+            e.Graphics.DrawLine (pen, bounds.Left + 2, bottom, bounds.Right - 2, bottom);
+            e.Graphics.FillRectangle (brush, bounds.Left + 1, bottom - 1, 1, 1);
+            e.Graphics.FillRectangle (brush, bounds.Right - 2, bottom - 1, 1, 1);
+        }
+    }
+
+    /// <summary>Provides a system-style renderer for ToolStrip. Stub in Majorsilence.Forms.</summary>
+    public class ToolStripSystemRenderer : ToolStripRenderer
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ToolStripSystemRenderer () { }
+    }
+
+    /// <summary>Provides global settings for all ToolStrip controls. Stub in Majorsilence.Forms.</summary>
+    public static partial class ToolStripManager
+    {
+        /// <summary>Gets or sets the global render mode for ToolStrip controls. Stub in Majorsilence.Forms.</summary>
+        public static ToolStripManagerRenderMode RenderMode { get; set; } = ToolStripManagerRenderMode.Professional;
+
+        private static ToolStripRenderer? renderer;
+
+        // Notifies on change; the event was declared and raised by nothing (W6.1).
+        /// <summary>Gets or sets the global renderer for ToolStrip controls. Stub in Majorsilence.Forms.</summary>
+        public static ToolStripRenderer? Renderer {
+            get => renderer;
+            set {
+                if (ReferenceEquals (renderer, value))
+                    return;
+
+                renderer = value;
+                RendererChanged?.Invoke (null, EventArgs.Empty);
+            }
+        }
+
+        // Merge and RevertMerge: ToolStripManager.Merge.cs (W6 mechanisms).
+    }
+
+    /// <summary>
+    /// Represents a status bar with items docked at the bottom of a form. Derives from
+    /// <see cref="ToolStrip"/>, matching WinForms' StatusStrip : ToolStrip, so ToolStrip members
+    /// (Renderer, RenderMode, LayoutStyle, GripStyle, Stretch, CanOverflow, ImageScalingSize, ...) are
+    /// reachable here. Its items are still painted by its own <see cref="Renderers.StatusStripRenderer"/>,
+    /// which RenderManager keys off the concrete StatusStrip type.
+    /// </summary>
+    public partial class StatusStrip : ToolStrip
+    {
+        /// <summary>Initializes a new instance of the StatusStrip class.</summary>
+        public StatusStrip ()
+        {
+            // Overrides the Top dock ToolBar sets for bars -- a status strip lives at the bottom.
+            Dock = DockStyle.Bottom;
+
+            // A status strip is not draggable, so it gets no grip -- upstream's StatusStrip sets this
+            // in its own constructor for the same reason. Stated here rather than special-cased in
+            // ToolBar.GripBandWidth, so the rule stays "the strip decides" (TSM-43).
+            GripStyle = ToolStripGripStyle.Hidden;
+            SetControlBehavior (ControlBehaviors.InvalidateOnTextChanged);
+
+            // A status strip spans its rafting panel's row, as upstream's Stretch default for StatusStrip has it (W6).
+            Stretch = true;
+        }
+
+        /// <inheritdoc/>
+        protected override Padding DefaultPadding => new Padding (1, 0, 16, 0);
+
+        /// <inheritdoc/>
+        protected override Size DefaultSize => new Size (600, 22);
+
+        /// <inheritdoc/>
+        public new static ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle,
+            (style) => {
+                style.Border.Top.Width = 1;
+                style.FontSize = 13;
+            });
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// A status strip is not a menu bar: it must not become Application.ActiveMenu on click, which is
+        /// what <see cref="ToolBar"/> (an ancestor via ToolStrip) opts every bar into.
+        /// </remarks>
+        protected override bool IsTopLevelMenu => false;
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Status items keep their own width and sit left-to-right; they are NOT expanded to fill the bar
+        /// the way <see cref="ToolBar"/>'s buttons are. Hidden items take no space at all. These are the
+        /// bounds <see cref="Renderers.StatusStripRenderer"/> paints into, so what you see is also what
+        /// MenuBase hit-tests -- while this type derived straight from Control nothing laid items out and
+        /// they could never be clicked.
+        /// </remarks>
+        protected override void LayoutItems ()
+        {
+            // PaddedClientRectangle is DEVICE-scaled while item Bounds are LOGICAL, which is the
+            // mismatch MenuBase.LogicalClientRectangle exists for. Laying out straight into it stored
+            // device geometry in logical fields: at scaling 2 a 400px strip laid its items out 800
+            // logical units wide, so the last one sat far outside the bar. Exactly the class W6.3
+            // catalogued, and invisible at scaling 1 -- which is why it survived until the Spring
+            // arithmetic below made it show up in the MF_HEADLESS_SCALE=2 gate.
+            var device = PaddedClientRectangle;
+            var rect = new Rectangle (
+                DeviceToLogicalUnits (device.X), DeviceToLogicalUnits (device.Y),
+                DeviceToLogicalUnits (device.Width), DeviceToLogicalUnits (device.Height));
+
+            var visible = Items.Cast<MenuItem> ().Where (i => i.Visible).ToList ();
+
+            foreach (MenuItem item in Items)
+                if (!item.Visible)
+                    item.SetBounds (0, 0, 0, 0);
+
+            // ToolStripStatusLabel.Spring: the springing items share whatever width the fixed ones
+            // leave, which is how the status bar's right-hand labels stay pinned to the right edge as
+            // the window resizes. It was stored and read by nothing, so every item took a fixed width
+            // and a "spring" label sat next to its neighbour with a gap after it.
+            var springs = visible.Count (IsSpring);
+            var fixed_width = visible.Where (i => !IsSpring (i)).Sum (Width);
+            var spacing = ItemSpacing * Math.Max (0, visible.Count - 1);
+            var spring_width = springs == 0
+                ? 0
+                : Math.Max (0, (rect.Width - fixed_width - spacing) / springs);
+
+            var x = rect.X;
+
+            foreach (var item in visible) {
+                var width = IsSpring (item) ? spring_width : Width (item);
+
+                item.SetBounds (x, rect.Y, width, rect.Height);
+
+                x += width + ItemSpacing;
+            }
+
+            static bool IsSpring (MenuItem item) => item is ToolStripStatusLabel label && label.Spring;
+
+            static int Width (MenuItem item)
+                => item is ToolStripItem tsi && tsi.Size.Width > 0 ? tsi.Size.Width : DefaultItemWidth;
+
+            OnLayoutCompletedCore ();
+        }
+
+        /// <summary>Width used for an item that hasn't been given an explicit Size.</summary>
+        internal const int DefaultItemWidth = 120;
+
+        /// <summary>Gap left between adjacent status items.</summary>
+        internal const int ItemSpacing = 4;
+
+        // NOTE: no OnPaint override -- MenuBase.OnPaint already lays the items out and dispatches to
+        // RenderManager, which resolves StatusStripRenderer from the concrete type. Overriding it here
+        // (as this type did while it derived straight from Control) would render the items twice.
+
+        /// <inheritdoc/>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+    }
+
+    /// <summary>Provides data for the ListView.ItemChecked event.</summary>
+    public class ItemCheckedEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ItemCheckedEventArgs (ListViewItem item) { Item = item; }
+
+        /// <summary>Gets the ListViewItem that was checked or unchecked.</summary>
+        public ListViewItem Item { get; }
+    }
+
+    /// <summary>Provides data for the ListView.BeforeLabelEdit and AfterLabelEdit events.</summary>
+    public partial class LabelEditEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public LabelEditEventArgs (int item) { Item = item; }
+
+        /// <summary>Initializes a new instance with new label text.</summary>
+        public LabelEditEventArgs (int item, string? label) { Item = item; Label = label; }
+
+        /// <summary>Gets the zero-based index of the item being edited.</summary>
+        public int Item { get; }
+
+        /// <summary>Gets the text assigned to the item's label during label editing, or null if cancelled.</summary>
+        public string? Label { get; }
+    }
+
+    /// <summary>Provides data for the ListView.RetrieveVirtualItem event.</summary>
+    public class RetrieveVirtualItemEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public RetrieveVirtualItemEventArgs (int itemIndex) { ItemIndex = itemIndex; }
+
+        /// <summary>Gets the index of the item to retrieve.</summary>
+        public int ItemIndex { get; }
+
+        /// <summary>Gets or sets the item retrieved for the given index.</summary>
+        public ListViewItem? Item { get; set; }
+    }
+
+    /// <summary>Provides data for the ListView.CacheVirtualItems event.</summary>
+    public class CacheVirtualItemsEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public CacheVirtualItemsEventArgs (int startIndex, int endIndex) { StartIndex = startIndex; EndIndex = endIndex; }
+
+        /// <summary>Gets the start of the requested item range.</summary>
+        public int StartIndex { get; }
+
+        /// <summary>Gets the end of the requested item range.</summary>
+        public int EndIndex { get; }
+    }
+
+    /// <summary>Specifies the style of a 3D border drawn by ControlPaint.</summary>
+    public enum Border3DStyle
+    {
+        /// <summary>No border.</summary>
+        None = 0,
+        /// <summary>A sunken inner border and a raised outer border.</summary>
+        Adjust = 8192,
+        /// <summary>A flat border.</summary>
+        Flat = 16394,
+        /// <summary>A raised inner border and a sunken outer border.</summary>
+        Info = 1024,
+        /// <summary>A raised inner border only.</summary>
+        Raised = 5,
+        /// <summary>A raised inner border and a raised outer border (default).</summary>
+        RaisedInner = 4,
+        /// <summary>A raised outer border only.</summary>
+        RaisedOuter = 1,
+        /// <summary>A sunken inner and outer border.</summary>
+        Sunken = 10,
+        /// <summary>A sunken inner border only.</summary>
+        SunkenInner = 8,
+        /// <summary>A sunken outer border only.</summary>
+        SunkenOuter = 2,
+        /// <summary>The border has no three-dimensional effect.</summary>
+        Bump = 9,
+        /// <summary>The border looks etched into the form.</summary>
+        Etched = 6,
+    }
+
+    /// <summary>Specifies the border style for a button drawn by ControlPaint.</summary>
+    public enum ButtonBorderStyle
+    {
+        /// <summary>No border.</summary>
+        None,
+        /// <summary>A dotted-line border.</summary>
+        Dotted,
+        /// <summary>A dashed border.</summary>
+        Dashed,
+        /// <summary>A solid border.</summary>
+        Solid,
+        /// <summary>A sunken border.</summary>
+        Inset,
+        /// <summary>A raised border.</summary>
+        Outset
+    }
+
+    /// <summary>Specifies the state of a button drawn by ControlPaint.</summary>
+    [Flags]
+    public enum ButtonState
+    {
+        /// <summary>Normal state.</summary>
+        Normal = 0,
+        /// <summary>The button is inactive (disabled).</summary>
+        Inactive = 256,
+        /// <summary>The button appears pushed.</summary>
+        Pushed = 512,
+        /// <summary>The button is checked.</summary>
+        Checked = 1024,
+        /// <summary>The button has a flat, two-dimensional border.</summary>
+        Flat = 16384,
+        /// <summary>All flags are set.</summary>
+        All = Flat | Checked | Pushed | Inactive
+    }
+
+    /// <summary>Specifies the image used to paint a menu glyph.</summary>
+    public enum MenuGlyph
+    {
+        /// <summary>An arrow.</summary>
+        Arrow = 0,
+        /// <summary>A bullet.</summary>
+        Bullet = 2,
+        /// <summary>A check mark.</summary>
+        Checkmark = 1,
+        /// <summary>A minimum value.</summary>
+        Min = 0,
+        /// <summary>A maximum value.</summary>
+        Max = 2,
+    }
+
+    /// <summary>Specifies the direction of a scroll button.</summary>
+    public enum ScrollButton
+    {
+        /// <summary>Scroll up.</summary>
+        Up,
+        /// <summary>Scroll down.</summary>
+        Down,
+        /// <summary>Scroll left.</summary>
+        Left,
+        /// <summary>Scroll right.</summary>
+        Right,
+        /// <summary>Minimum value.</summary>
+        Min = Up,
+        /// <summary>Maximum value.</summary>
+        Max = Right
+    }
+
+    /// <summary>Specifies how items are drawn in a ListBox or ComboBox.</summary>
+    public enum DrawMode
+    {
+        /// <summary>Items are drawn by the operating system (default).</summary>
+        Normal,
+        /// <summary>Items are drawn by the owner at a fixed height.</summary>
+        OwnerDrawFixed,
+        /// <summary>Items are drawn by the owner at variable heights.</summary>
+        OwnerDrawVariable
+    }
+
+    /// <summary>WinForms compat: specifies the alignment of a ToolStrip item.</summary>
+    public enum ToolStripItemAlignment
+    {
+        /// <summary>Item is aligned to the left.</summary>
+        Left,
+        /// <summary>Item is aligned to the right.</summary>
+        Right
+    }
+
+    /// <summary>Specifies the accessible role for a control.</summary>
+    public enum AccessibleRole
+    {
+        /// <summary>No accessible role.</summary>
+        None = 0,
+        /// <summary>Default accessible role.</summary>
+        Default = -1,
+        /// <summary>A title bar.</summary>
+        TitleBar = 1,
+        /// <summary>A menu bar.</summary>
+        MenuBar = 2,
+        /// <summary>A scroll bar.</summary>
+        ScrollBar = 3,
+        /// <summary>A grip handle.</summary>
+        Grip = 4,
+        /// <summary>A sound object.</summary>
+        Sound = 5,
+        /// <summary>A cursor.</summary>
+        Cursor = 6,
+        /// <summary>A caret.</summary>
+        Caret = 7,
+        /// <summary>An alert or condition notification.</summary>
+        Alert = 8,
+        /// <summary>A window.</summary>
+        Window = 9,
+        /// <summary>A client window.</summary>
+        Client = 10,
+        /// <summary>A menu pop-up.</summary>
+        MenuPopup = 11,
+        /// <summary>A menu item.</summary>
+        MenuItem = 12,
+        /// <summary>A tool tip.</summary>
+        ToolTip = 13,
+        /// <summary>An application.</summary>
+        Application = 14,
+        /// <summary>A document.</summary>
+        Document = 15,
+        /// <summary>A pane.</summary>
+        Pane = 16,
+        /// <summary>A chart.</summary>
+        Chart = 17,
+        /// <summary>A dialog box.</summary>
+        Dialog = 18,
+        /// <summary>A border.</summary>
+        Border = 19,
+        /// <summary>A group box.</summary>
+        Grouping = 20,
+        /// <summary>A separator.</summary>
+        Separator = 21,
+        /// <summary>A toolbar.</summary>
+        ToolBar = 22,
+        /// <summary>A status bar.</summary>
+        StatusBar = 23,
+        /// <summary>A table.</summary>
+        Table = 24,
+        /// <summary>A column header.</summary>
+        ColumnHeader = 25,
+        /// <summary>A row header.</summary>
+        RowHeader = 26,
+        /// <summary>A column.</summary>
+        Column = 27,
+        /// <summary>A row.</summary>
+        Row = 28,
+        /// <summary>A cell.</summary>
+        Cell = 29,
+        /// <summary>A link.</summary>
+        Link = 30,
+        /// <summary>A help balloon.</summary>
+        HelpBalloon = 31,
+        /// <summary>A character.</summary>
+        Character = 32,
+        /// <summary>A list.</summary>
+        List = 33,
+        /// <summary>A list item.</summary>
+        ListItem = 34,
+        /// <summary>An outline (tree).</summary>
+        Outline = 35,
+        /// <summary>An outline item (tree node).</summary>
+        OutlineItem = 36,
+        /// <summary>A page tab.</summary>
+        PageTab = 37,
+        /// <summary>A property page.</summary>
+        PropertyPage = 38,
+        /// <summary>An indicator.</summary>
+        Indicator = 39,
+        /// <summary>An image.</summary>
+        Graphic = 40,
+        /// <summary>A static text label.</summary>
+        StaticText = 41,
+        /// <summary>An editable text field.</summary>
+        Text = 42,
+        /// <summary>A push button.</summary>
+        PushButton = 43,
+        /// <summary>A check button.</summary>
+        CheckButton = 44,
+        /// <summary>An option (radio) button.</summary>
+        RadioButton = 45,
+        /// <summary>A combo box.</summary>
+        ComboBox = 46,
+        /// <summary>A drop-down list.</summary>
+        DropList = 47,
+        /// <summary>A progress bar.</summary>
+        ProgressBar = 48,
+        /// <summary>A dial.</summary>
+        Dial = 49,
+        /// <summary>A hot-key field.</summary>
+        HotkeyField = 50,
+        /// <summary>A slider.</summary>
+        Slider = 51,
+        /// <summary>A spin box.</summary>
+        SpinButton = 52,
+        /// <summary>A diagram.</summary>
+        Diagram = 53,
+        /// <summary>An animation.</summary>
+        Animation = 54,
+        /// <summary>An equation.</summary>
+        Equation = 55,
+        /// <summary>A drop-down button.</summary>
+        ButtonDropDown = 56,
+        /// <summary>A drop-down button that shows a menu.</summary>
+        ButtonMenu = 57,
+        /// <summary>A drop-down button that shows a grid.</summary>
+        ButtonDropDownGrid = 58,
+        /// <summary>A whitespace area.</summary>
+        WhiteSpace = 59,
+        /// <summary>A page tab list.</summary>
+        PageTabList = 60,
+        /// <summary>A clock.</summary>
+        Clock = 61,
+        /// <summary>A split button.</summary>
+        SplitButton = 62,
+        /// <summary>An IP address entry field.</summary>
+        IpAddress = 63,
+        /// <summary>An outline button.</summary>
+        OutlineButton = 64,
+    }
+
+    /// <summary>WinForms compatibility: provides access to a Win32 HWND. Stub in Majorsilence.Forms.</summary>
+    public interface IWin32Window
+    {
+        /// <summary>Gets the Win32 handle. Always IntPtr.Zero in Majorsilence.Forms.</summary>
+        IntPtr Handle { get; }
+    }
+
+    /// <summary>WinForms compatibility: contains environment and resource information. Stub in Majorsilence.Forms.</summary>
+    public static class NativeMethods
+    {
+        /// <summary>Stub — Majorsilence.Forms has no Win32 HWND; always returns 0.</summary>
+        public static nint SendMessage (nint hWnd, int msg, nint wParam, nint lParam) => 0;
+
+        /// <summary>Stub — Majorsilence.Forms has no Win32 HWND; always returns false.</summary>
+        public static bool PostMessage (nint hWnd, int msg, nint wParam, nint lParam) => false;
+    }
+
+    /// <summary>Specifies the appearance of a CheckBox or RadioButton.</summary>
+    public enum Appearance
+    {
+        /// <summary>Standard appearance (checkbox/radio with label).</summary>
+        Normal,
+        /// <summary>Button-like appearance.</summary>
+        Button
+    }
+
+    /// <summary>Describes the visual appearance of a Button in the Flat style.</summary>
+    public class FlatButtonAppearance
+    {
+        /// <summary>Gets or sets the border color of the button. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color BorderColor { get; set; } = System.Drawing.Color.Empty;
+
+        /// <summary>Gets or sets the border size. Stub in Majorsilence.Forms.</summary>
+        public int BorderSize { get; set; } = 1;
+
+        /// <summary>Gets or sets the background color when the mouse button is held down. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color MouseDownBackColor { get; set; } = System.Drawing.Color.Empty;   // painted while Control.IsPressed (W6 mechanisms)
+
+        /// <summary>Gets or sets the background color when the mouse is over the button. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color MouseOverBackColor { get; set; } = System.Drawing.Color.Empty;
+
+        /// <summary>Gets or sets the background color when the button is checked. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color CheckedBackColor { get; set; } = System.Drawing.Color.Empty;
+    }
+
+    /// <summary>Specifies the high DPI mode for a Windows Forms application.</summary>
+    public enum HighDpiMode
+    {
+        /// <summary>DPI is not set programmatically.</summary>
+        DpiUnaware = 0,
+        /// <summary>Application is system DPI-aware.</summary>
+        SystemAware = 1,
+        /// <summary>Application is per-monitor DPI-aware (v1).</summary>
+        PerMonitor = 2,
+        /// <summary>Application is per-monitor DPI-aware (v2).</summary>
+        PerMonitorV2 = 3,
+        /// <summary>DPI awareness is inherited from the system.</summary>
+        DpiUnawareGdiScaled = 4
+    }
+
+    /// <summary>Specifies the left or right alignment of a UI element.</summary>
+    public enum LeftRightAlignment
+    {
+        /// <summary>Aligned to the left.</summary>
+        Left,
+        /// <summary>Aligned to the right.</summary>
+        Right
+    }
+
+    /// <summary>Specifies the alignment of the tabs in a TabControl.</summary>
+    public enum TabAlignment
+    {
+        /// <summary>Tabs are aligned to the top.</summary>
+        Top,
+        /// <summary>Tabs are aligned to the bottom.</summary>
+        Bottom,
+        /// <summary>Tabs are aligned to the left.</summary>
+        Left,
+        /// <summary>Tabs are aligned to the right.</summary>
+        Right
+    }
+
+    /// <summary>Specifies the draw mode for a TabControl.</summary>
+    public enum TabDrawMode
+    {
+        /// <summary>All tabs are drawn by the operating system.</summary>
+        Normal,
+        /// <summary>All tabs are drawn by the owner (custom drawing).</summary>
+        OwnerDrawFixed
+    }
+
+    /// <summary>Specifies the visual appearance of a TabControl.</summary>
+    public enum TabAppearance
+    {
+        /// <summary>Tabs appear as standard buttons.</summary>
+        Normal,
+        /// <summary>Tabs appear as 3D buttons.</summary>
+        Buttons,
+        /// <summary>Tabs appear as flat buttons.</summary>
+        FlatButtons
+    }
+
+    /// <summary>Provides data for the TabControl.Selecting and TabControl.Deselecting events.</summary>
+    public class TabControlCancelEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public TabControlCancelEventArgs (TabPage? tabPage, int tabPageIndex, bool cancel, TabControlAction action)
+            : base (cancel)
+        {
+            TabPage = tabPage;
+            TabPageIndex = tabPageIndex;
+            Action = action;
+        }
+
+        /// <summary>Gets the tab page being selected or deselected.</summary>
+        public TabPage? TabPage { get; }
+
+        /// <summary>Gets the index of the tab page.</summary>
+        public int TabPageIndex { get; }
+
+        /// <summary>Gets the action that caused the event.</summary>
+        public TabControlAction Action { get; }
+    }
+
+    /// <summary>Provides data for the TabControl.Selected and TabControl.Deselected events.</summary>
+    public class TabControlEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public TabControlEventArgs (TabPage? tabPage, int tabPageIndex, TabControlAction action)
+        {
+            TabPage = tabPage;
+            TabPageIndex = tabPageIndex;
+            Action = action;
+        }
+
+        /// <summary>Gets the tab page being selected or deselected.</summary>
+        public TabPage? TabPage { get; }
+
+        /// <summary>Gets the index of the tab page.</summary>
+        public int TabPageIndex { get; }
+
+        /// <summary>Gets the action that caused the event.</summary>
+        public TabControlAction Action { get; }
+    }
+
+    /// <summary>Specifies the action that caused a TabControl event.</summary>
+    public enum TabControlAction
+    {
+        /// <summary>A tab page was selected.</summary>
+        Selecting,
+        /// <summary>A tab page was selected (after).</summary>
+        Selected,
+        /// <summary>A tab page was deselected.</summary>
+        Deselecting,
+        /// <summary>A tab page was deselected (after).</summary>
+        Deselected
+    }
+
+    /// <summary>Specifies how tabs are sized in a TabControl.</summary>
+    public enum TabSizeMode
+    {
+        /// <summary>Tabs are sized to fit their label.</summary>
+        Normal = 0,
+        /// <summary>Tabs are fixed-size.</summary>
+        Fixed = 2,
+        /// <summary>Tabs are stretched to fill the available width.</summary>
+        FillToRight = 1,
+    }
+
+    /// <summary>Provides data for an owner-draw event.</summary>
+    public class DrawItemEventArgs : EventArgs, IDisposable
+    {
+        private readonly Graphics _graphics;
+
+#pragma warning disable CA1416
+        /// <summary>Initializes a new instance using a Skia canvas.</summary>
+        public DrawItemEventArgs (SkiaSharp.SKCanvas canvas, System.Drawing.Rectangle bounds, int index, DrawItemState state)
+        {
+            _graphics = new Graphics (canvas);
+            Bounds = bounds;
+            Index = index;
+            State = state;
+            Font = Majorsilence.Forms.SystemFonts.DefaultFont ?? Majorsilence.Forms.SystemFonts.SmallCaptionFont ?? new Majorsilence.Forms.Drawing.Font ("Arial", 9);
+            ForeColor = Majorsilence.Forms.SystemColors.WindowText;
+            BackColor = (state & DrawItemState.Selected) != 0 ? Majorsilence.Forms.SystemColors.Highlight : Majorsilence.Forms.SystemColors.Window;
+        }
+#pragma warning restore CA1416
+
+        /// <summary>Initializes a new instance from an existing Graphics.</summary>
+        public DrawItemEventArgs (Graphics graphics, Majorsilence.Forms.Drawing.Font? font,
+            System.Drawing.Rectangle rect, int index, DrawItemState state)
+            : this (graphics, font, rect, index, state,
+                    Majorsilence.Forms.SystemColors.WindowText,
+                    (state & DrawItemState.Selected) != 0
+                        ? Majorsilence.Forms.SystemColors.Highlight
+                        : Majorsilence.Forms.SystemColors.Window) { }
+
+        /// <summary>Initializes a new instance with explicit colours.</summary>
+        public DrawItemEventArgs (Graphics graphics, Majorsilence.Forms.Drawing.Font? font,
+            System.Drawing.Rectangle rect, int index, DrawItemState state,
+            System.Drawing.Color foreColor, System.Drawing.Color backColor)
+        {
+            _graphics = graphics;
+            Bounds = rect;
+            Index = index;
+            State = state;
+            Font = font ?? Majorsilence.Forms.SystemFonts.DefaultFont ?? new Majorsilence.Forms.Drawing.Font ("Arial", 9);
+            ForeColor = foreColor;
+            BackColor = backColor;
+        }
+
+        /// <summary>Gets the graphics object for drawing.</summary>
+        public Graphics Graphics => _graphics;
+
+        /// <summary>Gets the bounding rectangle of the item to draw.</summary>
+        public System.Drawing.Rectangle Bounds { get; }
+
+        /// <summary>Gets the index of the item to draw.</summary>
+        public int Index { get; }
+
+        /// <summary>Gets the state of the item to draw.</summary>
+        public DrawItemState State { get; }
+
+        /// <summary>Gets the font to use for drawing text.</summary>
+        public Majorsilence.Forms.Drawing.Font Font { get; }
+
+        /// <summary>Gets the foreground color for drawing.</summary>
+        public System.Drawing.Color ForeColor { get; }
+
+        /// <summary>Gets the background color for drawing.</summary>
+        public System.Drawing.Color BackColor { get; }
+
+        /// <summary>Draws the background using the default appearance.</summary>
+        public void DrawBackground ()
+        {
+#pragma warning disable CA1416
+            using var brush = new Majorsilence.Forms.Drawing.SolidBrush (BackColor);
+#pragma warning restore CA1416
+            _graphics.FillRectangle (brush, Bounds);
+        }
+
+        /// <summary>Draws the focus rectangle using the default appearance.</summary>
+        public void DrawFocusRectangle () => _graphics.DrawFocusRectangle (Bounds);
+
+        /// <inheritdoc/>
+        public void Dispose ()
+        {
+            _graphics.Dispose ();
+            GC.SuppressFinalize (this);
+        }
+    }
+
+    /// <summary>Represents the state of an owner-drawn item.</summary>
+    [System.Flags]
+    public enum DrawItemState
+    {
+        /// <summary>Default state.</summary>
+        None = 0,
+        /// <summary>The item is selected.</summary>
+        Selected = 1,
+        /// <summary>The item has focus.</summary>
+        Focus = 16,
+        /// <summary>The item is disabled.</summary>
+        Disabled = 4,
+        /// <summary>The item is checked.</summary>
+        Checked = 8,
+        /// <summary>The item is the default item.</summary>
+        Default = 32,
+        /// <summary>The item is greyed out.</summary>
+        Grayed = 2,
+        /// <summary>The item is drawn with the hot-tracking highlight.</summary>
+        HotLight = 64,
+        /// <summary>The item is in an inactive window.</summary>
+        Inactive = 128,
+        /// <summary>The item's mnemonic underline is not drawn.</summary>
+        NoAccelerator = 256,
+        /// <summary>The item's focus rectangle is not drawn.</summary>
+        NoFocusRect = 512,
+        /// <summary>The item is the edit portion of an owner-drawn combo box.</summary>
+        ComboBoxEdit = 4096
+    }
+
+    /// <summary>Provides data for the MeasureItem event.</summary>
+    public class MeasureItemEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public MeasureItemEventArgs (SkiaSharp.SKCanvas graphics, int index)
+        {
+            Graphics = graphics;
+            Index = index;
+        }
+
+        /// <summary>Gets the graphics canvas.</summary>
+        public SkiaSharp.SKCanvas Graphics { get; }
+
+        /// <summary>Gets the index of the item to measure.</summary>
+        public int Index { get; }
+
+        /// <summary>Gets or sets the height of the item.</summary>
+        public int ItemHeight { get; set; }
+
+        /// <summary>Gets or sets the width of the item.</summary>
+        public int ItemWidth { get; set; }
+    }
+
+    /// <summary>
+    /// WinForms compatibility: provides methods to simulate keyboard input.
+    /// All methods are stubs in Majorsilence.Forms.
+    /// </summary>
+    /// <remarks>
+    /// Real as of W6 mechanisms, within this application: the keys go to the active form through the
+    /// same three entry points a backend feeds it -- key down, text input for a printable character,
+    /// key up -- so a focused control sees exactly what it would see from the keyboard. The WinForms
+    /// syntax is parsed as upstream parses it: <c>+</c>, <c>^</c> and <c>%</c> hold Shift, Control and
+    /// Alt for the next key or parenthesised group, <c>~</c> is Enter, <c>{NAME}</c> names a key and
+    /// <c>{NAME n}</c> repeats it, and a malformed string throws <see cref="ArgumentException"/>.
+    /// Deviation: keys cannot reach another process -- there is no OS-level input injection here.
+    /// </remarks>
+    public static class SendKeys
+    {
+        /// <summary>Sends keystrokes to the active form.</summary>
+        /// <remarks>Keys sent from inside a key handler are queued and delivered once that handler
+        /// returns, so a handler that sends a Tab does not re-enter itself.</remarks>
+        public static void Send (string keys)
+        {
+            Guard.ThrowIfNull (keys);
+
+            foreach (var stroke in Parse (keys))
+                queue.Enqueue (stroke);
+
+            Flush ();
+        }
+
+        /// <summary>Sends keystrokes to the active form and returns once they are processed.</summary>
+        public static void SendWait (string keys) => Send (keys);
+
+        /// <summary>Delivers every queued keystroke.</summary>
+        public static void Flush ()
+        {
+            if (delivering)
+                return;
+
+            delivering = true;
+
+            try {
+                while (queue.Count > 0) {
+                    var stroke = queue.Dequeue ();
+
+                    if ((Target?.Invoke () ?? Form.ActiveForm) is not { } window)
+                        continue;
+
+                    Deliver (window, stroke);
+                }
+            } finally {
+                delivering = false;
+            }
+        }
+
+        /// <summary>Overrides the form keys go to. Test seam; null means the active form.</summary>
+        internal static Func<WindowBase?>? Target { get; set; }
+
+        private static readonly System.Collections.Generic.Queue<Stroke> queue = new ();
+        private static bool delivering;
+
+        private readonly struct Stroke
+        {
+            internal Stroke (Keys key, Keys modifiers, char? character)
+            {
+                Key = key;
+                Modifiers = modifiers;
+                Character = character;
+            }
+
+            internal Keys Key { get; }
+            internal Keys Modifiers { get; }
+            internal char? Character { get; }
+        }
+
+        private static void Deliver (WindowBase window, Stroke stroke)
+        {
+            var data = stroke.Key == Keys.None ? Keys.None : stroke.Key | stroke.Modifiers;
+
+            if (data != Keys.None)
+                window.HandleKeyDown (data);
+
+            // A held Control or Alt makes a shortcut, not a character, as on the keyboard.
+            if (stroke.Character is { } c && (stroke.Modifiers & (Keys.Control | Keys.Alt)) == 0)
+                window.HandleTextInput (c.ToString ());
+
+            if (data != Keys.None)
+                window.HandleKeyUp (data);
+        }
+
+        private static System.Collections.Generic.List<Stroke> Parse (string keys)
+        {
+            var strokes = new System.Collections.Generic.List<Stroke> ();
+            var i = 0;
+            ParseRun (keys, ref i, Keys.None, strokes, inGroup: false);
+            return strokes;
+        }
+
+        private static void ParseRun (string keys, ref int i, Keys held, System.Collections.Generic.List<Stroke> strokes, bool inGroup)
+        {
+            var pending = Keys.None;
+
+            while (i < keys.Length) {
+                var c = keys[i];
+
+                switch (c) {
+                case '+':
+                    pending |= Keys.Shift;
+                    i++;
+                    continue;
+                case '^':
+                    pending |= Keys.Control;
+                    i++;
+                    continue;
+                case '%':
+                    pending |= Keys.Alt;
+                    i++;
+                    continue;
+                case '(':
+                    i++;
+                    ParseRun (keys, ref i, held | pending, strokes, inGroup: true);
+                    pending = Keys.None;
+                    continue;
+                case ')':
+                    if (!inGroup)
+                        throw new ArgumentException ($"Unmatched ')' at position {i} in '{keys}'.", nameof (keys));
+
+                    i++;
+                    return;
+                case '~':
+                    strokes.Add (new Stroke (Keys.Enter, held | pending, null));
+                    pending = Keys.None;
+                    i++;
+                    continue;
+                case '{':
+                    ParseBrace (keys, ref i, held | pending, strokes);
+                    pending = Keys.None;
+                    continue;
+                case '}':
+                    throw new ArgumentException ($"Unmatched '}}' at position {i} in '{keys}'.", nameof (keys));
+                default:
+                    strokes.Add (ForCharacter (c, held | pending));
+                    pending = Keys.None;
+                    i++;
+                    continue;
+                }
+            }
+
+            if (inGroup)
+                throw new ArgumentException ($"Unclosed '(' in '{keys}'.", nameof (keys));
+        }
+
+        private static void ParseBrace (string keys, ref int i, Keys modifiers, System.Collections.Generic.List<Stroke> strokes)
+        {
+            // {{} and {}} name the brace characters themselves, so the name may start with one.
+            var start = i + 1;
+            var end = start < keys.Length && (keys[start] == '{' || keys[start] == '}')
+                ? keys.IndexOf ('}', start + 1)
+                : keys.IndexOf ('}', start);
+
+            if (end < 0)
+                throw new ArgumentException ($"Unclosed '{{' in '{keys}'.", nameof (keys));
+
+            var body = keys.Substring (start, end - start);
+            i = end + 1;
+
+            var count = 1;
+            var space = body.LastIndexOf (' ');
+
+            if (space > 0 && TryDigits (body, space + 1, out var repeat)) {
+                count = repeat;
+                body = body.Substring (0, space);
+            }
+
+            Stroke stroke;
+
+            if (body.Length == 1) {
+                stroke = ForCharacter (body[0], modifiers);
+            } else if (NamedKey (body) is { } key) {
+                stroke = new Stroke (key, modifiers, null);
+            } else {
+                throw new ArgumentException ($"'{body}' is not a key SendKeys knows.", nameof (keys));
+            }
+
+            for (var n = 0; n < count; n++)
+                strokes.Add (stroke);
+        }
+
+        private static Stroke ForCharacter (char c, Keys modifiers)
+        {
+            var key = c switch {
+                >= 'a' and <= 'z' => Keys.A + (c - 'a'),
+                >= 'A' and <= 'Z' => Keys.A + (c - 'A'),
+                >= '0' and <= '9' => Keys.D0 + (c - '0'),
+                ' ' => Keys.Space,
+                _ => Keys.None,
+            };
+
+            // An upper-case letter is typed with Shift down, as on the keyboard.
+            if (c is >= 'A' and <= 'Z')
+                modifiers |= Keys.Shift;
+
+            // Shift held over a lower-case letter types the capital.
+            if ((modifiers & Keys.Shift) != 0 && c is >= 'a' and <= 'z')
+                c = char.ToUpperInvariant (c);
+
+            return new Stroke (key, modifiers, c);
+        }
+
+        private static Keys? NamedKey (string name)
+        {
+            switch (name.ToUpperInvariant ()) {
+            case "BACKSPACE": case "BS": case "BKSP": return Keys.Back;
+            case "BREAK": return Keys.Cancel;
+            case "CAPSLOCK": return Keys.CapsLock;
+            case "DELETE": case "DEL": return Keys.Delete;
+            case "DOWN": return Keys.Down;
+            case "END": return Keys.End;
+            case "ENTER": return Keys.Enter;
+            case "ESC": return Keys.Escape;
+            case "HELP": return Keys.Help;
+            case "HOME": return Keys.Home;
+            case "INSERT": case "INS": return Keys.Insert;
+            case "LEFT": return Keys.Left;
+            case "NUMLOCK": return Keys.NumLock;
+            case "PGDN": return Keys.PageDown;
+            case "PGUP": return Keys.PageUp;
+            case "PRTSC": return Keys.PrintScreen;
+            case "RIGHT": return Keys.Right;
+            case "SCROLLLOCK": return Keys.Scroll;
+            case "TAB": return Keys.Tab;
+            case "UP": return Keys.Up;
+            case "ADD": return Keys.Add;
+            case "SUBTRACT": return Keys.Subtract;
+            case "MULTIPLY": return Keys.Multiply;
+            case "DIVIDE": return Keys.Divide;
+            }
+
+            if (name.Length is 2 or 3 && (name[0] == 'F' || name[0] == 'f') && TryDigits (name, 1, out var f) && f is >= 1 and <= 16)
+                return Keys.F1 + (f - 1);
+
+            return null;
+        }
+
+        // The digits from a position to the end, as a count; false for anything else. Hand-rolled
+        // because the span overload of int.TryParse is not on netstandard2.0.
+        private static bool TryDigits (string text, int from, out int value)
+        {
+            value = 0;
+
+            if (from >= text.Length || text.Length - from > 6)
+                return false;
+
+            for (var i = from; i < text.Length; i++) {
+                if (text[i] is < '0' or > '9')
+                    return false;
+
+                value = value * 10 + (text[i] - '0');
+            }
+
+            return true;
+        }
+    }
+
+    /// <summary>Specifies the possible effects of a drag-and-drop operation.</summary>
+    [System.Flags]
+    public enum DragDropEffects
+    {
+        /// <summary>The drop target does not accept the data.</summary>
+        None = 0,
+        /// <summary>The data from the drag source is copied to the drop target.</summary>
+        Copy = 1,
+        /// <summary>The data from the drag source is moved to the drop target.</summary>
+        Move = 2,
+        /// <summary>The data from the drag source is linked to the drop target.</summary>
+        Link = 4,
+        /// <summary>The combination of Copy and Move.</summary>
+        Scroll = -2147483648,
+        /// <summary>All drop effects are allowed.</summary>
+        All = -2147483645
+    }
+
+    /// <summary>Provides data for drag-and-drop events.</summary>
+    public partial class DragEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public DragEventArgs (IDataObject? data, int keyState, int x, int y, DragDropEffects allowedEffect, DragDropEffects effect)
+        {
+            Data = data;
+            KeyState = keyState;
+            X = x;
+            Y = y;
+            AllowedEffect = allowedEffect;
+            Effect = effect;
+        }
+
+        /// <summary>Gets the data object that contains the data associated with this event.</summary>
+        public IDataObject? Data { get; }
+
+        /// <summary>Gets the current state of the keyboard modifier keys.</summary>
+        public int KeyState { get; }
+
+        /// <summary>Gets the x-coordinate of the mouse pointer.</summary>
+        public int X { get; }
+
+        /// <summary>Gets the y-coordinate of the mouse pointer.</summary>
+        public int Y { get; }
+
+        /// <summary>Gets the allowed drag-and-drop operations.</summary>
+        public DragDropEffects AllowedEffect { get; }
+
+        /// <summary>Gets or sets the target drop effect in a drag-and-drop operation.</summary>
+        public DragDropEffects Effect { get; set; }
+    }
+
+    /// <summary>Provides data for the GiveFeedback drag-and-drop event.</summary>
+    public partial class GiveFeedbackEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public GiveFeedbackEventArgs (DragDropEffects effect, bool useDefaultCursors)
+        {
+            Effect = effect;
+            UseDefaultCursors = useDefaultCursors;
+        }
+
+        /// <summary>Gets the type of drag-and-drop operation.</summary>
+        public DragDropEffects Effect { get; }
+
+        /// <summary>Gets or sets whether to use the default drag cursor.</summary>
+        public bool UseDefaultCursors { get; set; }
+    }
+
+    /// <summary>Provides data for the QueryContinueDrag drag-and-drop event.</summary>
+    public class QueryContinueDragEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public QueryContinueDragEventArgs (int keyState, bool escapePressed, DragAction action)
+        {
+            KeyState = keyState;
+            EscapePressed = escapePressed;
+            Action = action;
+        }
+
+        /// <summary>Gets the state of keyboard modifier keys.</summary>
+        public int KeyState { get; }
+
+        /// <summary>Gets whether the Escape key was pressed.</summary>
+        public bool EscapePressed { get; }
+
+        /// <summary>Gets or sets the drag action to perform.</summary>
+        public DragAction Action { get; set; }
+    }
+
+    /// <summary>Specifies how a drag-and-drop operation should proceed.</summary>
+    public enum DragAction
+    {
+        /// <summary>The drag-and-drop operation should continue.</summary>
+        Continue,
+        /// <summary>The drag-and-drop operation should stop with a drop.</summary>
+        Drop,
+        /// <summary>The drag-and-drop operation should be cancelled with no drop.</summary>
+        Cancel
+    }
+
+    /// <summary>Provides data for the TreeView.NodeMouseClick and NodeMouseDoubleClick events.</summary>
+    public class TreeNodeMouseClickEventArgs : MouseEventArgs
+    {
+        /// <summary>Gets the tree node that was clicked.</summary>
+        public TreeNode Node { get; }
+
+        /// <summary>Initializes a new instance.</summary>
+        public TreeNodeMouseClickEventArgs (TreeNode node, MouseButtons button, int clicks, int x, int y)
+            : base (button, clicks, x, y, System.Drawing.Point.Empty)
+        {
+            Node = node;
+        }
+    }
+
+    /// <summary>Provides data for the TreeView.NodeMouseHover event.</summary>
+    public class TreeNodeMouseHoverEventArgs : EventArgs
+    {
+        /// <summary>Gets the tree node that the mouse is hovering over.</summary>
+        public TreeNode Node { get; }
+
+        /// <summary>Initializes a new instance.</summary>
+        public TreeNodeMouseHoverEventArgs (TreeNode node) => Node = node;
+    }
+
+    /// <summary>Provides data for the TreeView.ItemDrag and ListView.ItemDrag events.</summary>
+    public class ItemDragEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ItemDragEventArgs (MouseButtons button, object? item) { Button = button; Item = item; }
+
+        /// <summary>Gets the mouse button that was pressed during the drag.</summary>
+        public MouseButtons Button { get; }
+
+        /// <summary>Gets the item being dragged.</summary>
+        public object? Item { get; }
+    }
+
+    /// <summary>Specifies why a ToolStripDropDown was closed.</summary>
+    public enum ToolStripDropDownCloseReason
+    {
+        /// <summary>Closed because the application focus changed.</summary>
+        AppFocusChange = 0,
+        /// <summary>Closed because the application clicked somewhere outside the ToolStrip.</summary>
+        AppClicked = 1,
+        /// <summary>Closed because an item was clicked.</summary>
+        ItemClicked = 2,
+        /// <summary>Closed programmatically by calling Close().</summary>
+        CloseCalled = 4,
+        /// <summary>Closed because the keyboard was used to select an item.</summary>
+        Keyboard = 3,
+    }
+
+    /// <summary>Provides data for the ToolStripDropDown.Closed event.</summary>
+    public class ToolStripDropDownClosedEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ToolStripDropDownClosedEventArgs (ToolStripDropDownCloseReason closeReason) { CloseReason = closeReason; }
+
+        /// <summary>Gets the reason the drop-down was closed.</summary>
+        public ToolStripDropDownCloseReason CloseReason { get; }
+    }
+
+    /// <summary>Provides data for the ToolStripDropDown.Closing event.</summary>
+    public class ToolStripDropDownClosingEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public ToolStripDropDownClosingEventArgs (ToolStripDropDownCloseReason closeReason) { CloseReason = closeReason; }
+
+        /// <summary>Gets the reason the drop-down is closing.</summary>
+        public ToolStripDropDownCloseReason CloseReason { get; }
+    }
+
+    /// <summary>Provides data for the RichTextBox.ContentsResized event.</summary>
+    public class ContentsResizedEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance of ContentsResizedEventArgs.</summary>
+        public ContentsResizedEventArgs (System.Drawing.Rectangle newRectangle) { NewRectangle = newRectangle; }
+
+        /// <summary>Gets the requested size of the RichTextBox control.</summary>
+        public System.Drawing.Rectangle NewRectangle { get; }
+    }
+
+    /// <summary>Provides data for the RichTextBox.LinkClicked event.</summary>
+    public partial class LinkClickedEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance of LinkClickedEventArgs.</summary>
+        public LinkClickedEventArgs (string linkText) { LinkText = linkText; }
+
+        /// <summary>Gets the text of the link that was clicked.</summary>
+        public string LinkText { get; }
+    }
+
+    /// <summary>Provides data for events that contain a Control reference.</summary>
+    public class ControlEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance of ControlEventArgs.</summary>
+        public ControlEventArgs (Control? control) { Control = control; }
+
+        /// <summary>Gets the control referenced by this event.</summary>
+        public Control? Control { get; }
+    }
+
+    /// <summary>Provides data for the <see cref="Control.Invalidated"/> event (WinForms compatibility).</summary>
+    public class InvalidateEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance for the given invalidated rectangle.</summary>
+        public InvalidateEventArgs (System.Drawing.Rectangle invalidRect) { InvalidRect = invalidRect; }
+
+        /// <summary>Gets the rectangle of the control that was invalidated.</summary>
+        public System.Drawing.Rectangle InvalidRect { get; }
+    }
+
+    /// <summary>Provides data for binding completion events.</summary>
+    public partial class BindingCompleteEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance of BindingCompleteEventArgs.</summary>
+        public BindingCompleteEventArgs (Binding? binding, BindingCompleteContext context)
+        {
+            Binding = binding;
+            BindingCompleteContext = context;
+        }
+
+        /// <summary>Gets the binding associated with this event.</summary>
+        public Binding? Binding { get; }
+
+        /// <summary>Gets the context in which the binding completed.</summary>
+        public BindingCompleteContext BindingCompleteContext { get; }
+
+        /// <summary>Gets or sets the error text. Stub in Majorsilence.Forms.</summary>
+        public string ErrorText { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the exception. Stub in Majorsilence.Forms.</summary>
+        public Exception? Exception { get; set; }
+    }
+
+    /// <summary>Specifies the context in which a binding completes.</summary>
+    public enum BindingCompleteContext
+    {
+        /// <summary>A control property value was pushed to the data source.</summary>
+        ControlUpdate,
+        /// <summary>A data source value was pushed to the control.</summary>
+        DataSourceUpdate
+    }
+
+    /// <summary>Provides data for the Form.InputLanguageChanged event.</summary>
+    public class InputLanguageChangedEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public InputLanguageChangedEventArgs (System.Globalization.CultureInfo culture, byte charSet)
+        {
+            Culture = culture;
+            CharSet = charSet;
+        }
+
+        /// <summary>Gets the culture of the new input language.</summary>
+        public System.Globalization.CultureInfo Culture { get; }
+
+        /// <summary>Gets the character set associated with the new input language.</summary>
+        public byte CharSet { get; }
+
+        /// <summary>Gets the input language. Stub in Majorsilence.Forms.</summary>
+        public object? InputLanguage => null;
+    }
+
+    /// <summary>Provides data for the Form.InputLanguageChanging event.</summary>
+    public class InputLanguageChangingEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance.</summary>
+        public InputLanguageChangingEventArgs (System.Globalization.CultureInfo culture, bool sysCharSet)
+        {
+            Culture = culture;
+            SysCharSet = sysCharSet;
+        }
+
+        /// <summary>Gets the culture of the new input language.</summary>
+        public System.Globalization.CultureInfo Culture { get; }
+
+        /// <summary>Gets whether the system default font supports the character set required by the new input language.</summary>
+        public bool SysCharSet { get; }
+
+        /// <summary>Gets the input language. Stub in Majorsilence.Forms.</summary>
+        public object? InputLanguage => null;
+    }
+
+    /// <summary>Specifies the layout of MDI child windows in a parent window.</summary>
+    public enum MdiLayout
+    {
+        /// <summary>All MDI child windows are cascaded within the client region of the MDI parent form.</summary>
+        Cascade = 0,
+        /// <summary>All MDI child windows are tiled horizontally within the client region of the MDI parent form.</summary>
+        TileHorizontal = 1,
+        /// <summary>All MDI child windows are tiled vertically within the client region of the MDI parent form.</summary>
+        TileVertical = 2,
+        /// <summary>All MDI child windows are arranged as icons at the bottom of the MDI parent form.</summary>
+        ArrangeIcons = 3
+    }
+
+    /// <summary>WinForms compatibility alias for <see cref="HorizontalScrollBar"/>.</summary>
+    public class HScrollBar : HorizontalScrollBar { }
+
+    /// <summary>WinForms compatibility alias for <see cref="VerticalScrollBar"/>.</summary>
+    public class VScrollBar : VerticalScrollBar { }
+
+    /// <summary>Translates colors from one representation to another. Stub wraps System.Drawing.ColorTranslator where available.</summary>
+    public static class ColorTranslator
+    {
+        /// <summary>Translates an HTML color string to a Color. E.g. "#FF0000" → Color.Red.</summary>
+        public static Color FromHtml (string htmlColor)
+        {
+            if (string.IsNullOrWhiteSpace (htmlColor))
+                return Color.Empty;
+
+            try {
+                var s = htmlColor.Trim ();
+
+                if (s.StartsWith ('#')) {
+                    s = s.Substring (1);
+
+                    if (s.Length == 3)
+                        s = $"{s[0]}{s[0]}{s[1]}{s[1]}{s[2]}{s[2]}";
+
+                    if (s.Length == 6)
+                        return Color.FromArgb (Convert.ToInt32 (s, 16) | unchecked((int)0xFF000000));
+
+                    if (s.Length == 8)
+                        return Color.FromArgb (Convert.ToInt32 (s, 16));
+                }
+
+                return Color.FromName (htmlColor);
+            } catch {
+                return Color.Empty;
+            }
+        }
+
+        /// <summary>Converts a Color to an HTML color string; see <see cref="Majorsilence.Forms.Drawing.ColorTranslator.ToHtml"/> (GFX-40).</summary>
+        public static string ToHtml (Color color) => Majorsilence.Forms.Drawing.ColorTranslator.ToHtml (color);
+
+        /// <summary>Translates an OLE color value to a Color.</summary>
+        public static Color FromOle (int oleColor) => Color.FromArgb (0xFF, oleColor & 0xFF, (oleColor >> 8) & 0xFF, (oleColor >> 16) & 0xFF);
+
+        /// <summary>Converts a Color to an OLE color value.</summary>
+        public static int ToOle (Color color) => color.R | (color.G << 8) | (color.B << 16);
+
+        /// <summary>Translates a Win32 color value to a Color.</summary>
+        public static Color FromWin32 (int win32Color) => FromOle (win32Color);
+
+        /// <summary>Converts a Color to a Win32 color value.</summary>
+        public static int ToWin32 (Color color) => ToOle (color);
+    }
+
+    /// <summary>WinForms compatibility: provides help for controls on a form. Stub in Majorsilence.Forms.
+    /// Targets are keyed as objects so both <see cref="Control"/>s and <see cref="WindowBase"/>-derived
+    /// forms are accepted — in real WinForms a Form IS a Control, and designer code routinely calls
+    /// SetHelpKeyword(Me, …) on the form itself.</summary>
+    public partial class HelpProvider : System.ComponentModel.Component
+    {
+        private readonly System.Collections.Generic.Dictionary<object, string> _helpStrings = new ();
+        private readonly System.Collections.Generic.Dictionary<object, string> _helpKeywords = new ();
+
+        /// <summary>Initializes a new instance of HelpProvider.</summary>
+        public HelpProvider () { }
+
+        /// <summary>Initializes a new instance of HelpProvider and adds it to the specified container.</summary>
+        public HelpProvider (System.ComponentModel.IContainer container) { container.Add (this); }
+
+        /// <summary>Gets or sets the path to the help file. Stub in Majorsilence.Forms.</summary>
+        public string HelpNamespace { get; set; } = string.Empty;
+
+        /// <summary>Sets the help string for the specified control.</summary>
+        /// <remarks>F1 on the control shows the string as of W6 mechanisms, unless
+        /// <see cref="SetShowHelp(Control, bool)"/> has turned the control's help off.</remarks>
+        public void SetHelpString (Control ctl, string helpString)
+        {
+            _helpStrings[ctl] = helpString;
+            Hook (ctl);
+        }
+
+        private readonly System.Collections.Generic.HashSet<Control> _hooked = new ();
+        private readonly System.Collections.Generic.Dictionary<object, bool> _showHelp = new ();
+        private readonly System.Collections.Generic.Dictionary<object, HelpNavigator> _navigators = new ();
+
+        private void Hook (Control ctl)
+        {
+            if (_hooked.Add (ctl))
+                ctl.HelpRequested += Control_HelpRequested;
+        }
+
+        // Upstream's WM_HELP handling collapsed to its observable outcome: the control's help string in
+        // a popup, and the event handled so the parents and the form do not hear it too. A keyword on
+        // its own needs the help file, which this layer does not open, so it shows nothing here.
+        // Upstream's order (HelpProvider.OnControlHelp): a help file named by HelpNamespace wins and
+        // opens at the control's keyword, and only without one does the help string pop up.
+        private void Control_HelpRequested (object? sender, HelpEventArgs e)
+        {
+            if (sender is not Control control || e.Handled || !GetShowHelp (control))
+                return;
+
+            if (!string.IsNullOrEmpty (HelpNamespace)) {
+                var keyword = GetHelpKeyword (control);
+
+                if (keyword.Length == 0)
+                    Help.ShowHelp (control, HelpNamespace, GetHelpNavigator (control));
+                else
+                    Help.ShowHelp (control, HelpNamespace, GetHelpNavigator (control), keyword);
+
+                e.Handled = true;
+                return;
+            }
+
+            var text = GetHelpString (control);
+
+            if (text.Length == 0)
+                return;
+
+            Help.ShowPopup (control, text, e.MousePos);
+            e.Handled = true;
+        }
+
+        /// <summary>Sets the help string for the specified form or window.</summary>
+        public void SetHelpString (WindowBase window, string helpString) => _helpStrings[window] = helpString;
+
+        /// <summary>Gets the help string for the specified control.</summary>
+        public string GetHelpString (Control ctl) => _helpStrings.TryGetValue (ctl, out var s) ? s : string.Empty;
+
+        /// <summary>Gets the help string for the specified form or window.</summary>
+        public string GetHelpString (WindowBase window) => _helpStrings.TryGetValue (window, out var s) ? s : string.Empty;
+
+        /// <summary>Sets the help keyword for the specified control.</summary>
+        public void SetHelpKeyword (Control ctl, string keyword)
+        {
+            _helpKeywords[ctl] = keyword;
+            Hook (ctl);
+        }
+
+        /// <summary>Sets the help keyword for the specified form or window.</summary>
+        public void SetHelpKeyword (WindowBase window, string keyword) => _helpKeywords[window] = keyword;
+
+        /// <summary>Gets the help keyword for the specified control.</summary>
+        public string GetHelpKeyword (Control ctl) => _helpKeywords.TryGetValue (ctl, out var k) ? k : string.Empty;
+
+        /// <summary>Gets the help keyword for the specified form or window.</summary>
+        public string GetHelpKeyword (WindowBase window) => _helpKeywords.TryGetValue (window, out var k) ? k : string.Empty;
+
+        /// <summary>Sets whether this provider answers F1 for the specified control.</summary>
+        /// <remarks>Real as of W6 mechanisms: false leaves the control's help string in place but
+        /// stops it showing, which is what a designer's ShowHelp checkbox does.</remarks>
+        public void SetShowHelp (Control ctl, bool value) => _showHelp[ctl] = value;
+
+        /// <inheritdoc cref="SetShowHelp(Control, bool)"/>
+        public void SetShowHelp (WindowBase window, bool value) => _showHelp[window] = value;
+
+        /// <summary>Gets whether this provider answers F1 for the specified control.</summary>
+        /// <remarks>Until set, true once the control has a help string or keyword, as upstream.</remarks>
+        public bool GetShowHelp (Control ctl) => ShowHelpFor (ctl);
+
+        /// <inheritdoc cref="GetShowHelp(Control)"/>
+        public bool GetShowHelp (WindowBase window) => ShowHelpFor (window);
+
+        private bool ShowHelpFor (object target)
+            => _showHelp.TryGetValue (target, out var show) ? show : _helpStrings.ContainsKey (target) || _helpKeywords.ContainsKey (target);
+
+        /// <summary>Sets how the help keyword for the specified control is looked up.</summary>
+        /// <remarks>Stored and read back as of W6 mechanisms. The help file itself is not opened here,
+        /// so the navigator does not yet change what F1 shows.</remarks>
+        public void SetHelpNavigator (Control ctl, HelpNavigator navigator) => _navigators[ctl] = navigator;
+
+        /// <inheritdoc cref="SetHelpNavigator(Control, HelpNavigator)"/>
+        public void SetHelpNavigator (WindowBase window, HelpNavigator navigator) => _navigators[window] = navigator;
+
+        /// <inheritdoc cref="GetHelpNavigator(Control)"/>
+        public HelpNavigator GetHelpNavigator (WindowBase window)
+            => _navigators.TryGetValue (window, out var navigator) ? navigator : HelpNavigator.AssociateIndex;
+
+        /// <summary>Gets or sets user-defined data associated with this component. Stub in Majorsilence.Forms.</summary>
+        public object? Tag { get; set; }
+    }
+
+    /// <summary>Specifies constants indicating which elements of the Help file to display.</summary>
+    public enum HelpNavigator
+    {
+        /// <summary>The Help file opens to the topic corresponding to the specified keyword.</summary>
+        AssociateIndex = -2147483643,
+        /// <summary>The Help file opens to the Find tab in the navigation pane.</summary>
+        Find = -2147483644,
+        /// <summary>The Help file opens to the index tab.</summary>
+        Index = -2147483645,
+        /// <summary>The Help file opens to the keywords tab.</summary>
+        KeywordIndex = -2147483642,
+        /// <summary>The Help file opens to a specified topic.</summary>
+        Topic = -2147483647,
+        /// <summary>The Help file opens to the table of contents.</summary>
+        TableOfContents = -2147483646,
+        /// <summary>The Help file opens to a specified topic.</summary>
+        TopicId = -2147483641,
+    }
+
+    /// <summary>WinForms compatibility: provides methods for sending keystrokes to an application. Stub in Majorsilence.Forms.</summary>
+    public static partial class Help
+    {
+        /// <summary>Opens a help file or page.</summary>
+        /// <remarks>
+        /// Real as of W6 mechanisms: the file or URL is handed to the operating system, which opens it
+        /// in whatever it registers for the type -- a browser for an HTML page, the Windows help
+        /// viewer for a .chm. The topic arguments of the other overloads need upstream's HTML Help
+        /// engine to resolve inside a .chm, which this layer does not have; they open the same file,
+        /// and a topic, keyword or index request inside it is not honoured. An empty url shows
+        /// nothing. Deviation: where the platform cannot open a file for an application (Android, iOS,
+        /// the browser) nothing opens.
+        /// </remarks>
+        public static void ShowHelp (Control? parent, string? url) => Open (url);
+
+        /// <inheritdoc cref="ShowHelp(Control, string)"/>
+        public static void ShowHelp (Control? parent, string? url, string? keyword) => Open (url);
+
+        /// <inheritdoc cref="ShowHelp(Control, string)"/>
+        public static void ShowHelp (Control? parent, string? url, HelpNavigator command) => Open (url);
+
+        /// <inheritdoc cref="ShowHelp(Control, string)"/>
+        public static void ShowHelp (Control? parent, string? url, HelpNavigator command, object? parameter) => Open (url);
+
+        /// <summary>Opens the given file or page at its index. Opens the file; see <see cref="ShowHelp(Control, string)"/>.</summary>
+        public static void ShowHelpIndex (Control? parent, string? url) => Open (url);
+
+        /// <summary>What opens a help target. Test seam; the default asks the operating system.</summary>
+        internal static Action<string> Launcher { get; set; } = OpenWithShell;
+
+        private static void Open (string? url)
+        {
+            if (!string.IsNullOrEmpty (url))
+                Launcher (url!);
+        }
+
+        private static void OpenWithShell (string target)
+        {
+            try {
+                using var process = System.Diagnostics.Process.Start (new System.Diagnostics.ProcessStartInfo (target) { UseShellExecute = true });
+            } catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or PlatformNotSupportedException or InvalidOperationException) {
+                // Nothing registered to open it, or no shell on this platform: help does not open,
+                // which is what the remarks above promise, rather than a crash on F1.
+            }
+        }
+
+        /// <summary>Shows a help pop-up with the given text, at a screen location.</summary>
+        /// <remarks>Real as of W6 mechanisms: a tool-tip style popup anchored to the control, which is
+        /// what upstream's HTML Help popup looks like. Empty text shows nothing. <see cref="HelpProvider"/>
+        /// routes F1 here for a control it has a help string for.</remarks>
+        public static void ShowPopup (Control parent, string caption, System.Drawing.Point location)
+        {
+            Guard.ThrowIfNull (parent);
+
+            if (string.IsNullOrEmpty (caption))
+                return;
+
+            popup ??= new ToolTip { ShowAlways = true };
+            popup.ShowItemTip (parent, caption, parent.PointToClient (location));
+        }
+
+        private static ToolTip? popup;
+
+        /// <summary>The text of the help popup on screen, or null. Test seam.</summary>
+        internal static string? PopupText => popup?.PopupText;
+    }
+
+    /// <summary>
+    /// Specifies the contextual information about an application thread, such as the main form,
+    /// used when calling <see cref="Application.Run(ApplicationContext)"/>.
+    /// </summary>
+    public partial class ApplicationContext : IDisposable
+    {
+        private Form? _mainForm;
+        private bool _disposed;
+
+        /// <summary>Initializes a new instance of the ApplicationContext class.</summary>
+        public ApplicationContext () { }
+
+        /// <summary>Initializes a new instance of the ApplicationContext class with the specified Form as the main form.</summary>
+        public ApplicationContext (Form mainForm) { MainForm = mainForm; }
+
+        /// <summary>
+        /// Gets or sets the Form to use as context for this thread. Setting it stops watching the
+        /// previous form and starts watching the new one, so closing or disposing MainForm raises
+        /// <see cref="OnMainFormClosed"/> the same way real WinForms reacts to MainForm's HandleDestroyed.
+        /// </summary>
+        public Form? MainForm {
+            get => _mainForm;
+            set {
+                // WindowGone rather than Closed: upstream listens for the main form's HandleDestroyed
+                // (ApplicationContext.cs), which disposing it without closing raises as well.
+                if (_mainForm is not null)
+                    _mainForm.WindowGone -= OnMainFormClosed;
+                _mainForm = value;
+                if (_mainForm is not null)
+                    _mainForm.WindowGone += OnMainFormClosed;
+            }
+        }
+
+        /// <summary>Occurs when the message loop of the thread should exit.</summary>
+        public event EventHandler? ThreadExit;
+
+        /// <summary>Terminates the message loop of the thread by invoking <see cref="ExitThreadCore"/>.</summary>
+        public void ExitThread () => ExitThreadCore ();
+
+        /// <summary>
+        /// Raises the <see cref="ThreadExit"/> event. <see cref="Application.Run(ApplicationContext)"/>
+        /// listens for this to end the message loop and dispose the context — override to redefine what
+        /// ends the thread's message loop (matches real WinForms' ApplicationContext.ExitThreadCore).
+        /// </summary>
+        protected virtual void ExitThreadCore () => ThreadExit?.Invoke (this, EventArgs.Empty);
+
+        /// <summary>
+        /// Called when <see cref="MainForm"/> closes. Default implementation calls
+        /// <see cref="ExitThreadCore"/>, ending the thread's message loop — override to keep the loop
+        /// alive after MainForm closes (e.g. a headless context with no visible MainForm).
+        /// </summary>
+        protected virtual void OnMainFormClosed (object? sender, EventArgs e) => ExitThreadCore ();
+
+        /// <inheritdoc/>
+        public void Dispose ()
+        {
+            Dispose (true);
+            GC.SuppressFinalize (this);
+        }
+
+        /// <summary>
+        /// Releases the resources used by the ApplicationContext. The default implementation disposes
+        /// <see cref="MainForm"/> (if any and not already disposed). Override to release additional
+        /// resources — call the base implementation, and always call <c>MyBase.Dispose(disposing)</c> /
+        /// <c>base.Dispose(disposing)</c> from the override.
+        /// </summary>
+        protected virtual void Dispose (bool disposing)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+
+            if (disposing && _mainForm is not null) {
+                if (!_mainForm.IsDisposed)
+                    _mainForm.Dispose ();
+                _mainForm = null;
+            }
+        }
+    }
+
+}

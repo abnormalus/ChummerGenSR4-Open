@@ -1,0 +1,735 @@
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System.Collections;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.Globalization;
+using Majorsilence.Forms.Layout;
+
+namespace Majorsilence.Forms;
+
+public partial class Control
+{
+    /// <summary>
+    ///  Represents a collection of Controls.
+    /// </summary>
+    [ListBindable (false)]
+    public class ControlCollection : IList<Control>
+    {
+        // Implicit controls are built-in controls that the user did not add
+        // and should not see. Things like implicit scrollbars.
+        private readonly List<Control> control_list = [];
+        private readonly List<Control> implicit_control_list = [];
+
+        ///  A caching mechanism for key accessor
+        ///  We use an index here rather than control so that we don't have lifetime
+        ///  issues by holding on to extra references.
+        ///  Note this is not Thread Safe - but WinForms has to be run in a STA anyways.
+        private int _lastAccessedIndex = -1;
+
+        /// <summary>
+        /// Initializes a new instance of the ControlCollection class.
+        /// </summary>
+        public ControlCollection (Control owner)
+        {
+            Owner = owner.OrThrowIfNull ();
+        }
+
+        /// <summary>
+        ///  Adds a child control to this control. The control becomes the last control in
+        ///  the child control list. If the control is already a child of another control it
+        ///  is first removed from that control.
+        /// </summary>
+        public virtual T Add<T> (T value) where T : Control
+        {
+            Insert (control_list.Count, value);
+            return value;
+        }
+
+        void ICollection<Control>.Add (Control item)
+        {
+            Add<Control> (item);
+        }
+
+        /// <summary>
+        ///  Adds a control as a child, the WinForms-shaped overload that returns nothing.
+        /// </summary>
+        /// <remarks>
+        ///  This library's own <see cref="Add{T}"/> returns the control it added, which reads well when
+        ///  building a tree inline. WinForms declares <c>void Add(Control?)</c> and a control library
+        ///  overrides it -- to refuse additions on a read-only collection, or to redirect them into an
+        ///  inner panel -- so the WinForms signature has to exist to be overridden. Overload resolution
+        ///  keeps the generic form for a statically-typed argument (<c>Controls.Add(new Label())</c> still
+        ///  returns the Label), so existing code is unaffected.
+        /// </remarks>
+        public virtual void Add (Control? value)
+        {
+            if (value is not null)
+                Add<Control> (value);
+        }
+
+
+        /// <summary>
+        ///  Adds a <see cref="Form"/> as a child of this control, as WinForms does for a form whose
+        ///  <see cref="Form.TopLevel"/> is false. The form is wrapped in a frame that composites it into
+        ///  this control tree; it owns no on-screen window while hosted.
+        /// </summary>
+        /// <remarks>
+        ///  A Form is not a Control here (it derives from <see cref="WindowBase"/>, so that only real
+        ///  windows carry the backend, render loop and platform input plumbing), which is why this needs
+        ///  its own overload rather than going through <see cref="Add{T}"/>. Adding the same form twice
+        ///  moves it, matching how Insert re-parents an already-parented control.
+        /// </remarks>
+        public virtual void Add (Form form)
+        {
+            if (form is null)
+                return;
+
+            // Already hosted somewhere: re-parent rather than building a second frame for it, so the
+            // form is never composited into two trees at once.
+            if (form.PanelHost is { } existing) {
+                if (existing.Parent == Owner)
+                    return;
+
+                existing.Parent?.Controls.Remove (existing);
+                form.PanelHost = existing;      // Remove cleared it; this add is a move, not a detach
+                Add<Control> (existing);
+                return;
+            }
+
+            var frame = new FormHost (form) {
+                // Dock/Bounds are typically set on the form before it is added ("form.Dock =
+                // DockStyle.Fill; panel.Controls.Add (form)"), so the frame inherits them here.
+                Dock = form.Dock,
+                Visible = form.Visible,
+            };
+
+            if (form.Dock == DockStyle.None)
+                frame.Bounds = new Rectangle (form.Location, form.Size);
+
+            form.PanelHost = frame;
+
+            // No self-drawn title bar or border: the form fills the frame exactly. Same preparation an
+            // MDI child gets, for the same reason -- the host owns the chrome, and here there is none.
+            form.PrepareAsHostedChild ();
+
+            // If the form already put an OS window on screen, take it down: from here it is composited
+            // into the frame instead, and leaving the window up gives a stray empty duplicate beside the
+            // host. This is reachable whenever a caller shows a form before parenting it -- WinForms code
+            // sets Visible and Parent as separate steps and either order is normal there, because a
+            // WinForms Form assigned a Parent stops being a top-level window.
+            form.HideOwnWindowForHosting ();
+
+            Add<Control> (frame);
+        }
+
+        /// <summary>
+        ///  Removes a hosted <see cref="Form"/> from this control, undoing <see cref="Add(Form)"/>.
+        /// </summary>
+        /// <remarks>
+        ///  Because Form and Control are unrelated types here, this is an overload rather than the same
+        ///  method, which makes an untyped <c>Remove (null)</c> ambiguous. Cast the argument
+        ///  (<c>Remove ((Control) null)</c>) in the rare code that passes a bare null literal; any
+        ///  typed expression resolves normally. The same applies to <see cref="Contains(Form)"/>.
+        /// </remarks>
+        public virtual bool Remove (Form form)
+        {
+            if (form?.PanelHost is not { } frame || frame.Parent != Owner)
+                return false;
+
+            // The Form overload keeps its bool: it reports whether the form was hosted here at all, which
+            // the Control overload's WinForms signature has no way to say.
+            return RemoveCore (frame);
+        }
+
+        /// <summary>
+        ///  Determines whether the specified <see cref="Form"/> is hosted directly by this control.
+        /// </summary>
+        public bool Contains (Form form) =>
+            form?.PanelHost is { } frame && control_list.Contains (frame);
+
+        internal T AddImplicitControl<T> (T item) where T : Control
+        {
+            // We do a lot less here for an implicit control because we control them
+            // - They are added in constructors so we don't need to do layouts yet
+            // - They won't already be parented to other controls
+            item.ImplicitControl = true;
+            implicit_control_list.Add (item);
+            item.SetParentInternal (Owner);
+
+            return item;
+        }
+
+        // The reverse of AddImplicitControl, for the one implicit child that moves between hosts: a
+        // Simple combo box shows its list inside itself, every other style in its drop-down popup, and
+        // the list is the same control either way because it holds the combo's items (LST-07).
+        internal bool RemoveImplicitControl (Control item)
+        {
+            if (!implicit_control_list.Remove (item))
+                return false;
+
+            item.ImplicitControl = false;
+            item.SetParentInternal (null);
+            Owner.Invalidate ();
+
+            return true;
+        }
+
+        /// <summary>
+        /// Adds multiple child controls to this control. This suspends layouts until all
+        /// controls are adding, which is more efficient than adding controls individually.
+        /// </summary>
+        public virtual void AddRange (params Control[] controls)
+        {
+            Guard.ThrowIfNull (controls);
+
+            if (controls.Length > 0) {
+                Owner.SuspendLayout ();
+
+                try {
+                    for (var i = 0; i < controls.Length; ++i)
+                        Add (controls[i]);
+                } finally {
+                    Owner.ResumeLayout (true);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Removes all controls from the collection.
+        /// </summary>
+        public virtual void Clear ()
+        {
+            Owner.SuspendLayout ();
+            // clear all preferred size caches in the tree -
+            // inherited fonts could go away, etc.
+            CommonProperties.xClearAllPreferredSizeCaches (Owner);
+
+            try {
+                while (Count > 0)
+                    RemoveAt (Count - 1);
+            } finally {
+                Owner.ResumeLayout ();
+            }
+        }
+
+        /// <summary>
+        /// Determines if the collection contains the specified control.
+        /// </summary>
+        public bool Contains (Control item) => control_list.Contains (item);
+
+        /// <summary>
+        ///  Returns true if the collection contains an item with the specified key, false otherwise.
+        /// </summary>
+        public virtual bool ContainsKey (string key)
+        {
+            return IsValidIndex (IndexOfKey (key));
+        }
+
+        private static void Copy (ControlCollection sourceList, int sourceIndex, ControlCollection destinationList, int destinationIndex, int length)
+        {
+            if (sourceIndex < destinationIndex) {
+                // We need to copy from the back forward to prevent overwrite if source and
+                // destination lists are the same, so we need to flip the source/dest indices
+                // to point at the end of the spans to be copied.
+                sourceIndex += length;
+                destinationIndex += length;
+
+                for (; length > 0; length--)
+                    destinationList.control_list[--destinationIndex] = sourceList[--sourceIndex];
+            } else {
+                for (; length > 0; length--)
+                    destinationList.control_list[destinationIndex++] = sourceList[sourceIndex++];
+            }
+        }
+
+        /// <summary>
+        /// Copies the collection of controls to the specified array.
+        /// </summary>
+        public void CopyTo (Control[] array, int arrayIndex) => control_list.CopyTo (array, arrayIndex);
+
+        /// <summary>
+        /// Return the number of controls in the collection.
+        /// </summary>
+        public int Count => control_list.Count;
+
+        /// <summary>
+        ///  Searches for Controls by their Name property, builds up an array
+        ///  of all the controls that match.
+        /// </summary>
+        public Control[] Find (string key, bool searchAllChildren)
+        {
+            key.ThrowIfNullOrEmptyWithMessage (SR.FindKeyMayNotBeEmptyOrNull);
+
+            List<Control> foundControls = [];
+            FindInternal (key, searchAllChildren, this, foundControls);
+            return foundControls.ToArray ();
+        }
+
+        /// <summary>
+        ///  Searches for Controls by their Name property, builds up a list
+        ///  of all the controls that match.
+        /// </summary>
+        private static void FindInternal (string key, bool searchAllChildren, ControlCollection controlsToLookIn, List<Control> foundControls)
+        {
+            try {
+                // Perform breadth first search - as it's likely people will want controls belonging
+                // to the same parent close to each other.
+                for (var i = 0; i < controlsToLookIn.Count; i++) {
+                    if (controlsToLookIn[i] is null)
+                        continue;
+
+                    if (WindowsFormsUtils.SafeCompareStrings (controlsToLookIn[i].Name, key, ignoreCase: true))
+                        foundControls.Add (controlsToLookIn[i]);
+                }
+
+                // Optional recursive search for controls in child collections.
+                if (searchAllChildren) {
+                    for (var i = 0; i < controlsToLookIn.Count; i++) {
+                        if (controlsToLookIn[i] is null)
+                            continue;
+
+                        if (controlsToLookIn[i].Controls.Count > 0)
+                            // If it has a valid child collection, append those results to our collection.
+                            FindInternal (key, true, controlsToLookIn[i].Controls, foundControls);
+                    }
+                }
+            } catch (Exception e) when (!WindowsFormsUtils.IsCriticalException (e)) {
+            }
+        }
+
+        // Returns true if any control (explicit or implicit) needs painting.
+        // Iterates both lists without allocating a combined enumerable.
+        internal bool AnyNeedsPaint ()
+        {
+            for (var i = 0; i < control_list.Count; i++)
+                if (CountsForPaint (control_list[i])) return true;
+
+            for (var i = 0; i < implicit_control_list.Count; i++)
+                if (CountsForPaint (implicit_control_list[i])) return true;
+
+            return false;
+        }
+
+        // Control.PaintChildren skips anything hidden or without area, so those controls never reach
+        // RaisePaint -- which is what clears their dirty flag. Counting them here meant a window with a
+        // hidden implicit child (the scrollbars, size grip and title bar every form carries) reported
+        // "needs paint" on every single frame and could never report anything else: the backend's
+        // 16ms render timer then repainted the whole window 60 times a second, forever, in every app.
+        // A control that is not drawn cannot need drawing; when it is shown again its dirty flag is
+        // still set, so it starts counting again on its own.
+        private static bool CountsForPaint (Control control)
+            => control.Visible && control.Width > 0 && control.Height > 0 && control.NeedsPaint;
+
+        // Returns true if any control (explicit or implicit) has mouse capture.
+        internal bool AnyCaptured ()
+        {
+            for (var i = 0; i < control_list.Count; i++)
+                if (control_list[i].Capture) return true;
+
+            for (var i = 0; i < implicit_control_list.Count; i++)
+                if (implicit_control_list[i].Capture) return true;
+
+            return false;
+        }
+
+        // WinForms z-order: within each list, INDEX 0 IS TOPMOST (BringToFront moves a control to
+        // index 0, SendToBack to the end, and dock layout processes Count-1 .. 0 so index 0 docks
+        // last -- see DockAndAnchorLayout.LayoutDockedControls). Implicit controls (title bar,
+        // scrollbars, other chrome overlays) sit above all explicit children. Hit-testing therefore
+        // searches implicit 0..n then explicit 0..n; painting runs the exact reverse (see
+        // GetControlsPaintOrder) so the pixels always match the input routing.
+
+        // Returns the topmost child (lowest z-index) that has mouse capture, without allocating.
+        internal Control? FindCapturedChild ()
+        {
+            for (var i = 0; i < implicit_control_list.Count; i++)
+                if (implicit_control_list[i].Capture) return implicit_control_list[i];
+
+            for (var i = 0; i < control_list.Count; i++)
+                if (control_list[i].Capture) return control_list[i];
+
+            return null;
+        }
+
+        // Returns the topmost visible child that can receive mouse events at the given point,
+        // without allocating. Searches topmost-first (implicit chrome, then explicit index 0 up)
+        // for early return.
+        internal Control? FindVisibleChildAt (Point location)
+        {
+            for (var i = 0; i < implicit_control_list.Count; i++) {
+                var c = implicit_control_list[i];
+                if (c.Visible && c.GetControlBehavior (ControlBehaviors.ReceivesMouseEvents) && c.Bounds.Contains (location))
+                    return c;
+            }
+
+            for (var i = 0; i < control_list.Count; i++) {
+                var c = control_list[i];
+                // Outside a child's Region the point belongs to what is underneath (CTL-23).
+                if (c.Visible && c.GetControlBehavior (ControlBehaviors.ReceivesMouseEvents) && c.Bounds.Contains (location)
+                    && c.RegionContains (new Point (location.X - c.Left, location.Y - c.Top)))
+                    return c;
+            }
+
+            return null;
+        }
+
+        internal IEnumerable<Control> GetAllControls (bool includeImplicit = true)
+        {
+            if (includeImplicit)
+                return control_list.Concat (implicit_control_list);
+
+            return control_list;
+        }
+
+        // Children in bottom-to-top paint order: explicit children from the highest index (back of
+        // the z-order) down to index 0, then implicit chrome the same way, so implicit controls
+        // paint above every explicit child and index 0 paints above its later siblings -- the
+        // WinForms convention (a designer's InitializeComponent adds the intended-topmost control
+        // first). Painting ascending collection order instead put later-added siblings on top,
+        // visually inverting every overlap.
+        internal IEnumerable<Control> GetControlsPaintOrder ()
+        {
+            for (var i = control_list.Count - 1; i >= 0; i--)
+                yield return control_list[i];
+
+            for (var i = implicit_control_list.Count - 1; i >= 0; i--)
+                yield return implicit_control_list[i];
+        }
+
+        /// <summary>
+        ///  Retrieves the index of the specified
+        ///  child control in this array.  An ArgumentException
+        ///  is thrown if child is not parented to this
+        ///  Control.
+        /// </summary>
+        public virtual int GetChildIndex (Control child, bool throwException = true)
+        {
+            var index = IndexOf (child);
+
+            if (index == -1 && throwException)
+                throw new ArgumentException (SR.ControlNotChild);
+
+            return index;
+        }
+
+        /// <summary>
+        /// Returns an enumerator for the collection.
+        /// </summary>
+        public IEnumerator<Control> GetEnumerator () => control_list.GetEnumerator ();
+
+        IEnumerator IEnumerable.GetEnumerator () => control_list.GetEnumerator ();
+
+        /// <summary>
+        ///  The zero-based index of the first occurrence of value within the entire CollectionBase, if found; otherwise, -1.
+        /// </summary>
+        public virtual int IndexOfKey (string key)
+        {
+            // Step 0 - Arg validation
+            if (string.IsNullOrEmpty (key))
+                return -1; // we don't support empty or null keys.
+
+            // step 1 - check the last cached item
+            if (IsValidIndex (_lastAccessedIndex))
+                if (WindowsFormsUtils.SafeCompareStrings (this[_lastAccessedIndex].Name, key, /* ignoreCase = */ true))
+                    return _lastAccessedIndex;
+
+            // step 2 - search for the item
+            for (var i = 0; i < Count; i++)
+                if (WindowsFormsUtils.SafeCompareStrings (this[i].Name, key, /* ignoreCase = */ true)) {
+                    _lastAccessedIndex = i;
+                    return i;
+                }
+
+            // step 3 - we didn't find it.  Invalidate the last accessed index and return -1.
+            _lastAccessedIndex = -1;
+            return -1;
+        }
+
+        /// <summary>
+        /// Returns the index in the collection of the specified control.
+        /// </summary>
+        public int IndexOf (Control item) => control_list.IndexOf (item);
+
+        /// <summary>
+        /// Adds the specified control at the specified index in the collection.
+        /// </summary>
+        public virtual void Insert (int index, Control item)
+        {
+            if (item is null)
+                return;
+
+            CheckParentingCycle (Owner, item);
+
+            if (item.parent == Owner) {
+                item.SendToBack ();
+                return;
+            }
+
+            // Remove the new control from its old parent (if any)
+            item.parent?.Controls.Remove (item);
+
+            // Find the next highest tab index
+            if (item.tab_index == -1)
+                item.tab_index = Count == 0 ? 0 : control_list.Max (c => c.TabIndex) + 1;
+
+            // Add the control
+            control_list.Insert (index, item);
+
+            // if we don't suspend layout, AssignParent will indirectly trigger a layout event
+            // before we're ready (AssignParent will fire a PropertyChangedEvent("Visible"), which calls PerformLayout)
+            Owner.SuspendLayout ();
+
+            try {
+                var oldParent = item.parent;
+
+                try {
+                    // AssignParent calls into user code - this could throw, which
+                    // would make us short-circuit the rest of the reparenting logic.
+                    // you could end up with a control half reparented.
+                    item.AssignParent (Owner);
+                } finally {
+                    // CreateControl only: AssignParent has already raised VisibleChanged if, and only
+                    // if, the effective visibility changed -- upstream's rule. Raising it again here
+                    // gave every Controls.Add a second, unconditional VisibleChanged (EVT-13), so a
+                    // control that loads data or starts a timer on VisibleChanged did it twice, at
+                    // construction time.
+                    //
+                    // And only into an owner that is already live (CTL-05): upstream
+                    // ControlCollection.Add creates the child only when `Owner` has States.Created
+                    // (Control.ControlCollection.cs). Creating on any Add raised HandleCreated and
+                    // UserControl.Load in the middle of InitializeComponent, before the form was shown.
+                    //
+                    // And only a visible one, as upstream (`if (value.Visible) value.CreateControl ()`):
+                    // CreateControl would skip a hidden control's creation anyway, but its public form
+                    // also tells an uncreated control its inherited BindingContext changed (CTL-29), which
+                    // a hidden control hears when it is shown instead.
+                    if (Owner.Created && item.Visible)
+                        item.CreateControl ();
+                }
+
+                item.InitLayout ();
+            } finally {
+                Owner.ResumeLayout (false);
+            }
+
+            // Not putting in the finally block, as it would eat the original
+            // exception thrown from AssignParent if the following throws an exception.
+            LayoutTransaction.DoLayout (Owner, item, PropertyNames.Parent);
+            Owner.OnControlAdded (new ControlEventArgs (item));
+
+            // A child added to a live window is dirty, but nothing told the window it has something to
+            // paint. Upstream needs no call here -- the new child is its own HWND and Windows sends it
+            // WM_PAINT. A backend that polls for dirty controls every frame (the desktop Avalonia window)
+            // hid the gap; one that paints only when asked (the browser/mobile single view, an embedded
+            // presenter) left the control off screen, and out of the browser's accessibility DOM, until
+            // something unrelated repainted -- seen with controls added from a Timer.Tick. The window
+            // only, not Owner.Invalidate (): no Invalidated event is raised for an add upstream either.
+            if (Owner.Created && item.Visible)
+                Owner.FindWindow ()?.Invalidate ();
+
+            return;
+        }
+
+        /// <summary>
+        /// Returns a value indicating if controls can be added to the collection.
+        /// </summary>
+        public bool IsReadOnly => false;
+
+        /// <summary>
+        ///  Determines if the index is valid for the collection.
+        /// </summary>
+        private bool IsValidIndex (int index)
+        {
+            return ((index >= 0) && (index < Count));
+        }
+
+        /// <summary>
+        ///  Repositions a element in this list.
+        /// </summary>
+        private protected void MoveElement (Control element, int fromIndex, int toIndex)
+        {
+            var delta = toIndex - fromIndex;
+
+            switch (delta) {
+                case -1:
+                case 1:
+                    // Simple swap
+                    control_list[fromIndex] = control_list[toIndex];
+                    break;
+
+                default:
+                    int start;
+                    int dest;
+
+                    // Which direction are we moving?
+                    if (delta > 0) {
+                        // Shift down by the delta to open the new spot
+                        start = fromIndex + 1;
+                        dest = fromIndex;
+                    } else {
+                        // Shift up by the delta to open the new spot
+                        start = toIndex;
+                        dest = toIndex + 1;
+
+                        // Make it positive
+                        delta = -delta;
+                    }
+
+                    Copy (this, start, this, dest, delta);
+                    break;
+            }
+
+            control_list[toIndex] = element;
+        }
+
+        /// <summary>
+        ///  Who owns this control collection.
+        /// </summary>
+        public Control Owner { get; }
+
+        /// <summary>
+        ///  Removes control from this control. Inheriting controls should call
+        ///  base.remove to ensure that the control is removed.
+        /// </summary>
+        /// <remarks>
+        ///  Returns nothing, as WinForms does, so a control library can override it -- a read-only
+        ///  collection overrides Add and Remove together to refuse both. Whether anything was removed is
+        ///  still available through <see cref="ICollection{T}.Remove"/>, which the collection implements
+        ///  explicitly because that interface requires a bool.
+        /// </remarks>
+        public virtual void Remove (Control? value) => RemoveCore (value);
+
+        bool ICollection<Control>.Remove (Control item) => RemoveCore (item);
+
+        private bool RemoveCore (Control? item)
+        {
+            // Sanity check parameter
+            if (item is null)
+                return false;     // Don't do anything
+
+            if (item.Parent == Owner) {
+
+                // Remove the control from the internal control array
+                control_list.Remove (item);
+
+                // Drop a hosted form's back-reference to its frame, so the form is not left believing
+                // it is still parented. Covers Clear() and RemoveAt() too, which both route through here.
+                (item as FormHost)?.DetachChild ();
+
+                // Found before detaching: afterwards the control no longer leads to its window.
+                var adapter = Owner.FindAdapter ();
+
+                item.AssignParent (null);
+
+                LayoutTransaction.DoLayout (Owner, item, PropertyNames.Parent);
+                Owner.OnControlRemoved (new ControlEventArgs (item));
+
+                // The owner paints into a cached back buffer that only an invalidation rebuilds, so without this the child's pixels stayed
+                // on screen until something else happened to invalidate the owner (#370). WinForms repaints the parent when a child leaves.
+                Owner.Invalidate ();
+
+                // Focus cannot stay on a control that has left the window (EVT-21); upstream's
+                // ContainerControl.AfterControlRemoved, which the adapter stands in for here.
+                adapter?.AfterControlRemoved (item, Owner);
+
+                return true;
+            }
+
+            // The control was not a child of this collection, so nothing was removed.
+            return false;
+        }
+
+        /// <summary>
+        /// Removes the control at the specified collection index.
+        /// </summary>
+        public void RemoveAt (int index)
+        {
+            RemoveCore (this[index]);
+        }
+
+        /// <summary>
+        ///  Removes the child control with the specified key.
+        /// </summary>
+        public virtual void RemoveByKey (string key)
+        {
+            var index = IndexOfKey (key);
+
+            if (IsValidIndex (index))
+                RemoveAt (index);
+        }
+
+        /// <summary>
+        ///  Sets the index of the specified
+        ///  child control in this array.  An ArgumentException
+        ///  is thrown if child is not parented to this
+        ///  Control.
+        /// </summary>
+        public virtual void SetChildIndex (Control child, int newIndex) => SetChildIndexInternal (child, newIndex);
+
+        /// <summary>
+        ///  This is internal virtual method so that "Readonly Collections" can override this and throw as they should not allow changing
+        ///  the child control indices.
+        /// </summary>
+        internal virtual void SetChildIndexInternal (Control child, int newIndex)
+        {
+            // Sanity check parameters
+            Guard.ThrowIfNull (child);
+
+            var currentIndex = GetChildIndex (child);
+
+            if (currentIndex == newIndex)
+                return;
+
+            if (newIndex >= Count || newIndex == -1)
+                newIndex = Count - 1;
+
+            MoveElement (child, currentIndex, newIndex);
+
+            LayoutTransaction.DoLayout (Owner, child, PropertyNames.ChildIndex);
+        }
+
+        /// <summary>
+        ///  Retrieves the child control with the specified index.
+        /// </summary>
+        public virtual Control this[int index] {
+            get {
+                //do some bounds checking here...
+                if (index < 0 || index >= Count) {
+                    throw new ArgumentOutOfRangeException (
+                        nameof (index),
+                        string.Format (SR.IndexOutOfRange, index.ToString (CultureInfo.CurrentCulture)));
+                }
+
+                var control = control_list[index];
+                Debug.Assert (control is not null, "Why are we returning null controls from a valid index?");
+                return control;
+            }
+        }
+
+        // Setter required by IList<T>, but we don't want users to be able to set Controls this way
+        Control IList<Control>.this[int index] {
+            get => this[index];
+            set => throw new NotSupportedException ();
+        }
+
+        /// <summary>
+        ///  Retrieves the child control with the specified key.
+        /// </summary>
+        public virtual Control? this[string key] {
+            get {
+                // We do not support null and empty string as valid keys.
+                if (string.IsNullOrEmpty (key))
+                    return null;
+
+                // Search for the key in our collection
+                var index = IndexOfKey (key);
+
+                return IsValidIndex (index) ? this[index] : null;
+            }
+        }
+    }
+}

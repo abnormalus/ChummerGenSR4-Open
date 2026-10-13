@@ -1,0 +1,625 @@
+﻿using System;
+using System.Drawing;
+using System.Collections;
+using System.ComponentModel;
+using System.Linq;
+using System.Threading;
+
+namespace Majorsilence.Forms
+{
+    // Application, MenuItem and BindingSource parity (docs/winforms-gap-plan.md).
+    //
+    // BindingSource is the interesting one. Its missing surface is almost entirely the
+    // IBindingListView contract -- SupportsSorting, ApplySort, SortDescriptions, RemoveFilter -- and
+    // the honest answer depends on the bound list, not on this class: a List<T> cannot sort itself,
+    // a DataView can. So the Supports* properties ask the underlying list rather than returning a
+    // fixed answer, and ApplySort forwards to it when it can and sorts a copy when it cannot.
+    //
+    // MenuItem's is mostly the .NET 1.x menu surface. Mnemonic and Index are computed; the ones that
+    // describe Win32 menu layout (BarBreak, Break, MdiList) are stored, because this layer lays menus
+    // out itself and has no column-break concept to honour.
+
+    public partial class Application
+    {
+        /// <summary>Handles a request for whether a message loop is running on the current thread.</summary>
+        public delegate bool MessageLoopCallback ();
+
+        private static MessageLoopCallback? message_loop_callback;
+
+        /// <summary>Gets whether the caller may quit this application.</summary>
+        /// <remarks>Always true: quitting is not gated by a hosting environment here, which is the
+        /// only thing that makes it false upstream.</remarks>
+        public static bool AllowQuit => true;
+
+        /// <summary>Gets the colour mode the application is running in.</summary>
+        public static SystemColorMode ColorMode { get; private set; } = SystemColorMode.Classic;
+
+        /// <summary>Gets the colour mode the operating system asks for.</summary>
+        /// <remarks>Classic: the backends do not surface the OS appearance setting, so reporting Dark
+        /// here would be a guess. <see cref="SetColorMode"/> is how an application chooses.</remarks>
+        public static SystemColorMode SystemColorMode => SystemColorMode.Classic;
+
+        /// <summary>Gets whether the application is currently rendering in dark mode.</summary>
+        public static bool IsDarkModeEnabled
+            => ColorMode == SystemColorMode.Dark || (ColorMode == SystemColorMode.System && SystemColorMode == SystemColorMode.Dark);
+
+        /// <summary>Gets the high-DPI mode the application is running in.</summary>
+        /// <remarks>The backends scale by the system DPI and there is no opt-out, so this reports the
+        /// mode that actually applies rather than one a caller could have selected.</remarks>
+        public static HighDpiMode HighDpiMode => HighDpiMode.PerMonitorV2;
+
+        /// <summary>Gets whether controls are drawn with visual styles.</summary>
+        /// <remarks>
+        /// Gated on <see cref="Majorsilence.Forms.VisualStyles.VisualStyleRenderer.IsSupported"/>, because the two are the same answer
+        /// by construction upstream and were opposite answers here (GFX-38). This said <c>true</c> while
+        /// <c>VisualStyleRenderer.DrawBackground</c> was an empty method, so the standard
+        /// <c>if (Application.RenderWithVisualStyles) … else ControlPaint.Draw…</c> fork that every
+        /// themed custom control is written around took the themed branch, drew nothing, and never
+        /// reached the classic fallback. Reporting <c>false</c> is the honest answer while this
+        /// framework has no visual-style engine: it sends that fork to <c>ControlPaint</c>, which since
+        /// GFX-01 actually paints.
+        /// </remarks>
+        public static bool RenderWithVisualStyles
+            => Majorsilence.Forms.VisualStyles.VisualStyleRenderer.IsSupported && VisualStyleState != VisualStyleState.NoneEnabled;
+
+        /// <summary>Gets whether the application enabled visual styles.</summary>
+        public static bool UseVisualStyles => RenderWithVisualStyles;
+
+        /// <summary>Gets or sets whether every open form shows the wait cursor.</summary>
+        public static bool UseWaitCursor {
+            get => use_wait_cursor;
+            set {
+                if (use_wait_cursor == value)
+                    return;
+
+                use_wait_cursor = value;
+
+                // As upstream: every open form (and through it every control) takes the value (SVC-13).
+                foreach (var form in OpenForms.Cast<Form> ().ToList ())
+                    form.UseWaitCursor = value;
+            }
+        }
+
+        private static bool use_wait_cursor;
+
+        /// <summary>
+        /// Runs every registered message filter over the given message, returning true if one consumed
+        /// it. The library calls this for input before dispatching it to a control.
+        /// </summary>
+        public static bool FilterMessage (ref Message message)
+        {
+            // Snapshot reference: the array is replaced, never mutated, so a filter may add or remove
+            // filters while this loop is running.
+            var filters = _messageFilters;
+            if (filters.Length == 0)
+                return false;
+
+            foreach (var filter in filters) {
+                if (filter.PreFilterMessage (ref message))
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Initializes COM for the calling thread.</summary>
+        /// <remarks>Reports the thread's existing apartment state rather than changing it: there is no
+        /// COM to initialize outside Windows, and silently switching a thread's apartment would be a
+        /// side effect nobody asked for.</remarks>
+        public static ApartmentState OleRequired () => Thread.CurrentThread.GetApartmentState ();
+
+        /// <summary>Raises the <see cref="ThreadException"/> event for the given exception.</summary>
+        public static void OnThreadException (Exception t)
+            => ThreadException?.Invoke (typeof (Application), new System.Threading.ThreadExceptionEventArgs (t));
+
+        /// <summary>Raises the <see cref="Idle"/> event.</summary>
+        public static void RaiseIdle (EventArgs e) => Idle?.Invoke (null, e);
+
+        /// <summary>Registers a callback that reports whether a message loop is running.</summary>
+        public static void RegisterMessageLoop (MessageLoopCallback callback) => message_loop_callback = callback;
+
+        /// <summary>Removes the callback registered by <see cref="RegisterMessageLoop"/>.</summary>
+        public static void UnregisterMessageLoop () => message_loop_callback = null;
+
+        /// <summary>Gets whether a message loop is running that would drain posted work.</summary>
+        /// <remarks>
+        /// Not cosmetic: posting to the backend only enqueues, and the queue is drained by the loop.
+        /// Code that marshals work has to know whether anything will ever run it, or it hands back a
+        /// task that can never complete. A caller that runs its own loop can say so through
+        /// <see cref="RegisterMessageLoop"/>.
+        /// </remarks>
+        internal static bool HasMessageLoop
+            => message_loop_callback?.Invoke () ?? _mainLoopCancellationTokenSource is { IsCancellationRequested: false };
+
+        /// <summary>Suspends or hibernates the machine.</summary>
+        /// <remarks>Always false, and it does nothing. Power management is an OS privilege this layer
+        /// does not reach for; returning false is how upstream reports that the request was refused,
+        /// so a caller that checks the result behaves correctly here.</remarks>
+        public static bool SetSuspendState (PowerState state, bool force, bool disableWakeEvent) => false;
+
+        /// <summary>Raised when the application is about to enter a modal loop.</summary>
+        public static event EventHandler? EnterThreadModal;
+
+        /// <summary>Raised when the application leaves a modal loop.</summary>
+        public static event EventHandler? LeaveThreadModal;
+
+        /// <summary>Raised when a thread's message loop is about to end.</summary>
+        public static event EventHandler? ThreadExit;
+
+        // Raised from the modal-dialog path so the two events describe something real rather than
+        // being declared and forgotten.
+        internal static void RaiseEnterThreadModal () => EnterThreadModal?.Invoke (null, EventArgs.Empty);
+
+        internal static void RaiseLeaveThreadModal () => LeaveThreadModal?.Invoke (null, EventArgs.Empty);
+
+        internal static void RaiseThreadExit () => ThreadExit?.Invoke (null, EventArgs.Empty);
+    }
+
+    public partial class MenuItem
+    {
+        /// <summary>Gets or sets whether the item starts a new column with a separating bar.</summary>
+        /// <remarks>Real as of W6 mechanisms: a drop-down lays its items out in columns, a new one
+        /// starting at every item with this or <see cref="Break"/> set; this one also draws a bar
+        /// between the columns, as the legacy menu did.</remarks>
+        public bool BarBreak {
+            get => bar_break;
+            set {
+                if (bar_break == value)
+                    return;
+
+                bar_break = value;
+                OwnerControl?.PerformLayout ();
+                OwnerControl?.Invalidate ();
+            }
+        }
+
+        /// <summary>Gets or sets whether the item starts a new column. See <see cref="BarBreak"/>.</summary>
+        public bool Break {
+            get => column_break;
+            set {
+                if (column_break == value)
+                    return;
+
+                column_break = value;
+                OwnerControl?.PerformLayout ();
+                OwnerControl?.Invalidate ();
+            }
+        }
+
+        private bool bar_break;
+        private bool column_break;
+
+        /// <summary>Gets or sets whether the item is populated with the list of MDI child windows.</summary>
+        /// <remarks>Real as of W6 mechanisms: opening the item refills it with one entry per MDI child
+        /// of the owning form, checked for the active one and activating it when clicked.</remarks>
+        public bool MdiList { get; set; }
+
+        /// <summary>Gets or sets how this item merges with items from another menu.</summary>
+        public MenuMerge MergeType { get; set; } = MenuMerge.Add;
+
+        /// <summary>Gets or sets the shortcut key associated with this item.</summary>
+        public Shortcut Shortcut { get; set; } = Shortcut.None;
+
+        /// <summary>Gets or sets this item's position within its parent's collection.</summary>
+        public int Index {
+            get => Parent?.Items.IndexOf (this) ?? -1;
+            set {
+                if (Parent is not { } parent)
+                    return;
+
+                var current = parent.Items.IndexOf (this);
+                if (current < 0 || value < 0 || value >= parent.Items.Count || current == value)
+                    return;
+
+                parent.Items.RemoveAt (current);
+                parent.Items.Insert (value, this);
+            }
+        }
+
+        /// <summary>Gets whether this item has a submenu.</summary>
+        public virtual bool IsParent => HasItems;
+
+        /// <summary>Gets the mnemonic character, or '\0' when the text declares none.</summary>
+        public char Mnemonic {
+            get {
+                var text = Text;
+
+                for (var i = 0; i < text.Length - 1; i++) {
+                    if (text[i] != '&')
+                        continue;
+
+                    // "&&" is an escaped ampersand, not a mnemonic marker.
+                    if (text[i + 1] == '&') {
+                        i++;
+                        continue;
+                    }
+
+                    return text[i + 1];
+                }
+
+                return '\0';
+            }
+        }
+
+        /// <summary>Raises this item's Click event as though the user had chosen it.</summary>
+        /// <remarks>
+        /// A strip item clicks only while it is <c>Enabled</c> and <c>Available</c>, as upstream's does
+        /// (<c>ToolStripItem.cs</c>, <c>PerformClick</c>: <c>if (Enabled &amp;&amp; Available)</c>), so a
+        /// caller that clicks a possibly-disabled item -- an accessibility default action, a split
+        /// button's <c>DefaultItem</c> -- no longer runs its handler anyway (TSM-26). The legacy
+        /// <see cref="MenuItem"/> keeps the .NET Framework rule, which raised Click unconditionally.
+        /// </remarks>
+        public void PerformClick ()
+        {
+            if (this is ToolStripItem && !(Enabled && Available))
+                return;
+
+            OnClick (new MouseEventArgs (MouseButtons.Left, 1, 0, 0, System.Drawing.Point.Empty));
+        }
+
+        /// <summary>Raises the <see cref="Select"/> event as though the item had been highlighted.</summary>
+        public virtual void PerformSelect () => Select?.Invoke (this, EventArgs.Empty);
+
+        /// <summary>Returns a copy of this item and its submenu.</summary>
+        public virtual MenuItem CloneMenu ()
+        {
+            var clone = new MenuItem (Text);
+            clone.CloneMenu (this);
+            return clone;
+        }
+
+        /// <summary>Copies the given item's state and submenu into this one.</summary>
+        protected void CloneMenu (MenuItem itemSrc)
+        {
+            Guard.ThrowIfNull (itemSrc);
+
+            Text = itemSrc.Text;
+            Checked = itemSrc.Checked;
+            Enabled = itemSrc.Enabled;
+            Visible = itemSrc.Visible;
+            RadioCheck = itemSrc.RadioCheck;
+            DefaultItem = itemSrc.DefaultItem;
+            OwnerDraw = itemSrc.OwnerDraw;
+            ShowShortcut = itemSrc.ShowShortcut;
+            Shortcut = itemSrc.Shortcut;
+            MergeOrder = itemSrc.MergeOrder;
+            MergeType = itemSrc.MergeType;
+            Tag = itemSrc.Tag;
+
+            if (itemSrc.HasItems)
+                foreach (var child in itemSrc.Items)
+                    Items.Add (child.CloneMenu ());
+        }
+
+        /// <summary>Returns a copy of this item suitable for merging into another menu.</summary>
+        public virtual MenuItem MergeMenu () => CloneMenu ();
+
+        /// <summary>Merges the given item's submenu into this one, honouring its merge type.</summary>
+        public void MergeMenu (MenuItem itemSrc)
+        {
+            Guard.ThrowIfNull (itemSrc);
+
+            switch (itemSrc.MergeType) {
+                case MenuMerge.Remove:
+                    return;
+                case MenuMerge.Replace:
+                    Items.Clear ();
+                    break;
+                case MenuMerge.MergeItems:
+                    foreach (var child in itemSrc.Items)
+                        Items.Add (child.CloneMenu ());
+                    return;
+            }
+
+            Items.Add (itemSrc.CloneMenu ());
+        }
+
+        /// <summary>Raised when the item is highlighted.</summary>
+        public event EventHandler? Select;
+
+        /// <summary>Raised before the item's submenu is shown.</summary>
+        public event EventHandler? Popup;
+
+        /// <summary>Raised when an owner-drawn item must be painted.</summary>
+        /// <remarks>Real as of W6 mechanisms: the drop-down renderer raises it, with the item's device
+        /// rectangle and state, for every item whose <see cref="OwnerDraw"/> is set, and paints nothing
+        /// itself for that item -- upstream's contract for an owner-drawn menu item.</remarks>
+        public event DrawItemEventHandler? DrawItem;
+
+        /// <summary>Raised when an owner-drawn item must be measured.</summary>
+        /// <remarks>Real as of W6 mechanisms: <see cref="GetPreferredSize"/> asks it, starting from the
+        /// renderer's own measurement, for an item whose <see cref="OwnerDraw"/> is set; the answer's
+        /// <c>ItemWidth</c>/<c>ItemHeight</c> are in logical pixels.</remarks>
+        public event MeasureItemEventHandler? MeasureItem;
+
+        /// <summary>Raises the <see cref="DrawItem"/> event.</summary>
+        protected virtual void OnDrawItem (DrawItemEventArgs e) => DrawItem?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="MeasureItem"/> event.</summary>
+        protected virtual void OnMeasureItem (MeasureItemEventArgs e) => MeasureItem?.Invoke (this, e);
+
+        // The renderer's door: true when the item painted itself (OwnerDraw), so the default is skipped.
+        internal bool RaiseDrawItem (Rectangle deviceBounds, PaintEventArgs e)
+        {
+            if (!OwnerDraw || OwnerControl is not { } owner)
+                return false;
+
+            var state = DrawItemState.None;
+
+            if (Hovered || IsDropDownOpened)
+                state |= DrawItemState.Selected;
+            if (!Enabled)
+                state |= DrawItemState.Disabled;
+            if (Checked)
+                state |= DrawItemState.Checked;
+
+            var index = (owner as MenuBase)?.Items.IndexOf (this) ?? -1;
+
+            OnDrawItem (new DrawItemEventArgs (e.Graphics, owner.Font, deviceBounds, index, state, owner.ForeColor, owner.BackColor));
+
+            return true;
+        }
+
+        // GetPreferredSize's door: the measured size, or the handler's answer for an owner-drawn item.
+        internal Size MeasureOwnerDrawn (Size measured)
+        {
+            if (!OwnerDraw || OwnerControl is not { } owner)
+                return measured;
+
+            var args = new MeasureItemEventArgs (MeasureCanvas, (owner as MenuBase)?.Items.IndexOf (this) ?? -1) {
+                ItemWidth = measured.Width,
+                ItemHeight = measured.Height,
+            };
+
+            OnMeasureItem (args);
+
+            return new Size (Math.Max (1, args.ItemWidth), Math.Max (1, args.ItemHeight));
+        }
+
+        private static readonly SkiaSharp.SKCanvas MeasureCanvas = new (new SkiaSharp.SKBitmap (1, 1));
+
+        /// <summary>Raises the <see cref="Popup"/> event.</summary>
+        protected virtual void OnPopup (EventArgs e) => Popup?.Invoke (this, e);
+    }
+
+    public partial class BindingSource
+    {
+        private bool binding_suspended;
+
+        /// <summary>Gets the list the bindings actually read from.</summary>
+        public IList List => _list;
+
+        /// <summary>Gets the currency manager that owns this source's current-item position.</summary>
+        /// <remarks>
+        /// ONE manager for the life of the BindingSource, created in the constructor over the
+        /// BindingSource itself -- which is upstream's design (<c>new CurrencyManager(this)</c>), and
+        /// what W4.1 adopted (BND-01). The BindingSource is the stable list identity: DataSource can be
+        /// re-resolved underneath it, but the manager's subscription to <see cref="ListChanged"/> is
+        /// how it finds out, so a binding that captured this manager before the data arrived stays
+        /// attached to the right object forever. The two earlier designs both failed at exactly that:
+        /// a new manager per READ meant no two callers shared a position, and a new manager per
+        /// RESOLVE meant every already-attached binding was orphaned by <c>EndInit</c>.
+        /// </remarks>
+        public virtual CurrencyManager CurrencyManager => currency_manager ??= CreateCurrencyManager ();
+
+        private CurrencyManager? currency_manager;
+
+        private CurrencyManager CreateCurrencyManager ()
+        {
+            var manager = new CurrencyManager (this);
+
+            // The BindingSource's own events are the manager's, re-announced: the manager owns the
+            // position, so it is the one that knows when these happen. The subscription order the
+            // manager raises in (CurrentChanged, CurrentItemChanged, then PositionChanged) is
+            // upstream's, and PositionChanged used to have no caller at all (BND-10).
+            manager.CurrentChanged += (_, _) => OnCurrentChanged (EventArgs.Empty);
+            manager.CurrentItemChanged += (_, _) => OnCurrentItemChanged (EventArgs.Empty);
+            manager.PositionChanged += (_, _) => OnPositionChanged (EventArgs.Empty);
+            manager.BindingComplete += (_, e) => BindingComplete?.Invoke (this, e);
+            manager.DataErrorForwarder = ReportDataError;
+
+            return manager;
+        }
+
+        /// <summary>Gets whether the list can raise change notifications.</summary>
+        public virtual bool SupportsChangeNotification => _list is IBindingList;
+
+        /// <summary>Gets whether the list can sort itself.</summary>
+        public virtual bool SupportsSorting => _list is IBindingList { SupportsSorting: true };
+
+        /// <summary>Gets whether the list can sort by more than one property.</summary>
+        public virtual bool SupportsAdvancedSorting => _list is IBindingListView { SupportsAdvancedSorting: true };
+
+        /// <summary>Gets whether the list can filter itself.</summary>
+        public virtual bool SupportsFiltering => _list is IBindingListView { SupportsFiltering: true };
+
+        /// <summary>Gets whether the list can search itself.</summary>
+        public virtual bool SupportsSearching => _list is IBindingList { SupportsSearching: true };
+
+        /// <summary>Gets whether the list is currently sorted.</summary>
+        public virtual bool IsSorted => _list is IBindingList { IsSorted: true };
+
+        /// <summary>Gets the property the list is sorted by, or null.</summary>
+        public virtual PropertyDescriptor? SortProperty => (_list as IBindingList)?.SortProperty;
+
+        /// <summary>Gets the direction the list is sorted in.</summary>
+        public virtual ListSortDirection SortDirection
+            => _list is IBindingList { IsSorted: true } list ? list.SortDirection : ListSortDirection.Ascending;
+
+        /// <summary>Gets the multi-property sort currently applied, or null.</summary>
+        public virtual ListSortDescriptionCollection? SortDescriptions => (_list as IBindingListView)?.SortDescriptions;
+
+        /// <summary>Gets whether <see cref="SuspendBinding"/> is in effect.</summary>
+        public bool IsBindingSuspended => binding_suspended;
+
+        /// <summary>Stops the bound controls being updated from the source.</summary>
+        /// <remarks>Suspends the manager too (BND-19): the flag here mutes this source's
+        /// <see cref="ListChanged"/>, and the manager's flag is what stops simple bindings reading and
+        /// writing -- without it, a control edit during the suspension still wrote back.</remarks>
+        public void SuspendBinding ()
+        {
+            binding_suspended = true;
+            CurrencyManager.SuspendBinding ();
+        }
+
+        /// <summary>Resumes updating the bound controls, and refreshes them.</summary>
+        public void ResumeBinding ()
+        {
+            if (!binding_suspended)
+                return;
+
+            binding_suspended = false;
+            CurrencyManager.ResumeBinding ();
+            ResetBindings (metaDataChanged: false);
+        }
+
+        /// <summary>Sorts the list by the given property.</summary>
+        /// <remarks>Forwarded to the list when it can sort itself. A list that cannot -- a plain
+        /// <c>List&lt;T&gt;</c>, say -- is left alone rather than being reordered behind the caller's
+        /// back, and <see cref="IsSorted"/> keeps reporting false so the caller can tell.</remarks>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage ("Naming", "CA1725:Parameter names should match base declaration",
+            Justification = "WinForms names this parameter 'sort', not IBindingList's 'direction'. Callers " +
+                            "porting from WinForms use named arguments; matching the interface would break them.")]
+        public virtual void ApplySort (PropertyDescriptor property, ListSortDirection sort)
+        {
+            Guard.ThrowIfNull (property);
+
+            if (_list is IBindingList { SupportsSorting: true } list)
+                list.ApplySort (property, sort);
+
+            RecordSortExpression ($"{property.Name} {(sort == ListSortDirection.Descending ? "DESC" : "ASC")}");
+        }
+
+        /// <inheritdoc cref="ApplySort(PropertyDescriptor,ListSortDirection)"/>
+        public virtual void ApplySort (ListSortDescriptionCollection sorts)
+        {
+            Guard.ThrowIfNull (sorts);
+
+            if (_list is IBindingListView { SupportsAdvancedSorting: true } view)
+                view.ApplySort (sorts);
+        }
+
+        /// <summary>Asks the list to maintain a search index over the given property.</summary>
+        /// <remarks>
+        /// A hint, not a contract -- IBindingList.Find works whether or not an index exists. Forwarded so
+        /// a list that does optimise searches gets the chance to; a list that ignores it loses nothing.
+        /// </remarks>
+        public virtual void AddIndex (PropertyDescriptor property)
+        {
+            Guard.ThrowIfNull (property);
+            (_list as IBindingList)?.AddIndex (property);
+        }
+
+        /// <summary>Releases a search index previously requested by <see cref="AddIndex"/>.</summary>
+        public virtual void RemoveIndex (PropertyDescriptor property)
+        {
+            Guard.ThrowIfNull (property);
+            (_list as IBindingList)?.RemoveIndex (property);
+        }
+
+        /// <summary>Removes any sort applied to the list.</summary>
+        public virtual void RemoveSort ()
+        {
+            if (_list is IBindingList { SupportsSorting: true } list)
+                list.RemoveSort ();
+
+            RecordSortExpression (null);
+        }
+
+        /// <summary>Removes any filter applied to the list.</summary>
+        public virtual void RemoveFilter ()
+        {
+            if (_list is IBindingListView { SupportsFiltering: true } view)
+                view.RemoveFilter ();
+
+            Filter = null;
+        }
+
+        /// <summary>Restores <see cref="AllowNew"/> to the value the list implies.</summary>
+        /// <remarks>Real as of W6 mechanisms; see <see cref="AllowNew"/>.</remarks>
+        public virtual void ResetAllowNew () => allow_new = null;
+
+        /// <summary>Returns the properties of the items in this list.</summary>
+        public virtual PropertyDescriptorCollection GetItemProperties (PropertyDescriptor[]? listAccessors)
+            => ((ITypedList)this).GetItemProperties (listAccessors);
+
+        /// <summary>Returns the name of the bound list.</summary>
+        public virtual string GetListName (PropertyDescriptor[]? listAccessors)
+            => ((ITypedList)this).GetListName (listAccessors);
+
+        /// <summary>Returns the currency manager for a related list.</summary>
+        /// <remarks>
+        /// A named member gets the manager of a real child <see cref="BindingSource"/> over that member
+        /// -- one that re-targets when this source's current item moves, and is cached so every caller
+        /// asking for "Orders" shares one position. It used to be a fresh manager over THIS source's
+        /// own list positioned at 0, which is neither related nor current (BND-06).
+        /// </remarks>
+        public virtual CurrencyManager GetRelatedCurrencyManager (string? dataMember)
+        {
+            if (string.IsNullOrEmpty (dataMember))
+                return CurrencyManager;
+
+            related_sources ??= new Dictionary<string, BindingSource> (StringComparer.Ordinal);
+
+            if (!related_sources.TryGetValue (dataMember, out var related))
+                related_sources[dataMember] = related = new BindingSource (this, dataMember);
+
+            return related.CurrencyManager;
+        }
+
+        private Dictionary<string, BindingSource>? related_sources;
+
+        /// <summary>Raised when a new item is about to be added.</summary>
+        public event AddingNewEventHandler? AddingNew;
+
+        /// <summary>Raised when the current item's position changes.</summary>
+        public event EventHandler? PositionChanged;
+
+        /// <summary>Raised when a property of the current item changes.</summary>
+        public event EventHandler? CurrentItemChanged;
+
+        /// <summary>Raised when a binding operation over this source completes; forwarded from the
+        /// currency manager (BND-18).</summary>
+        public event BindingCompleteEventHandler? BindingComplete;
+
+        /// <summary>Raised when the currency manager reports a data error; forwarded from
+        /// <see cref="BindingManagerBase.DataError"/> (W6 mechanisms).</summary>
+        public event BindingManagerDataErrorEventHandler? DataError;
+
+        /// <summary>Raises the <see cref="DataError"/> event.</summary>
+        protected virtual void OnDataError (BindingManagerDataErrorEventArgs e) => DataError?.Invoke (this, e);
+
+        // The manager's forwarder: true only when a listener is attached here, so an error nobody
+        // hears still propagates (see BindingManagerBase.ReportDataError).
+        private bool ReportDataError (Exception exception)
+        {
+            if (DataError is null)
+                return false;
+
+            OnDataError (new BindingManagerDataErrorEventArgs (exception));
+
+            return true;
+        }
+
+        /// <summary>Raises the <see cref="AddingNew"/> event.</summary>
+        protected virtual void OnAddingNew (AddingNewEventArgs e) => AddingNew?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="PositionChanged"/> event.</summary>
+        protected virtual void OnPositionChanged (EventArgs e) => PositionChanged?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="CurrentItemChanged"/> event.</summary>
+        protected virtual void OnCurrentItemChanged (EventArgs e) => CurrentItemChanged?.Invoke (this, e);
+    }
+
+    /// <summary>Handles painting of a <see cref="ToolStrip"/>'s move grip.</summary>
+    public delegate void ToolStripGripRenderEventHandler (object? sender, ToolStripGripRenderEventArgs e);
+
+    /// <summary>Handles painting of a <see cref="ToolStripItem"/>'s image.</summary>
+    public delegate void ToolStripItemImageRenderEventHandler (object? sender, ToolStripItemImageRenderEventArgs e);
+
+    /// <summary>Handles painting of a <see cref="ToolStripItem"/>'s text.</summary>
+    public delegate void ToolStripItemTextRenderEventHandler (object? sender, ToolStripItemTextRenderEventArgs e);
+
+    /// <summary>Handles painting of a <see cref="ToolStripSeparator"/>.</summary>
+    public delegate void ToolStripSeparatorRenderEventHandler (object? sender, ToolStripSeparatorRenderEventArgs e);
+}

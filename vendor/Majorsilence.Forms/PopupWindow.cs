@@ -1,0 +1,165 @@
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a popup window used for things like ComboBoxes and context menus.
+    /// </summary>
+    public class PopupWindow : WindowBase
+    {
+        private readonly WindowBase parent_form;
+
+        // False for a tool tip: it is never interacted with, so it must not take activation from the
+        // window it describes. An activating tip popped up under the pointer on hover and the next
+        // click on the control beneath was spent on the tip / on re-activating the parent (#367).
+        private readonly bool activates = true;
+
+        internal override bool ShowsActivated => activates;
+
+        /// <summary>The window this popup was opened for.</summary>
+        internal WindowBase ParentWindow => parent_form;
+
+        /// <summary>
+        /// Whether this popup is a tool tip, which the browser's accessibility DOM reads as one piece of
+        /// text describing its owner. Set by <see cref="ToolTip"/>; not implied by showing without
+        /// activating, which a combo box's suggestion list (a listbox) does too.
+        /// </summary>
+        internal bool IsToolTip { get; init; }
+
+        /// <summary>
+        /// What the popup was opened for -- the combo box, date picker or tool-tipped control -- so the
+        /// browser's accessibility DOM can link the two (<c>aria-controls</c>, <c>aria-describedby</c>).
+        /// Null when the popup's content says it itself (a menu drop-down knows its owner item).
+        /// </summary>
+        internal object? AccessibleOwner { get; set; }
+
+        // The popups on screen, in the order they were shown, for the browser's accessibility DOM, which
+        // mirrors them next to the forms. Application.OpenForms holds forms only.
+        private static readonly System.Collections.Generic.List<PopupWindow> shown_popups = new ();
+
+        /// <summary>The popups currently shown, oldest first.</summary>
+        internal static PopupWindow[] ShownPopups {
+            get {
+                lock (shown_popups)
+                    return shown_popups.ToArray ();
+            }
+        }
+
+        /// <summary>Raised when a popup is shown or hidden. A popup's hiding paints nothing, so the
+        /// accessibility DOM cannot learn of it from a frame.</summary>
+        internal static event System.Action? ShownPopupsChanged;
+
+        /// <inheritdoc/>
+        protected override void OnVisibleChanged (System.EventArgs e)
+        {
+            lock (shown_popups) {
+                shown_popups.Remove (this);
+                if (Visible)
+                    shown_popups.Add (this);
+            }
+
+            ShownPopupsChanged?.Invoke ();
+            base.OnVisibleChanged (e);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>Disposing takes the popup off screen without a VisibleChanged, so it leaves the
+        /// list of shown popups here.</remarks>
+        protected override void Dispose (bool disposing)
+        {
+            base.Dispose (disposing);
+
+            bool removed;
+            lock (shown_popups)
+                removed = shown_popups.Remove (this);
+
+            if (removed)
+                ShownPopupsChanged?.Invoke ();
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the PopupWindow class.
+        /// </summary>
+        /// <param name="parentForm">
+        /// The owning window. Usually a <see cref="Form"/>, but may be any <see cref="WindowBase"/>
+        /// (e.g. a <see cref="HostedSurface"/> when Majorsilence.Forms is embedded in another toolkit).
+        /// </param>
+        public PopupWindow (WindowBase parentForm)
+        {
+            InitWindow (CreateBackendWindow (this, isPopup: true));
+
+            StartPosition = FormStartPosition.Manual;
+
+            parent_form = parentForm;
+
+            // A popup dies with the window it was opened for, as a drop-down or tip does in WinForms.
+            // Without this a grid's filter popup outlived its closed form and stayed registered as
+            // Application.ActivePopupWindow (W6; it made an unrelated test order-dependent).
+            parent_form.WindowGone += OnParentClosed;
+            // NOTE: deliberately NOT dismissing on the parent's Deactivated. Opening this popup
+            // deactivates the parent as a side effect, so that fires immediately and would close the
+            // popup we just opened. Dismissal is handled generically by the posted, activation-
+            // cancellable close in WindowBase.OnBackendDeactivated (see
+            // Application.ScheduleClosePopupsOnDeactivate), driven by THIS popup's own deactivation.
+        }
+
+        private void OnParentClosed (object? sender, EventArgs e)
+        {
+            parent_form.WindowGone -= OnParentClosed;
+
+            if (!IsDisposed)
+                Close ();
+        }
+
+        /// <inheritdoc/>
+        protected override System.Drawing.Size DefaultSize => new System.Drawing.Size (100, 100);
+
+        /// <summary>Gets the default style for all controls of this type.</summary>
+        public new static ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle,
+            (style) => {
+                style.BackgroundColor = Theme.ControlMidColor;
+            });
+
+        /// <summary>Show the PopupWindow at the specified screen coordinates.</summary>
+        public void Show (int x, int y)
+        {
+            Backend.Location = new System.Drawing.Point (x, y);
+            Backend.Size = Size;
+
+            if (activates)
+                Application.ActivePopupWindow = this;
+
+            // Showing the popup deactivates the parent window; that deactivation must NOT dismiss the
+            // popup we are opening. WindowBase.Show sets IsActive = true proactively before returning,
+            // and Application.ScheduleClosePopupsOnDeactivate checks that flag directly rather than
+            // inferring it from activate/deactivate ordering (which was found not to be reliable -- see
+            // that method's doc comment). Works the same way for nested submenus, since each is shown
+            // through this same path.
+            Show ();
+        }
+
+        /// <summary>Show the PopupWindow at the specified screen coordinates.</summary>
+        public void Show (System.Drawing.Point screenLocation) => Show (screenLocation.X, screenLocation.Y);
+
+        /// <summary>Show the PopupWindow at the specified coordinates relative to the provided Control.</summary>
+        public void Show (Control control, int x, int y)
+        {
+            var pos = control.GetPositionInForm ();
+
+            Show (parent_form.PointToScreen (new System.Drawing.Point (pos.X + x, pos.Y + y)));
+        }
+
+        // A popup that shows without activating: a tool tip, or a combo box's suggestion list, which must
+        // leave the keyboard in the edit box. Not registered as ActivePopupWindow either,
+        // which would otherwise replace an open menu or drop-down with a tip and have it close that
+        // popup on the next click.
+        internal PopupWindow (WindowBase parentForm, bool activates) : this (parentForm)
+        {
+            this.activates = activates;
+        }
+
+        /// <summary>Gets or sets the unscaled size of the window.</summary>
+        public new System.Drawing.Size Size { get; set; }
+
+        /// <summary>Gets the ControlStyle properties for this instance of the Control.</summary>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+    }
+}

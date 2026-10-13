@@ -1,0 +1,104 @@
+﻿using System.Drawing;
+
+namespace Majorsilence.Forms
+{
+    // TODO: Need to unify this with ScrollableControl
+    /// <summary>
+    /// Represents a control that can scroll.
+    /// </summary>
+    public class ScrollControl : Control
+    {
+        private ScrollBars scroll_bars;
+        private readonly HorizontalScrollBar hscrollbar;
+        private readonly VerticalScrollBar vscrollbar;
+        private readonly SizeGrip sizegrip;
+
+        /// <summary>
+        /// Initializes a new instance of the ScrollControl class.
+        /// </summary>
+        public ScrollControl ()
+        {
+            sizegrip = Controls.AddImplicitControl (
+                new SizeGrip {
+                    Visible = false,
+                    Cursor = Cursors.Arrow
+                });
+
+            hscrollbar = Controls.AddImplicitControl (
+                new HorizontalScrollBar {
+                    Visible = false,
+                    Dock = DockStyle.Bottom,
+                    Cursor = Cursors.Arrow
+                });
+
+            vscrollbar = Controls.AddImplicitControl (
+                new VerticalScrollBar {
+                    Visible = false,
+                    Dock = DockStyle.Right,
+                    Cursor = Cursors.Arrow
+                });
+        }
+
+        /// <inheritdoc/>
+        internal override bool HandlesMouseWheel => true;
+
+        /// <inheritdoc/>
+        protected override void OnMouseWheel (MouseEventArgs e)
+        {
+            base.OnMouseWheel (e);
+
+            vscrollbar.RaiseMouseWheel (e);
+        }
+
+        /// <inheritdoc/>
+        public override Rectangle PaddedClientRectangle {
+            get {
+                // Device throughout (RC-8): the padding and the scroll bars' own sizes are logical, and
+                // subtracting them unscaled left the content running under half of each bar at 200%.
+                var client_rect = DeviceClientRectangle;
+                var padding = LogicalToDeviceUnits (Padding);
+
+                var x = client_rect.Left + padding.Left;
+                var y = client_rect.Top + padding.Top;
+                var w = client_rect.Width - padding.Horizontal;
+                var h = client_rect.Height - padding.Vertical;
+
+                if (hscrollbar.Visible)
+                    h -= LogicalToDeviceUnits (hscrollbar.Height);
+
+                if (vscrollbar.Visible)
+                    w -= LogicalToDeviceUnits (vscrollbar.Width);
+
+                return new Rectangle (x, y, w, h);
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets which scrollbars should be visible.
+        /// </summary>
+        public ScrollBars ScrollBars {
+            get => scroll_bars;
+            set {
+                if (scroll_bars != value) {
+                    scroll_bars = value;
+
+                    hscrollbar.Visible = value.In (ScrollBars.Horizontal, ScrollBars.Both);
+                    vscrollbar.Visible = value.In (ScrollBars.Vertical, ScrollBars.Both);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the control's vertical scrollbar.
+        /// </summary>
+        public VerticalScrollBar VerticalScrollBar => vscrollbar;
+
+        /// <summary>
+        /// Gets the control's horizontal scrollbar.
+        /// </summary>
+        /// <remarks>Symmetric with <see cref="VerticalScrollBar"/>, which a derived control has always
+        /// been able to reach. <see cref="TextBox"/> needs this one to scroll a non-wrapping multiline
+        /// box sideways (finding <c>TXT-11</c>).</remarks>
+        public HorizontalScrollBar HorizontalScrollBar => hscrollbar;
+    }
+}

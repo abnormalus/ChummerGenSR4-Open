@@ -1,0 +1,278 @@
+﻿using System.Drawing;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a MenuDropDown control.
+    /// </summary>
+    /// <remarks>
+    /// Derives from <see cref="ToolStrip"/> so that <see cref="ContextMenu"/> and
+    /// <see cref="ContextMenuStrip"/> expose the ToolStrip member surface real WinForms gives them
+    /// (ContextMenuStrip : ToolStripDropDownMenu : ToolStripDropDown : ToolStrip upstream). The popup
+    /// show/hide mechanism and the vertical drop-down layout below are unchanged.
+    /// </remarks>
+    public class MenuDropDown : ToolStrip
+    {
+        private WindowBase? parent_form;
+        private PopupWindow? popup;
+        private int width = 400;
+        private int height = 400;
+
+        /// <summary>
+        /// Initializes a new instance of the MenuDropDown class.
+        /// </summary>
+        public MenuDropDown () : base ()
+        {
+            Dock = DockStyle.Fill;
+
+            foreach (var item in Items)
+                item.ParentControl = this;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the MenuDropDown class with the provided root MenuItem.
+        /// </summary>
+        public MenuDropDown (MenuItem root) : base (root)
+        {
+            // NOTE: base (root) reaches MenuBase (MenuItem) through ToolStrip/ToolBar's protected
+            // root-forwarding constructors -- this is the ctor MenuItem.ShowDropDown uses for submenus.
+            Dock = DockStyle.Fill;
+
+            foreach (var item in Items)
+                item.ParentControl = this;
+        }
+
+        /// <inheritdoc/>
+        internal override void Deactivate ()
+        {
+            base.Deactivate ();
+
+            Hide ();
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Restores Control's zero default: <see cref="ToolBar"/> (now an ancestor via ToolStrip)
+        /// defaults to a 600x34 docked bar, which a drop-down is not. The popup's real size comes from
+        /// <see cref="LayoutItems"/>.
+        /// </remarks>
+        protected override Size DefaultSize => Size.Empty;
+
+        /// <summary>
+        /// Gets the collection of menu items in this drop down. Re-exposed past
+        /// <see cref="ToolStrip"/>'s ToolStripItemCollection facade: MenuDropDownRenderer, LayoutItems
+        /// and MenuBase's hit-testing all consume this collection.
+        /// </summary>
+        public new MenuItemCollection Items => RootItems;
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// A plain drop down is never the top level menu -- it hangs off one. This restores MenuBase's
+        /// default, which <see cref="ToolBar"/> (now an ancestor via ToolStrip) flips to true;
+        /// <see cref="ContextMenu"/> deliberately sets it back to true because it IS the root.
+        /// </remarks>
+        protected override bool IsTopLevelMenu => false;
+
+        /// <inheritdoc/>
+        public new static ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle,
+            (style) => {
+                style.BackgroundColor = Theme.ControlMidColor;
+                style.Border.Width = 1;
+            });
+
+        // Part styles for the items (CSS `MenuDropDown::item` and `MenuDropDown::item:hover`). The hover style
+        // layers on the item style, so an item text colour carries into the hovered state.
+
+        /// <summary>The default style of an item: its text colour and background. CSS: <c>MenuDropDown::item</c>.</summary>
+        public new static readonly ControlStyle DefaultItemStyle = new ControlStyle (null,
+            (style) => { style.ForegroundColor = Theme.ForegroundColor; style.BackgroundColor = Theme.ControlLowColor; });
+
+        /// <summary>The default style of a hovered (or open) item. CSS: <c>MenuDropDown::item:hover</c>.</summary>
+        public new static readonly ControlStyle DefaultItemHoverStyle = new ControlStyle (DefaultItemStyle,
+            (style) => style.BackgroundColor = Theme.ControlHighlightLowColor);
+
+        /// <inheritdoc/>
+        public override Form? FindForm ()
+        {
+            if (base.FindForm () is Form f)
+                return f;
+
+            return parent_form as Form;
+        }
+
+        /// <summary>
+        /// Hides the drop down.
+        /// </summary>
+        public new void Hide ()
+        {
+            popup?.Hide ();
+        }
+
+        /// <inheritdoc/>
+        protected override void LayoutItems ()
+        {
+            var visible_items = Items.Where (i => i.Visible).ToList ();
+
+            if (visible_items.Count == 0)
+                return;
+
+            // Columns (W6 mechanisms): an item with Break or BarBreak starts a new one, laid out to
+            // the right of the previous; a BarBreak column also gets a bar in the gap before it. One
+            // column is the layout every drop-down had before.
+            var columns = new List<List<MenuItem>> ();
+            var bars = new List<int> ();
+            var current = new List<MenuItem> ();
+
+            foreach (var item in visible_items) {
+                if (current.Count > 0 && (item.Break || item.BarBreak)) {
+                    columns.Add (current);
+                    current = new List<MenuItem> ();
+                }
+
+                current.Add (item);
+            }
+
+            columns.Add (current);
+
+            var x = 1;
+            var tallest = 0;
+
+            foreach (var column in columns) {
+                if (column[0].BarBreak && x > 1) {
+                    bars.Add (x + 1);
+                    x += BarBreakGap;
+                }
+
+                var sizes = column.Select (i => i.GetPreferredSize (Size.Empty)).ToList ();
+                var column_width = sizes.Max (s => s.Width) - 2;
+                var column_height = sizes.Sum (s => s.Height);
+
+                StackLayoutEngine.VerticalExpand.Layout (new Rectangle (x, 1, column_width, column_height), column.Cast<ILayoutable> ());
+
+                x += column_width;
+                tallest = Math.Max (tallest, column_height);
+            }
+
+            width = x + 1;
+            height = tallest + 2;
+            column_bars = bars;
+        }
+
+        // The logical width a BarBreak gap takes, with the bar drawn down its middle.
+        internal const int BarBreakGap = 3;
+
+        private IReadOnlyList<int> column_bars = Array.Empty<int> ();
+
+        /// <summary>The logical x of every BarBreak bar, for the renderer (W6 mechanisms).</summary>
+        internal IReadOnlyList<int> ColumnBars => column_bars;
+
+        /// <summary>The size the popup needs for its items, laid out fresh (W6 mechanisms).</summary>
+        internal Size PreferredPopupSize {
+            get {
+                LayoutItems ();
+                return new Size (width, height);
+            }
+        }
+
+        /// <summary>The screen point the drop-down was last shown at (W6 mechanisms; tests).</summary>
+        internal Point LastShowLocation { get; private set; }
+
+        /// <inheritdoc/>
+        protected override void OnMouseClick (MouseEventArgs e)
+        {
+            var clicked_item = GetItemAtLocation (e.Location);
+
+            // The Enabled gate has to be here too. MenuBase.OnMouseClick has one, but a drop-down --
+            // a context menu, or any sub-menu, which is where disabled items overwhelmingly live --
+            // is routed through THIS override and never reaches it. Removing the `new Enabled` shadow
+            // (TSM-01) was therefore not on its own enough to stop a disabled item from firing Click:
+            // found by driving a click through a real MenuDropDown rather than by reading the setter.
+            if (clicked_item != null && !clicked_item.HasItems && clicked_item.Enabled) {
+
+                // One physical release can be delivered to both this popup and the menu bar on X11
+                // (see MenuBase.TryBeginLeafClick); only the first delivery raises the click.
+                if (!TryBeginLeafClick (clicked_item))
+                    return;
+
+                try {
+                    // ItemClicked is the reason the menu's Closing sees; AutoClose off keeps the menu
+                    // open on an item click, as upstream's ToolStripDropDown.OnItemClicked closes only
+                    // `if (AutoClose)` (TSM-21).
+                    if (Application.ActiveMenu is not ContextMenu { AutoCloseCore: false })
+                        Application.ClosePopups (reason: ToolStripDropDownCloseReason.ItemClicked);
+
+                    clicked_item.OnClick (e);
+                    OnItemClicked (e, clicked_item);
+                } finally {
+                    EndLeafClick ();
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override void OnHoverChanged (MenuItem? oldItem, MenuItem? newItem)
+        {
+            if (newItem != null) {
+                oldItem?.HideDropDown ();
+
+                Items.FirstOrDefault (i => i.IsDropDownOpened)?.HideDropDown ();
+            }
+
+            newItem?.ShowDropDown ();
+        }
+
+        /// <summary>
+        /// Shows the drop down at the specified location.
+        /// </summary>
+        public virtual void Show (Control parent, Point location)
+        {
+            if (popup == null) {
+                if (parent.FindWindow () is not WindowBase parent_window)
+                    throw new InvalidOperationException ("Control 'parent' must belong to a window.");
+
+                this.parent_form = parent_window;
+                popup = new PopupWindow (parent_window);
+                popup.Controls.Add (this);
+            }
+
+            LayoutItems ();
+
+            // width/height come from the items' preferred sizes, which are already logical (each is run
+            // through DeviceToLogicalUnits by MenuItem.GetPreferredSize). Window Size is logical too --
+            // ComboBox and ToolTip set their popups the same way. This line used to divide by Scaling,
+            // which at scale 1 was identity but at scale 2 handed the popup half the size its items
+            // were laid into: the click hit-test (which runs in logical space) then landed off the
+            // bottom-right item and the menu did nothing.
+            popup.Size = new Size (width, height);
+
+            Invalidate ();
+            LastShowLocation = location;
+            popup.Show (location);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>Items stack downwards here, so Up/Down navigate within this menu rather than along
+        /// a bar (finding <c>TSM-13</c>).</remarks>
+        protected override bool IsVertical => true;
+
+        /// <inheritdoc/>
+        /// <remarks>The item this drop-down hangs off, which is what Escape and Left close back to. It
+        /// is the root the menu was built around: see the <c>MenuDropDown (MenuItem)</c> constructor.</remarks>
+        internal override MenuItem? DropDownOwnerItem => RootMenuItem.Parent is null ? null : RootMenuItem;
+
+        /// <inheritdoc/>
+        /// <remarks>A drop-down is its own popup, not part of the form: it underlines access keys when the
+        /// strip that opened it does.</remarks>
+        protected internal override bool ShowKeyboardCues
+            => DropDownOwnerItem?.OwnerControl is { } owner ? owner.ShowKeyboardCues : base.ShowKeyboardCues;
+
+        /// <inheritdoc/>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+
+        /// <inheritdoc/>
+        public override bool Visible {
+            get => popup?.Visible ?? false;
+            set => popup?.Show ();
+        }
+    }
+}

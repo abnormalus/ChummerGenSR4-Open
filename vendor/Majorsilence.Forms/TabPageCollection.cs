@@ -1,0 +1,137 @@
+using System.Collections.ObjectModel;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a collection of TabPages.
+    /// </summary>
+    public class TabPageCollection : Collection<TabPage>
+    {
+        /// <summary>Adds several tab pages at once.</summary>
+        /// <remarks>The shape the WinForms designer emits for a populated TabControl -- one
+        /// <c>TabPages.AddRange (new TabPage[] { ... })</c> per control -- so every migrated designer file
+        /// needs it. Without it the call binds to the LINQ-style extension method and fails to compile.</remarks>
+        public void AddRange (params TabPage[] pages)
+        {
+            Guard.ThrowIfNull (pages);
+
+            foreach (var page in pages)
+                Add (page);
+        }
+
+        /// <summary>Removes the tab page with the specified Name, if present. Mirrors WinForms.</summary>
+        public void RemoveByKey (string key)
+        {
+            var page = this.FirstOrDefault (p => string.Equals (p.Name, key, StringComparison.OrdinalIgnoreCase));
+
+            if (page is not null)
+                Remove (page);
+        }
+
+        private readonly TabControl owner;
+        private readonly TabStrip tab_strip;
+
+        internal TabPageCollection (TabControl owner, TabStrip tabStrip)
+        {
+            this.owner = owner;
+            tab_strip = tabStrip;
+        }
+
+        /// <summary>
+        /// Adds the TabPage to the collection.
+        /// </summary>
+        public new TabPage Add (TabPage item)
+        {
+            base.Add (item);
+
+            return item;
+        }
+
+        /// <summary>Adds a new TabPage with the specified text.</summary>
+        public TabPage Add (string text) => Add (new TabPage (text));
+
+        /// <summary>Adds a new TabPage with the specified key and text.</summary>
+        public TabPage Add (string key, string text)
+        {
+            var page = new TabPage (text) { Name = key };
+            return Add (page);
+        }
+
+        /// <summary>Adds a new TabPage with the specified key, text, and image index.</summary>
+        public TabPage Add (string key, string text, int imageIndex)
+        {
+            var page = new TabPage (text) { Name = key, ImageIndex = imageIndex };
+            return Add (page);
+        }
+
+        /// <summary>Gets the TabPage with the specified key (Name), or null.</summary>
+        public TabPage? this[string key]
+            => this.FirstOrDefault (p => string.Equals (p.Name, key, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>Returns true if a TabPage with the specified key exists.</summary>
+        public bool ContainsKey (string key) => this.Any (p => string.Equals (p.Name, key, StringComparison.OrdinalIgnoreCase));
+
+        /// <inheritdoc/>
+        protected override void InsertItem (int index, TabPage item)
+        {
+            base.InsertItem (index, item);
+
+            item.Visible = false;
+            owner.Controls.Insert (index, item);
+            tab_strip.Tabs.Insert (index, item.TabStripItem);
+
+            // A page's ImageIndex/ImageKey is usually set before it joins a control (the designer
+            // emits it on the constructed page, and TabPages.Add (key, text, imageIndex) does the
+            // same), so the image has to be resolved on the way in as well as on later changes (LAY-14).
+            owner.UpdateTabImage (item);
+        }
+
+        /// <inheritdoc/>
+        protected override void ClearItems ()
+        {
+            // Collection<T>.Clear () routes through here; remove each item individually so the
+            // owning TabControl's Controls and the backing TabStrip's Tabs stay in sync.
+            while (Count > 0)
+                RemoveItem (Count - 1);
+
+            base.ClearItems ();
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// The single removal choke point -- <c>ClearItems</c> routes through here too -- so it is the
+        /// one place a subclass can be asked whether a removal may proceed. <see cref="TabControl
+        /// .OnPageRemoving"/> is a no-op here; the Telerik page view overrides it to raise a
+        /// cancellable event.
+        /// </remarks>
+        protected override void RemoveItem (int index)
+        {
+            // Asked BEFORE anything is unhooked, so a veto leaves the collection exactly as it was.
+            if (!owner.OnPageRemoving (this[index]))
+                return;
+
+            base.RemoveItem (index);
+
+            owner.Controls.RemoveAt (index);
+            tab_strip.Tabs.RemoveAt (index);
+
+            // When the last page is removed there is nothing left to select; clear the stale
+            // selection so SelectedIndex reports -1 and SelectedTab returns null instead of throwing.
+            if (tab_strip.Tabs.Count == 0)
+                tab_strip.SelectedTab = null;
+        }
+
+        /// <inheritdoc/>
+        protected override void SetItem (int index, TabPage item)
+        {
+            base.SetItem (index, item);
+
+            item.Visible = false;
+
+            owner.SuspendLayout ();
+            RemoveItem (index);
+            InsertItem (index, item);
+            owner.ResumeLayout ();
+        }
+    }
+}

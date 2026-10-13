@@ -1,0 +1,478 @@
+﻿using System.Collections.Concurrent;
+using SkiaSharp;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Provides a repository of color resources.
+    /// </summary>
+    public static partial class Theme
+    {
+        private static int suspend_count;
+        private static bool suspended_raise_waiting;
+
+        private static readonly object _lock = new ();
+        private static readonly ConcurrentDictionary<string, object> values = new ();
+
+        // On Linux/macOS "Segoe UI Emoji" resolves to "Noto Color Emoji" via fontconfig — an emoji-
+        // only font with no Latin glyphs. Every character then triggers a per-glyph fallback search,
+        // making the first text render take ~1 second. Use "sans-serif" on non-Windows so fontconfig
+        // maps it directly to a proper UI font (e.g. "Noto Sans").
+        private static readonly string _uiFontFamily =
+            System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform (System.Runtime.InteropServices.OSPlatform.Windows)
+                ? "Segoe UI Emoji"
+                : "sans-serif";
+
+        // The font defaults every built-in theme shares. Created once (typeface lookup is not free) and
+        // re-applied by SetBuiltInTheme, so switching to a built-in theme also undoes a custom theme's
+        // fonts and sizes -- otherwise a CSS theme's --font-size would leak into the next theme.
+        // A platform with no fonts to map "sans-serif" to (browser-wasm has one built-in face, a monospace
+        // one) gets a bundled face; anywhere else it is the platform font manager's answer, as before.
+        private static readonly SKTypeface default_ui_font = Majorsilence.Forms.Drawing.FontSubstitution.ResolveWhereNoSystemFonts (_uiFontFamily, SKFontStyle.Normal);
+        private static readonly SKTypeface default_ui_font_bold = Majorsilence.Forms.Drawing.FontSubstitution.ResolveWhereNoSystemFonts (_uiFontFamily, SKFontStyle.Bold);
+        private const int default_font_size = 14;
+        private const int default_item_font_size = 12;
+
+        static Theme ()
+        {
+            CachingFontMapper.Install ();
+
+            SetBuiltInTheme (BuiltInTheme.Default);
+        }
+
+        /// <summary>
+        /// Pre-loads fonts into both the fontconfig cache (via SkiaSharp) and the RichTextKit
+        /// FontMapper cache (via a dummy text measure). Call once on the UI thread at startup to
+        /// prevent slow first-render delays. Safe to call multiple times — subsequent calls are
+        /// instant because both caches are already populated.
+        /// </summary>
+        internal static void WarmupFonts ()
+        {
+            var font = UIFont;
+            var bold = UIFontBold;
+            var size = FontSize;
+            // Warm HarfBuzz shaping and Skia glyph atlas for the full printable ASCII range so
+            // that the first render of any control using standard text costs ~5ms instead of ~20ms.
+            const string warmText = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,!?:-_()[]/'\"";
+            if (font is not null) TextMeasurer.MeasureText (warmText, font, size);
+            if (bold is not null) TextMeasurer.MeasureText (warmText, bold, size);
+        }
+
+        /// <summary>
+        /// The primary color uses for accents.
+        /// </summary>
+        public static SKColor AccentColor {
+            get => GetValue<SKColor> (nameof (AccentColor));
+            set => SetValue (nameof (AccentColor), value);
+        }
+
+        /// <summary>
+        /// The secondary color uses for accents.
+        /// </summary>
+        public static SKColor AccentColor2 {
+            get => GetValue<SKColor> (nameof (AccentColor2));
+            set => SetValue (nameof (AccentColor2), value);
+        }
+
+        /// <summary>
+        /// The default background color of a Form and Control.
+        /// </summary>
+        public static SKColor BackgroundColor {
+            get => GetValue<SKColor> (nameof (BackgroundColor));
+            set => SetValue (nameof (BackgroundColor), value);
+        }
+
+        /// <summary>
+        /// Pause raising ThemeChanged for better performance if changing many Theme elements.
+        /// Resume with EndUpdate ().
+        /// </summary>
+        public static void BeginUpdate ()
+        {
+            lock (_lock) {
+                suspend_count++;
+            }
+        }
+
+        /// <summary>
+        /// The low color used for Control borders.
+        /// </summary>
+        public static SKColor BorderLowColor {
+            get => GetValue<SKColor> (nameof (BorderLowColor));
+            set => SetValue (nameof (BorderLowColor), value);
+        }
+
+        /// <summary>
+        /// The mid color used for Control borders.
+        /// </summary>
+        public static SKColor BorderMidColor {
+            get => GetValue<SKColor> (nameof (BorderMidColor));
+            set => SetValue (nameof (BorderMidColor), value);
+        }
+
+        /// <summary>
+        /// The high color used for Control borders.
+        /// </summary>
+        public static SKColor BorderHighColor {
+            get => GetValue<SKColor> (nameof (BorderHighColor));
+            set => SetValue (nameof (BorderHighColor), value);
+        }
+
+        /// <summary>
+        /// The low color used for Controls.
+        /// </summary>
+        public static SKColor ControlLowColor {
+            get => GetValue<SKColor> (nameof (ControlLowColor));
+            set => SetValue (nameof (ControlLowColor), value);
+        }
+
+        /// <summary>
+        /// The mid color used for Controls.
+        /// </summary>
+        public static SKColor ControlMidColor {
+            get => GetValue<SKColor> (nameof (ControlMidColor));
+            set => SetValue (nameof (ControlMidColor), value);
+        }
+
+        /// <summary>
+        /// The mid-high color used for Controls.
+        /// </summary>
+        public static SKColor ControlMidHighColor {
+            get => GetValue<SKColor> (nameof (ControlMidHighColor));
+            set => SetValue (nameof (ControlMidHighColor), value);
+        }
+
+        /// <summary>
+        /// The high color used for Controls.
+        /// </summary>
+        public static SKColor ControlHighColor {
+            get => GetValue<SKColor> (nameof (ControlHighColor));
+            set => SetValue (nameof (ControlHighColor), value);
+        }
+
+        /// <summary>
+        /// The very high color used for Controls.
+        /// </summary>
+        public static SKColor ControlVeryHighColor {
+            get => GetValue<SKColor> (nameof (ControlVeryHighColor));
+            set => SetValue (nameof (ControlVeryHighColor), value);
+        }
+
+        /// <summary>
+        /// The low color used for highlighted elements, like hovered tabs or buttons.
+        /// </summary>
+        public static SKColor ControlHighlightLowColor {
+            get => GetValue<SKColor> (nameof (ControlHighlightLowColor));
+            set => SetValue (nameof (ControlHighlightLowColor), value);
+        }
+
+        /// <summary>
+        /// The mid color used for highlighted elements, like hovered tabs or buttons.
+        /// </summary>
+        public static SKColor ControlHighlightMidColor {
+            get => GetValue<SKColor> (nameof (ControlHighlightMidColor));
+            set => SetValue (nameof (ControlHighlightMidColor), value);
+        }
+
+        /// <summary>
+        /// The high color used for highlighted elements, like hovered tabs or buttons.
+        /// </summary>
+        public static SKColor ControlHighlightHighColor {
+            get => GetValue<SKColor> (nameof (ControlHighlightHighColor));
+            set => SetValue (nameof (ControlHighlightHighColor), value);
+        }
+
+        /// <summary>
+        /// Resume raising the ThemeChanged event after pausing with BeginUpdate ().
+        /// </summary>
+        public static void EndUpdate ()
+        {
+            bool should_raise;
+
+            lock (_lock) {
+                if (suspend_count == 0)
+                    throw new InvalidOperationException ("EndUpdate called without matching BeginUpdate");
+
+                suspend_count--;
+                should_raise = suspend_count == 0 && suspended_raise_waiting;
+
+                if (should_raise)
+                    suspended_raise_waiting = false;
+            }
+
+            if (should_raise)
+                InvokeThemeChanged ();
+        }
+
+        /// <summary>
+        /// The default font size used by control.
+        /// </summary>
+        public static int FontSize {
+            get => GetValue<int> (nameof (FontSize));
+            set => SetValue (nameof (FontSize), value);
+        }
+
+        /// <summary>
+        /// The foreground color used for text.
+        /// </summary>
+        public static SKColor ForegroundColor {
+            get => GetValue<SKColor> (nameof (ForegroundColor));
+            set => SetValue (nameof (ForegroundColor), value);
+        }
+
+        /// <summary>
+        /// A text color that is visible on an AccentColor background.
+        /// </summary>
+        public static SKColor ForegroundColorOnAccent {
+            get => GetValue<SKColor> (nameof (ForegroundColorOnAccent));
+            set => SetValue (nameof (ForegroundColorOnAccent), value);
+        }
+
+        /// <summary>
+        /// The color used for disabled text.
+        /// </summary>
+        public static SKColor ForegroundDisabledColor {
+            get => GetValue<SKColor> (nameof (ForegroundDisabledColor));
+            set => SetValue (nameof (ForegroundDisabledColor), value);
+        }
+
+        private static T GetValue<T> (string name) => (T)values[name];
+
+        /// <summary>
+        /// A smaller font size generally used for lists of items.
+        /// </summary>
+        public static int ItemFontSize {
+            get => GetValue<int> (nameof (ItemFontSize));
+            set => SetValue (nameof (ItemFontSize), value);
+        }
+
+        /// <summary>
+        /// The color used as the background for selected text.
+        /// </summary>
+        public static SKColor TextSelectionBackgroundColor {
+            get => GetValue<SKColor> (nameof (TextSelectionBackgroundColor));
+            set => SetValue (nameof (TextSelectionBackgroundColor), value);
+        }
+
+        /// <summary>
+        /// The color used to highlight a potentially destructive action.
+        /// </summary>
+        public static SKColor WarningHighlightColor {
+            get => GetValue<SKColor> (nameof (WarningHighlightColor));
+            set => SetValue (nameof (WarningHighlightColor), value);
+        }
+
+        /// <summary>
+        /// Changes or resets the application theme to a set of built-in defaults.
+        /// </summary>
+        /// <param name="theme"></param>
+        public static void SetBuiltInTheme (BuiltInTheme theme)
+        {
+            // We always reset the colors, even if we were already using the current theme.
+            // This resets any modification the user made, which feels like the expected behavior.
+
+            BeginUpdate ();
+            try {
+
+            values[nameof (UIFont)] = default_ui_font;
+            values[nameof (UIFontBold)] = default_ui_font_bold;
+            values[nameof (FontSize)] = default_font_size;
+            values[nameof (ItemFontSize)] = default_item_font_size;
+
+            // TODO: BuiltInTheme.Default should detect the OS setting. Currently it just uses Light.
+            switch (theme) {
+                case BuiltInTheme.Dark:
+                    values[nameof (BackgroundColor)] = SKColor.Parse ("#FF282828");
+                    values[nameof (BorderLowColor)] = SKColor.Parse ("#FF505050");
+                    values[nameof (BorderMidColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (BorderHighColor)] = SKColor.Parse ("#FFA0A0A0");
+                    values[nameof (ControlLowColor)] = SKColor.Parse ("#FF282828");
+                    values[nameof (ControlMidColor)] = SKColor.Parse ("#FF505050");
+                    values[nameof (ControlMidHighColor)] = SKColor.Parse ("#FF686868");
+                    values[nameof (ControlHighColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (ControlVeryHighColor)] = SKColor.Parse ("#FFEFEBEF");
+                    values[nameof (ControlHighlightLowColor)] = SKColor.Parse ("#FFA8A8A8");
+                    values[nameof (ControlHighlightMidColor)] = SKColor.Parse ("#FF828282");
+                    values[nameof (ControlHighlightHighColor)] = SKColor.Parse ("#FF505050");
+                    values[nameof (ForegroundColor)] = SKColor.Parse ("#FFDEDEDE");
+                    values[nameof (ForegroundDisabledColor)] = new SKColor (150, 150, 150);
+                    values[nameof (ForegroundColorOnAccent)] = SKColors.White;
+                    values[nameof (AccentColor)] = SKColor.Parse ("#FF096085");
+                    values[nameof (AccentColor2)] = new SKColor (0, 120, 212);
+                    values[nameof (TextSelectionBackgroundColor)] = new SKColor (153, 201, 239);
+                    values[nameof (WarningHighlightColor)] = new SKColor (232, 17, 35);
+                    break;
+                case BuiltInTheme.Classic:
+                    values[nameof (BackgroundColor)] = SKColor.Parse ("#FFC0C0C0");
+                    values[nameof (BorderLowColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (BorderMidColor)] = SKColor.Parse ("#FF404040");
+                    values[nameof (BorderHighColor)] = SKColor.Parse ("#FF000000");
+                    values[nameof (ControlLowColor)] = SKColor.Parse ("#FFFFFFFF");
+                    values[nameof (ControlMidColor)] = SKColor.Parse ("#FFC0C0C0");
+                    values[nameof (ControlMidHighColor)] = SKColor.Parse ("#FFDFDFDF");
+                    values[nameof (ControlHighColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (ControlVeryHighColor)] = SKColor.Parse ("#FF404040");
+                    values[nameof (ControlHighlightLowColor)] = SKColor.Parse ("#FFFFFFFF");
+                    values[nameof (ControlHighlightMidColor)] = SKColor.Parse ("#FFC0C0C0");
+                    values[nameof (ControlHighlightHighColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (ForegroundColor)] = SKColor.Parse ("#FF000000");
+                    values[nameof (ForegroundDisabledColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (ForegroundColorOnAccent)] = SKColors.White;
+                    values[nameof (AccentColor)] = SKColor.Parse ("#FF000080");
+                    values[nameof (AccentColor2)] = SKColor.Parse ("#FF0000FF");
+                    values[nameof (TextSelectionBackgroundColor)] = SKColor.Parse ("#FF000080");
+                    values[nameof (WarningHighlightColor)] = SKColor.Parse ("#FFFF0000");
+                    break;
+                case BuiltInTheme.Aero:
+                    values[nameof (BackgroundColor)] = SKColor.Parse ("#FFE8EEF4");
+                    values[nameof (BorderLowColor)] = SKColor.Parse ("#FF9EB6CE");
+                    values[nameof (BorderMidColor)] = SKColor.Parse ("#FF5A7EA8");
+                    values[nameof (BorderHighColor)] = SKColor.Parse ("#FF3C556E");
+                    values[nameof (ControlLowColor)] = SKColor.Parse ("#FFFFFFFF");
+                    values[nameof (ControlMidColor)] = SKColor.Parse ("#FFDCE9F7");
+                    values[nameof (ControlMidHighColor)] = SKColor.Parse ("#FFBFD8F2");
+                    values[nameof (ControlHighColor)] = SKColor.Parse ("#FF9AC0E8");
+                    values[nameof (ControlVeryHighColor)] = SKColor.Parse ("#FF5A7EA8");
+                    values[nameof (ControlHighlightLowColor)] = SKColor.Parse ("#FFDDF0FE");
+                    values[nameof (ControlHighlightMidColor)] = SKColor.Parse ("#FFB8E0FB");
+                    values[nameof (ControlHighlightHighColor)] = SKColor.Parse ("#FF3C7FB1");
+                    values[nameof (ForegroundColor)] = SKColor.Parse ("#FF000000");
+                    values[nameof (ForegroundDisabledColor)] = new SKColor (160, 160, 160);
+                    values[nameof (ForegroundColorOnAccent)] = SKColors.White;
+                    values[nameof (AccentColor)] = SKColor.Parse ("#FF1C7CC7");
+                    values[nameof (AccentColor2)] = SKColor.Parse ("#FF0058A8");
+                    values[nameof (TextSelectionBackgroundColor)] = new SKColor (153, 201, 239);
+                    values[nameof (WarningHighlightColor)] = new SKColor (232, 17, 35);
+                    break;
+                case BuiltInTheme.PointOfSale:
+                    values[nameof (BackgroundColor)] = SKColor.Parse ("#FF002147");
+                    values[nameof (BorderLowColor)] = SKColor.Parse ("#FF0059B3");
+                    values[nameof (BorderMidColor)] = SKColor.Parse ("#FF3385FF");
+                    values[nameof (BorderHighColor)] = SKColor.Parse ("#FFFFFFFF");
+                    values[nameof (ControlLowColor)] = SKColor.Parse ("#FF002147");
+                    values[nameof (ControlMidColor)] = SKColor.Parse ("#FF0059B3");
+                    values[nameof (ControlMidHighColor)] = SKColor.Parse ("#FF0072C6");
+                    values[nameof (ControlHighColor)] = SKColor.Parse ("#FF3385FF");
+                    values[nameof (ControlVeryHighColor)] = SKColor.Parse ("#FFFFFFFF");
+                    values[nameof (ControlHighlightLowColor)] = SKColor.Parse ("#FFFFC107");
+                    values[nameof (ControlHighlightMidColor)] = SKColor.Parse ("#FFFFA000");
+                    values[nameof (ControlHighlightHighColor)] = SKColor.Parse ("#FFFF6F00");
+                    values[nameof (ForegroundColor)] = SKColor.Parse ("#FFFFFFFF");
+                    values[nameof (ForegroundDisabledColor)] = new SKColor (140, 160, 190);
+                    values[nameof (ForegroundColorOnAccent)] = SKColors.Black;
+                    values[nameof (AccentColor)] = SKColor.Parse ("#FFFFC107");
+                    values[nameof (AccentColor2)] = SKColor.Parse ("#FF43A047");
+                    values[nameof (TextSelectionBackgroundColor)] = SKColor.Parse ("#FFFFC107");
+                    values[nameof (WarningHighlightColor)] = SKColor.Parse ("#FFE53935");
+                    break;
+                case BuiltInTheme.HotDog:
+                    values[nameof (BackgroundColor)] = SKColor.Parse ("#FFF3D18B");
+                    values[nameof (BorderLowColor)] = SKColor.Parse ("#FFFFC72C");
+                    values[nameof (BorderMidColor)] = SKColor.Parse ("#FFD62828");
+                    values[nameof (BorderHighColor)] = SKColor.Parse ("#FF7B3F00");
+                    values[nameof (ControlLowColor)] = SKColor.Parse ("#FFFFF3D6");
+                    values[nameof (ControlMidColor)] = SKColor.Parse ("#FFF3D18B");
+                    values[nameof (ControlMidHighColor)] = SKColor.Parse ("#FFE8B04B");
+                    values[nameof (ControlHighColor)] = SKColor.Parse ("#FFC0722A");
+                    values[nameof (ControlVeryHighColor)] = SKColor.Parse ("#FF7B3F00");
+                    values[nameof (ControlHighlightLowColor)] = SKColor.Parse ("#FFFFDD57");
+                    values[nameof (ControlHighlightMidColor)] = SKColor.Parse ("#FFFFC72C");
+                    values[nameof (ControlHighlightHighColor)] = SKColor.Parse ("#FFD62828");
+                    values[nameof (ForegroundColor)] = SKColor.Parse ("#FF4A2C0F");
+                    values[nameof (ForegroundDisabledColor)] = new SKColor (180, 150, 110);
+                    values[nameof (ForegroundColorOnAccent)] = SKColors.White;
+                    values[nameof (AccentColor)] = SKColor.Parse ("#FFD62828");
+                    values[nameof (AccentColor2)] = SKColor.Parse ("#FFFFC72C");
+                    values[nameof (TextSelectionBackgroundColor)] = new SKColor (124, 181, 24);
+                    values[nameof (WarningHighlightColor)] = SKColor.Parse ("#FFB00020");
+                    break;
+                default:
+                    values[nameof (BackgroundColor)] = new SKColor (240, 240, 240);
+                    values[nameof (BorderLowColor)] = SKColor.Parse ("#FFABABAB");
+                    values[nameof (BorderMidColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (BorderHighColor)] = SKColor.Parse ("#FF333333");
+                    values[nameof (ControlLowColor)] = SKColor.Parse ("#FFFBFBFB");
+                    values[nameof (ControlMidColor)] = SKColor.Parse ("#FFF3F3F3");
+                    values[nameof (ControlMidHighColor)] = SKColor.Parse ("#FFE1E1E1");
+                    values[nameof (ControlHighColor)] = SKColor.Parse ("#FFC2C3C9");
+                    values[nameof (ControlVeryHighColor)] = SKColor.Parse ("#FF686868");
+                    values[nameof (ControlHighlightLowColor)] = SKColor.Parse ("#FFC6C6C6");
+                    values[nameof (ControlHighlightMidColor)] = SKColor.Parse ("#FFB0B0B0");
+                    values[nameof (ControlHighlightHighColor)] = SKColor.Parse ("#FF808080");
+                    values[nameof (ForegroundColor)] = SKColor.Parse ("#FF000000");
+                    values[nameof (ForegroundDisabledColor)] = new SKColor (170, 170, 170);
+                    values[nameof (ForegroundColorOnAccent)] = SKColors.White;
+                    values[nameof (AccentColor)] = new SKColor (42, 138, 208);
+                    values[nameof (AccentColor2)] = new SKColor (0, 120, 212);
+                    values[nameof (TextSelectionBackgroundColor)] = new SKColor (153, 201, 239);
+                    values[nameof (WarningHighlightColor)] = new SKColor (232, 17, 35);
+                    break;
+            }
+
+            // A built-in theme resets everything a theme can set, and a CSS theme's control rules are
+            // part of that (Theme.Css.cs). Runs after the colors so the re-run type defaults read them.
+            ClearStyleSheetRules ();
+
+            RaiseThemeChanged ();
+            } finally {
+                // Always balance BeginUpdate even if a ThemeChanged subscriber threw while resuming --
+                // a leaked suspend count silently suppresses every later theme broadcast in the process.
+                EndUpdate ();
+            }
+        }
+
+        private static void InvokeThemeChanged ()
+        {
+            TextMeasurer.ClearTextBlockCache ();
+            ThemeChanged?.Invoke (null, EventArgs.Empty);
+            Application.DoThemeChanged ();
+            RaiseStyleSheetApplied ();
+        }
+
+        private static void RaiseThemeChanged ()
+        {
+            bool should_raise;
+
+            lock (_lock) {
+                if (suspend_count > 0) {
+                    suspended_raise_waiting = true;
+                    should_raise = false;
+                } else {
+                    suspended_raise_waiting = false;
+                    should_raise = true;
+                }
+            }
+
+            if (should_raise)
+                InvokeThemeChanged ();
+        }
+
+        private static void SetValue (string key, object value)
+        {
+            values[key] = value;
+
+            RaiseThemeChanged ();
+        }
+
+        /// <summary>
+        /// Raised when a theme color is changed. Controls listen
+        /// for this event to know when to repaint themselves.
+        /// </summary>
+        public static event EventHandler? ThemeChanged;
+
+        /// <summary>
+        /// The default font used by controls.
+        /// </summary>
+        public static SKTypeface UIFont {
+            get => GetValue<SKTypeface> (nameof (UIFont));
+            set => SetValue (nameof (UIFont), value);
+        }
+
+        /// <summary>
+        /// The default bold font used by controls.
+        /// </summary>
+        public static SKTypeface UIFontBold {
+            get => GetValue<SKTypeface> (nameof (UIFontBold));
+            set => SetValue (nameof (UIFontBold), value);
+        }
+    }
+}

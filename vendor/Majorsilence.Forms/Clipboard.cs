@@ -1,0 +1,422 @@
+using Majorsilence.Forms.Backends;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Class for interacting with an operating system's clipboard.
+    /// </summary>
+    public static partial class Clipboard
+    {
+        /// <summary>Gets the contents of the clipboard as text.</summary>
+        public static Task<string?> GetTextAsync ()
+            => Task.FromResult<string?> (Platform.Backend.GetClipboardText ());
+
+        /// <summary>Sets the text contents of the clipboard.</summary>
+        public static Task SetTextAsync (string text)
+        {
+            Platform.Backend.SetClipboardText (text);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>Clears the contents of the clipboard.</summary>
+        public static Task ClearAsync ()
+        {
+            Platform.Backend.ClearClipboard ();
+            return Task.CompletedTask;
+        }
+
+        // --- WinForms sync compatibility wrappers ---
+
+        /// <summary>Gets the text contents of the clipboard synchronously.</summary>
+        public static string GetText () => Platform.Backend.GetClipboardText ();
+
+        /// <summary>Clears the clipboard and then puts text on it.</summary>
+        /// <remarks>As upstream (<c>OLE/Clipboard.cs</c>, <c>SetText</c> places a new one-format
+        /// <c>DataObject</c>), whatever the clipboard held before goes: an RTF or HTML payload from an
+        /// earlier copy must not still answer <see cref="ContainsText(TextDataFormat)"/> after plain
+        /// text has replaced it (SVC-18).</remarks>
+        public static void SetText (string text)
+        {
+            ClearInProcess ();
+            Platform.Backend.SetClipboardText (text);
+        }
+
+        /// <summary>Clears the clipboard synchronously.</summary>
+        public static void Clear ()
+        {
+            // The in-process image and formats go with the text (W6 mechanisms).
+            ClearInProcess ();
+            Platform.Backend.ClearClipboard ();
+        }
+
+        private static void ClearInProcess ()
+        {
+            clipboard_image = null;
+            clipboard_data.Clear ();
+        }
+
+        // Named formats other than text and image are in-process too, for the same reason the image
+        // is (W6 mechanisms): a custom format a drag-and-drop or a copy command puts up has to be
+        // there for the paste that follows in the same application.
+        private static readonly System.Collections.Generic.Dictionary<string, object?> clipboard_data = new (StringComparer.OrdinalIgnoreCase);
+
+        private static bool IsTextFormat (string format)
+            => string.Equals (format, DataFormats.Text.Name, StringComparison.OrdinalIgnoreCase)
+               || string.Equals (format, DataFormats.UnicodeText.Name, StringComparison.OrdinalIgnoreCase)
+               || string.Equals (format, DataFormats.StringFormat.Name, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsImageFormat (string format)
+            => string.Equals (format, DataFormats.Bitmap.Name, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>Returns whether the clipboard contains text.</summary>
+        public static bool ContainsText () => !string.IsNullOrEmpty (GetText ());
+
+        /// <summary>Returns whether the clipboard contains text in the specified format.</summary>
+        /// <remarks>Each <see cref="TextDataFormat"/> is its own clipboard format, as upstream's
+        /// <c>ConvertToDataFormats</c> maps them: plain text does not answer for <c>Rtf</c>, <c>Html</c>
+        /// or <c>CommaSeparatedValue</c> (SVC-18). <c>Text</c> and <c>UnicodeText</c> are one piece of
+        /// data and both read the platform clipboard.</remarks>
+        public static bool ContainsText (TextDataFormat format)
+            => IsPlainText (format) ? ContainsText () : clipboard_data.TryGetValue (DataObject.FormatName (format), out var data) && data is string text && text.Length > 0;
+
+        private static bool IsPlainText (TextDataFormat format)
+            => format is TextDataFormat.Text or TextDataFormat.UnicodeText;
+
+        // The image clipboard is IN-PROCESS (W6 mechanisms). The platform backends expose text only,
+        // so a system-wide image clipboard would be a new backend capability across all five of them.
+        // This is the same shape the in-process drag session took: copy and paste of an image works
+        // within one application, which is the common case, and the deviation is recorded rather than
+        // the three members staying no-ops that silently drop what they are given.
+        private static Majorsilence.Forms.Drawing.Image? clipboard_image;
+
+        /// <summary>Gets whether the clipboard holds an image.</summary>
+        /// <remarks>See <see cref="SetImage"/>: the image clipboard is in-process.</remarks>
+        public static bool ContainsImage () => clipboard_image is not null;
+
+        /// <summary>Gets the image on the clipboard, or null.</summary>
+        /// <remarks>See <see cref="SetImage"/>: the image clipboard is in-process.</remarks>
+        public static Majorsilence.Forms.Drawing.Image? GetImage () => clipboard_image;
+
+        /// <summary>Puts an image on the clipboard.</summary>
+        /// <remarks>
+        /// Real as of W6 mechanisms, within this process: it used to accept the image and drop it, so
+        /// a copy followed by a paste in the same application found nothing. Deviation from upstream,
+        /// whose clipboard is system-wide — the platform backends here carry text only, and an
+        /// image-capable clipboard is a backend capability rather than a gap in this layer.
+        /// <see cref="Clear"/> takes it away again.
+        /// </remarks>
+        public static void SetImage (Majorsilence.Forms.Drawing.Image image) => clipboard_image = image;
+
+        /// <summary>Gets the text on the clipboard for the specified format, or an empty string when there is none in it.</summary>
+        /// <remarks>See <see cref="ContainsText(TextDataFormat)"/>: <c>GetText (TextDataFormat.Rtf)</c> used
+        /// to return the plain text, which an RTF consumer then parsed as markup (SVC-18).</remarks>
+        public static string GetText (TextDataFormat format)
+            => IsPlainText (format)
+                ? GetText ()
+                : clipboard_data.TryGetValue (DataObject.FormatName (format), out var data) && data is string text ? text : string.Empty;
+
+        /// <summary>Clears the clipboard and then puts text on it in the specified format.</summary>
+        /// <remarks>Plain text reaches the platform clipboard; RTF, HTML and CSV are in-process, as
+        /// every format other than text is here (see <see cref="SetImage"/>). Either way the clipboard
+        /// is cleared first, as upstream's is (SVC-18).</remarks>
+        public static void SetText (string text, TextDataFormat format)
+        {
+            if (IsPlainText (format)) {
+                SetText (text);
+                return;
+            }
+
+            ClearInProcess ();
+            Platform.Backend.ClearClipboard ();
+            clipboard_data[DataObject.FormatName (format)] = text;
+        }
+
+        /// <summary>Sets an IDataObject on the clipboard. Stub — stores text if the object supports it.</summary>
+        /// <summary>Places data on the clipboard, retrying if another process holds it.</summary>
+        /// <remarks>The retry count and delay are accepted and not used: the backends' clipboard is
+        /// not a shared OS resource that can be locked out from under a caller, so there is nothing
+        /// to retry. Present because the overload is what a migrated app already calls.</remarks>
+        public static void SetDataObject (object data, bool copy, int retryTimes, int retryDelay)
+            => SetDataObject (data, copy);
+
+        /// <summary>Places data on the clipboard.</summary>
+        /// <remarks>Every format an <see cref="IDataObject"/> carries is taken (W6 mechanisms): text
+        /// goes to the platform clipboard, an image and any other named format to the in-process
+        /// store. It used to take the text and drop the rest.</remarks>
+        public static void SetDataObject (object data, bool copy = false)
+        {
+            switch (data) {
+            case IDataObject source:
+                foreach (var format in source.GetFormats ())
+                    SetData (format, source.GetData (format));
+                break;
+            case string text:
+                SetText (text);
+                break;
+            case Majorsilence.Forms.Drawing.Image image:
+                SetImage (image);
+                break;
+            default:
+                SetData (data.GetType ().FullName ?? data.GetType ().Name, data);
+                break;
+            }
+        }
+
+        /// <summary>Gets a data object holding everything on the clipboard.</summary>
+        /// <remarks>A <see cref="DataObject"/> as of W6 mechanisms, so <c>SetData</c> on it stores
+        /// into the object -- upstream's contract, where the object is a snapshot that a caller edits
+        /// and puts back with <see cref="SetDataObject(object, bool)"/>. It used to be a text-only
+        /// view whose setters dropped what they were given.</remarks>
+        public static IDataObject GetDataObject ()
+        {
+            var snapshot = new DataObject ();
+
+            if (ContainsText ())
+                snapshot.SetData (DataFormats.Text.Name, GetText ());
+
+            if (clipboard_image is { } image)
+                snapshot.SetData (DataFormats.Bitmap.Name, image);
+
+            foreach (var entry in clipboard_data)
+                snapshot.SetData (entry.Key, entry.Value);
+
+            return snapshot;
+        }
+
+        /// <summary>Returns whether the clipboard holds data in the given format.</summary>
+        public static bool ContainsData (string format)
+        {
+            if (IsTextFormat (format))
+                return ContainsText ();
+
+            if (IsImageFormat (format))
+                return ContainsImage ();
+
+            return clipboard_data.ContainsKey (format);
+        }
+
+        /// <summary>Puts data on the clipboard under a named format.</summary>
+        /// <remarks>Text formats reach the platform clipboard; an image and any other format are
+        /// in-process, as <see cref="SetImage"/> describes (W6 mechanisms).</remarks>
+        public static void SetData (string format, object? data)
+        {
+            Guard.ThrowIfNull (format);
+
+            // Straight to the backend, not through SetText: SetDataObject adds an object's formats one
+            // at a time through here, and SetText's clear would drop the ones already added.
+            if (IsTextFormat (format) && data is string text) {
+                Platform.Backend.SetClipboardText (text);
+                return;
+            }
+
+            if (IsImageFormat (format) && data is Majorsilence.Forms.Drawing.Image image) {
+                SetImage (image);
+                return;
+            }
+
+            clipboard_data[format] = data;
+        }
+
+        /// <summary>Gets the data on the clipboard in the given format, or null.</summary>
+        public static object? GetData (string format)
+        {
+            if (IsTextFormat (format))
+                return ContainsText () ? GetText () : null;
+
+            if (IsImageFormat (format))
+                return clipboard_image;
+
+            return clipboard_data.TryGetValue (format, out var data) ? data : null;
+        }
+    }
+
+    /// <summary>Specifies the clipboard text data format.</summary>
+    public enum TextDataFormat
+    {
+        /// <summary>Unicode text format.</summary>
+        UnicodeText = 1,
+        /// <summary>Regular text format.</summary>
+        Text = 0,
+        /// <summary>RTF text format.</summary>
+        Rtf = 2,
+        /// <summary>HTML text format.</summary>
+        Html = 3,
+        /// <summary>CommaSeparatedValue format.</summary>
+        CommaSeparatedValue = 4,
+    }
+
+    /// <summary>Defines a format-independent mechanism for transferring data.</summary>
+    public interface IDataObject
+    {
+        /// <summary>Gets the data in the specified format.</summary>
+        object? GetData (string format);
+        /// <summary>Gets the data in the specified type format.</summary>
+        object? GetData (Type format);
+        /// <summary>Gets the data in the specified format, optionally converting it.</summary>
+        object? GetData (string format, bool autoConvert);
+        /// <summary>Returns whether data is present in the specified format.</summary>
+        bool GetDataPresent (string format);
+        /// <summary>Returns whether data is present in the specified type format.</summary>
+        bool GetDataPresent (Type format);
+        /// <summary>Returns whether data is present in the specified format, optionally converting.</summary>
+        bool GetDataPresent (string format, bool autoConvert);
+        /// <summary>Returns a list of all formats the data is stored in.</summary>
+        string[] GetFormats ();
+        /// <summary>Returns a list of all formats, optionally converting.</summary>
+        string[] GetFormats (bool autoConvert);
+        /// <summary>Stores the specified data in this object.</summary>
+        void SetData (object data);
+        /// <summary>Stores the specified data in the specified format.</summary>
+        void SetData (string format, object? data);
+        /// <summary>Stores the specified data using the specified type as the format.</summary>
+        void SetData (Type format, object? data);
+
+#if !NETSTANDARD2_0
+        // These DataFormat convenience overloads are default interface members on the .NET TFMs. The
+        // netstandard2.0 runtime has no DIM support, so for that TFM they move to extension methods
+        // (IDataObjectDataFormatExtensions below) -- same call sites, same behaviour.
+        /// <summary>Gets the data in the specified DataFormat. Convenience overload -- delegates to GetData(string).</summary>
+        object? GetData (DataFormat format) => GetData (format.Name);
+        /// <summary>Gets the data in the specified DataFormat, optionally converting it. Convenience overload -- delegates to GetData(string, bool).</summary>
+        object? GetData (DataFormat format, bool autoConvert) => GetData (format.Name, autoConvert);
+        /// <summary>Returns whether data is present in the specified DataFormat. Convenience overload -- delegates to GetDataPresent(string).</summary>
+        bool GetDataPresent (DataFormat format) => GetDataPresent (format.Name);
+        /// <summary>Returns whether data is present in the specified DataFormat, optionally converting. Convenience overload -- delegates to GetDataPresent(string, bool).</summary>
+        bool GetDataPresent (DataFormat format, bool autoConvert) => GetDataPresent (format.Name, autoConvert);
+        /// <summary>Stores the specified data in the specified DataFormat. Convenience overload -- delegates to SetData(string, object).</summary>
+        void SetData (DataFormat format, object? data) => SetData (format.Name, data);
+#endif
+
+        /// <summary>Stores the specified data and indicates whether the data can be converted to another format.</summary>
+        void SetData (string format, bool autoConvert, object? data);
+    }
+
+#if NETSTANDARD2_0
+    /// <summary>
+    /// netstandard2.0 stand-ins for <see cref="IDataObject"/>'s DataFormat convenience overloads, which
+    /// are default interface members on the .NET TFMs (unsupported on the netstandard2.0 runtime).
+    /// </summary>
+    public static class IDataObjectDataFormatExtensions
+    {
+        /// <inheritdoc cref="IDataObject.GetData(string)"/>
+        public static object? GetData (this IDataObject o, DataFormat format) => o.GetData (format.Name);
+        /// <inheritdoc cref="IDataObject.GetData(string,bool)"/>
+        public static object? GetData (this IDataObject o, DataFormat format, bool autoConvert) => o.GetData (format.Name, autoConvert);
+        /// <inheritdoc cref="IDataObject.GetDataPresent(string)"/>
+        public static bool GetDataPresent (this IDataObject o, DataFormat format) => o.GetDataPresent (format.Name);
+        /// <inheritdoc cref="IDataObject.GetDataPresent(string,bool)"/>
+        public static bool GetDataPresent (this IDataObject o, DataFormat format, bool autoConvert) => o.GetDataPresent (format.Name, autoConvert);
+        /// <inheritdoc cref="IDataObject.SetData(string,object)"/>
+        public static void SetData (this IDataObject o, DataFormat format, object? data) => o.SetData (format.Name, data);
+    }
+#endif
+
+    /// <summary>Implements <see cref="IDataObject"/> for transferring data. Stub in Majorsilence.Forms.</summary>
+    public partial class DataObject : IDataObject
+    {
+        private readonly System.Collections.Generic.Dictionary<string, object?> _data = new ();
+
+        /// <summary>Initializes an empty DataObject.</summary>
+        public DataObject () { }
+
+        /// <summary>Initializes a DataObject with a text value.</summary>
+        public DataObject (string data) => SetData (DataFormats.Text.Name, data);
+
+        /// <summary>Initializes a DataObject with data in the specified format.</summary>
+        public DataObject (string format, object? data) => SetData (format, data);
+
+        // ── Mapped formats (SVC-17) ──────────────────────────────────────────────────────────────
+        //
+        // Upstream's DataFormatNames.AddMappedFormats: these names are one piece of data, so text stored as
+        // "Text" answers to UnicodeText and to typeof (string), a file list to FileName, and so on. The
+        // plain GetData / GetDataPresent / GetFormats overloads convert by default, as upstream's do. It
+        // was an exact-name dictionary, so the two commonest drop-handler idioms --
+        // `e.Data.GetDataPresent (typeof (string))` and `GetDataPresent (DataFormats.UnicodeText)` -- said
+        // no to text stored the other way.
+        private static readonly string[][] format_groups = {
+            new[] { "Text", "UnicodeText", "System.String" },
+            new[] { "FileDrop", "FileNameW", "FileName" },
+            new[] { "Bitmap", "System.Drawing.Bitmap" },
+            new[] { "EnhancedMetafile", "System.Drawing.Imaging.Metafile" },
+        };
+
+        // The format itself, then the names it maps to. Case-insensitively, as OLE matches them.
+        private static IEnumerable<string> WithMappedFormats (string format)
+        {
+            yield return format;
+
+            foreach (var group in format_groups)
+                if (group.Contains (format, StringComparer.OrdinalIgnoreCase))
+                    foreach (var name in group)
+                        if (!string.Equals (name, format, StringComparison.OrdinalIgnoreCase))
+                            yield return name;
+        }
+
+        private bool TryFind (string format, bool autoConvert, out object? value)
+        {
+            foreach (var name in autoConvert ? WithMappedFormats (format) : new[] { format })
+                if (_data.TryGetValue (name, out value))
+                    return true;
+
+            value = null;
+            return false;
+        }
+
+        private static string NameOf (Type format) => format.FullName ?? format.Name;
+
+        /// <inheritdoc/>
+        public object? GetData (string format) => GetData (format, autoConvert: true);
+        /// <inheritdoc/>
+        public object? GetData (Type format) => GetData (NameOf (format), autoConvert: true);
+        /// <inheritdoc/>
+        public object? GetData (string format, bool autoConvert) => TryFind (format, autoConvert, out var value) ? value : null;
+        /// <inheritdoc/>
+        public bool GetDataPresent (string format) => GetDataPresent (format, autoConvert: true);
+        /// <inheritdoc/>
+        public bool GetDataPresent (Type format) => GetDataPresent (NameOf (format), autoConvert: true);
+        /// <inheritdoc/>
+        public bool GetDataPresent (string format, bool autoConvert) => TryFind (format, autoConvert, out _);
+        /// <inheritdoc/>
+        public string[] GetFormats () => GetFormats (autoConvert: true);
+        /// <inheritdoc/>
+        public string[] GetFormats (bool autoConvert)
+            => autoConvert
+                ? _data.Keys.SelectMany (WithMappedFormats).Distinct (StringComparer.Ordinal).ToArray ()
+                : _data.Keys.ToArray ();
+        /// <inheritdoc/>
+        public void SetData (object data) => _data[data.GetType ().FullName ?? data.GetType ().Name] = data;
+        /// <inheritdoc/>
+        public void SetData (string format, object? data) => _data[format] = data;
+        /// <inheritdoc/>
+        public void SetData (Type format, object? data) => _data[format.FullName ?? format.Name] = data;
+        /// <inheritdoc/>
+        public void SetData (string format, bool autoConvert, object? data) => SetData (format, data);
+
+        /// <summary>Gets whether the data object contains text.</summary>
+        public bool ContainsText () => GetDataPresent (DataFormats.Text.Name);
+
+        /// <summary>Gets the text from the data object.</summary>
+        public string GetText () => GetData (DataFormats.Text.Name) as string ?? string.Empty;
+
+        /// <summary>Sets text on the data object.</summary>
+        public void SetText (string text) => SetData (DataFormats.Text.Name, text);
+
+        /// <summary>Stores text under the format the given kind names.</summary>
+        public void SetText (string text, TextDataFormat format) => SetData (FormatName (format), text);
+
+        /// <summary>Returns whether text of the given kind is present.</summary>
+        public bool ContainsText (TextDataFormat format) => GetDataPresent (FormatName (format));
+
+        /// <summary>Returns the text of the given kind, or an empty string.</summary>
+        public string GetText (TextDataFormat format) => GetData (FormatName (format)) as string ?? string.Empty;
+
+        // The four text kinds are distinct clipboard formats, not decorations on one: storing RTF and
+        // reading it back as UnicodeText has to miss, or a paste would insert the markup.
+        internal static string FormatName (TextDataFormat format) => format switch {
+            TextDataFormat.Rtf => DataFormats.Rtf.Name,
+            TextDataFormat.Html => DataFormats.Html.Name,
+            TextDataFormat.CommaSeparatedValue => DataFormats.CommaSeparatedValue.Name,
+            _ => DataFormats.Text.Name,
+        };
+    }
+}

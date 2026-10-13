@@ -1,0 +1,522 @@
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System.ComponentModel;
+using System.Drawing;
+
+namespace Majorsilence.Forms;
+
+// The protected extensibility surface WinForms custom controls override: the On*Changed
+// notifications for the ambient appearance properties, the drag-and-drop and focus hooks, the
+// Reset* methods designer serialization calls, and the RTL/scaling helpers.
+public partial class Control
+{
+    #region Ambient appearance notifications
+
+    /// <summary>
+    /// Raises the <see cref="BackColorChanged"/> event and cascades to children that inherit their
+    /// background ambiently.
+    /// </summary>
+    protected virtual void OnBackColorChanged (EventArgs e)
+    {
+        Invalidate ();
+
+        (Events[s_backColorChangedEvent] as EventHandler)?.Invoke (this, e);
+
+        if (Properties.GetObject (s_controlsCollectionProperty) is ControlCollection collection)
+            for (var i = 0; i < collection.Count; i++)
+                collection[i].OnParentBackColorChanged (e);
+    }
+
+    /// <summary>
+    /// Called when the parent's BackColor changes. A control that never set its own background
+    /// resolves it from the parent (see <see cref="GetEffectiveBackgroundColor"/>), so its own
+    /// BackColor changed too.
+    /// </summary>
+    [EditorBrowsable (EditorBrowsableState.Advanced)]
+    protected virtual void OnParentBackColorChanged (EventArgs e)
+    {
+        if (Style.TryGetBackgroundColor () is null)
+            OnBackColorChanged (e);
+    }
+
+    /// <summary>
+    /// Raises the <see cref="ForeColorChanged"/> event and cascades to children that inherit their
+    /// foreground ambiently.
+    /// </summary>
+    protected virtual void OnForeColorChanged (EventArgs e)
+    {
+        Invalidate ();
+
+        (Events[s_foreColorChangedEvent] as EventHandler)?.Invoke (this, e);
+
+        if (Properties.GetObject (s_controlsCollectionProperty) is ControlCollection collection)
+            for (var i = 0; i < collection.Count; i++)
+                collection[i].OnParentForeColorChanged (e);
+    }
+
+    /// <summary>
+    /// Called when the parent's ForeColor changes.
+    /// </summary>
+    [EditorBrowsable (EditorBrowsableState.Advanced)]
+    protected virtual void OnParentForeColorChanged (EventArgs e)
+    {
+        if (Style.ForegroundColor is null)
+            OnForeColorChanged (e);
+    }
+
+    /// <summary>
+    /// Raises the <see cref="FontChanged"/> event and cascades to children that inherit their font
+    /// ambiently. A font change can resize text, so the control also re-lays-out.
+    /// </summary>
+    protected virtual void OnFontChanged (EventArgs e)
+    {
+        Invalidate ();
+
+        (Events[s_fontChangedEvent] as EventHandler)?.Invoke (this, e);
+
+        if (Properties.GetObject (s_controlsCollectionProperty) is ControlCollection collection)
+            for (var i = 0; i < collection.Count; i++)
+                collection[i].OnParentFontChanged (e);
+
+        PerformLayout (this, nameof (Font));
+    }
+
+    /// <summary>
+    /// Called when the parent's Font changes. A control that never set its own font resolves it
+    /// from the parent (see <see cref="Font"/>), so its own Font changed too.
+    /// </summary>
+    [EditorBrowsable (EditorBrowsableState.Advanced)]
+    protected virtual void OnParentFontChanged (EventArgs e)
+    {
+        if (_font is null)
+            OnFontChanged (e);
+    }
+
+    /// <summary>
+    /// Raises the <see cref="RightToLeftChanged"/> event and cascades to children that inherit
+    /// their reading order.
+    /// </summary>
+    protected virtual void OnRightToLeftChanged (EventArgs e)
+    {
+        Invalidate ();
+
+        (Events[s_rightToLeftChangedEvent] as EventHandler)?.Invoke (this, e);
+
+        if (Properties.GetObject (s_controlsCollectionProperty) is ControlCollection collection)
+            for (var i = 0; i < collection.Count; i++)
+                if (collection[i].right_to_left == RightToLeft.Inherit)
+                    collection[i].OnRightToLeftChanged (e);
+    }
+
+    #endregion
+
+    #region Handle lifetime
+
+    /// <summary>
+    /// Raises the <see cref="HandleCreated"/> event. Majorsilence.Forms has no HWND; this fires from
+    /// <see cref="CreateControl"/>, the point at which the control becomes live.
+    /// </summary>
+    protected virtual void OnHandleCreated (EventArgs e) => (Events[s_handleCreatedEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="HandleDestroyed"/> event (fires when the control is disposed).
+    /// </summary>
+    protected virtual void OnHandleDestroyed (EventArgs e) => (Events[s_handleDestroyedEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Destroys the handle associated with this control. Called from <see cref="Dispose(bool)"/> and
+    /// from <see cref="RecreateHandle"/>, immediately before <see cref="OnHandleDestroyed"/>/
+    /// <see cref="HandleDestroyed"/> fire -- ported code commonly overrides it to release
+    /// window-lifetime resources at that exact point. See <see cref="Form.DestroyHandle"/> for the
+    /// matching hook on the Form side (Form doesn't derive from Control here, so it needed its own copy
+    /// rather than inheriting this one).
+    /// </summary>
+    protected virtual void DestroyHandle ()
+    {
+        if (!IsHandleCreated)
+            return;
+
+        SetState (States.HandleCreated, false);
+        OnHandleDestroyed (EventArgs.Empty);
+    }
+
+    #endregion
+
+    #region Focus / validation
+
+    /// <summary>
+    /// Raises the <see cref="Enter"/> event. Called by <see cref="OnGotFocus"/>, before GotFocus.
+    /// </summary>
+    protected virtual void OnEnter (EventArgs e) => (Events[s_enterEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="Leave"/> event. Called by <see cref="OnLostFocus"/>, before LostFocus.
+    /// </summary>
+    protected virtual void OnLeave (EventArgs e) => (Events[s_leaveEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="CausesValidationChanged"/> event.
+    /// </summary>
+    protected virtual void OnCausesValidationChanged (EventArgs e) => (Events[s_causesValidationChangedEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="ImeModeChanged"/> event.
+    /// </summary>
+    protected virtual void OnImeModeChanged (EventArgs e) => (Events[s_imeModeChangedEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="ContextMenuStripChanged"/> event.
+    /// </summary>
+    protected virtual void OnContextMenuStripChanged (EventArgs e) => (Events[s_contextMenuStripChangedEvent] as EventHandler)?.Invoke (this, e);
+
+    #endregion
+
+    #region Mouse / keyboard
+
+    /// <summary>
+    /// Raises the <see cref="MouseClick"/> event. Called by <see cref="OnClick"/>.
+    /// </summary>
+    protected virtual void OnMouseClick (MouseEventArgs e) => (Events[s_mouseClickEvent] as MouseEventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="MouseDoubleClick"/> event. Called by <see cref="OnDoubleClick(MouseEventArgs)"/>.
+    /// </summary>
+    protected virtual void OnMouseDoubleClick (MouseEventArgs e) => (Events[s_mouseDoubleClickEvent] as MouseEventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="MouseHover"/> event. Majorsilence.Forms has no hover timer, so this is
+    /// called once per mouse entry from <see cref="OnMouseEnter"/>.
+    /// </summary>
+    protected virtual void OnMouseHover (EventArgs e) => (Events[s_mouseHoverEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="MouseCaptureChanged"/> event. Called when <see cref="Capture"/> changes.
+    /// </summary>
+    protected virtual void OnMouseCaptureChanged (EventArgs e) => (Events[s_mouseCaptureChangedEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>
+    /// Raises the <see cref="PreviewKeyDown"/> event, called for a key-down before the dialog keys are
+    /// processed; a handler that sets <see cref="PreviewKeyDownEventArgs.IsInputKey"/> keeps the key.
+    /// </summary>
+    protected virtual void OnPreviewKeyDown (PreviewKeyDownEventArgs e) => (Events[s_previewKeyDownEvent] as PreviewKeyDownEventHandler)?.Invoke (this, e);
+
+    // The window's pre-processing step raises it on the focused control (WindowBase.PreProcessKey).
+    internal void RaisePreviewKeyDown (PreviewKeyDownEventArgs e) => OnPreviewKeyDown (e);
+
+    #endregion
+
+    #region Drag and drop
+
+    // Majorsilence.Forms has no OS drag source yet (DoDragDrop returns None), so nothing in the
+    // framework calls these. They are wired to real events so a derived control can raise/override
+    // them today and a future backend can drive them without an API change.
+
+    /// <summary>Raises the <see cref="DragEnter"/> event.</summary>
+    protected virtual void OnDragEnter (DragEventArgs e) => (Events[s_dragEnterEvent] as DragEventHandler)?.Invoke (this, e);
+
+    /// <summary>Raises the <see cref="DragOver"/> event.</summary>
+    protected virtual void OnDragOver (DragEventArgs e) => (Events[s_dragOverEvent] as DragEventHandler)?.Invoke (this, e);
+
+    /// <summary>Raises the <see cref="DragDrop"/> event.</summary>
+    protected virtual void OnDragDrop (DragEventArgs e) => (Events[s_dragDropEvent] as DragEventHandler)?.Invoke (this, e);
+
+    /// <summary>Raises the <see cref="DragLeave"/> event.</summary>
+    protected virtual void OnDragLeave (EventArgs e) => (Events[s_dragLeaveEvent] as EventHandler)?.Invoke (this, e);
+
+    /// <summary>Raises the <see cref="GiveFeedback"/> event.</summary>
+    protected virtual void OnGiveFeedback (GiveFeedbackEventArgs e) => (Events[s_giveFeedbackEvent] as GiveFeedbackEventHandler)?.Invoke (this, e);
+
+    /// <summary>Raises the <see cref="QueryContinueDrag"/> event.</summary>
+    protected virtual void OnQueryContinueDrag (QueryContinueDragEventArgs e) => (Events[s_queryContinueDragEvent] as QueryContinueDragEventHandler)?.Invoke (this, e);
+
+    // The drag-and-drop session's doors to the protected hooks above (W6 mechanisms).
+    internal void RaiseDragEnter (DragEventArgs e) => OnDragEnter (e);
+    internal void RaiseDragOver (DragEventArgs e) => OnDragOver (e);
+    internal void RaiseDragDrop (DragEventArgs e) => OnDragDrop (e);
+    internal void RaiseDragLeave (EventArgs e) => OnDragLeave (e);
+    internal void RaiseGiveFeedback (GiveFeedbackEventArgs e) => OnGiveFeedback (e);
+    internal void RaiseQueryContinueDrag (QueryContinueDragEventArgs e) => OnQueryContinueDrag (e);
+
+    #endregion
+
+    #region Printing
+
+    /// <summary>
+    /// Paints the control to the supplied surface without going through the normal invalidation
+    /// path. WinForms uses this for WM_PRINTCLIENT; here it simply draws the background and then
+    /// the control, which is what <see cref="DrawToBitmap"/>-style callers need.
+    /// </summary>
+    protected virtual void OnPrint (PaintEventArgs e)
+    {
+        Guard.ThrowIfNull (e);
+
+        // The overrides are application paint code, in logical units, as in a normal paint (EVT-37).
+        using (e.LogicalSpace ()) {
+            OnPaintBackground (e);
+            OnPaint (e);
+        }
+    }
+
+    #endregion
+
+    #region Reset* (designer serialization)
+
+    /// <summary>
+    /// Clears any explicitly-set background color so the control resolves it ambiently again
+    /// (parent control, then hosting window, then theme).
+    /// </summary>
+    public virtual void ResetBackColor ()
+    {
+        if (Style.BackgroundColor is null)
+            return;
+
+        Style.BackgroundColor = null;
+        OnBackColorChanged (EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Clears any explicitly-set foreground color so the control resolves it from its style chain
+    /// and the theme again.
+    /// </summary>
+    public virtual void ResetForeColor ()
+    {
+        if (Style.ForegroundColor is null)
+            return;
+
+        Style.ForegroundColor = null;
+        OnForeColorChanged (EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Clears any explicitly-set cursor so the control inherits its parent's cursor, or
+    /// <see cref="DefaultCursor"/> at the top of the chain.
+    /// </summary>
+    public virtual void ResetCursor ()
+    {
+        if (Properties.GetObject (s_cursorProperty) is null)
+            return;
+
+        Properties.SetObject (s_cursorProperty, null);
+        OnCursorChanged (EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Resets <see cref="RightToLeft"/> to <see cref="RightToLeft.Inherit"/>, so the control takes
+    /// its reading order from its parent again.
+    /// </summary>
+    public virtual void ResetRightToLeft () => RightToLeft = RightToLeft.Inherit;
+
+    /// <summary>
+    /// Resets <see cref="ImeMode"/> to <see cref="DefaultImeMode"/>.
+    /// </summary>
+    public void ResetImeMode () => ImeMode = DefaultImeMode;
+
+    #endregion
+
+    #region RTL translation helpers
+
+    /// <summary>
+    /// Mirrors a horizontal alignment when the control reads right-to-left.
+    /// </summary>
+    protected HorizontalAlignment RtlTranslateAlignment (HorizontalAlignment align) => RtlTranslateHorizontal (align);
+
+    /// <summary>
+    /// Mirrors a left/right alignment when the control reads right-to-left.
+    /// </summary>
+    protected LeftRightAlignment RtlTranslateAlignment (LeftRightAlignment align) => RtlTranslateLeftRight (align);
+
+    /// <summary>
+    /// Mirrors a content alignment when the control reads right-to-left.
+    /// </summary>
+    protected ContentAlignment RtlTranslateAlignment (ContentAlignment align) => RtlTranslateContent (align);
+
+    /// <summary>
+    /// Mirrors a horizontal alignment when the control reads right-to-left. Center is unchanged.
+    /// </summary>
+    protected HorizontalAlignment RtlTranslateHorizontal (HorizontalAlignment align)
+    {
+        if (RightToLeft.Yes != RightToLeft)
+            return align;
+
+        return align switch {
+            HorizontalAlignment.Left => HorizontalAlignment.Right,
+            HorizontalAlignment.Right => HorizontalAlignment.Left,
+            _ => align
+        };
+    }
+
+    /// <summary>
+    /// Mirrors a left/right alignment when the control reads right-to-left.
+    /// </summary>
+    protected LeftRightAlignment RtlTranslateLeftRight (LeftRightAlignment align)
+    {
+        if (RightToLeft.Yes != RightToLeft)
+            return align;
+
+        return align == LeftRightAlignment.Left ? LeftRightAlignment.Right : LeftRightAlignment.Left;
+    }
+
+    /// <summary>
+    /// Mirrors a content alignment horizontally when the control reads right-to-left. The vertical
+    /// component (Top/Middle/Bottom) and the horizontally centered values are unchanged.
+    /// </summary>
+    protected ContentAlignment RtlTranslateContent (ContentAlignment align)
+    {
+        if (RightToLeft.Yes != RightToLeft)
+            return align;
+
+        return align switch {
+            ContentAlignment.TopLeft => ContentAlignment.TopRight,
+            ContentAlignment.TopRight => ContentAlignment.TopLeft,
+            ContentAlignment.MiddleLeft => ContentAlignment.MiddleRight,
+            ContentAlignment.MiddleRight => ContentAlignment.MiddleLeft,
+            ContentAlignment.BottomLeft => ContentAlignment.BottomRight,
+            ContentAlignment.BottomRight => ContentAlignment.BottomLeft,
+            _ => align
+        };
+    }
+
+    #endregion
+
+    #region Scaling
+
+    // Upstream sets ControlStyles.FixedWidth/FixedHeight on these types as their state changes (a
+    // combo box unless it is Simple, a single-line text box, an AutoSize strip); answering from the
+    // current state here gives scaling the same answer without tracking every change.
+    internal virtual bool IsFixedWidthForScaling => false;
+    internal virtual bool IsFixedHeightForScaling => false;
+
+    // A control whose size is its content's (an AutoSize label, check box or radio button): scaling
+    // moves it, and it then takes its preferred size rather than the scaled one.
+    internal virtual bool SizesToContentWhenScaled => false;
+
+    // The bounds a scale starts from: the control's own, unless it shortened what it was asked for
+    // (an IntegralHeight list box), when upstream scales the requested size instead (its
+    // ListBox.GetScaledBounds). GetScaledBounds itself also maps to device pixels, so it is not the hook.
+    internal virtual Rectangle BoundsToScale => Bounds;
+
+    /// <summary>
+    /// Scales this control -- its bounds, and everything else measured in the same pixels -- by the
+    /// given factor. Only the bounds components named by <paramref name="specified"/> are scaled.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the documented WinForms hook a custom control overrides to take part in DPI or font
+    /// scaling, and until 2026-08-31 nothing called it (finding <c>LAY-21</c>, P0): <c>Scale</c> went
+    /// straight to <c>ScaleCore</c>, which scaled bounds and recursed. So an override compiled, read
+    /// correctly, and never ran -- and <see cref="Control.Padding"/>, <see cref="Control.Margin"/>,
+    /// <see cref="Control.MinimumSize"/> and <see cref="Control.MaximumSize"/> kept their unscaled
+    /// values while the bounds around them grew. At 150% that leaves a FlowLayoutPanel's gaps and
+    /// every control's inset about a third too small, and clamps <c>MinimumSize</c> at the wrong pixel
+    /// count.
+    /// </para>
+    /// <para>
+    /// Min/max are cleared before the bounds are scaled and re-applied afterwards, as upstream does,
+    /// and the order is load-bearing: a control sitting at its <see cref="Control.MinimumSize"/>
+    /// cannot grow while the old clamp is still in force, so the scaled bounds would be computed and
+    /// then squashed back to the unscaled limit.
+    /// </para>
+    /// </remarks>
+    protected virtual void ScaleControl (SizeF factor, BoundsSpecified specified)
+    {
+        var min = MinimumSize;
+        var max = MaximumSize;
+
+        MinimumSize = Size.Empty;
+        MaximumSize = Size.Empty;
+
+        // A control whose size along an axis comes from its content keeps it, as upstream's
+        // GetScaledBounds does for ControlStyles.FixedWidth/FixedHeight: a combo box or single-line
+        // text box is as tall as its font makes it. Scaled anyway, a legacy dialog's combo boxes came
+        // out a third taller than under WinForms. Applied here rather than in GetScaledBounds because
+        // that method also maps bounds to device pixels, where every dimension must scale.
+        if (GetStyle (ControlStyles.FixedWidth) || IsFixedWidthForScaling)
+            specified &= ~BoundsSpecified.Width;
+        if (GetStyle (ControlStyles.FixedHeight) || IsFixedHeightForScaling)
+            specified &= ~BoundsSpecified.Height;
+
+        var scaled = GetScaledBounds (BoundsToScale, factor, specified);
+
+        // Padding and Margin live in the same pixel space as Bounds, so they move with them -- except
+        // under a legacy AutoScaleBaseSize scale, which upstream runs through Scale (float, float) and
+        // ScaleCore: that moves and resizes and leaves both alone. Scaled there, ReportDesigner's menu
+        // bar padding went from 6,2 to 8,3 and the bar came out 2px taller than under WinForms.
+        if (!InLegacyAutoScale) {
+            Padding = ScalePadding (Padding, factor);
+            Margin = ScalePadding (Margin, factor);
+        }
+
+        // Anchored children hold their distances to each edge in recorded anchor info. Scaling the
+        // bounds without scaling that leaves them snapping back to 96-DPI distances -- which is why
+        // DefaultLayout.ScaleAnchorInfo exists upstream, and why it had no caller here.
+        //
+        // Before SetBounds, not after: SetBounds re-records the anchor info of an element that needs
+        // anchor layout (any AutoSize control) from the bounds it is given, which are already scaled.
+        // Scaling the recorded info afterwards scaled those distances a second time, so every AutoSize
+        // check box and radio button in a legacy dialog's group box landed at about 1.64x its position
+        // under a 1.28x scale. Upstream sidesteps it by setting the bounds through SetBoundsCore.
+        Majorsilence.Forms.Layout.DefaultLayout.ScaleAnchorInfo (this, factor);
+
+        SetBounds (scaled.X, scaled.Y, scaled.Width, scaled.Height, BoundsSpecified.All);
+
+        // Upstream re-measures an AutoSize label, check box or radio button after any change, scaling
+        // included; here the scaled bounds stuck, so a label measured at 64px stayed at its scaled 82.
+        if (SizesToContentWhenScaled)
+            Size = GetPreferredSize (Size.Empty);
+
+        if (!min.IsEmpty)
+            MinimumSize = ScaleSize (min, factor);
+
+        if (!max.IsEmpty)
+            MaximumSize = ScaleSize (max, factor);
+    }
+
+    /// <summary>Whether scaling leaves this control's width alone (upstream's ControlStyles.FixedWidth).</summary>
+    internal bool KeepsWidthWhenScaled => GetStyle (ControlStyles.FixedWidth) || IsFixedWidthForScaling;
+
+    /// <summary>Whether scaling leaves this control's height alone (upstream's ControlStyles.FixedHeight).</summary>
+    internal bool KeepsHeightWhenScaled => GetStyle (ControlStyles.FixedHeight) || IsFixedHeightForScaling;
+
+    /// <summary>Set by Form while it applies a legacy AutoScaleBaseSize scale (see ScaleControl).</summary>
+    [System.ThreadStatic]
+    internal static bool InLegacyAutoScale;
+
+    private static Padding ScalePadding (Padding padding, SizeF factor)
+        => new Padding (
+            (int)System.Math.Round (padding.Left * factor.Width),
+            (int)System.Math.Round (padding.Top * factor.Height),
+            (int)System.Math.Round (padding.Right * factor.Width),
+            (int)System.Math.Round (padding.Bottom * factor.Height));
+
+    private static Size ScaleSize (Size size, SizeF factor)
+        => new Size (
+            (int)System.Math.Round (size.Width * factor.Width),
+            (int)System.Math.Round (size.Height * factor.Height));
+
+    /// <summary>
+    /// Replaces <paramref name="logicalBitmap"/> with a copy scaled from logical (96 DPI) units to
+    /// this control's device units. A no-op when the control is running at 96 DPI.
+    /// </summary>
+    public void ScaleBitmapLogicalToDevice (ref Majorsilence.Forms.Drawing.Bitmap logicalBitmap)
+        => logicalBitmap = ScaleBitmapLogicalToDevice (logicalBitmap, DeviceDpi);
+
+    // Split out from the ref-taking protected overload so the scaling itself is testable at a DPI
+    // other than the headless backend's 96.
+    internal static Majorsilence.Forms.Drawing.Bitmap ScaleBitmapLogicalToDevice (Majorsilence.Forms.Drawing.Bitmap logicalBitmap, int deviceDpi)
+    {
+        if (logicalBitmap is null)
+            return logicalBitmap!;
+
+        var device = new Size (DpiHelper.LogicalToDeviceUnits (logicalBitmap.Width, deviceDpi),
+                               DpiHelper.LogicalToDeviceUnits (logicalBitmap.Height, deviceDpi));
+
+        if (device == logicalBitmap.Size)
+            return logicalBitmap;
+
+        return new Majorsilence.Forms.Drawing.Bitmap (logicalBitmap, device);
+    }
+
+    #endregion
+}

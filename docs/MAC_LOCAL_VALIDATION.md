@@ -12,3 +12,7 @@ Next check: open artifacts/mac/ChummerSR4.app manually in Finder outside the age
 ## Retina correction
 
 User confirmed normal Finder launch stays open. The main-window framebuffer metadata caused extra Retina magnification and click misalignment. Added a pinned, locally corrected Avalonia backend under vendor/; core dependency unchanged. Interactive New toolbar and Select Setting OK clicks now match their painted centers. Release build and all 399 offscreen fixture checks passed again; locally signed app is artifacts/retina-fixed/ChummerSR4.app. BP dialog spinner arrow placement still needs correction.
+
+## Numeric spinner correction
+
+Corrected the shared numeric control's logical arrow-strip geometry and renderer conversion. Arrow clicks passed at scales 1 and 2; all 399 fixture round trips passed. The packaged app was inspected in the native character-creation window and arrows no longer overlap the values. The current package is artifacts/spinner-fixed/ChummerSR4.app. Local library source and attribution are in vendor/LOCAL_PATCHES.md.

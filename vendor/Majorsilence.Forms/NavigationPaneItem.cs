@@ -1,0 +1,154 @@
+﻿using System.Drawing;
+using SkiaSharp;
+
+namespace Majorsilence.Forms;
+
+/// <summary>
+/// Represents a NavigationPaneItem.
+/// </summary>
+public class NavigationPaneItem : ILayoutable
+{
+    private bool enabled = true;
+    private string text;
+    private Majorsilence.Forms.Drawing.Image? _image;
+    private SKBitmap? _imageSK;
+
+    /// <summary>
+    /// Initializes a new instance of the NavigationPaneItem class.
+    /// </summary>
+    public NavigationPaneItem (SKBitmap image, string? text = null)
+    {
+        _imageSK = image;
+        this.text = text ?? string.Empty;
+        Margin = new Padding (4);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the NavigationPaneItem class with a Majorsilence.Forms.Drawing.Image.
+    /// </summary>
+#pragma warning disable CA1416
+    public NavigationPaneItem (Majorsilence.Forms.Drawing.Image image, string? text = null)
+    {
+        _image = image;
+        _imageSK = image.ToSKBitmap ();
+        this.text = text ?? string.Empty;
+        Margin = new Padding (4);
+    }
+#pragma warning restore CA1416
+
+    /// <summary>
+    /// Gets the current bounding box of the item.
+    /// </summary>
+    public Rectangle Bounds { get; private set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the item is enabled.
+    /// </summary>
+    public bool Enabled {
+        get => enabled && Parent?.Enabled == true;
+        set {
+            if (enabled != value) {
+                enabled = value;
+                Parent?.Invalidate ();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the preferred size of the item.
+    /// </summary>
+    public Size GetPreferredSize (Size proposedSize)
+    {
+        var size = Parent?.LogicalToDeviceUnits (40) ?? 40;
+
+        // Padding (W6 mechanisms) adds to the item's height, in the logical units Bounds is kept in;
+        // the pane fixes the width.
+        return new Size (size, size + Padding.Vertical);
+    }
+
+    /// <summary>
+    /// Gets a value indicating if the item currently has the mouse hovered over it.
+    /// </summary>
+    public bool Hovered => Parent?.Items.HoveredIndex == Index;
+
+    /// <summary>
+    /// Gets or sets the image displayed on the item. Accepts <see cref="Majorsilence.Forms.Drawing.Image"/> for WinForms compatibility.
+    /// </summary>
+#pragma warning disable CA1416
+    public Majorsilence.Forms.Drawing.Image? Image {
+        get => _image;
+        set {
+            _image = value;
+            _imageSK?.Dispose ();
+            _imageSK = value?.ToSKBitmap ();
+            Parent?.Invalidate ();
+        }
+    }
+#pragma warning restore CA1416
+
+    /// <summary>Gets the SKBitmap representation of the image (used by renderers).</summary>
+    internal SKBitmap? ImageSK => _imageSK;
+
+    // Gets the current index in the parent NavigationPane, if parented to a NavigationPane.
+    private int Index => Parent?.Items.IndexOf (this) ?? -1;
+
+    /// <summary>
+    /// Gets or sets the amount of space to leave between this item and other elements.
+    /// </summary>
+    public Padding Margin { get; set; } = Padding.Empty;
+
+    /// <summary>
+    /// Gets or sets the amount of space to leave between the text and the border of the item.
+    /// </summary>
+    /// <remarks>Read as of W6 mechanisms: the renderer insets the text and image by it, and the
+    /// vertical part adds to the item's height.</remarks>
+    public Padding Padding {
+        get => padding;
+        set {
+            if (padding == value)
+                return;
+
+            padding = value;
+            Parent?.PerformLayout ();
+            Parent?.Invalidate ();
+        }
+    }
+
+    private Padding padding = new Padding (14, 0, 14, 0);
+
+    /// <summary>
+    /// Gets the NavigationPane this item is currently a part of.
+    /// </summary>
+    public NavigationPane? Parent { get; internal set; }
+
+    /// <summary>
+    /// Gets a value indicating if the item is currently the selected item.
+    /// </summary>
+    public bool Selected => Parent?.SelectedItem == this;
+
+    /// <summary>
+    /// Sets the bounding box of the item. This is internal API and should not be called.
+    /// </summary>
+    public void SetBounds (int x, int y, int width, int height, BoundsSpecified specified = BoundsSpecified.All)
+    {
+        Bounds = new Rectangle (x, y, width, height);
+    }
+
+    /// <summary>
+    /// Gets or sets an object with additional user data about this item.
+    /// </summary>
+    public object? Tag { get; set; }
+
+    /// <summary>
+    /// Gets or sets the text displayed on the item.
+    /// </summary>
+    public string Text {
+        get => text;
+        set {
+            if (text != value) {
+                text = value;
+                Parent?.Invalidate ();
+            }
+        }
+    }
+}

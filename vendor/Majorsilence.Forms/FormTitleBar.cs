@@ -1,0 +1,445 @@
+using System.Drawing;
+using Majorsilence.Forms.Renderers;
+using SkiaSharp;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a FormTitleBar control.
+    /// </summary>
+    public class FormTitleBar : Control
+    {
+        // Logical width reserved on the left for the native macOS traffic-light buttons when the
+        // title bar is merged into the OS title bar (native-overlay mode).
+        private const int MAC_TRAFFIC_LIGHT_INSET = 78;
+
+        private readonly TitleBarButton minimize_button;
+        private readonly TitleBarButton maximize_button;
+        private readonly TitleBarButton close_button;
+        private readonly TitleBarButton help_button;
+        private readonly PictureBox form_image;
+        private Control? overlay_spacer;
+
+        private bool show_image = true;
+        private bool show_text = true;
+        private bool native_overlay;
+
+        /// <summary>
+        /// Initializes a new instance of the FormTitleBar class.
+        /// </summary>
+        public FormTitleBar ()
+        {
+            Dock = DockStyle.Top;
+
+            SetControlBehavior (ControlBehaviors.InvalidateOnTextChanged);
+            SetControlBehavior (ControlBehaviors.Selectable, false);
+
+            minimize_button = Controls.AddImplicitControl (new TitleBarButton (TitleBarButton.TitleBarButtonGlyph.Minimize));
+            minimize_button.Click += (o, e) => {
+                var form_min = FindForm ();
+
+                if (form_min is not null)
+                    form_min.WindowState = FormWindowState.Minimized;
+            };
+
+            maximize_button = Controls.AddImplicitControl (new TitleBarButton (TitleBarButton.TitleBarButtonGlyph.Maximize));
+            maximize_button.Click += (o, e) => {
+                var form = FindForm ();
+
+                if (form is not null) {
+                    form.WindowState = form.WindowState == FormWindowState.Maximized
+                        ? FormWindowState.Normal
+                        : FormWindowState.Maximized;
+
+                    UpdateMaximizeButtonGlyph ();
+                }
+            };
+
+            close_button = Controls.AddImplicitControl (new TitleBarButton (TitleBarButton.TitleBarButtonGlyph.Close));
+            close_button.Click += (o, e) => { FindForm ()?.Close (); };
+            // Form.HelpButton's button: hidden until asked for, as upstream's is (W6 mechanisms).
+            help_button = Controls.AddImplicitControl (new TitleBarButton (TitleBarButton.TitleBarButtonGlyph.Help) { Visible = false });
+            help_button.Click += (o, e) => FindForm ()?.RaiseHelpButtonClicked ();
+
+            // The caption shows the SMALL icon, as upstream does: an .ico decodes to its largest frame
+            // (typically 48 or 256px), which CenterImage drew at full size and cropped to the caption,
+            // so only a corner of the icon was visible. Zoom into a SmallIconSize box instead.
+            var icon_inset = (DefaultSize.Height - SystemInformation.SmallIconSize.Height) / 2;
+
+            form_image = Controls.AddImplicitControl (new PictureBox {
+                Width = DefaultSize.Height,
+                Dock = DockStyle.Left,
+                Visible = false,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Padding = new Padding (icon_inset),
+            });
+
+            // It's ok to hardcode SKColors.Transparent here.
+            form_image.Style.BackgroundColor = SKColors.Transparent;
+            form_image.SetControlBehavior (ControlBehaviors.ReceivesMouseEvents, false);
+        }
+
+        /// <summary>
+        /// Whether the title bar is merged into a native OS title bar (macOS): the OS draws the caption
+        /// buttons (traffic lights) and frame, while this control paints the title/background into the
+        /// extended title-bar area. In this mode our own caption buttons are hidden and a left margin is
+        /// reserved for the traffic lights.
+        /// </summary>
+        internal bool NativeOverlay {
+            get => native_overlay;
+            set {
+                if (native_overlay == value)
+                    return;
+
+                native_overlay = value;
+                ApplyNativeOverlay ();
+            }
+        }
+
+        // Which side the (logical) caption buttons occupy. The reserved traffic-light inset is on the
+        // left in native-overlay mode; our own buttons are on the right otherwise.
+        internal bool CaptionButtonsOnLeft => native_overlay;
+
+        private void ApplyNativeOverlay ()
+        {
+            // The OS draws the caption buttons in native-overlay mode, so hide ours and reserve room on
+            // the left for the traffic lights. The strip blends with the window background rather than
+            // using the accent color.
+            minimize_button.Visible = !native_overlay;
+            maximize_button.Visible = !native_overlay;
+            help_button.Visible = allow_help && !native_overlay;
+            close_button.Visible = !native_overlay;
+
+            if (native_overlay && overlay_spacer is null) {
+                overlay_spacer = Controls.AddImplicitControl (new Control { Dock = DockStyle.Left, Width = MAC_TRAFFIC_LIGHT_INSET });
+                overlay_spacer.Style.BackgroundColor = SKColors.Transparent;
+                overlay_spacer.SetControlBehavior (ControlBehaviors.ReceivesMouseEvents, false);
+            }
+
+            if (overlay_spacer is not null)
+                overlay_spacer.Visible = native_overlay;
+
+            // The native overlay blends with the window, so it pins the window background. Otherwise the bar
+            // takes FormTitleBar.DefaultStyle -- which a FormTitleBar { ... } theme rule sets -- rather than
+            // a copy of it taken now, which no later rule could change (#100).
+            Style.BackgroundColor = native_overlay ? Theme.BackgroundColor : null;
+            Invalidate ();
+        }
+
+        /// <inheritdoc/>
+        protected internal override void OnThemeChanged (EventArgs e)
+        {
+            // The merged (native-overlay) title bar blends with the window background, which tracks the theme.
+            if (native_overlay)
+                Style.BackgroundColor = Theme.BackgroundColor;
+
+            base.OnThemeChanged (e);
+        }
+
+        /// <summary>
+        /// Gets or sets whenther the Maximize button is shown.
+        /// </summary>
+        public bool AllowMaximize {
+            get => maximize_button.Visible;
+            set {
+                maximize_button.Visible = value && !native_overlay;
+                UpdateMaximizeButtonGlyph ();
+                Invalidate (); // TODO: Shouldn't be necessary, should automatically be triggered
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the Close button is shown.
+        /// </summary>
+        /// <remarks>
+        /// Exists for <see cref="Form.ControlBox"/>, which turns the whole caption-button cluster off.
+        /// Minimise and maximise already had their own switches; close did not, so there was no way to
+        /// express the one thing ControlBox is for.
+        /// </remarks>
+        public bool AllowClose {
+            get => close_button.Visible;
+            set {
+                close_button.Visible = value && !native_overlay;
+                Invalidate ();
+            }
+        }
+
+        /// <summary>Whether the caption shows a help button; <see cref="Form.HelpButton"/> drives it.</summary>
+        public bool AllowHelp {
+            get => allow_help;
+            set {
+                allow_help = value;
+                help_button.Visible = value && !native_overlay;
+                Invalidate ();
+            }
+        }
+
+        private bool allow_help;
+
+        internal Control HelpButtonControl => help_button;
+
+        internal Control MinimizeButtonControl => minimize_button;
+
+        internal Control MaximizeButtonControl => maximize_button;
+
+        /// <summary>
+        /// Enables or greys out the minimize/maximize buttons independently of whether they are shown,
+        /// for <see cref="Form.MinimizeBox"/>/<see cref="Form.MaximizeBox"/>: when only one of the two
+        /// is turned off, upstream keeps both buttons and disables the one that was turned off.
+        /// </summary>
+        internal void SetCaptionButtonsEnabled (bool minimize, bool maximize)
+        {
+            minimize_button.Enabled = minimize;
+            maximize_button.Enabled = maximize;
+            Invalidate ();
+        }
+
+        /// <summary>
+        /// Gets or sets whether the Minimize button is shown.
+        /// </summary>
+        public bool AllowMinimize {
+            get => minimize_button.Visible;
+            set {
+                minimize_button.Visible = value && !native_overlay;
+                Invalidate (); // TODO: Shouldn't be necessary, should automatically be triggered
+            }
+        }
+
+        // Total logical width of the caption-button cluster: in native-overlay mode the reserved
+        // traffic-light inset on the left; otherwise close + optional maximize/minimize on the right.
+        // The Form treats the rest of the title bar as a draggable caption region.
+        internal int CaptionButtonsWidth =>
+            native_overlay
+                ? (overlay_spacer?.Width ?? 0)
+                : (close_button.Visible ? close_button.Width : 0)
+                    + (maximize_button.Visible ? maximize_button.Width : 0)
+                    + (minimize_button.Visible ? minimize_button.Width : 0)
+                    + (help_button.Visible ? help_button.Width : 0);
+
+        // Logical room the caption text must keep clear of on each side: the icon (and, merged into a
+        // native bar, the traffic lights) on the left, our own caption buttons on the right.
+        internal int TitleLeftInset => (native_overlay ? CaptionButtonsWidth : 0) + (form_image.Visible ? form_image.Width : 0);
+
+        internal int TitleRightInset => native_overlay ? 0 : CaptionButtonsWidth;
+
+        // The preferred title-bar height, used to size the extended (merged) title-bar region.
+        internal int PreferredHeight => CaptionHeight;
+
+        /// <summary>The height a form's caption is drawn at, and what SystemInformation reports.</summary>
+        internal const int CaptionHeight = 34;
+
+        /// <inheritdoc/>
+        protected override Size DefaultSize => new Size (600, CaptionHeight);
+
+        /// <inheritdoc/>
+        public new static ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle,
+           (style) => {
+               style.BackgroundColor = Theme.AccentColor2;
+               style.ForegroundColor = Theme.ForegroundColorOnAccent;
+           });
+
+        /// <summary>
+        /// Gets or sets the image used as the upper-left icon of the titlebar.
+        /// </summary>
+#pragma warning disable CA1416
+        public Majorsilence.Forms.Drawing.Image? Image {
+            get => form_image.Image;
+            set {
+                form_image.Image = value;
+                form_image.Visible = form_image.Image is not null && show_image;
+                Invalidate ();
+            }
+        }
+#pragma warning restore CA1416
+
+        internal SKBitmap? SKImage => form_image.SKImage;
+
+        internal void SetSKImage (SKBitmap? bmp)
+        {
+            form_image.SetSKImage (bmp);
+            form_image.Visible = form_image.SKImage is not null && show_image;
+            Invalidate ();
+        }
+
+        /// <inheritdoc/>
+        protected override void OnMouseDown (MouseEventArgs e)
+        {
+            base.OnMouseDown (e);
+
+            // We won't get a MouseUp from the system for this, so don't capture the mouse
+            Capture = false;
+
+            if (FindForm () is not { } form)
+                return;
+
+            // The application gets first refusal on the gesture (a docking library turns it into a
+            // re-dock); only move the window if nobody claimed it.
+            if (form.RaiseCaptionDragStarting (e.Location))
+                return;
+
+            form.BeginMoveDrag ();
+        }
+
+        /// <inheritdoc/>
+        protected override void OnPaint (PaintEventArgs e)
+        {
+            base.OnPaint (e);
+
+            RenderManager.Render (this, e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnSizeChanged (EventArgs e)
+        {
+            base.OnSizeChanged (e);
+
+            // Keep our form image a square
+            form_image.Width = Height;
+
+            UpdateMaximizeButtonGlyph ();
+        }
+
+        /// <summary>
+        /// Specifies whether the Form's title text is painted in the title bar. Set to false when the
+        /// title bar hosts its own content (e.g. a tab strip) that would otherwise collide with the text.
+        /// </summary>
+        public bool ShowText {
+            get => show_text;
+            set {
+                if (show_text != value) {
+                    show_text = value;
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Specifies whether the Form's Image should be shown in the left corner.
+        /// </summary>
+        public bool ShowImage {
+            get => show_image;
+            set {
+                if (show_image != value) {
+                    show_image = value;
+                    form_image.Visible = value && (form_image.Image is not null || form_image.SKImage is not null);
+                    Invalidate (); // TODO: Shouldn't be required
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+
+        private void UpdateMaximizeButtonGlyph ()
+        {
+            var form = FindForm ();
+
+            if (form == null || !maximize_button.Visible) {
+                maximize_button.Glyph = TitleBarButton.TitleBarButtonGlyph.Maximize;
+                return;
+            }
+
+            maximize_button.Glyph = form.WindowState == FormWindowState.Maximized
+                ? TitleBarButton.TitleBarButtonGlyph.Restore
+                : TitleBarButton.TitleBarButtonGlyph.Maximize;
+        }
+
+        internal sealed class TitleBarButton : Button
+        {
+            private const int BUTTON_PADDING = 10;
+
+            private TitleBarButtonGlyph glyph;
+
+            /// <summary>
+            /// Gets or sets the glyph displayed by the button.
+            /// </summary>
+            public TitleBarButtonGlyph Glyph {
+                get => glyph;
+                set {
+                    if (glyph != value) {
+                        glyph = value;
+                        Invalidate ();
+                    }
+                }
+            }
+
+            public TitleBarButton (TitleBarButtonGlyph glyph)
+            {
+                this.glyph = glyph;
+                Width = 46;
+                Dock = DockStyle.Right;
+
+                // Caption buttons are chrome, not content: in WinForms they live in the NON-CLIENT area
+                // and are unreachable by Tab. This derives from Button, which is a tab stop by default,
+                // so Tab from the last control walked onto Minimise/Maximise/Close and — because they
+                // are implicit children — appeared to lose focus entirely. ScrollBar's constructor does
+                // the same thing for the same reason, and this is only visible where the library draws
+                // its own chrome (everywhere except macOS, which uses system decorations).
+                TabStop = false;
+
+                Style.BackgroundColor = SKColors.Transparent;
+
+                // Borderless through the flat-appearance route rather than by writing Style.Border.Width:
+                // ButtonBase.ApplyFlatAppearance re-derives the border width from FlatStyle before every
+                // paint, so a Standard-style button got the themed 1px frame back and every caption
+                // button was drawn boxed.
+                FlatStyle = FlatStyle.Flat;
+                FlatAppearance.BorderSize = 0;
+            }
+
+            protected override void OnPaint (PaintEventArgs e)
+            {
+                base.OnPaint (e);
+                using var device = e.DeviceSpace ();   // laid out in device pixels (EVT-37)
+
+                if (IsHovering && Enabled)
+                    e.Canvas.Clear (glyph == TitleBarButtonGlyph.Close ? Theme.WarningHighlightColor : Theme.AccentColor);
+
+                // A disabled caption button (MaximizeBox = false beside a live MinimizeBox, as upstream
+                // draws it) keeps its slot but greys its glyph.
+                using var dim = Enabled ? null : new SKPaint { Color = SKColors.White.WithAlpha (0x60) };
+
+                if (dim is not null)
+                    e.Canvas.SaveLayer (dim);
+
+                var glyph_bounds = glyph == TitleBarButtonGlyph.Minimize ?
+                    DrawingExtensions.CenterRectangle (DeviceClientRectangle, e.LogicalToDeviceUnits (new Size (BUTTON_PADDING, 1))) :
+                    DrawingExtensions.CenterSquare (DeviceClientRectangle, e.LogicalToDeviceUnits (BUTTON_PADDING));
+
+                switch (glyph) {
+                    case TitleBarButtonGlyph.Close:
+                        ControlPaint.DrawCloseGlyph (e, glyph_bounds);
+                        break;
+                    case TitleBarButtonGlyph.Minimize:
+                        ControlPaint.DrawMinimizeGlyph (e, glyph_bounds);
+                        break;
+                    case TitleBarButtonGlyph.Maximize:
+                        ControlPaint.DrawMaximizeGlyph (e, glyph_bounds);
+                        break;
+                    case TitleBarButtonGlyph.Restore:
+                        ControlPaint.DrawRestoreGlyph (e, glyph_bounds);
+                        break;
+                    case TitleBarButtonGlyph.Help:
+                        e.Canvas.DrawText ("?", Theme.UIFont, e.LogicalToDeviceUnits (Theme.FontSize + 2), DeviceClientRectangle,
+                            Theme.ForegroundColorOnAccent, ContentAlignment.MiddleCenter);
+                        break;
+                }
+
+                if (dim is not null)
+                    e.Canvas.Restore ();
+            }
+
+            /// <summary>
+            /// Specifies which glyph is displayed by the title bar button.
+            /// </summary>
+            public enum TitleBarButtonGlyph
+            {
+                Close,
+                Minimize,
+                Maximize,
+                Restore,
+                Help
+            }
+        }
+    }
+}

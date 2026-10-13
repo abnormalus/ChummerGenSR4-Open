@@ -1,0 +1,300 @@
+﻿using System;
+using System.Drawing;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// WinForms compatibility: provides system-level information about the user's computer.
+    /// Values are approximations; for exact data use <see cref="Screen"/>.
+    /// </summary>
+    public static class SystemInformation
+    {
+        /// <summary>Gets the height of the horizontal scroll bar in pixels.</summary>
+        public static int HorizontalScrollBarHeight => 17;
+
+        /// <summary>Gets the width of the vertical scroll bar in pixels.</summary>
+        public static int VerticalScrollBarWidth => 17;
+
+        /// <summary>Gets the height of the horizontal scroll bar thumb.</summary>
+        public static int HorizontalScrollBarThumbWidth => 18;
+
+        /// <summary>Gets the height of the vertical scroll bar thumb.</summary>
+        public static int VerticalScrollBarThumbHeight => 18;
+
+        /// <summary>Gets the bounds of the primary screen's working area (excludes taskbar).</summary>
+        public static Rectangle WorkingArea =>
+            Screen.PrimaryScreen?.WorkingArea ?? new Rectangle (0, 0, 1920, 1080);
+
+        /// <summary>Gets the size of the primary monitor.</summary>
+        public static Size PrimaryMonitorSize =>
+            Screen.PrimaryScreen is Screen s ? new Size (s.Bounds.Width, s.Bounds.Height) : new Size (1920, 1080);
+
+        /// <summary>Gets the height of a single-line menu bar in pixels.</summary>
+        public static int MenuHeight => 24;
+
+        /// <summary>Gets the font used for menu text.</summary>
+        /// <remarks>
+        /// The theme's UI font rather than a Windows system metric -- that is the font menus actually
+        /// render with here, so a caller measuring menu text against it gets the right answer.
+        /// </remarks>
+        public static Majorsilence.Forms.Drawing.Font MenuFont =>
+            new Majorsilence.Forms.Drawing.Font (Theme.UIFont.FamilyName, Theme.ItemFontSize);
+
+        /// <summary>Gets the default height of a caption bar (title bar).</summary>
+        /// <remarks>
+        /// The height of the caption this library actually draws (<c>FormTitleBar</c>), not a Windows
+        /// metric. It was the constant 30 while the title bar was 34, so layout code reserving this
+        /// much room for a custom caption -- or positioning something just below one -- was out by four
+        /// pixels, and a port drawing its own bar over the library's got a visible double band.
+        /// </remarks>
+        public static int CaptionHeight => FormTitleBar.CaptionHeight;
+
+        /// <summary>Gets whether the drop shadow effect for windows is enabled.</summary>
+        /// <remarks>
+        /// Always false: window drop shadows are the compositor's business, and Majorsilence.Forms does
+        /// not ask for one. Ported code reads this to decide whether to draw its own shadow, and false
+        /// is the answer that makes it do so.
+        /// </remarks>
+        public static bool IsDropShadowEnabled => false;
+
+        /// <summary>Gets the thickness of a 3D border, in pixels.</summary>
+        /// <remarks>
+        /// Fixed at the classic Windows 2x2 rather than queried from the OS: Majorsilence.Forms draws
+        /// its own borders, so nothing here varies by desktop theme. Control libraries read this to
+        /// inset their content.
+        /// </remarks>
+        public static System.Drawing.Size Border3DSize => new System.Drawing.Size (2, 2);
+
+        /// <summary>Gets the double-click time in milliseconds.</summary>
+        public static int DoubleClickTime => 500;
+
+        /// <summary>Gets the time, in milliseconds, the mouse must rest before a hover is raised.</summary>
+        /// <remarks>Reports the Windows default. See Control.ResetMouseEventArgs for how hover is
+        /// actually raised here, which is not timer-driven.</remarks>
+        public static int MouseHoverTime => 400;
+
+        /// <summary>Gets the double-click rectangle size (area in which a second click is a double-click).</summary>
+        public static Size DoubleClickSize => new Size (4, 4);
+
+        /// <summary>Gets the size of a small icon.</summary>
+        public static Size SmallIconSize => new Size (16, 16);
+
+        /// <summary>Gets the size of a large icon.</summary>
+        public static Size IconSize => new Size (32, 32);
+
+        /// <summary>Gets whether the mouse is present. Always true in Majorsilence.Forms.</summary>
+        public static bool MousePresent => true;
+
+        /// <summary>Gets the number of mouse buttons.</summary>
+        public static int MouseButtons => 3;
+
+        /// <summary>Gets whether a drag operation has started, based on the drag threshold.</summary>
+        public static Size DragSize => new Size (4, 4);
+
+        /// <summary>Gets the number of display monitors.</summary>
+        public static int MonitorCount => Screen.AllScreens.Length;
+
+        /// <summary>Gets the number of lines to scroll when the mouse wheel is rotated.</summary>
+        public static int MouseWheelScrollLines => 3;
+
+        /// <summary>Gets the screen size of the default cursor in pixels.</summary>
+        public static Size CursorSize => new Size (32, 32);
+
+        /// <summary>Gets the thickness of the border drawn around a window, in pixels. A Size, as upstream:
+        /// callers read <c>.Width</c>/<c>.Height</c> off it to inset a client area.</summary>
+        public static Size BorderSize { get; } = new Size (1, 1);
+
+        /// <summary>Gets whether the operating system is a network-enabled version.</summary>
+        public static bool Network => true;
+
+        /// <summary>Gets whether the user has swapped the meaning of the left and right mouse buttons.</summary>
+        public static bool MouseButtonsSwapped => false;
+
+        /// <summary>Gets whether a slow machine flag is set. Always false in Majorsilence.Forms.</summary>
+        public static bool SlowMachine => false;
+
+        /// <summary>Gets whether the computer is running on battery power.</summary>
+        public static PowerStatus PowerStatus => new PowerStatus ();
+
+        /// <summary>Gets the thickness of the frame border for a window without sizing capabilities.</summary>
+        public static Size FixedFrameBorderSize { get; } = new Size (3, 3);
+
+        /// <summary>Gets the thickness of the frame border around a sizable window.</summary>
+        public static Size FrameBorderSize { get; } = new Size (4, 4);
+
+        /// <summary>Gets the thickness of the sizing border around a sizable window.</summary>
+        public static int SizingBorderWidth => 4;
+
+        /// <summary>Gets the bounds of the virtual screen (combined area of all monitors). Stub in Majorsilence.Forms.</summary>
+        public static System.Drawing.Rectangle VirtualScreen => new System.Drawing.Rectangle (0, 0, PrimaryMonitorSize.Width, PrimaryMonitorSize.Height);
+
+        /// <summary>Gets the current screen orientation. Stub in Majorsilence.Forms.</summary>
+        public static ScreenOrientation ScreenOrientation => ScreenOrientation.Angle0;
+
+        /// <summary>Gets the minimum width of a window in pixels.</summary>
+        public static int MinimumWindowSize => 112;
+
+        /// <summary>Gets the maximum number of elements in a single menu.</summary>
+        public static int MaxWindowTrackSize => int.MaxValue;
+
+        /// <summary>Gets whether the user has asked the system for a high-contrast appearance.</summary>
+        /// <remarks>
+        /// Always false. The accessibility preference this reports is an OS signal that no backend here
+        /// surfaces, and it cannot be inferred from the palette: a plain light theme is already black on
+        /// white, so contrast alone does not distinguish one. A caller that switches to a high-contrast
+        /// palette on this flag keeps the palette it has, which is the safe direction to be wrong in --
+        /// and <see cref="Theme.SetBuiltInTheme"/> is the way to select one deliberately.
+        /// </remarks>
+        public static bool HighContrast => HighContrastOverride ?? false;
+
+        // Test seam: the members whose whole point is their high-contrast branch (ControlPaint's
+        // ContrastControlDark and DrawStringDisabled) cannot otherwise be exercised, since no backend
+        // reports the OS preference.
+        internal static bool? HighContrastOverride { get; set; }
+
+        /// <summary>Gets how long a submenu waits before opening, in milliseconds.</summary>
+        /// <remarks>400, the Windows default. This is the delay a menu manager sleeps for before pushing
+        /// out the child of a hovered item, so the value has to be a plausible one rather than zero.</remarks>
+        public static int MenuShowDelay => 400;
+
+        /// <summary>Gets the amount a wheel must rotate to count as one detent.</summary>
+        /// <remarks>120, the <c>WHEEL_DELTA</c> constant. Wheel deltas arriving from the backend are
+        /// expressed in these units, so a control dividing by this reaches whole notches.</remarks>
+        public static int MouseWheelScrollDelta => 120;
+
+        /// <summary>Gets whether menus fade out when they close rather than vanishing.</summary>
+        /// <remarks>False, with <see cref="IsMenuAnimationEnabled"/>: menu open/close animation is an OS
+        /// effect this layer does not implement, and a caller that checks first skips the animation code
+        /// rather than running an animation that never appears.</remarks>
+        public static bool IsMenuFadeEnabled => false;
+
+        /// <inheritdoc cref="IsMenuFadeEnabled"/>
+        public static bool IsMenuAnimationEnabled => false;
+
+        /// <summary>Gets whether font smoothing is enabled.</summary>
+        /// <remarks>True: text here is drawn by SkiaSharp, which antialiases glyphs by default.</remarks>
+        public static bool IsFontSmoothingEnabled => true;
+
+        /// <summary>Gets whether the user's selection fades out rather than clearing.</summary>
+        /// <inheritdoc cref="IsMenuFadeEnabled"/>
+        public static bool IsSelectionFadeEnabled => false;
+
+        /// <summary>Gets whether tool tips animate into view.</summary>
+        /// <inheritdoc cref="IsMenuFadeEnabled"/>
+        public static bool IsToolTipAnimationEnabled => false;
+
+        /// <summary>Gets whether combo boxes animate their drop-down.</summary>
+        /// <inheritdoc cref="IsMenuFadeEnabled"/>
+        public static bool IsComboBoxAnimationEnabled => false;
+
+        /// <summary>Gets whether UI effects are enabled at all.</summary>
+        /// <inheritdoc cref="IsMenuFadeEnabled"/>
+        public static bool UIEffectsEnabled => false;
+
+        /// <summary>
+        /// Gets whether the user has asked for reduced motion: Android's animator duration scale at zero, iOS's Reduce Motion, Windows'
+        /// client-area animation setting, macOS's reduce-motion, or GNOME's <c>enable-animations</c>. False when the active backend
+        /// cannot answer (the conservative default every member on this page uses, for the same reason: it never suppresses an
+        /// animation nobody asked to suppress).
+        /// </summary>
+        /// <remarks>Only the Headless backend's (via its <c>HeadlessRenderer.PrefersReducedMotion</c> test hook) and the Avalonia
+        /// backend's answer is real; a third-party backend that does not implement <see cref="Backends.IReducedMotionSource"/> answers
+        /// false. See "Reduced motion" in docs/backends.md for which platforms are read and how.</remarks>
+        public static bool PrefersReducedMotion
+            => Backends.Platform.Backend is Backends.IReducedMotionSource source && source.PrefersReducedMotion;
+
+        /// <summary>Raised, on the UI thread, when <see cref="PrefersReducedMotion"/> changes, on a backend that can tell.</summary>
+        /// <remarks>Subscribing while the active backend cannot answer is harmless: the event is simply never raised. As with every
+        /// other member on this page, it reads <see cref="Backends.Platform.Backend"/> at the moment you subscribe, not once for the
+        /// life of the app, matching how <see cref="Application.RunOnUIThread"/> and the rest of this class already work.</remarks>
+        public static event EventHandler? PrefersReducedMotionChanged {
+            add {
+                if (Backends.Platform.Backend is Backends.IReducedMotionSource source)
+                    source.PrefersReducedMotionChanged += value;
+            }
+            remove {
+                if (Backends.Platform.Backend is Backends.IReducedMotionSource source)
+                    source.PrefersReducedMotionChanged -= value;
+            }
+        }
+
+        /// <summary>Gets whether the process is running in a context that can interact with a user.</summary>
+        /// <remarks>Answers from <see cref="Application.UserInteractive"/>, so the two cannot disagree.</remarks>
+        public static bool UserInteractive => Application.UserInteractive;
+
+        /// <summary>Gets the NetBIOS name of the local computer.</summary>
+        /// <remarks>Real data, from <see cref="Environment.MachineName"/> -- error reporters and About
+        /// boxes put this in front of the user, so a placeholder would be a visible lie.</remarks>
+        public static string ComputerName => Environment.MachineName;
+
+        /// <summary>Gets the user name of the person logged into the system.</summary>
+        /// <inheritdoc cref="ComputerName"/>
+        public static string UserName => Environment.UserName;
+
+        /// <summary>Gets the name of the domain the user belongs to.</summary>
+        /// <inheritdoc cref="ComputerName"/>
+        public static string UserDomainName => Environment.UserDomainName;
+    }
+
+    /// <summary>
+    /// WinForms compatibility stub for PowerStatus information.
+    /// </summary>
+    public class PowerStatus
+    {
+        /// <summary>Gets the current battery charge status. Always High in Majorsilence.Forms.</summary>
+        public BatteryChargeStatus BatteryChargeStatus => BatteryChargeStatus.High;
+
+        /// <summary>Gets the approximate amount of full battery charge remaining as a percentage.</summary>
+        public float BatteryLifePercent => 1.0f;
+
+        /// <summary>Gets the reported remaining battery lifetime in seconds. Returns -1 (unknown).</summary>
+        public int BatteryLifeRemaining => -1;
+
+        /// <summary>Gets the reported full battery lifetime in seconds. Returns -1 (unknown).</summary>
+        public int BatteryFullLifetime => -1;
+
+        /// <summary>Gets the current power line status. Always Online in Majorsilence.Forms.</summary>
+        public PowerLineStatus PowerLineStatus => PowerLineStatus.Online;
+    }
+
+    /// <summary>Specifies the battery charge status.</summary>
+    public enum BatteryChargeStatus
+    {
+        /// <summary>Indicates a high level of battery charge.</summary>
+        High = 1,
+        /// <summary>Indicates a low level of battery charge.</summary>
+        Low = 2,
+        /// <summary>Indicates a critically low level of battery charge.</summary>
+        Critical = 4,
+        /// <summary>Indicates the battery is charging.</summary>
+        Charging = 8,
+        /// <summary>Indicates no system battery is present.</summary>
+        NoSystemBattery = 128,
+        /// <summary>Indicates an unknown battery charge status.</summary>
+        Unknown = 255
+    }
+
+    /// <summary>Specifies the screen orientation.</summary>
+    public enum ScreenOrientation
+    {
+        /// <summary>0 degrees (landscape).</summary>
+        Angle0,
+        /// <summary>90 degrees (portrait).</summary>
+        Angle90,
+        /// <summary>180 degrees (landscape flipped).</summary>
+        Angle180,
+        /// <summary>270 degrees (portrait flipped).</summary>
+        Angle270
+    }
+
+    /// <summary>Specifies the power line status.</summary>
+    public enum PowerLineStatus
+    {
+        /// <summary>The system is not connected to AC power.</summary>
+        Offline = 0,
+        /// <summary>The system is connected to AC power.</summary>
+        Online = 1,
+        /// <summary>The power line status is unknown.</summary>
+        Unknown = 255
+    }
+}

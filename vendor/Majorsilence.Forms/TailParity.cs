@@ -1,0 +1,1060 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+
+namespace Majorsilence.Forms
+{
+    // The flat tail of the WinForms surface (docs/winforms-gap-plan.md) -- the controls with a
+    // handful of gaps each rather than one type with dozens.
+    //
+    // Two themes run through it. Several members are navigation or geometry that this layer already
+    // has the information to answer, and those are computed: TreeNode's visible-node walk,
+    // SplitContainer's splitter rectangle, ToolStripPanel's row layout, Menu's ancestor lookups.
+    //
+    // The rest are the shell integration of the common dialogs -- pinned places, known-folder GUIDs,
+    // "add to recent" -- which the backends' file pickers do not expose. Those are stored so a
+    // designer file round-trips, and each says so.
+
+    public partial class ButtonBase
+    {
+        /// <summary>Gets or sets the image shown on the button.</summary>
+        public virtual Majorsilence.Forms.Drawing.Image? Image { get; set; }
+
+        /// <summary>Gets or sets where the image is drawn within the button.</summary>
+        public virtual ContentAlignment ImageAlign { get; set; } = ContentAlignment.MiddleCenter;
+
+        /// <summary>Gets or sets the index of the button's image in <see cref="ImageList"/>.</summary>
+        public virtual int ImageIndex { get; set; } = -1;
+
+        /// <summary>Gets or sets the key of the button's image in <see cref="ImageList"/>.</summary>
+        public virtual string ImageKey { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the image list the button takes its image from.</summary>
+        public virtual ImageList? ImageList { get; set; }
+
+        private CommandLink? command_link;
+
+        // The earlier state is the control's own flag: Enabled also folds in a disabled parent, and restoring that would leave this
+        // button disabled after the parent was enabled again.
+        private CommandLink Link => command_link ??= new CommandLink (
+            () => CommandParameter, () => GetState (States.Enabled), value => Enabled = value,
+            () => CommandCanExecuteChanged?.Invoke (this, EventArgs.Empty));
+
+        /// <summary>Gets or sets the command run when the button is clicked.</summary>
+        /// <remarks>
+        /// An <see cref="System.Windows.Input.ICommand"/>, as WinForms on modern .NET takes, so an MVVM toolkit's <c>RelayCommand</c>
+        /// binds directly. The command runs with <see cref="CommandParameter"/>, only while it can execute, and <see cref="Control.Enabled"/>
+        /// follows <c>CanExecute</c> until the command is cleared, which restores what it was. A framework
+        /// <see cref="ICommandExecutor"/> is adapted with <see cref="CommandExecutorExtensions.AsCommand"/>.
+        /// </remarks>
+        public System.Windows.Input.ICommand? Command {
+            get => command_link?.Command;
+            set {
+                if (Link.SetCommand (value))
+                    CommandChanged?.Invoke (this, EventArgs.Empty);
+            }
+        }
+
+        // Notifies on change; the event was declared and raised by nothing (W6.1).
+        private object? command_parameter;
+
+        /// <summary>Gets or sets the parameter passed to <see cref="Command"/>.</summary>
+        /// <remarks>It is an input to <c>CanExecute</c> as well as <c>Execute</c>, so changing it re-evaluates <see cref="Control.Enabled"/>.</remarks>
+        public object? CommandParameter {
+            get => command_parameter;
+            set {
+                if (ReferenceEquals (command_parameter, value))
+                    return;
+
+                command_parameter = value;
+                CommandParameterChanged?.Invoke (this, EventArgs.Empty);
+                command_link?.ParameterChanged ();
+            }
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Where <see cref="Command"/> is finally run. It was stored and read by nothing, so a button
+        /// bound to a command did nothing at all when clicked -- the WinForms 8 idiom, silently inert.
+        /// After the Click handlers, as upstream does: a handler that cancels or reconfigures the
+        /// button gets to run first.
+        /// </remarks>
+        protected override void OnClick (EventArgs e)
+        {
+            base.OnClick (e);
+
+            command_link?.Execute ();
+        }
+
+        /// <summary>Raised when <see cref="Command"/> changes.</summary>
+        public event EventHandler? CommandChanged;
+
+        /// <summary>Raised when <see cref="CommandParameter"/> changes.</summary>
+        public event EventHandler? CommandParameterChanged;
+
+        /// <summary>Raised when the command's ability to run changes.</summary>
+        public event EventHandler? CommandCanExecuteChanged;
+    }
+
+    public partial class TreeNode
+    {
+        /// <summary>Gets or sets the context menu shown when this node is right-clicked.</summary>
+        public virtual ContextMenuStrip? ContextMenuStrip { get; set; }
+
+        /// <summary>Gets or sets the image list key for this node's state image.</summary>
+        public string StateImageKey { get; set; } = string.Empty;
+
+        /// <summary>Gets whether the node's label is being edited.</summary>
+        /// <remarks>Real as of W6 mechanisms: true between <see cref="BeginEdit"/> and the end of the edit.</remarks>
+        public bool IsEditing => TreeView is { } tree && ReferenceEquals (tree.EditingNode, this);
+
+        /// <summary>Gets whether the node is at least partly visible in its tree: every ancestor is
+        /// expanded and its row is inside the client area at the current scroll position.</summary>
+        /// <remarks>Upstream asks the native tree for the node's on-screen rectangle
+        /// (<c>TreeView/TreeNode.cs</c>). This answered from the ancestors alone, so a node scrolled out
+        /// of view reported visible, and so did a node in no tree at all (<c>LST-42</c>).</remarks>
+        public bool IsVisible {
+            get {
+                if (TreeView is not { } tree || tree.IsDisposed)
+                    return false;
+
+                for (var parent = Parent; parent is not null; parent = parent.Parent)
+                    if (!parent.IsExpanded)
+                        return false;
+
+                return tree.IsNodeOnScreen (this);
+            }
+        }
+
+        /// <summary>Gets the next node the user can see below this one, or null.</summary>
+        public TreeNode? NextVisibleNode => VisibleNodes ().SkipWhile (n => !ReferenceEquals (n, this)).Skip (1).FirstOrDefault ();
+
+        /// <summary>Gets the previous node the user can see above this one, or null.</summary>
+        public TreeNode? PrevVisibleNode => VisibleNodes ().TakeWhile (n => !ReferenceEquals (n, this)).LastOrDefault ();
+
+        /// <summary>Gets the window handle of the node.</summary>
+        /// <remarks>Zero: nodes are not windows here, which is the same reason
+        /// <see cref="FromHandle"/> cannot find one.</remarks>
+        public IntPtr Handle => IntPtr.Zero;
+
+        /// <summary>Expands this node and every node beneath it.</summary>
+        public void ExpandAll ()
+        {
+            Expand ();
+
+            foreach (var child in Nodes)
+                child.ExpandAll ();
+        }
+
+        /// <summary>Returns a copy of this node and its children.</summary>
+        public virtual object Clone ()
+        {
+            var clone = new TreeNode (Text) {
+                Name = Name,
+                Tag = Tag,
+                ImageIndex = ImageIndex,
+                SelectedImageIndex = SelectedImageIndex,
+                ImageKey = ImageKey,
+                SelectedImageKey = SelectedImageKey,
+                StateImageKey = StateImageKey,
+            };
+
+            foreach (var child in Nodes)
+                if (child.Clone () is TreeNode copy)
+                    clone.Nodes.Add (copy);
+
+            return clone;
+        }
+
+        /// <summary>Returns the node owning the given handle.</summary>
+        /// <remarks>Always null: nodes have no window handle here.</remarks>
+        public static TreeNode? FromHandle (TreeView tree, IntPtr handle) => null;
+
+        // The nodes the user could scroll to, in the order they appear. GetVisibleItems is the
+        // tree's own walk -- reusing it keeps this agreeing with what the control lays out -- and the
+        // Skip (1) drops the hidden root item, exactly as TreeView.LayoutItems does.
+        private IEnumerable<TreeNode> VisibleNodes ()
+        {
+            var root = this;
+            while (root.Parent is { } parent)
+                root = parent;
+
+            return root.GetVisibleItems ().Skip (1);
+        }
+    }
+
+    public partial class Menu
+    {
+        /// <summary>Gets the items on this menu.</summary>
+        public global::Majorsilence.Forms.MenuItemCollection MenuItems => Items;
+
+        /// <summary>Gets whether the menu has any items.</summary>
+        public virtual bool IsParent => Items.Count > 0;
+
+        /// <summary>Gets the item populated with the list of MDI child windows, or null.</summary>
+        public MenuItem? MdiListItem => Items.FirstOrDefault (i => i.MdiList);
+
+        /// <summary>Returns the context menu this menu belongs to, or null.</summary>
+        /// <remarks>Always null: ContextMenu derives from MenuDropDown in this library rather than
+        /// from Menu, so a Menu is never one. The method exists because migrated code calls it to walk
+        /// upwards from a MenuItem, and null is the answer it already handles for a menu bar.</remarks>
+        public ContextMenu? GetContextMenu () => null;
+
+        /// <summary>Returns the main menu this menu belongs to, or null.</summary>
+        public MainMenu? GetMainMenu () => this as MainMenu;
+
+        /// <summary>Merges another menu's items into this one.</summary>
+        public virtual void MergeMenu (Menu menuSrc)
+        {
+            Guard.ThrowIfNull (menuSrc);
+
+            foreach (var item in menuSrc.Items)
+                Items.Add (item.CloneMenu ());
+        }
+
+        /// <summary>Finds an item by handle or shortcut.</summary>
+        /// <remarks>Only the shortcut lookup can work -- menu items have no window handle here -- so
+        /// a handle search reports nothing rather than matching the wrong item.</remarks>
+        public MenuItem? FindMenuItem (int type, IntPtr value)
+            => type == FindShortcut ? Items.FirstOrDefault (i => (long)i.Shortcut == value.ToInt64 ()) : null;
+
+        /// <summary>Passed to <see cref="FindMenuItem"/> to search by window handle.</summary>
+        public const int FindHandle = 0;
+
+        /// <summary>Passed to <see cref="FindMenuItem"/> to search by shortcut.</summary>
+        public const int FindShortcut = 1;
+    }
+
+    public partial class ToolBar
+    {
+        /// <summary>Gets or sets whether buttons draw with a raised border (<see cref="ToolBarAppearance.Normal"/>) or flat.</summary>
+        /// <remarks>Read by <see cref="Renderers.ToolBarRenderer"/> as of W6 mechanisms.</remarks>
+        public ToolBarAppearance Appearance {
+            get => appearance;
+            set {
+                if (appearance == value)
+                    return;
+
+                appearance = value;
+                Invalidate ();
+            }
+        }
+
+        private ToolBarAppearance appearance = ToolBarAppearance.Normal;
+
+        private BorderStyle border_style = BorderStyle.None;
+
+        /// <summary>Gets or sets the border drawn around the toolbar.</summary>
+        public BorderStyle BorderStyle {
+            get => border_style;
+            set {
+                if (border_style == value)
+                    return;
+
+                border_style = value;
+                ApplyBorderStyle (value);
+            }
+        }
+
+        /// <summary>Gets or sets whether the toolbar shows a divider above it.</summary>
+        /// <remarks>Drawn by <see cref="Renderers.ToolBarRenderer"/> as of W6 mechanisms.</remarks>
+        public bool Divider { get => divider; set => SetChrome (ref divider, value); }
+
+        /// <summary>Gets or sets whether drop-down buttons show an arrow.</summary>
+        /// <remarks>Read as of W6 mechanisms: with arrows, only the arrow gutter opens the menu; without,
+        /// the whole button does, as upstream.</remarks>
+        public bool DropDownArrows { get => drop_down_arrows; set => SetChrome (ref drop_down_arrows, value); }
+
+        /// <summary>Gets or sets whether button tooltips are shown.</summary>
+        /// <remarks>Read as of W6 mechanisms: <see cref="ToolBarButton.ToolTipText"/> is the tip.</remarks>
+        public bool ShowToolTips { get; set; }
+
+        /// <summary>Gets or sets where button text is drawn relative to the image.</summary>
+        /// <remarks>Read as of W6 mechanisms: mirrored buttons stack or side-by-side their image and caption.</remarks>
+        public ToolBarTextAlign TextAlign {
+            get => text_align;
+            set {
+                if (text_align == value)
+                    return;
+
+                text_align = value;
+                ButtonsChanged ();
+            }
+        }
+
+        /// <summary>Gets or sets whether buttons wrap onto a second row when the bar is too narrow.</summary>
+        /// <remarks>Read by the layout as of W6 mechanisms; the bar grows to hold the rows.</remarks>
+        public bool Wrappable { get => wrappable; set => SetChrome (ref wrappable, value); }
+
+        private bool divider = true;
+        private bool drop_down_arrows;
+        private ToolBarTextAlign text_align = ToolBarTextAlign.Underneath;
+        private bool wrappable = true;
+
+        private void SetChrome<T> (ref T field, T value)
+        {
+            if (EqualityComparer<T>.Default.Equals (field, value))
+                return;
+
+            field = value;
+            PerformLayout ();
+            Invalidate ();
+        }
+
+        /// <summary>Gets the size of the images the toolbar draws.</summary>
+        public Size ImageSize => ImageList?.ImageSize ?? new Size (16, 16);
+
+        /// <summary>Raised when a drop-down button's arrow is clicked.</summary>
+        /// <remarks>Real as of W6 mechanisms; see <see cref="Buttons"/>.</remarks>
+        public event ToolBarButtonClickEventHandler? ButtonDropDown;
+
+        /// <summary>Raises the <see cref="ButtonDropDown"/> event.</summary>
+        protected virtual void OnButtonDropDown (ToolBarButtonClickEventArgs e) => ButtonDropDown?.Invoke (this, e);
+
+        internal void RaiseButtonDropDown (ToolBarButton button) => OnButtonDropDown (new ToolBarButtonClickEventArgs (button));
+    }
+
+    public partial class SplitContainer
+    {
+        private BorderStyle border_style = BorderStyle.None;
+
+        /// <summary>Gets or sets the border drawn around the container.</summary>
+        public BorderStyle BorderStyle {
+            get => border_style;
+            set {
+                if (border_style == value)
+                    return;
+
+                border_style = value;
+                ApplyBorderStyle (value);
+            }
+        }
+
+        /// <summary>Gets whether the container scrolls; always <see langword="false"/>.</summary>
+        /// <remarks>Upstream's override answers <see langword="false"/> whatever is assigned ("SplitContainer
+        /// doesn't support AutoScroll", Layout/Containers/SplitContainer.cs), so code that reads the flag back
+        /// to decide whether to scroll the container does not. Assign <c>AutoScroll</c> on
+        /// <see cref="Panel1"/> or <see cref="Panel2"/>, which do scroll (LAY-09).</remarks>
+        public virtual bool AutoScroll {
+            get => false;
+            set { }
+        }
+
+        /// <summary>Gets or sets the margin left around a control scrolled into view.</summary>
+        /// <remarks>Stored, as upstream leaves it: a <c>SplitContainer</c> answers <c>false</c> from
+        /// <c>AutoScroll</c> whatever is assigned to it, so the container itself never scrolls and
+        /// these three inherited members have nothing to act on. The panels are what scroll -- both
+        /// are real <see cref="SplitterPanel"/>s with their own <c>AutoScroll</c>.</remarks>
+        public Size AutoScrollMargin { get; set; }
+
+        /// <summary>Gets or sets the smallest logical size the container scrolls over.</summary>
+        /// <remarks>See <see cref="AutoScrollMargin"/>: the container does not scroll.</remarks>
+        public Size AutoScrollMinSize { get; set; }
+
+        /// <summary>Gets or sets the current scroll offset.</summary>
+        /// <remarks>See <see cref="AutoScrollMargin"/>: the container does not scroll.</remarks>
+        public Point AutoScrollPosition { get; set; }
+
+        /// <summary>Gets the rectangle the splitter occupies.</summary>
+        public Rectangle SplitterRectangle
+            => Orientation == Orientation.Vertical
+                ? new Rectangle (SplitterDistance, 0, SplitterWidth, Height)
+                : new Rectangle (0, SplitterDistance, Width, SplitterWidth);
+
+        /// <summary>Starts a batch of designer-set properties; layout waits for <see cref="EndInit"/>.</summary>
+        /// <remarks>Real as of W6 mechanisms: it used to do nothing, so a control the designer
+        /// initialises laid itself out once per property assigned instead of once at the end.</remarks>
+        public void BeginInit () => SuspendLayout ();
+
+        /// <summary>Ends the batch <see cref="BeginInit"/> started and lays the control out once.</summary>
+        public void EndInit () => ResumeLayout (performLayout: true);
+
+        /// <summary>Raises the SplitterMoved event.</summary>
+        public void OnSplitterMoved (SplitterEventArgs e) => SplitterMoved?.Invoke (this, e);
+
+        /// <summary>Raises the SplitterMoving event.</summary>
+        public void OnSplitterMoving (SplitterCancelEventArgs e) => SplitterMoving?.Invoke (this, e);
+    }
+
+    public partial class Binding
+    {
+        /// <summary>Gets or sets whether formatting is applied to the bound value.</summary>
+        /// <remarks>Changing it on a live binding re-shows the value, formatted or not, as upstream's
+        /// setter does (<c>PushData</c>, Binding.cs).</remarks>
+        public bool FormattingEnabled {
+            get => formatting_enabled;
+            set {
+                if (formatting_enabled == value)
+                    return;
+
+                formatting_enabled = value;
+
+                if (IsBinding)
+                    PushValue ();
+            }
+        }
+
+        private bool formatting_enabled;
+
+        /// <summary>Gets or sets when the control is refreshed from the data source.</summary>
+        /// <remarks>Changing it on a live binding refreshes the control under the new mode, as upstream's
+        /// setter does (<c>PushData</c>, Binding.cs) -- so switching from <c>Never</c> back to
+        /// <c>OnPropertyChanged</c> catches up with source changes made in between.</remarks>
+        public ControlUpdateMode ControlUpdateMode {
+            get => control_update_mode;
+            set {
+                if (control_update_mode == value)
+                    return;
+
+                control_update_mode = value;
+
+                if (IsBinding)
+                    PushValue ();
+            }
+        }
+
+        private ControlUpdateMode control_update_mode = ControlUpdateMode.OnPropertyChanged;
+
+        /// <summary>Gets or sets the value written to the source when the control is empty.</summary>
+        /// <remarks>Defaults to <see cref="DBNull.Value"/>, as upstream does for value-type members
+        /// (BND-24): a cleared bound box over a DataRowView column writes a database null, not a CLR
+        /// null that the column rejects. Only consulted when <see cref="FormattingEnabled"/> is set;
+        /// the legacy path writes what the control holds.</remarks>
+        public object? DataSourceNullValue { get; set; } = DBNull.Value;
+
+        /// <summary>Gets or sets the binding manager driving this binding.</summary>
+        public BindingManagerBase? BindingManagerBase { get; set; }
+
+        /// <summary>Gets the component this binding is attached to.</summary>
+        public IBindableComponent? BindableComponent { get; internal set; }
+
+        /// <summary>Gets the control this binding is attached to.</summary>
+        public Control? Control => BindableComponent as Control;
+
+        // IsBinding and ReadValue live in BindingRuntime.cs, with the rest of the live mechanism.
+        // IsBinding used to answer `DataSource is not null` -- true for a binding that had never been
+        // attached to anything and could not move a value -- and ReadValue was an empty method.
+
+        /// <summary>Raised when a binding operation completes, carrying success or the exception.</summary>
+        /// <remarks>Raised as of W4.4 (BND-18) on every push and pull of a binding whose
+        /// <see cref="FormattingEnabled"/> is set -- which is the documented place a conversion error
+        /// surfaces. Errors used to be swallowed (or, worse, coerced to zero and written).</remarks>
+        public event BindingCompleteEventHandler? BindingComplete;
+
+        internal void RaiseBindingComplete (BindingCompleteEventArgs e)
+        {
+            BindingComplete?.Invoke (this, e);
+            BindingManagerBase?.RaiseBindingComplete (e);
+        }
+    }
+
+    public partial class BindingManagerBase
+    {
+        /// <summary>Gets the bindings this manager drives.</summary>
+        public BindingsCollection Bindings => bindings ??= new BindingsCollection ();
+
+        private BindingsCollection? bindings;
+
+        /// <summary>Gets whether updates to the bound controls are suspended.</summary>
+        public bool IsBindingSuspended { get; internal set; }
+
+        /// <summary>Adds a new item to the bound list and makes it current.</summary>
+        /// <remarks>
+        /// Real as of W6 mechanisms. A list that can create its own items (an <see cref="IBindingList"/>
+        /// with <c>AllowNew</c>, which is what a <see cref="BindingSource"/> is) is asked to; any other
+        /// list gets an instance of its element type. A list that announces nothing is announced for
+        /// here, so the position moves and the bound controls show the new item. A
+        /// <see cref="PropertyManager"/> has one object and no list, which upstream reports the same
+        /// way: <see cref="NotSupportedException"/>.
+        /// </remarks>
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage ("Trimming", "IL2072", Justification = "Data binding creates items of user-provided types by reflection, as it does upstream.")]
+        public virtual void AddNew ()
+        {
+            if (list is null)
+                throw new NotSupportedException ("AddNew is not supported by a manager over a single object.");
+
+            if (list is IBindingList { AllowNew: true } creating) {
+                creating.AddNew ();
+            } else {
+                var type = ElementTypeOf (list)
+                    ?? throw new InvalidOperationException ("The bound list does not say what it holds, so a new item cannot be created.");
+
+                list.Add (Activator.CreateInstance (type));
+
+                // A plain list raises nothing; the manager announces what it just did.
+                if (list is not IBindingList)
+                    OnListChanged (this, new ListChangedEventArgs (ListChangedType.ItemAdded, list.Count - 1));
+            }
+
+            Position = Count - 1;
+        }
+
+        /// <summary>Removes the item at the given position from the bound list.</summary>
+        /// <remarks>Real as of W6 mechanisms; see <see cref="AddNew"/> for the announcement a plain
+        /// list gets and for what a <see cref="PropertyManager"/> does.</remarks>
+        public virtual void RemoveAt (int index)
+        {
+            if (list is null)
+                throw new NotSupportedException ("RemoveAt is not supported by a manager over a single object.");
+
+            list.RemoveAt (index);
+
+            if (list is not IBindingList)
+                OnListChanged (this, new ListChangedEventArgs (ListChangedType.ItemDeleted, index));
+        }
+
+        // The element type a list declares, for AddNew to construct; null for an untyped list.
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage ("Trimming", "IL2075", Justification = "Data binding inspects the list's generic interfaces, as it does upstream.")]
+        private static Type? ElementTypeOf (System.Collections.IList list)
+        {
+            if (list.GetType ().IsArray)
+                return list.GetType ().GetElementType ();
+
+            foreach (var iface in list.GetType ().GetInterfaces ()) {
+                if (iface.IsGenericType && iface.GetGenericTypeDefinition () == typeof (System.Collections.Generic.IList<>)) {
+                    var argument = iface.GetGenericArguments ()[0];
+                    return argument == typeof (object) ? null : argument;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns the properties of the items in the bound list.</summary>
+        public virtual PropertyDescriptorCollection GetItemProperties () => PropertyDescriptorCollection.Empty;
+
+        /// <summary>Raised when a binding operation on one of this manager's bindings completes.</summary>
+        public event BindingCompleteEventHandler? BindingComplete;
+
+        internal void RaiseBindingComplete (BindingCompleteEventArgs e) => BindingComplete?.Invoke (this, e);
+
+        /// <summary>Raised when an exception escapes a binding push or a commit of the current item.</summary>
+        /// <remarks>Real as of W6 mechanisms: <c>PushDataToBindings</c> and <see cref="EndCurrentEdit"/>
+        /// offer the exception here (and to the owning <see cref="BindingSource.DataError"/>). It
+        /// propagates when nothing is attached -- a deliberate divergence from upstream, which swallows
+        /// it. Conversion failures a binding handles itself still go through
+        /// <see cref="BindingComplete"/>, as upstream.</remarks>
+        public event BindingManagerDataErrorEventHandler? DataError;
+
+        /// <summary>Raises the <see cref="DataError"/> event.</summary>
+        protected internal void OnDataError (Exception e)
+            => DataError?.Invoke (this, new BindingManagerDataErrorEventArgs (e));
+
+        /// <summary>Raised when the current item changes, or changes in place.</summary>
+        public event EventHandler? CurrentItemChanged;
+
+        internal void RaiseCurrentItemChanged () => CurrentItemChanged?.Invoke (this, EventArgs.Empty);
+    }
+
+    public partial class ToolStripPanel
+    {
+        private ToolStripRenderer? renderer;
+
+        /// <summary>Gets the rows of strips in this panel.</summary>
+        /// <remarks>Only rows that hold a strip: a row its last strip leaves is removed, as upstream's is.</remarks>
+        public ToolStripPanelRow[] Rows {
+            get {
+                SyncRows ();
+                return rows.ToArray ();
+            }
+        }
+
+        private readonly List<ToolStripPanelRow> rows = [];
+
+        /// <summary>Gets or sets the margin around the block of rows.</summary>
+        /// <remarks>Read by the row layout as of W6 mechanisms.</remarks>
+        public Padding RowMargin {
+            get => row_margin;
+            set {
+                if (row_margin == value)
+                    return;
+
+                row_margin = value;
+                PerformLayout ();
+            }
+        }
+
+        private Padding row_margin = new Padding (3, 0, 0, 0);
+
+        /// <summary>Gets or sets the renderer used to paint the panel.</summary>
+        public ToolStripRenderer? Renderer {
+            get => renderer;
+            set {
+                if (ReferenceEquals (renderer, value))
+                    return;
+
+                renderer = value;
+                RendererChanged?.Invoke (this, EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        /// <summary>Gets or sets which renderer paints the panel's background.</summary>
+        /// <remarks>Read as of W6 mechanisms; see <c>OnPaintBackground</c>.</remarks>
+        public ToolStripRenderMode RenderMode {
+            get => render_mode;
+            set {
+                if (render_mode == value)
+                    return;
+
+                render_mode = value;
+                Invalidate ();
+            }
+        }
+
+        private ToolStripRenderMode render_mode = ToolStripRenderMode.ManagerRenderMode;
+
+        /// <summary>Raised when <see cref="Renderer"/> changes.</summary>
+        public event EventHandler? RendererChanged;
+
+        /// <summary>Adds a strip to the panel, on a new row after the last.</summary>
+        public void Join (ToolStrip toolStripToDrag) => Join (toolStripToDrag, rows.Count);
+
+        /// <summary>Adds a strip to the given row of the panel, before the strips already on it; a row
+        /// index past the last row puts it on a new row at the end.</summary>
+        /// <remarks>Upstream turns the row into a drop point at its leading edge -- the row's
+        /// <c>DragBounds</c>, or the panel's past the last row -- and joins there
+        /// (<c>ToolStripPanel.Join(ToolStrip, int)</c>, <c>ToolStripPanelRow.HorizontalRowManager.JoinRow</c>),
+        /// so the strip lands at the front of that row, beside the strips already on it (TSM-36).</remarks>
+        public void Join (ToolStrip toolStripToDrag, int row)
+        {
+            Guard.ThrowIfNull (toolStripToDrag);
+            Guard.ThrowIfNegative (row);
+
+            SyncRows ();
+            JoinRow (toolStripToDrag, row < rows.Count ? rows[row] : null, 0);
+        }
+
+        /// <inheritdoc cref="Join(ToolStrip)"/>
+        public void Join (ToolStrip toolStripToDrag, Point location) => Join (toolStripToDrag, location.X, location.Y);
+
+        /// <summary>Adds a strip to the panel at a client point: onto the row under the point, among its
+        /// strips by position along the row, or onto a new row at the end when no row is there.</summary>
+        public void Join (ToolStrip toolStripToDrag, int x, int y)
+        {
+            Guard.ThrowIfNull (toolStripToDrag);
+
+            var target = PointToRow (new Point (x, y));
+            var along = Orientation == Orientation.Horizontal ? x : y;
+
+            // Before the first strip that starts at or after the point, as upstream's JoinRow walks its
+            // cells (ToolStripPanelRow.HorizontalRowManager.cs).
+            var index = target is null ? 0 : target.Controls.FindIndex (strip =>
+                (Orientation == Orientation.Horizontal ? strip.Left : strip.Top) >= along);
+
+            JoinRow (toolStripToDrag, target, index < 0 ? int.MaxValue : index);
+        }
+
+        // Moves the strip onto the row (a new one at the end when null) at the given place in it. Joining
+        // is a MOVE: leaving the strip on both rows made the panel report it in the earlier one for ever
+        // (found wiring the rafting drag, W6).
+        private void JoinRow (ToolStrip strip, ToolStripPanelRow? target, int index)
+        {
+            var current = rows.FirstOrDefault (r => r.Controls.Contains (strip));
+
+            if (current is not null && ReferenceEquals (current, target) && current.Controls.Count == 1)
+                return;
+
+            if (current is not null) {
+                current.Controls.Remove (strip);
+
+                // A row its last strip leaves goes, as upstream's LeaveRow removes it.
+                if (current.Controls.Count == 0 && !ReferenceEquals (current, target))
+                    rows.Remove (current);
+            }
+
+            if (target is null) {
+                target = new ToolStripPanelRow (this);
+                rows.Add (target);
+            }
+
+            target.Controls.Insert (Math.Min (index, target.Controls.Count), strip);
+
+            if (!Controls.Contains (strip))
+                Controls.Add (strip);
+
+            PerformLayout ();
+        }
+
+        /// <summary>
+        /// Puts strips back on the rows they were saved on, in row order, rows renumbered from the top.
+        /// Used by <see cref="ToolStripManager.LoadSettings(Form, string)"/>; strips that share a saved
+        /// row share a row again, in the order given.
+        /// </summary>
+        internal void RestoreRows (IEnumerable<(ToolStrip Strip, int Row)> placements)
+        {
+            var list = placements.ToList ();
+
+            foreach (var (strip, _) in list)
+                foreach (var row in rows)
+                    row.Controls.Remove (strip);
+
+            rows.RemoveAll (row => row.Controls.Count == 0);
+
+            var insertAt = 0;
+
+            foreach (var group in list.GroupBy (p => p.Row).OrderBy (g => g.Key)) {
+                var row = new ToolStripPanelRow (this);
+                row.Controls.AddRange (group.Select (p => p.Strip));
+                rows.Insert (Math.Min (Math.Max (insertAt, group.Key), rows.Count), row);
+                insertAt = rows.IndexOf (row) + 1;
+            }
+
+            foreach (var (strip, _) in list)
+                if (!Controls.Contains (strip))
+                    Controls.Add (strip);
+
+            PerformLayout ();
+        }
+
+        /// <summary>Returns the row at the given client point, or null.</summary>
+        public ToolStripPanelRow? PointToRow (Point clientLocation)
+            => rows.FirstOrDefault (r => r.Bounds.Contains (clientLocation));
+    }
+
+    public partial class ToolStripDropDown
+    {
+        /// <summary>Gets or sets whether the drop-down closes when the user clicks away.</summary>
+        /// <remarks>Read as upstream reads it (TSM-21): off, clicking an item does not close the
+        /// drop-down, and every close other than <see cref="Close()"/> arrives at <c>Closing</c>
+        /// already cancelled.</remarks>
+        public bool AutoClose { get; set; } = true;
+
+        /// <inheritdoc/>
+        internal override bool AutoCloseCore => AutoClose;
+
+        /// <summary>Gets or sets whether the drop-down supports transparency.</summary>
+        public bool AllowTransparency { get; set; }
+
+        /// <summary>Gets or sets whether a drop shadow is drawn behind the drop-down.</summary>
+        public bool DropShadowEnabled { get; set; } = true;
+
+        /// <summary>Gets or sets the drop-down's opacity, from 0 to 1.</summary>
+        public double Opacity { get; set; } = 1d;
+
+        /// <summary>Gets or sets whether the drop-down is a top-level window.</summary>
+        public bool TopLevel { get; set; } = true;
+
+        /// <summary>Gets whether the framework created this drop-down rather than the application.</summary>
+        public bool IsAutoGenerated { get; internal set; }
+
+        /// <summary>Gets or sets the item this drop-down belongs to.</summary>
+        public ToolStripItem? OwnerItem { get; set; }
+
+        /// <summary>Closes the drop-down.</summary>
+        public void Close () => Close (ToolStripDropDownCloseReason.CloseCalled);
+
+        /// <inheritdoc cref="Close()"/>
+        /// <remarks>The reason reaches <c>Closing</c> and <c>Closed</c>, as upstream's
+        /// <c>Close (reason)</c> passes it through <c>SetCloseReason</c>. This used to be <c>Hide ()</c>,
+        /// which for a shown context menu hid the popup without raising either event (TSM-21). An owned
+        /// drop-down is a view onto its item's submenu and still closes through the item.</remarks>
+        public void Close (ToolStripDropDownCloseReason reason)
+        {
+            if (OwnerItem is null && IsShownMenu) {
+                SetCloseReason (reason);
+                Deactivate ();
+            } else
+                Hide ();
+        }
+    }
+
+    // ToolStrip used to declare its own AutoScroll/AutoScrollMargin/AutoScrollMinSize/AutoScrollPosition/
+    // SetAutoScrollMargin stubs, because it was not a ScrollableControl and had nowhere to inherit them
+    // from. It is one now (as it is in WinForms), so those are gone: the inherited members are the real
+    // implementations rather than auto-properties nothing reads. HorizontalScroll/VerticalScroll moved to
+    // ScrollableControl already declared HorizontalScroll/VerticalScroll, so those are inherited too.
+
+    public static partial class ToolStripManager
+    {
+        /// <summary>Gets or sets whether tool strips render with visual styles.</summary>
+        public static bool VisualStylesEnabled { get; set; } = true;
+
+        /// <summary>Returns the strip with the given name, or null.</summary>
+        public static ToolStrip? FindToolStrip (string toolStripName)
+            => Application.OpenForms
+                .SelectMany (form => form.Controls.OfType<ToolStrip> ())
+                .FirstOrDefault (strip => string.Equals (strip.Name, toolStripName, StringComparison.Ordinal));
+
+        /// <summary>Returns whether the given key combination is a usable menu shortcut.</summary>
+        public static bool IsValidShortcut (Keys shortcut)
+        {
+            var key = shortcut & Keys.KeyCode;
+
+            if (key == Keys.None)
+                return false;
+
+            // A function key stands alone; anything else needs a modifier, or every letter typed into
+            // a text box would look like a shortcut.
+            if (key is >= Keys.F1 and <= Keys.F24)
+                return true;
+
+            return (shortcut & (Keys.Control | Keys.Alt)) != 0;
+        }
+
+        /// <summary>Returns whether the given shortcut is already used by a menu item.</summary>
+        public static bool IsShortcutDefined (Keys shortcut) => false;
+
+        /// <summary>Saves the layout of the form's tool strips under the form's type name.</summary>
+        /// <inheritdoc cref="SaveSettings(Form, string)" path="/remarks"/>
+        public static void SaveSettings (Form sourceForm)
+        {
+            Guard.ThrowIfNull (sourceForm);
+            SaveSettings (sourceForm, SettingsKeyFor (sourceForm));
+        }
+
+        /// <summary>Saves the layout of the form's tool strips under the given key.</summary>
+        /// <remarks>
+        /// Real as of W6 mechanisms. Every named strip under the form is recorded and
+        /// <see cref="LoadSettings(Form, string)"/> puts it back, so a user's arrangement survives a
+        /// restart. For a strip in a <see cref="ToolStripPanel"/> that is the panel and the row it is on
+        /// (strips sharing a row come back side by side, in their order along it); for a strip anywhere else
+        /// it is the location and size; visibility is kept either way. The store is a text file in
+        /// <see cref="Application.UserAppDataPath"/>, where upstream's user settings live too. A strip
+        /// with no <see cref="Control.Name"/> cannot be matched on the way back and is skipped, as
+        /// upstream skips it. A key is a plain string, so one without a tab in it.
+        /// </remarks>
+        public static void SaveSettings (Form sourceForm, string key)
+        {
+            Guard.ThrowIfNull (sourceForm);
+            Guard.ThrowIfNull (key);
+
+            var lines = ReadStore ().Where (line => !line.StartsWith (key + '\t', StringComparison.Ordinal)).ToList ();
+
+            foreach (var strip in StripsIn (sourceForm.Controls)) {
+                if (strip.Name.Length == 0)
+                    continue;
+
+                var panel = strip.Parent as ToolStripPanel;
+                // The row, not the Controls index: the panel lays strips out from its rows (TSM-36).
+                var order = panel is null ? -1 : panel.RowIndexOf (strip);
+
+                lines.Add (string.Join ("\t", key, strip.Name, panel?.Name ?? string.Empty, Invariant (order),
+                    Invariant (strip.Left), Invariant (strip.Top), Invariant (strip.Width), Invariant (strip.Height),
+                    strip.Visible ? "1" : "0"));
+            }
+
+            var directory = System.IO.Path.GetDirectoryName (SettingsPath);
+
+            if (!string.IsNullOrEmpty (directory))
+                System.IO.Directory.CreateDirectory (directory);
+
+            System.IO.File.WriteAllLines (SettingsPath, lines);
+        }
+
+        /// <summary>Restores the layout <see cref="SaveSettings(Form)"/> recorded for the form's type.</summary>
+        /// <inheritdoc cref="SaveSettings(Form, string)" path="/remarks"/>
+        public static void LoadSettings (Form targetForm)
+        {
+            Guard.ThrowIfNull (targetForm);
+            LoadSettings (targetForm, SettingsKeyFor (targetForm));
+        }
+
+        /// <summary>Restores the layout <see cref="SaveSettings(Form, string)"/> recorded under the key.</summary>
+        /// <inheritdoc cref="SaveSettings(Form, string)" path="/remarks"/>
+        public static void LoadSettings (Form targetForm, string key)
+        {
+            Guard.ThrowIfNull (targetForm);
+            Guard.ThrowIfNull (key);
+
+            var strips = new Dictionary<string, ToolStrip> (StringComparer.Ordinal);
+            var panels = new Dictionary<string, ToolStripPanel> (StringComparer.Ordinal);
+
+            foreach (var strip in StripsIn (targetForm.Controls))
+                if (strip.Name.Length > 0 && !strips.ContainsKey (strip.Name))
+                    strips[strip.Name] = strip;
+
+            foreach (var panel in Descendants (targetForm.Controls).OfType<ToolStripPanel> ())
+                if (panel.Name.Length > 0 && !panels.ContainsKey (panel.Name))
+                    panels[panel.Name] = panel;
+
+            var placements = new Dictionary<ToolStripPanel, List<(ToolStrip Strip, int Row, int Along)>> ();
+
+            // Applied after the rows are restored, so a strip saved hidden is still placed on its row
+            // first rather than keeping wherever the user's rearrangement left it.
+            var visibility = new List<(ToolStrip Strip, bool Visible)> ();
+
+            foreach (var line in ReadStore ()) {
+                var parts = line.Split ('\t');
+
+                if (parts.Length != 9 || parts[0] != key || !strips.TryGetValue (parts[1], out var strip))
+                    continue;
+
+                if (!TryInvariant (parts[3], out var order) || !TryInvariant (parts[4], out var left) || !TryInvariant (parts[5], out var top)
+                    || !TryInvariant (parts[6], out var width) || !TryInvariant (parts[7], out var height))
+                    continue;
+
+                if (parts[2].Length > 0 && panels.TryGetValue (parts[2], out var panel)) {
+                    // Back onto the row it was on, once every line is read: restoring one strip at a time
+                    // would join a strip to whatever row happens to hold that index meanwhile.
+                    if (!placements.TryGetValue (panel, out var list))
+                        placements[panel] = list = [];
+
+                    list.Add ((strip, Math.Max (0, order), panel.Orientation == Orientation.Horizontal ? left : top));
+                    visibility.Add ((strip, parts[8] == "1"));
+                    continue;
+                }
+
+                strip.Location = new Point (left, top);
+                strip.Size = new Size (width, height);
+
+                strip.Visible = parts[8] == "1";
+            }
+
+            foreach (var pair in placements)
+                pair.Key.RestoreRows (pair.Value.OrderBy (p => p.Row).ThenBy (p => p.Along).Select (p => (p.Strip, p.Row)));
+
+            foreach (var (strip, visible) in visibility)
+                strip.Visible = visible;
+        }
+
+        /// <summary>The file the strip layouts are kept in. Settable so a test can point it elsewhere.</summary>
+        internal static string SettingsPath { get; set; } =
+            System.IO.Path.Combine (Application.UserAppDataPath, "toolstrip-layouts.txt");
+
+        private static string SettingsKeyFor (Form form) => form.GetType ().FullName ?? form.GetType ().Name;
+
+        private static string Invariant (int value) => value.ToString (System.Globalization.CultureInfo.InvariantCulture);
+
+        private static bool TryInvariant (string text, out int value)
+            => int.TryParse (text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out value);
+
+        private static string[] ReadStore ()
+            => System.IO.File.Exists (SettingsPath) ? System.IO.File.ReadAllLines (SettingsPath) : [];
+
+        private static IEnumerable<ToolStrip> StripsIn (Control.ControlCollection controls)
+            => Descendants (controls).OfType<ToolStrip> ();
+
+        private static IEnumerable<Control> Descendants (Control.ControlCollection controls)
+        {
+            foreach (Control control in controls) {
+                yield return control;
+
+                foreach (var child in Descendants (control.Controls))
+                    yield return child;
+            }
+        }
+
+        /// <summary>Raised when the shared renderer changes.</summary>
+#pragma warning disable CS0067
+        public static event EventHandler? RendererChanged;
+#pragma warning restore CS0067
+    }
+
+    public partial class FileDialog
+    {
+        /// <summary>Gets or sets whether the chosen file is added to the recent-files list.</summary>
+        /// <remarks>The shell integration properties below are stored so a designer file round-trips.
+        /// The backends' file pickers expose a path and a filter and nothing else, so none of them
+        /// change what the user sees.</remarks>
+        public bool AddToRecent { get; set; } = true;
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool AutoUpgradeEnabled { get; set; } = true;
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool OkRequiresInteraction { get; set; }
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool ShowHiddenFiles { get; set; }
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool ShowPinnedPlaces { get; set; } = true;
+
+        /// <summary>Gets or sets the identifier the shell uses to remember this dialog's state.</summary>
+        public Guid? ClientGuid { get; set; }
+
+        /// <summary>Gets the custom places shown in the dialog's sidebar.</summary>
+        public FileDialogCustomPlacesCollection CustomPlaces => custom_places ??= new FileDialogCustomPlacesCollection ();
+
+        private FileDialogCustomPlacesCollection? custom_places;
+
+        /// <summary>Raised when the user accepts the dialog.</summary>
+        public event CancelEventHandler? FileOk;
+
+        /// <summary>Raises the <see cref="FileOk"/> event.</summary>
+        protected void OnFileOk (CancelEventArgs e)
+        {
+            file_ok_raised = true;
+            FileOk?.Invoke (this, e);
+        }
+    }
+
+    public partial class FolderBrowserDialog
+    {
+        /// <summary>Gets or sets whether the chosen folder is added to the recent list.</summary>
+        /// <remarks>Stored; see <see cref="FileDialog.AddToRecent"/>.</remarks>
+        public bool AddToRecent { get; set; } = true;
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool AutoUpgradeEnabled { get; set; } = true;
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool OkRequiresInteraction { get; set; }
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool ShowHiddenFiles { get; set; }
+
+        /// <inheritdoc cref="AddToRecent"/>
+        public bool ShowPinnedPlaces { get; set; } = true;
+
+        /// <summary>Gets or sets the identifier the shell uses to remember this dialog's state.</summary>
+        public Guid? ClientGuid { get; set; }
+
+        /// <summary>Gets or sets whether more than one folder can be chosen.</summary>
+        public bool Multiselect { get; set; }
+
+        /// <summary>Gets the folders the user chose.</summary>
+        public string[] SelectedPaths
+            => string.IsNullOrEmpty (SelectedPath) ? [] : [SelectedPath];
+
+        /// <summary>Raised when the user asks for help.</summary>
+#pragma warning disable CS0067
+        public event EventHandler? HelpRequest;
+#pragma warning restore CS0067
+    }
+
+    public partial class Clipboard
+    {
+        /// <summary>Returns whether the clipboard holds audio.</summary>
+        public static bool ContainsAudio () => Current.ContainsAudio ();
+
+        /// <summary>Returns whether the clipboard holds a list of dropped files.</summary>
+        public static bool ContainsFileDropList () => Current.ContainsFileDropList ();
+
+        /// <summary>Returns the clipboard's audio as a stream, or null.</summary>
+        public static Stream? GetAudioStream () => Current.GetAudioStream ();
+
+        /// <summary>Returns the clipboard's file paths.</summary>
+        public static StringCollection GetFileDropList () => Current.GetFileDropList ();
+
+        /// <summary>Puts audio on the clipboard.</summary>
+        public static void SetAudio (byte[] audioBytes) => Current.SetAudio (audioBytes);
+
+        /// <inheritdoc cref="SetAudio(byte[])"/>
+        public static void SetAudio (Stream audioStream) => Current.SetAudio (audioStream);
+
+        /// <summary>Puts a list of file paths on the clipboard.</summary>
+        public static void SetFileDropList (StringCollection filePaths) => Current.SetFileDropList (filePaths);
+
+        /// <summary>Puts a value on the clipboard, serialised as JSON.</summary>
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode ("The stored type is serialised with reflection, as it is upstream.")]
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode ("The stored type is serialised with the reflection-based JSON serializer, as it is upstream.")]
+        public static void SetDataAsJson<T> (string format, T data) => Current.SetDataAsJson (format, data);
+
+        /// <summary>Returns the clipboard's value when it is of the requested type.</summary>
+        public static bool TryGetData<T> (string format, out T? data) => Current.TryGetData (format, out data);
+
+        /// <inheritdoc cref="TryGetData{T}(string,out T)"/>
+        public static bool TryGetData<T> (out T? data) => Current.TryGetData (out data);
+
+        // One data object holds what this process put on the clipboard, so the typed accessors above
+        // agree with each other. The text helpers still go through the backend, which is what makes
+        // copy and paste work across applications.
+        private static readonly DataObject Current = new ();
+    }
+}

@@ -1,0 +1,77 @@
+﻿using System.Drawing;
+
+namespace Majorsilence.Forms.Renderers
+{
+    /// <summary>
+    /// Represents a class that can render a ComboBox.
+    /// </summary>
+    public class ComboBoxRenderer : Renderer<ComboBox>
+    {
+        /// <summary>
+        /// Size of the drop down glyph.
+        /// </summary>
+        /// <remarks>The control owns this measurement now (<c>ComboBox.DropDownGlyphWidth</c>): the
+        /// edit region's bounds and the painted text area must agree exactly, and two definitions of
+        /// the same 15 pixels is how a caret ends up under the glyph.</remarks>
+        protected const int GLYPH_SIZE = ComboBox.DropDownGlyphWidth;
+
+        /// <inheritdoc/>
+        protected override void Render (ComboBox control, PaintEventArgs e)
+        {
+            var text_area = GetTextArea (control, e);
+            var unit_3 = e.LogicalToDeviceUnits (3);
+
+            if (control.Selected && control.ShowFocusCues) {
+                var focus_bounds = new Rectangle (text_area.Left - unit_3, text_area.Top, text_area.Width + unit_3, text_area.Height);
+                e.Canvas.DrawFocusRectangle (focus_bounds, unit_3);
+            }
+
+            // Draw the text of the selected item -- unless the control has an editable region, in which
+            // case the child TextBox is painting it, and painting it here too double-draws it (LST-07).
+            if (!control.IsEditable && control.Items.SelectedItem != null) {
+                // Owner draw (W6 mechanisms): the selected item in the edit area is the application's
+                // to paint, with ComboBoxEdit in the state, as upstream.
+                if (control.DrawMode != DrawMode.Normal)
+                    control.RaiseEditAreaDrawItem (text_area, e);
+                else
+                    e.Canvas.DrawText (control.GetItemText (control.Items.SelectedItem), text_area, control, ContentAlignment.MiddleLeft, maxLines: 1);
+            } else if (!control.IsEditable && control.Items.SelectedItem is null && control.EmptyText.Length > 0) {
+                // Nothing selected: the empty text, dimmed (W6 mechanisms, #176). The editable region
+                // shows it itself, as its placeholder.
+                e.Canvas.DrawText (control.EmptyText, control.GetEffectiveFont (), e.LogicalToDeviceUnits (control.GetEffectiveFontSize ()),
+                    text_area, Theme.ForegroundDisabledColor, ContentAlignment.MiddleLeft, maxLines: 1);
+            }
+
+            // A Simple combo has nothing to drop down: its list is the child under the edit region.
+            if (control.IsSimple)
+                return;
+
+            // Upstream's thin chevron, with the field it sits in (ComboBox.PaintsUpstreamField).
+            if (control.PaintsUpstreamField) {
+                ComboBox.DrawUpstreamChevron (e, control.ScaledWidth, control.ScaledHeight, control.Enabled);
+                return;
+            }
+
+            // Draw the drop down glyph
+            var button_bounds = GetDropDownButtonArea (control, e);
+
+            ControlPaint.DrawArrowGlyph (e, button_bounds, control.Enabled ? Theme.ForegroundColor : Theme.ForegroundDisabledColor, ArrowDirection.Down);
+        }
+
+        /// <summary>
+        /// Gets the bounding box of the area to draw the drop down glyph.
+        /// </summary>
+        protected Rectangle GetDropDownButtonArea (ComboBox control, PaintEventArgs e)
+        {
+            var glyph_size = e.LogicalToDeviceUnits (GLYPH_SIZE);
+
+            return new Rectangle (control.ScaledWidth - glyph_size, 0, glyph_size - e.LogicalToDeviceUnits (control.Padding.Right), control.ScaledHeight);
+        }
+
+        /// <summary>
+        /// Gets the bounding box of the area to draw the ComboBox text.
+        /// </summary>
+        protected Rectangle GetTextArea (ComboBox control, PaintEventArgs e)
+            => control.EditAreaDeviceBounds;
+    }
+}

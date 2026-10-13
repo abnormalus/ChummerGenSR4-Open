@@ -1,0 +1,233 @@
+﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a collection of DataGridViewRow objects in a DataGridView control.
+    /// </summary>
+    public partial class DataGridViewRowCollection : Collection<DataGridViewRow>
+    {
+        private readonly DataGridView owner;
+
+        /// <summary>
+        /// Initializes a new instance of the DataGridViewRowCollection class.
+        /// </summary>
+        internal DataGridViewRowCollection (DataGridView owner)
+        {
+            this.owner = owner;
+        }
+
+        /// <summary>Gets or sets the row at an index.</summary>
+        /// <remarks>
+        /// W6 mechanisms: with <see cref="DataGridView.AllowUserToAddRows"/> showing a new row, the index
+        /// <see cref="DataGridView.NewRowIndex"/> (which is <see cref="Collection{T}.Count"/>) answers the
+        /// uncommitted placeholder, so <c>grid.Rows[grid.NewRowIndex].IsNewRow</c> is true as it is
+        /// upstream. A DELIBERATE divergence: upstream counts the placeholder in <c>Rows.Count</c>; here
+        /// <c>Count</c> is the committed rows only, so nothing that walks the rows sees a row that is not
+        /// yet data, and <c>NewRowIndex == Rows.Count</c> keeps the meaning it always had.
+        /// </remarks>
+        public new DataGridViewRow this[int index] {
+            get => index == Count && owner.ShowsNewRow ? owner.NewRowPlaceholder : base[index];
+            set => base[index] = value;
+        }
+
+        // The commit that promotes the new-row placeholder into a real row: past ThrowIfBound (an
+        // unbound grid's own add) and through InsertItem, so RowsAdded fires.
+        internal void AddPromoted (DataGridViewRow row) => base.Add (row);
+
+        /// <summary>
+        /// Adds the specified existing row to the collection and returns its index.
+        /// </summary>
+        public new int Add (DataGridViewRow dataGridViewRow)
+        {
+            // Routes through InsertItem, which assigns the owning DataGridView.
+            base.Add (dataGridViewRow);
+            return Count - 1;
+        }
+
+        // Upstream throws InvalidOperationException from every public Add/Insert while the grid is
+        // bound: a row added by hand to a bound grid is a phantom that the next ListChanged deletes
+        // (DGV-33). The grid's own binding goes through InsertBound/RemoveBound/MoveBound instead.
+        private void ThrowIfBound ()
+        {
+            if (owner.DataSource is not null)
+                throw new InvalidOperationException (
+                    "Rows cannot be programmatically added to or removed from the DataGridView's rows collection when the control is data-bound. Change the data source instead.");
+        }
+
+        /// <summary>
+        /// Adds a new row with the specified cell values and returns its index.
+        /// </summary>
+        /// <remarks>
+        /// Returns the index, as upstream's <c>int Add (params object[] values)</c> does
+        /// (<c>DataGridViewRowCollection.cs</c>). It returned the row, so <c>int r = grid.Rows.Add ("a", 1);</c>
+        /// -- the most common line in migrated grid code -- did not compile (DGV-04). There is no
+        /// <c>string[]</c> overload upstream either: a string array converts to <c>object[]</c> and lands here.
+        /// </remarks>
+        public int Add (params object[] values)
+        {
+            Guard.ThrowIfNull (values);
+            ThrowIfBound ();
+            var row = (DataGridViewRow)owner.RowTemplate.Clone ();
+            row.Cells.Clear ();
+
+            foreach (var value in values)
+                row.Cells.Add (value);
+
+            base.Add (row);
+            return Count - 1;
+        }
+
+        /// <summary>
+        /// Adds the specified number of new empty rows.
+        /// </summary>
+        /// <returns>The index of the last row added -- so <c>Rows.Add ()</c> returns the new row's index.</returns>
+        public int Add (int count)
+        {
+            // It returned Count, so Rows.Add () on an empty grid returned 1 and the canonical
+            // `int i = grid.Rows.Add (); grid.Rows[i].Cells[0].Value = …` threw on every call (DGV-03).
+            if (count < 1)
+                throw new ArgumentOutOfRangeException (nameof (count), count, "At least one row must be added.");
+
+            ThrowIfBound ();
+
+            for (var i = 0; i < count; i++)
+                base.Add (CreateEmptyRow ());
+
+            return Count - 1;
+        }
+
+        // An empty row has one cell per column, as upstream's RowTemplate clone does. Without them the
+        // finding's own idiom -- Rows[Rows.Add ()].Cells[0].Value = … -- still threw once the index
+        // was right, on the Cells indexer instead (DGV-03).
+        private DataGridViewRow CreateEmptyRow () => owner.CreateRowFromTemplate ();
+
+        /// <summary>
+        /// Returns the index of the specified row, or -1 if not found.
+        /// </summary>
+        public new int IndexOf (DataGridViewRow row) => Items.IndexOf (row);
+
+        /// <summary>Inserts a new row at the specified index with the given cell values.</summary>
+        public void Insert (int rowIndex, params object[] values)
+        {
+            var row = (DataGridViewRow)owner.RowTemplate.Clone ();
+            row.Cells.Clear ();
+            foreach (var value in values)
+                row.Cells.Add (value);
+            Insert (rowIndex, row);
+        }
+
+        /// <summary>Inserts the specified row at the specified index.</summary>
+        public new void Insert (int rowIndex, DataGridViewRow dataGridViewRow)
+        {
+            ThrowIfBound ();
+
+            // Through InsertItem, so RowsAdded fires: it went straight to Items.Insert and bypassed the
+            // event (DGV-33).
+            base.Insert (rowIndex, dataGridViewRow);
+        }
+
+        // The grid's own binding path. Not guarded by ThrowIfBound -- these ARE the bound changes.
+        internal void InsertBound (int rowIndex, DataGridViewRow row) => base.Insert (rowIndex, row);
+
+        internal void RemoveBound (int rowIndex) => base.RemoveAt (rowIndex);
+
+        internal void MoveBound (int fromIndex, int toIndex)
+        {
+            if (fromIndex == toIndex)
+                return;
+
+            // Move the object, not its contents: the app's DataGridViewRow reference, Tag, Height and
+            // per-row style travel with it. Done silently -- a move is neither an add nor a remove.
+            var row = Items[fromIndex];
+            Items.RemoveAt (fromIndex);
+            Items.Insert (toIndex, row);
+            owner.OnRowsChanged ();
+        }
+
+        /// <inheritdoc/>
+        protected override void ClearItems ()
+        {
+            foreach (var row in this)
+                row.SetOwner (null);
+
+            int clearedCount = Count;
+            base.ClearItems ();
+            owner.OnRowsChanged ();
+
+            if (clearedCount > 0)
+                owner.RaiseRowsRemoved (0, clearedCount);
+
+            // Upstream's Clear announces a Refresh, not one Remove per row (DataGridViewRowCollection.cs).
+            OnCollectionChanged (new CollectionChangeEventArgs (CollectionChangeAction.Refresh, null));
+        }
+
+        /// <inheritdoc/>
+        protected override void InsertItem (int index, DataGridViewRow item)
+        {
+            item.SetOwner (owner);
+            base.InsertItem (index, item);
+            owner.OnRowsChanged ();
+            owner.RaiseRowsAdded (index, 1);
+
+            // Declared and raised by nothing (DGV-40). Upstream raises Add with the row from every add
+            // and insert, after the grid has taken the row in.
+            OnCollectionChanged (new CollectionChangeEventArgs (CollectionChangeAction.Add, item));
+        }
+
+        /// <inheritdoc/>
+        protected override void RemoveItem (int index)
+        {
+            var removed = this[index];
+            removed.SetOwner (null);
+            base.RemoveItem (index);
+            owner.OnRowsChanged ();
+            owner.RaiseRowsRemoved (index, 1);
+            OnCollectionChanged (new CollectionChangeEventArgs (CollectionChangeAction.Remove, removed));
+        }
+
+        /// <summary>
+        /// Replaces all rows with the specified list, raising a single change notification.
+        /// </summary>
+        internal void ReplaceAll (List<DataGridViewRow> rows)
+        {
+            // Clear without per-item notifications
+            var removed = Count;
+
+            foreach (var row in this)
+                row.SetOwner (null);
+
+            Items.Clear ();
+
+            foreach (var row in rows) {
+                row.SetOwner (owner);
+                Items.Add (row);
+            }
+
+            owner.OnRowsChanged ();
+
+            // One RowsRemoved and one RowsAdded for the batch, so the two balance. A bind used to raise
+            // RowsRemoved (0, N) from a Clear before it and nothing from here, so RowsAdded handlers --
+            // the row-colouring idiom -- never ran for bound rows and counters went negative (DGV-33).
+            if (removed > 0)
+                owner.RaiseRowsRemoved (0, removed);
+
+            if (rows.Count > 0)
+                owner.RaiseRowsAdded (0, rows.Count);
+
+            // A whole-list swap is upstream's Refresh -- the bind path's ReplaceAll is a Clear and an
+            // AddRange, both of which announce Refresh there.
+            OnCollectionChanged (new CollectionChangeEventArgs (CollectionChangeAction.Refresh, null));
+        }
+
+        /// <inheritdoc/>
+        protected override void SetItem (int index, DataGridViewRow item)
+        {
+            this[index].SetOwner (null);
+            item.SetOwner (owner);
+            base.SetItem (index, item);
+            owner.OnRowsChanged ();
+        }
+    }
+}

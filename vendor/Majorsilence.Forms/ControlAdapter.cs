@@ -1,0 +1,391 @@
+﻿using System.Drawing;
+using SkiaSharp;
+
+namespace Majorsilence.Forms
+{
+    internal sealed class ControlAdapter : ScrollableControl
+    {
+        private Control? selected_control;
+
+        public ControlAdapter (WindowBase parent)
+        {
+            ParentForm = parent;
+            SetControlBehavior (ControlBehaviors.Selectable, false);
+        }
+
+        // We need to override this because the ControlAdapter doesn't need to be scaled
+        internal override Rectangle DeviceClientRectangle {
+            get {
+                var x = CurrentStyle.Border.Left.GetWidth ();
+                var y = CurrentStyle.Border.Top.GetWidth ();
+                var w = Width - CurrentStyle.Border.Right.GetWidth () - x;
+                var h = Height - CurrentStyle.Border.Bottom.GetWidth () - y;
+                return new Rectangle (x, y, w, h);
+            }
+        }
+
+        public new WindowBase ParentForm { get; }
+
+        // The top of every control's Cursor inheritance chain on this window. Upstream the form is the
+        // root control, so a control without a cursor of its own -- the client area included -- shows the
+        // form's. Here the chain ended at this adapter, which has no parent, so it answered the arrow and
+        // the pointer over a form's empty client area lost the form's cursor.
+        protected override Cursor DefaultCursor => ParentForm.Cursor ?? base.DefaultCursor;
+
+        /// <summary>The window's binding context: the adapter is the root its children inherit from.</summary>
+        /// <remarks>
+        /// Upstream the form IS the root control, so a child's inherited context is the form's. Here the
+        /// chain ended at this adapter, which minted a context of its own -- so
+        /// <c>form.BindingContext[table]</c> and the manager every control on the form bound through
+        /// were two different objects, and moving one never moved the other (BND-15).
+        /// </remarks>
+        public override BindingContext BindingContext {
+            get => ((IBindableComponent) ParentForm).BindingContext ?? base.BindingContext;
+            // The window raises the change (OnWindowBindingContextChanged), so setting it here or on the
+            // form does the same thing once.
+            set => ((IBindableComponent) ParentForm).BindingContext = value;
+        }
+
+        // The window's context changed: re-home this root's children and raise BindingContextChanged.
+        internal void RaiseBindingContextChanged () => OnBindingContextChanged (EventArgs.Empty);
+
+        /// <summary>
+        /// Lays the window's children out, then lets the window itself lay out.
+        /// </summary>
+        /// <remarks>
+        /// The adapter is the Control standing in for the Form, so its layout pass IS the Form's.
+        /// Base first: a Form's OnLayout override generally positions children relative to the ones
+        /// the normal dock/anchor pass has just placed, so it has to see their settled bounds.
+        /// </remarks>
+        protected override void OnLayout (LayoutEventArgs e)
+        {
+            base.OnLayout (e);
+
+            // Only once the window has actually been shown. Adding controls during a Form subclass's
+            // construction lays the adapter out, and forwarding that would invoke the subclass's
+            // OnLayout override before its own constructor has run -- a real consumer (DockPanelSuite's
+            // FloatWindow) reads a collection there that its constructor has not created yet and throws.
+            // WinForms does not raise a Form's layout before it has a handle either.
+            if (ParentForm is { shown: true } window)
+                window.RaiseLayout (e);
+        }
+
+        // The Adapter is given the Form's native surface including any managed Form borders, and it
+        // needs to not draw on top of those borders -- that is, it often has to start drawing at
+        // (1, 1) instead of (0, 0). This could probably be eliminated in the future with
+        // Canvas.Translate.
+        internal override Point ChildPaintOffset {
+            get {
+                var form_border = ParentForm.CurrentStyle.Border;
+                var scaling = Scaling;
+
+                return new Point (
+                    (int)(form_border.Left.GetWidth () * scaling),
+                    (int)(form_border.Top.GetWidth () * scaling));
+            }
+        }
+
+        public override bool Visible {
+            get => ParentForm != null;
+            set { }
+        }
+
+        // Raised when the focused (selected) control changes. The single choke-point for keyboard focus,
+        // consumed by AutomationObserver to feed UI Automation focus-changed events.
+        internal event EventHandler<Control?>? SelectedControlChanged;
+
+        /// <summary>
+        /// The focused control, and the single choke point for changing it.
+        /// </summary>
+        /// <remarks>
+        /// Assigning here runs the whole WinForms focus sequence — see <see cref="ChangeFocus"/>. It
+        /// used to deselect the old control and then call <c>Select ()</c> on the new one, which called
+        /// back into this setter; the mutual recursion is why the event order differed between mouse
+        /// and keyboard focus changes.
+        /// </remarks>
+        internal Control? SelectedControl {
+            get => selected_control;
+            set {
+                if (selected_control == value)
+                    return;
+
+                // The adapter is the root standing in for the window; it is never itself "focused".
+                if (value is ControlAdapter)
+                    return;
+
+                ChangeFocus (value);
+            }
+        }
+
+        // Guards against a Validating or Enter handler moving focus again while we are still moving it.
+        // Upstream has the same problem and solves it the same way (ContainerControl's s_stateValidating).
+        private bool changing_focus;
+
+        // Focus requested while the window was raising Load; applied by ApplyDeferredFocus once it returns.
+        private Control? deferred_focus;
+        private bool has_deferred_focus;
+
+        /// <summary>
+        /// Runs the focus change a Load handler asked for, now that Load has returned. No-op when Load
+        /// did not touch focus, which is the usual case.
+        /// </summary>
+        internal void ApplyDeferredFocus ()
+        {
+            if (!has_deferred_focus)
+                return;
+
+            has_deferred_focus = false;
+
+            var target = deferred_focus;
+            deferred_focus = null;
+
+            ChangeFocus (target);
+        }
+
+        /// <summary>
+        /// Moves focus from the current control to <paramref name="value"/>, running WinForms' sequence:
+        /// Leave up the leaving chain, the validation cycle between the two, then Enter down the
+        /// entering chain, and finally the LostFocus/GotFocus notifications.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Mirrors <c>ContainerControl.UpdateFocusedControl</c> and <c>EnterValidation</c>. The pieces
+        /// that matter, and that the previous implementation had wrong:
+        /// </para>
+        /// <list type="bullet">
+        /// <item>Leave and Enter walk the <em>ancestor path</em>, not just the two leaf controls, so a
+        /// Panel or UserControl hears focus entering and leaving it.</item>
+        /// <item>Validation runs while focus is still on the leaving control, so cancelling it can
+        /// actually keep focus there.</item>
+        /// <item>Validation is gated on the <em>entering</em> control's <c>CausesValidation</c> and on
+        /// the container's <c>AutoValidate</c>, both of which were previously ignored.</item>
+        /// </list>
+        /// </remarks>
+        private void ChangeFocus (Control? value)
+        {
+            // A handler that moves focus again re-enters here. Let the innermost move win rather than
+            // interleaving two half-finished sequences.
+            if (changing_focus) {
+                selected_control = value;
+                return;
+            }
+
+            // Focus asked for from inside a Load handler. Record it and raise nothing: upstream cannot
+            // focus a control on a form that is not displayed yet, so no focus event reaches a Load
+            // handler there. selected_control is deliberately left alone, so when this runs for real
+            // after Load there is no "leaving" control and no LostFocus fires for one that never had
+            // focus -- which is exactly the event that was reaching half-initialised handlers.
+            if (ParentForm is { raising_load: true }) {
+                deferred_focus = value;
+                has_deferred_focus = true;
+                return;
+            }
+
+            var leaving = selected_control;
+            var entering = value;
+            var ancestor = CommonAncestor (leaving, entering);
+
+            changing_focus = true;
+
+            try {
+                // 1. Leave, bottom-up from the leaving control to (excluding) the common ancestor.
+                for (var c = leaving; c is not null && c != ancestor; c = c.Parent)
+                    c.RaiseLeaveOnly ();
+
+                // 2. The validation cycle, still focused on the leaving control so a cancel can hold it.
+                if (!RunValidation (leaving, entering, ancestor)) {
+                    // Cancelled: focus stays where it was. Re-enter the control we just left so its own
+                    // Enter/Leave pairing stays balanced for anything counting them.
+                    for (var c = leaving; c is not null && c != ancestor; c = c.Parent)
+                        c.RaiseEnterOnly ();
+
+                    return;
+                }
+
+                selected_control = entering;
+
+                leaving?.MarkDeselected ();
+                entering?.MarkSelected ();
+
+                // 3. The focus notifications and the Enter walk, top-down to the entering control.
+                leaving?.RaiseLostFocusOnly ();
+
+                foreach (var c in PathDownTo (entering, ancestor))
+                    c.RaiseEnterOnly ();
+
+                entering?.RaiseGotFocus ();
+
+                // LAY-30: the headline behaviour of ScrollControlIntoView is that TABBING into a
+                // control below the fold of an AutoScroll panel scrolls it into view. Upstream drives
+                // that from ContainerControl when the active control changes; this is the equivalent
+                // point here. Without it, focus lands on a field the user cannot see -- immediately
+                // noticed on any long data-entry form, and the reason the method exists.
+                entering?.ScrollControlIntoView (entering);
+
+                leaving?.Invalidate ();
+                entering?.Invalidate ();
+            } finally {
+                changing_focus = false;
+            }
+
+            SelectedControlChanged?.Invoke (this, selected_control);
+        }
+
+        /// <summary>
+        /// Runs Validating/Validated on the leaving control and its ancestors up to (excluding) the
+        /// common ancestor. Returns false when a handler cancelled and focus must stay put.
+        /// </summary>
+        private bool RunValidation (Control? leaving, Control? entering, Control? ancestor)
+        {
+            if (leaving is null)
+                return true;
+
+            // Upstream's EnterValidation gates: nothing to validate, the entered control opting out, or
+            // auto-validation switched off on the container.
+            if (entering is not null && !entering.CausesValidation)
+                return true;
+
+            var mode = AutoValidateFor (leaving);
+
+            if (mode == AutoValidate.Disable)
+                return true;
+
+            for (var c = leaving; c is not null && c != ancestor; c = c.Parent) {
+                if (!c.CausesValidation)
+                    continue;
+
+                if (c.RaiseValidation ())
+                    continue;
+
+                // A cancel only holds focus in EnablePreventFocusChange, which is the default. In
+                // EnableAllowFocusChange the validation still ran and still failed, but focus moves on.
+                return mode != AutoValidate.EnablePreventFocusChange;
+            }
+
+            return true;
+        }
+
+        // The effective AutoValidate for a control: the nearest container that declares one, else the
+        // window's.
+        private AutoValidate AutoValidateFor (Control control)
+        {
+            for (var c = control.Parent; c is not null; c = c.Parent) {
+                if (c is ContainerControl container)
+                    return container.AutoValidate;
+            }
+
+            return ParentForm is Form form ? form.AutoValidate : AutoValidate.EnablePreventFocusChange;
+        }
+
+        /// <summary>
+        /// Moves focus off a control that has just been removed from this window, when it or one of its
+        /// descendants held it.
+        /// </summary>
+        /// <remarks>
+        /// Upstream's <c>ControlCollection.Remove</c> calls <c>ContainerControl.AfterControlRemoved</c>,
+        /// which selects the next control in the container, or clears the active control when there is
+        /// none (ContainerControl.cs AfterControlRemoved). Nothing did here (EVT-21), so keystrokes kept
+        /// routing to the detached control, and the next control clicked raised Leave and Validating on
+        /// it. The removed control is not validated: it is leaving the form, and a cancel could only
+        /// keep focus on something no longer in the window.
+        /// </remarks>
+        internal void AfterControlRemoved (Control removed, Control oldParent)
+        {
+            var focused = selected_control;
+
+            if (focused is null || !(ReferenceEquals (focused, removed) || removed.Contains (focused)))
+                return;
+
+            selected_control = null;
+            focused.MarkDeselected ();
+
+            // Leave up the whole old chain -- the detached branch, then from its old parent to this root --
+            // so the Enter walk of whatever takes focus next starts from nothing and stays balanced.
+            for (var c = focused; c is not null; c = c.Parent)
+                c.RaiseLeaveOnly ();
+
+            for (Control? c = oldParent; c is not null; c = c.Parent)
+                c.RaiseLeaveOnly ();
+
+            focused.RaiseLostFocusOnly ();
+
+            // A form tearing down its controls has nowhere to send focus.
+            if (!oldParent.GetAnyDisposingInHierarchy () && ParentForm is { IsDisposed: false }) {
+                var container = oldParent.GetContainerControl () as Control ?? this;
+
+                if (!container.SelectNextControl (null, true, true, true, true) && !ReferenceEquals (container, this))
+                    SelectNextControl (null, true, true, true, true);
+            }
+
+            if (selected_control is null)
+                SelectedControlChanged?.Invoke (this, null);
+        }
+
+        // The deepest control that contains both, or null when they share only this adapter.
+        private static Control? CommonAncestor (Control? first, Control? second)
+        {
+            if (first is null || second is null)
+                return null;
+
+            for (var a = first; a is not null; a = a.Parent) {
+                for (var b = second; b is not null; b = b.Parent) {
+                    if (ReferenceEquals (a, b))
+                        return a;
+                }
+            }
+
+            return null;
+        }
+
+        // The chain from just below `ancestor` down to `target`, outermost first, so Enter arrives on a
+        // container before the child inside it.
+        private static List<Control> PathDownTo (Control? target, Control? ancestor)
+        {
+            var path = new List<Control> ();
+
+            for (var c = target; c is not null && c != ancestor; c = c.Parent)
+                path.Add (c);
+
+            path.Reverse ();
+            return path;
+        }
+
+        internal void RaiseParentVisibleChanged (EventArgs e)
+        {
+            OnParentVisibleChanged (e);
+        }
+
+        // ── The keyboard pre-processing chain crosses from Control to WindowBase here ─────────────
+        //
+        // Control's chain bubbles to Parent; the adapter has none, and it is the root control standing
+        // in for the window. Upstream the window IS a Control and the walk simply continues, so these
+        // four hand the key to WindowBase/Form -- which is where AcceptButton, CancelButton, menu
+        // shortcuts and KeyPreview live. Without them the chain would stop one level short of every
+        // form-level behaviour it exists to reach.
+        //
+        // Tab is handled here rather than on the window, mirroring ContainerControl: focus traversal
+        // is a property of the container that owns the focus chain, and the adapter is that container.
+
+        protected override bool ProcessCmdKey (ref Message msg, Keys keyData)
+            => ParentForm.RaiseProcessCmdKey (ref msg, keyData);
+
+        protected override bool ProcessDialogKey (Keys keyData)
+        {
+            if ((keyData & Keys.KeyCode) == Keys.Tab && (keyData & (Keys.Alt | Keys.Control)) == Keys.None) {
+                if (FindForm () is Form form)
+                    form.ShowFocusCues = true;
+
+                SelectNextControl (SelectedControl, (keyData & Keys.Shift) == Keys.None, true, true, true);
+                return true;
+            }
+
+            return ParentForm.RaiseProcessDialogKey (keyData);
+        }
+
+        protected override bool ProcessDialogChar (char charCode)
+            => ParentForm.RaiseProcessDialogChar (charCode);
+
+        protected override bool ProcessKeyPreview (ref Message m)
+            => ParentForm.RaiseProcessKeyPreview (ref m);
+    }
+}

@@ -1,0 +1,3550 @@
+using System;
+using System.Drawing;
+using Majorsilence.Forms.Drawing.Drawing2D;
+using Majorsilence.Forms.Drawing.Text;
+using SkiaSharp;
+
+#pragma warning disable CA1416  // WinForms compat layer — intentionally uses Windows-only System.Drawing APIs
+
+namespace Majorsilence.Forms.Drawing
+{
+    /// <summary>
+    /// WinForms compatibility: wraps an <see cref="SKCanvas"/> to provide a GDI-like drawing surface.
+    /// Use <see cref="Control.CreateGraphics"/> for text measurement; for painting use <see cref="PaintEventArgs.Canvas"/>.
+    /// </summary>
+    public sealed partial class Graphics : IDisposable, Majorsilence.Forms.Drawing.IDeviceContext
+    {
+        private readonly Control? _control;
+        private readonly SKCanvas? _canvas;
+
+        // The surface this Graphics draws onto. Exposed to the Forms layer so PaintEventArgs can be
+        // built from a Graphics, which is the shape WinForms code constructs it in.
+        internal SKCanvas? Canvas => _canvas;
+        private readonly bool _ownsCanvas;
+
+        // The image FromImage was created over, if any. An SKCanvas does NOT keep its backing SKBitmap
+        // alive, so without this a caller who does not hold the image themselves gets the bitmap
+        // collected out from under native code -- which aborts the process rather than throwing.
+        private readonly Majorsilence.Forms.Drawing.Image? _sourceImage;
+        private bool _disposed;
+
+        // The canvas matrix as it stood when this Graphics was created. GDI+ keeps the device origin
+        // (for a control, its client origin) OUT of Graphics.Transform -- that starts as identity and
+        // means "the world transform the caller has applied". Skia makes no such separation: whatever
+        // translation put the canvas at the control's origin is already in SKCanvas.TotalMatrix. So the
+        // world transform is tracked RELATIVE to this baseline. Without it, assigning Transform would
+        // wipe out the control's origin and move the drawing to the top-left of the whole surface.
+        private readonly SKMatrix _baseline = SKMatrix.Identity;
+
+        internal Graphics (Control? control = null) { _control = control; }
+
+        internal Graphics (SKCanvas canvas, Control? control = null)
+        {
+            _canvas = canvas;
+            _control = control;
+            _baseline = canvas.TotalMatrix;
+        }
+
+        private Graphics (SKCanvas canvas, bool ownsCanvas, Majorsilence.Forms.Drawing.Image? sourceImage = null)
+        {
+            _canvas = canvas;
+            _ownsCanvas = ownsCanvas;
+            _sourceImage = sourceImage;
+            _baseline = canvas.TotalMatrix;
+        }
+
+        /// <summary>Creates a Graphics object for drawing on the specified Majorsilence.Forms.Drawing.Image.
+        /// Drawing goes directly into the image's backing bitmap, matching System.Drawing semantics.</summary>
+        public static Graphics FromImage (Majorsilence.Forms.Drawing.Image image)
+        {
+            Guard.ThrowIfNull (image);
+
+            // Upstream's Graphics.FromImage refuses an indexed image (GdiplusCannotCreateGraphicsFromIndexedPixelFormat):
+            // there is no palette-preserving way to draw into one. Reachable now that a Bitmap reports
+            // the format it was created in (GFX-31).
+            if ((image.PixelFormat & Majorsilence.Forms.Drawing.Imaging.PixelFormat.Indexed) != 0)
+                throw new ArgumentException ("A Graphics object cannot be created from an image that has an indexed pixel format.", nameof (image));
+
+            var backing = image.GetSKBitmap () ?? throw new ArgumentException ("Image has no backing bitmap.", nameof (image));
+            // A bitmap's resolution is the surface's (GFX-10): fonts and DpiX/DpiY follow SetResolution.
+            return new Graphics (new SKCanvas (backing), ownsCanvas: true, sourceImage: image) {
+                UnitsPerInch = image.HorizontalResolution > 0 ? image.HorizontalResolution : 96f,
+            };
+        }
+
+        /// <summary>Creates a Graphics object for the specified window handle. Returns a no-op instance in Majorsilence.Forms.</summary>
+        public static Graphics FromHwnd (IntPtr hwnd) => new Graphics ();
+
+        /// <summary>Creates a Graphics object from a device context handle. Returns a no-op instance in Majorsilence.Forms.</summary>
+        public static Graphics FromHdc (IntPtr hdc) => new Graphics ();
+
+        // --- Text measurement ---
+
+        /// <summary>Measures the size of the specified string using the given font and size.</summary>
+        public SizeF MeasureString (string text, SKTypeface font, int fontSize = -1)
+        {
+            if (string.IsNullOrEmpty (text)) return SizeF.Empty;
+            var sz = fontSize <= 0
+                ? TextMeasurer.MeasureText (text, font, Theme.FontSize)
+                : TextMeasurer.MeasureText (text, font, fontSize);
+            return new SizeF (sz.Width, sz.Height);
+        }
+
+        /// <summary>Measures the string constrained to a maximum width.</summary>
+        /// <remarks>
+        /// A <paramref name="maxWidth"/> of zero or less means UNBOUNDED, not "wrap at zero". That is
+        /// GDI+'s convention, and callers rely on it: <c>Graphics.MeasureString (text, font)</c> is
+        /// itself specified as passing a layout area of <c>SizeF (0, 0)</c>, so any library that
+        /// funnels its measurement through one constrained overload passes 0 to mean "no limit".
+        /// Taking the 0 literally wrapped every string to one grapheme per line, which turned
+        /// auto-sized controls into tall narrow slivers rather than merely mis-measuring them.
+        /// </remarks>
+        public SizeF MeasureString (string text, SKTypeface font, int maxWidth, int fontSize = -1)
+        {
+            if (string.IsNullOrEmpty (text)) return SizeF.Empty;
+            var proposed = new System.Drawing.Size (maxWidth > 0 ? maxWidth : int.MaxValue, int.MaxValue);
+            var sz = fontSize <= 0
+                ? TextMeasurer.MeasureText (text, font, Theme.FontSize, proposed)
+                : TextMeasurer.MeasureText (text, font, fontSize, proposed);
+            return new SizeF (sz.Width, sz.Height);
+        }
+
+        /// <summary>Measures the string using the control's own font.</summary>
+        public SizeF MeasureString (string text, Control control)
+        {
+            if (string.IsNullOrEmpty (text)) return SizeF.Empty;
+            var sz = TextMeasurer.MeasureText (text, control);
+            return new SizeF (sz.Width, sz.Height);
+        }
+
+        /// <summary>Measures the string with a Majorsilence.Forms.Drawing.Font (maps to SKTypeface at the font's size).</summary>
+        /// <remarks>
+        /// As in GDI+, spaces at the end of a line are not part of the measurement; see
+        /// <see cref="MeasureString(string, Majorsilence.Forms.Drawing.Font, SizeF, Majorsilence.Forms.Drawing.StringFormat)"/>.
+        /// </remarks>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font)
+            => MeasureFormatted (text, font, 0, null);
+
+        /// <summary>Measures the string with a Majorsilence.Forms.Drawing.Font, constrained to a size.</summary>
+        /// <inheritdoc cref="MeasureString(string, Majorsilence.Forms.Drawing.Font)" path="/remarks"/>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font, SizeF layoutArea)
+            => MeasureFormatted (text, font, layoutArea.Width, null);
+
+        /// <summary>
+        /// The run exactly as it is drawn, trailing spaces included: what the drawing code positions,
+        /// aligns and underlines by. The public overloads apply GDI+'s measurement rules on top.
+        /// </summary>
+        internal SizeF MeasureRun (string text, Majorsilence.Forms.Drawing.Font font, float layoutWidth = 0)
+        {
+            if (string.IsNullOrEmpty (text) || font is null) return SizeF.Empty;
+            var face = TypefaceCache.Resolve (font);
+            return layoutWidth > 0
+                ? MeasureString (text, face, (int)layoutWidth, (int)Math.Round (FontUnits (font)))
+                : MeasureString (text, face, (int)Math.Round (FontUnits (font)));
+        }
+
+        /// <summary>Measures the string with a Majorsilence.Forms.Drawing.Font and StringFormat.</summary>
+        /// <remarks>
+        /// Honours <c>HotkeyPrefix</c>, <see cref="Majorsilence.Forms.Drawing.StringFormatFlags.NoWrap"/>,
+        /// <see cref="Majorsilence.Forms.Drawing.StringFormatFlags.MeasureTrailingSpaces"/> and
+        /// <see cref="Majorsilence.Forms.Drawing.StringFormatFlags.DirectionVertical"/> (which swaps the
+        /// reported width and height, matching the rotated run
+        /// <see cref="DrawString(string, Majorsilence.Forms.Drawing.Font, Majorsilence.Forms.Drawing.Brush, RectangleF, Majorsilence.Forms.Drawing.StringFormat?)"/>
+        /// draws for it). <see cref="Majorsilence.Forms.Drawing.StringFormat.Trimming"/> is not applied to
+        /// the measurement: Microsoft's documentation describes trimming only as how drawn text is cut,
+        /// and does not say whether GDI+ caps a measurement at the layout width because of it.
+        /// </remarks>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.StringFormat? format)
+        {
+            var single = MeasureFormatted (WithoutHotkeyPrefix (text, format), font, 0, format);
+            return IsVertical (format) ? new SizeF (single.Height, single.Width) : single;
+        }
+
+        /// <summary>Measures the string with a Majorsilence.Forms.Drawing.Font, constrained to int width.</summary>
+        /// <inheritdoc cref="MeasureString(string, Majorsilence.Forms.Drawing.Font, Majorsilence.Forms.Drawing.StringFormat)"/>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font, int width, Majorsilence.Forms.Drawing.StringFormat? format)
+            => MeasureString (text, font, new SizeF (width, 0), format);
+
+        /// <summary>Measures the string with a Majorsilence.Forms.Drawing.Font, constrained to SizeF.</summary>
+        /// <inheritdoc cref="MeasureString(string, Majorsilence.Forms.Drawing.Font, Majorsilence.Forms.Drawing.StringFormat)"/>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font, SizeF layoutArea, Majorsilence.Forms.Drawing.StringFormat? format)
+        {
+            var display = WithoutHotkeyPrefix (text, format);
+
+            // Vertical text here is a single rotated run, not multi-column CJK stacking (see
+            // DrawStringVertical), so there is no second column for it to wrap into -- the width
+            // constraint that drives wrapping for horizontal text does not apply.
+            if (IsVertical (format)) {
+                var single = MeasureFormatted (display, font, 0, format);
+                return new SizeF (single.Height, single.Width);
+            }
+            return MeasureFormatted (display, font, layoutArea.Width, format);
+        }
+
+        /// <summary>The GDI+ measurement of <paramref name="text"/> under <paramref name="format"/>.</summary>
+        /// <remarks>
+        /// GFX-20, from Microsoft's <c>StringFormatFlags</c> documentation:
+        /// <list type="bullet">
+        /// <item><c>NoWrap</c> suppresses line breaking, so the measurement is the natural single-line
+        /// run -- how column auto-fit and "is this truncated?" checks are written. It was ignored, so
+        /// those got the wrapped height and a width capped at the layout area.</item>
+        /// <item>"By default the boundary rectangle returned by the MeasureString method excludes the
+        /// space at the end of each line"; <c>MeasureTrailingSpaces</c> includes it. Trailing spaces
+        /// always counted here, so a caption measured as <c>"Name: "</c> to place a value after it put
+        /// the value a space further right than GDI+ does, and a run of only spaces measured wide where
+        /// GDI+ reports a line with no width.</item>
+        /// <item>Unless <c>NoClip</c> is set, "trailing spaces that extend outside the layout rectangle
+        /// are not included in the measurement", so counting them never takes the width past the
+        /// layout width.</item>
+        /// </list>
+        /// </remarks>
+        private SizeF MeasureFormatted (string text, Majorsilence.Forms.Drawing.Font font, float layoutWidth,
+            Majorsilence.Forms.Drawing.StringFormat? format)
+        {
+            if (string.IsNullOrEmpty (text) || font is null)
+                return SizeF.Empty;
+
+            var flags = format?.FormatFlags ?? 0;
+            var wrapWidth = (flags & Majorsilence.Forms.Drawing.StringFormatFlags.NoWrap) != 0 ? 0 : layoutWidth;
+
+            var trimmed = WithoutTrailingSpaces (text);
+            if (trimmed.Length == text.Length)
+                return MeasureRun (text, font, wrapWidth);
+
+            // Only spaces: one line tall, no width.
+            var size = trimmed.Length > 0
+                ? MeasureRun (trimmed, font, wrapWidth)
+                : new SizeF (0, MeasureRun (text, font).Height);
+
+            if ((flags & Majorsilence.Forms.Drawing.StringFormatFlags.MeasureTrailingSpaces) == 0)
+                return size;
+
+            var width = MeasureRun (text, font, wrapWidth).Width;
+            if (layoutWidth > 0 && (flags & Majorsilence.Forms.Drawing.StringFormatFlags.NoClip) == 0)
+                width = Math.Min (width, layoutWidth);
+
+            return new SizeF (Math.Max (width, size.Width), size.Height);
+        }
+
+        // The text without the spaces that end each of its lines. Only U+0020, as the documentation says
+        // "space"; a line ends at a CR, an LF or the end of the text.
+        private static string WithoutTrailingSpaces (string text)
+        {
+            if (text.IndexOf (' ') < 0)
+                return text;
+
+            var result = new System.Text.StringBuilder (text.Length);
+            var pending = 0;
+            foreach (var c in text) {
+                if (c == ' ') {
+                    pending++;
+                    continue;
+                }
+                if (c != '\r' && c != '\n')
+                    result.Append (' ', pending);
+                pending = 0;
+                result.Append (c);
+            }
+            return result.ToString ();
+        }
+
+        // Vertical here means "rotate the run 90 degrees", the way RDL's WritingMode="tb-rl" and every
+        // chart library render a sideways axis title -- see the remarks on DrawStringVertical.
+        private static bool IsVertical (Majorsilence.Forms.Drawing.StringFormat? format) =>
+            format is not null && format.FormatFlags.HasFlag (Majorsilence.Forms.Drawing.StringFormatFlags.DirectionVertical);
+
+        // The text that will actually be drawn, per the format's hotkey handling. Measuring the raw string
+        // would reserve room for ampersands that never render, so a button sized from its own caption comes
+        // out wider than its text -- and a centred caption sits off-centre by the same amount.
+        private static string WithoutHotkeyPrefix (string text, Majorsilence.Forms.Drawing.StringFormat? format) =>
+            format is null || format.HotkeyPrefix == Majorsilence.Forms.Drawing.Text.HotkeyPrefix.None
+                ? text
+                : Mnemonics.Strip (text);
+
+        /// <summary>
+        /// Returns one <see cref="Majorsilence.Forms.Drawing.Region"/> per character range previously
+        /// supplied to <see cref="Majorsilence.Forms.Drawing.StringFormat.SetMeasurableCharacterRanges"/>,
+        /// describing where that range lands when <paramref name="text"/> is laid out inside
+        /// <paramref name="layoutRect"/>.
+        /// </summary>
+        /// <remarks>
+        /// A range that wraps across lines produces a region containing one rectangle per line, the same
+        /// as GDI+. Wrapping is greedy word wrap against <c>layoutRect.Width</c>; a width of zero (or a
+        /// <see cref="Majorsilence.Forms.Drawing.StringFormat"/> with no ranges set) means no wrapping.
+        /// Text is positioned from the left edge of <paramref name="layoutRect"/> — horizontal
+        /// <c>StringFormat.Alignment</c> is not applied to the measurement.
+        /// </remarks>
+        public Majorsilence.Forms.Drawing.Region[] MeasureCharacterRanges (
+            string text,
+            Majorsilence.Forms.Drawing.Font font,
+            RectangleF layoutRect,
+            Majorsilence.Forms.Drawing.StringFormat? stringFormat)
+        {
+            var ranges = stringFormat?.MeasurableCharacterRanges;
+            if (ranges is null || ranges.Length == 0)
+                return [];
+
+            var result = new Majorsilence.Forms.Drawing.Region[ranges.Length];
+            if (string.IsNullOrEmpty (text) || font is null) {
+                for (var i = 0; i < ranges.Length; i++)
+                    result[i] = EmptyRegion ();
+                return result;
+            }
+
+            var skFont = SkFontFor (font, out var ownedFont);
+            using var owned_font = ownedFont;
+            var metrics = skFont.Metrics;
+            var lineHeight = metrics.Descent - metrics.Ascent;
+            var lines = LayoutLines (text, skFont, layoutRect.Width);
+
+            for (var i = 0; i < ranges.Length; i++) {
+                var region = EmptyRegion ();
+                var rangeStart = ranges[i].First;
+                var rangeEnd = rangeStart + ranges[i].Length;
+
+                foreach (var (start, length, index) in lines) {
+                    // Clip this range against the slice of text that landed on this line.
+                    var segStart = Math.Max (rangeStart, start);
+                    var segEnd = Math.Min (rangeEnd, start + length);
+                    if (segEnd <= segStart)
+                        continue;
+
+                    var x = layoutRect.X + skFont.MeasureText (text.AsSpan (start, segStart - start));
+                    var width = skFont.MeasureText (text.AsSpan (segStart, segEnd - segStart));
+                    region.Union (new RectangleF (x, layoutRect.Y + index * lineHeight, width, lineHeight));
+                }
+
+                result[i] = region;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Measures <paramref name="text"/> as a single unwrapped run, in the units of this surface, and returns
+        /// its width.
+        /// </summary>
+        /// <remarks>
+        /// This is the width <see cref="MeasureCharacterRanges"/> reports for one range covering the whole of a text
+        /// without line breaks (the same <c>SKFont.MeasureText</c> advances, so the same floats), without the
+        /// <see cref="Majorsilence.Forms.Drawing.Region"/>, <see cref="Majorsilence.Forms.Drawing.StringFormat"/> and
+        /// layout that come with it. It is not the width <c>MeasureString</c> returns: that goes through text
+        /// shaping and rounds the font size to a whole number. Text must not contain line breaks.
+        /// </remarks>
+        public float MeasureRunWidth (string text, Majorsilence.Forms.Drawing.Font font)
+        {
+            if (string.IsNullOrEmpty (text) || font is null)
+                return 0f;
+
+            return SkFontFor (font, out _).MeasureText (text.AsSpan ());
+        }
+
+        /// <summary>
+        /// Measures where character ranges of an unwrapped, single-line <paramref name="text"/> start and end, as
+        /// <see cref="MeasureCharacterRanges"/> would report them for a layout rectangle at x = 0 that is wide
+        /// enough not to wrap, but without creating a region per range.
+        /// </summary>
+        /// <param name="text">The text, without line breaks.</param>
+        /// <param name="font">The font to measure with.</param>
+        /// <param name="ranges">The ranges, as given to <see cref="Majorsilence.Forms.Drawing.StringFormat.SetMeasurableCharacterRanges"/>.</param>
+        /// <param name="result">Receives the left and right edge of each range, in the same order. At least as long as <paramref name="ranges"/>.</param>
+        /// <remarks>
+        /// A range outside the text, or empty, gets <c>(0, 0)</c>, as the empty region <see cref="MeasureCharacterRanges"/>
+        /// returns for it has zero bounds. Edges come from the same two <c>SKFont.MeasureText</c> calls as
+        /// <see cref="MeasureCharacterRanges"/> makes (the text before the range, and the range), so they are the same floats.
+        /// </remarks>
+        public void MeasureRunSpans (
+            string text,
+            Majorsilence.Forms.Drawing.Font font,
+            ReadOnlySpan<Majorsilence.Forms.Drawing.CharacterRange> ranges,
+            Span<(float Left, float Right)> result)
+        {
+            if (result.Length < ranges.Length)
+                throw new ArgumentException ("result must be at least as long as ranges.", nameof (result));
+
+            if (string.IsNullOrEmpty (text) || font is null) {
+                for (var i = 0; i < ranges.Length; i++)
+                    result[i] = (0f, 0f);
+                return;
+            }
+
+            var skFont = SkFontFor (font, out _);
+            for (var i = 0; i < ranges.Length; i++) {
+                var segStart = Math.Max (ranges[i].First, 0);
+                var segEnd = Math.Min (ranges[i].First + ranges[i].Length, text.Length);
+                if (segEnd <= segStart) {
+                    result[i] = (0f, 0f);
+                    continue;
+                }
+
+                var left = skFont.MeasureText (text.AsSpan (0, segStart));
+                var width = skFont.MeasureText (text.AsSpan (segStart, segEnd - segStart));
+                result[i] = (left, left + width);
+            }
+        }
+
+        private static Majorsilence.Forms.Drawing.Region EmptyRegion ()
+        {
+            var region = new Majorsilence.Forms.Drawing.Region ();
+            region.MakeEmpty ();
+            return region;
+        }
+
+        /// <summary>
+        /// Splits <paramref name="text"/> into laid-out lines, honoring explicit newlines and greedy
+        /// word wrapping at <paramref name="maxWidth"/>. Each entry keeps its start index into the
+        /// original string so character ranges can be mapped back onto it.
+        /// </summary>
+        internal static List<(int Start, int Length, int Index)> LayoutLines (string text, SKFont font, float maxWidth)
+        {
+            var lines = new List<(int, int, int)> ();
+            var lineIndex = 0;
+
+            for (var paragraphStart = 0; paragraphStart <= text.Length;) {
+                var newline = text.IndexOf ('\n', paragraphStart);
+                var paragraphEnd = newline < 0 ? text.Length : newline;
+                // A trailing \r belongs to the break, not to the measured text.
+                var contentEnd = paragraphEnd > paragraphStart && text[paragraphEnd - 1] == '\r' ? paragraphEnd - 1 : paragraphEnd;
+
+                if (maxWidth <= 0) {
+                    lines.Add ((paragraphStart, contentEnd - paragraphStart, lineIndex++));
+                } else {
+                    var cursor = paragraphStart;
+                    while (cursor <= contentEnd) {
+                        var take = FitRun (text, cursor, contentEnd, font, maxWidth);
+                        lines.Add ((cursor, take, lineIndex++));
+                        cursor += take;
+                        if (take == 0)
+                            break;      // nothing fits at all — avoid spinning forever
+                        // Consume the space the wrap happened on, so it isn't re-measured next line.
+                        while (cursor < contentEnd && text[cursor] == ' ')
+                            cursor++;
+                    }
+                }
+
+                if (newline < 0)
+                    break;
+                paragraphStart = paragraphEnd + 1;
+            }
+
+            return lines;
+        }
+
+        /// <summary>
+        /// Returns how many characters starting at <paramref name="start"/> fit within
+        /// <paramref name="maxWidth"/>, breaking on the last space that fits. Falls back to a hard
+        /// character break when a single word is itself wider than the line.
+        /// </summary>
+        /// <remarks>
+        /// The width of a prefix never shrinks as it grows (the advances are not negative), so the first
+        /// character at which the prefix overflows can be found by measuring the whole run once and, only if
+        /// that overflows, by bisection. This used to measure every prefix in turn, which is quadratic in the
+        /// length of the text and, for a caller that wants no wrapping and passes a huge width, did all that
+        /// work to learn that everything fits. It reaches the same answer: every prefix it compares is measured
+        /// exactly as before, only fewer of them.
+        /// </remarks>
+        internal static int FitRun (string text, int start, int end, SKFont font, float maxWidth)
+        {
+            if (start >= end)
+                return 0;
+
+            // Everything fits: the usual case for a table cell, and the only one when there is no wrapping.
+            if (font.MeasureText (text.AsSpan (start, end - start)) <= maxWidth)
+                return end - start;
+
+            // Smallest i in [start, end) whose prefix text[start..i] is wider than maxWidth. The full run
+            // overflows, so one exists; the last index is the fallback the loop below converges on.
+            var low = start;
+            var high = end - 1;
+            while (low < high) {
+                var mid = low + (high - low) / 2;
+                if (font.MeasureText (text.AsSpan (start, mid - start + 1)) > maxWidth)
+                    high = mid;
+                else
+                    low = mid + 1;
+            }
+
+            // Every prefix before low fits, so the last space before it is the last one that fit.
+            var lastBreak = low > start ? text.LastIndexOf (' ', low - 1, low - start) : -1;
+            if (lastBreak >= 0)
+                return lastBreak - start;        // break at the last space that fit
+            return Math.Max (1, low - start);    // single over-long word: hard break
+        }
+
+        // --- Transform stubs ---
+
+        /// <summary>Gets the horizontal resolution of the surface, in units per inch.</summary>
+        /// <remarks>
+        /// GFX-10: this was hardcoded to 96, so <c>points * g.DpiY / 72</c> and every printer layout came
+        /// out at screen resolution whatever the device. It is the surface's own resolution, the same
+        /// figure fonts are sized by: 96 on screen (paint code draws in logical units, so the display's
+        /// scale factor is not part of it), the page's units per inch when printing, and the image's
+        /// resolution for <see cref="FromImage"/>, as GDI+ reports a bitmap's.
+        /// </remarks>
+        public float DpiX => UnitsPerInch;
+
+        /// <summary>Gets the vertical resolution of the surface, in units per inch.</summary>
+        /// <inheritdoc cref="DpiX" path="/remarks"/>
+        public float DpiY => _sourceImage is { VerticalResolution: > 0 } image ? image.VerticalResolution : UnitsPerInch;
+
+        /// <summary>Gets the bounding rectangle of the current clipping region.</summary>
+        /// <remarks>
+        /// Reports the canvas' actual clip. It used to report the control's bounds -- or Empty when the
+        /// Graphics wrapped a bitmap rather than a control, as double-buffered painting does -- which
+        /// broke the save-and-restore idiom <c>var last = g.ClipBounds; g.SetClip(...); g.SetClip(last);</c>:
+        /// restoring an empty rectangle clipped away everything drawn from that point on.
+        /// </remarks>
+        public RectangleF ClipBounds {
+            get {
+                if (_canvas is { } c) {
+                    // DeviceClipBounds is exact, where LocalClipBounds is outset by a pixel to be
+                    // conservative about antialiasing; it ignores the transform, so it is only usable
+                    // while there is none.
+                    if (c.TotalMatrix.IsIdentity) {
+                        var device = c.DeviceClipBounds;
+                        return new RectangleF (device.Left, device.Top, device.Width, device.Height);
+                    }
+
+                    var bounds = c.LocalClipBounds;
+                    return new RectangleF (bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+                }
+
+                return _control is not null
+                    ? new RectangleF (0, 0, _control.Width, _control.Height)
+                    : RectangleF.Empty;
+            }
+        }
+
+        /// <summary>Gets the visible clip bounds. Alias for ClipBounds in Majorsilence.Forms.</summary>
+        public RectangleF VisibleClipBounds => ClipBounds;
+
+        /// <summary>Gets whether the visible clip region is empty -- nothing drawn now would appear.</summary>
+        /// <remarks>
+        /// W6.4 (RC-9): this used to be a bare <c>false</c>, which is the worst shape a state-reporting
+        /// member can take -- indistinguishable from a correct answer at the call site, and wrong
+        /// exactly when it matters. The standard use is the early-out <c>if (e.Graphics
+        /// .IsVisibleClipEmpty) return;</c> at the top of a paint handler, which a constant <c>false</c>
+        /// turns into "always draw", and a caller that trusted a clipped-away region to report empty
+        /// got told it was visible. <see cref="ClipBounds"/> has been real all along, so the answer was
+        /// available: an empty clip is one with no area.
+        /// </remarks>
+        public bool IsVisibleClipEmpty {
+            get {
+                var clip = VisibleClipBounds;
+
+                return clip.Width <= 0 || clip.Height <= 0;
+            }
+        }
+
+        /// <summary>Gets or sets the unit the caller's coordinates are in.</summary>
+        /// <remarks>
+        /// Real as of W6 mechanisms: assigning it (or <see cref="PageScale"/>) puts a scale on the
+        /// canvas so a caller can draw in points, inches or millimetres and have it land in the right
+        /// place, which is what upstream's page transform does. The conversion uses the surface's own
+        /// units per inch (<see cref="DpiX"/>), the same figure fonts are sized by. <c>World</c> and <c>Display</c> are the
+        /// device's own unit here, as they are for a font.
+        /// </remarks>
+        public Majorsilence.Forms.Drawing.GraphicsUnit PageUnit {
+            get => page_unit;
+            set {
+                if (page_unit == value)
+                    return;
+
+                page_unit = value;
+                ApplyPageTransform ();
+            }
+        }
+
+        private Majorsilence.Forms.Drawing.GraphicsUnit page_unit = Majorsilence.Forms.Drawing.GraphicsUnit.Pixel;
+
+        /// <summary>Gets or sets an extra scale applied on top of <see cref="PageUnit"/>.</summary>
+        /// <remarks>Read as of W6 mechanisms; see <see cref="PageUnit"/>.</remarks>
+        public float PageScale {
+            get => page_scale;
+            set {
+                if (page_scale == value)
+                    return;
+
+                page_scale = value;
+                ApplyPageTransform ();
+            }
+        }
+
+        private float page_scale = 1f;
+
+        /// <summary>
+        /// How many canvas units make an inch, for sizing fonts: 96 on screen, 100 on a printed page, whose
+        /// unit is a hundredth of an inch as upstream's printer Graphics is (SVC-28). A font is in points, so
+        /// it has to come out the same physical size whatever the unit -- a 10 pt font is 13.33 units at 96
+        /// and 13.89 at 100.
+        /// </summary>
+        internal float UnitsPerInch { get; set; } = 96f;
+
+        private float FontUnits (Majorsilence.Forms.Drawing.Font font)
+            => font.PixelSize * FontScale (font);
+
+        // Canvas units per pixel of the font's own size. A font sized in a physical unit (points, the
+        // default) keeps its physical size whatever PageUnit is, as in GDI+: the page transform is
+        // already on the canvas, so it is divided back out here. Without that, a caller drawing with
+        // PageUnit = Point -- ReportDesigner's whole design surface -- got every font 96/72 too big.
+        // A Pixel/World/Display font is in page units, so the page transform applies to it.
+        private float FontScale (Majorsilence.Forms.Drawing.Font font)
+        {
+            var scale = UnitsPerInch / 96f;
+
+            if (font.Unit is not (Majorsilence.Forms.Drawing.GraphicsUnit.Pixel
+                               or Majorsilence.Forms.Drawing.GraphicsUnit.World
+                               or Majorsilence.Forms.Drawing.GraphicsUnit.Display))
+                scale /= PageTransformScale;
+
+            return scale;
+        }
+
+        // The font's cached Skia font when the canvas units are the font's own pixels; otherwise a
+        // resized copy the caller disposes.
+        private SKFont SkFontFor (Majorsilence.Forms.Drawing.Font font, out SKFont? owned)
+        {
+            var cached = font.GetSKFont ();
+
+            if (FontScale (font) == 1f) {
+                owned = null;
+                return cached;
+            }
+
+            // Kept with the Font (it used to be made, and disposed by every caller, on each call). Never owned by the
+            // caller: a caller that wants to change it makes its own copy, as the draw path does for TextPaint.
+            owned = null;
+            return font.GetScaledSKFont (FontUnits (font));
+        }
+
+        /// <summary>How many device pixels one unit of <see cref="PageUnit"/> covers, times <see cref="PageScale"/>.</summary>
+        // Through the surface's own resolution, so an inch on a printed page or a 300-DPI bitmap is that
+        // device's inch rather than a screen one (GFX-10).
+        internal float PageTransformScale => page_scale * (page_unit switch {
+            Majorsilence.Forms.Drawing.GraphicsUnit.Point => UnitsPerInch / 72f,
+            Majorsilence.Forms.Drawing.GraphicsUnit.Inch => UnitsPerInch,
+            Majorsilence.Forms.Drawing.GraphicsUnit.Document => UnitsPerInch / 300f,
+            Majorsilence.Forms.Drawing.GraphicsUnit.Millimeter => UnitsPerInch / 25.4f,
+            _ => 1f,   // Pixel, World, Display
+        });
+
+        // The canvas carries one page transform at a time: the previous one is taken off before the
+        // new one goes on, so setting PageUnit and then PageScale does not compound.
+        private float applied_page_scale = 1f;
+
+        private void ApplyPageTransform ()
+        {
+            var wanted = PageTransformScale;
+
+            if (_canvas is null || wanted == applied_page_scale || wanted <= 0)
+                return;
+
+            _canvas.Scale (wanted / applied_page_scale);
+            applied_page_scale = wanted;
+        }
+
+        /// <summary>
+        /// Saves the current graphics state -- transform, clip, page unit and scale, and every quality
+        /// setting -- and returns a token that <see cref="Restore"/> can rewind to.
+        /// </summary>
+        /// <remarks>
+        /// GFX-16: this saved only what Skia's own save stack holds (matrix and clip), so the standard
+        /// <c>var s = g.Save (); g.SmoothingMode = AntiAlias; ...; g.Restore (s);</c> block leaked the mode
+        /// into everything drawn afterwards. GDI+'s <c>GdipSaveGraphics</c> snapshots the whole state,
+        /// and so does this: the properties ride on the token and are put back on restore.
+        /// </remarks>
+        public Majorsilence.Forms.Drawing.Drawing2D.GraphicsState Save ()
+        {
+            var snapshot = CaptureState ();
+            return new Majorsilence.Forms.Drawing.Drawing2D.GraphicsState (_canvas?.Save () ?? 0) { Snapshot = snapshot };
+        }
+
+        /// <summary>Restores the graphics state to a token previously returned by <see cref="Save"/>.</summary>
+        public void Restore (Majorsilence.Forms.Drawing.Drawing2D.GraphicsState state)
+        {
+            if (_canvas is null)
+                return;
+            if (state is null) {
+                _canvas.Restore ();
+                return;
+            }
+
+            _canvas.RestoreToCount (state.Count);
+            ReapplyState (state.Snapshot as StateSnapshot);
+        }
+
+        // Everything GraphicsState carries beyond Skia's matrix-and-clip frame. The clip is here too: the
+        // canvas frame restores the clip itself, but the tracked region (Clip, Union/Xor/Complement) and the
+        // clip baseline (which frame SetClip unwinds to) are this object's own and have to match it.
+        private sealed class StateSnapshot
+        {
+            public SmoothingMode SmoothingMode;
+            public InterpolationMode InterpolationMode;
+            public Majorsilence.Forms.Drawing.Drawing2D.PixelOffsetMode PixelOffsetMode;
+            public Majorsilence.Forms.Drawing.Drawing2D.CompositingMode CompositingMode;
+            public Majorsilence.Forms.Drawing.Drawing2D.CompositingQuality CompositingQuality;
+            public Majorsilence.Forms.Drawing.Text.TextRenderingHint TextRenderingHint;
+            public int TextContrast;
+            public Point RenderingOrigin;
+            public Majorsilence.Forms.Drawing.GraphicsUnit PageUnit;
+            public float PageScale;
+            public float AppliedPageScale;
+            public Majorsilence.Forms.Drawing.Region? ClipRegion;
+            public int? ClipBaseline;
+            public int ClipBaselineArmedAt;
+        }
+
+        private StateSnapshot CaptureState () => new () {
+            SmoothingMode = SmoothingMode,
+            InterpolationMode = InterpolationMode,
+            PixelOffsetMode = PixelOffsetMode,
+            CompositingMode = CompositingMode,
+            CompositingQuality = CompositingQuality,
+            TextRenderingHint = TextRenderingHint,
+            TextContrast = TextContrast,
+            RenderingOrigin = RenderingOrigin,
+            PageUnit = page_unit,
+            PageScale = page_scale,
+            AppliedPageScale = applied_page_scale,
+            ClipRegion = _clipRegion?.Clone (),
+            ClipBaseline = _clipBaseline,
+            ClipBaselineArmedAt = _clipBaselineArmedAt,
+        };
+
+        private void ReapplyState (StateSnapshot? snapshot)
+        {
+            if (snapshot is null)
+                return;
+
+            SmoothingMode = snapshot.SmoothingMode;
+            InterpolationMode = snapshot.InterpolationMode;
+            PixelOffsetMode = snapshot.PixelOffsetMode;
+            CompositingMode = snapshot.CompositingMode;
+            CompositingQuality = snapshot.CompositingQuality;
+            TextRenderingHint = snapshot.TextRenderingHint;
+            TextContrast = snapshot.TextContrast;
+            RenderingOrigin = snapshot.RenderingOrigin;
+
+            // Fields, not the properties: the page transform's scale lives in the canvas matrix the
+            // restore just put back, so re-applying it through the setters would scale twice.
+            page_unit = snapshot.PageUnit;
+            page_scale = snapshot.PageScale;
+            applied_page_scale = snapshot.AppliedPageScale;
+
+            SetClipShadow (snapshot.ClipRegion?.Clone ());
+            _clipBaseline = snapshot.ClipBaseline;
+            _clipBaselineArmedAt = snapshot.ClipBaselineArmedAt;
+        }
+
+        /// <summary>
+        /// Opens a new graphics container: saves the current transform and clip so that
+        /// <see cref="EndContainer"/> restores them exactly. Containers share the underlying canvas
+        /// state stack with <see cref="Save"/>/<see cref="Restore"/>, so the two nest freely.
+        /// </summary>
+        public Majorsilence.Forms.Drawing.Drawing2D.GraphicsContainer BeginContainer ()
+        {
+            // The full state, as Save takes it (GFX-16).
+            var snapshot = CaptureState ();
+            return new Majorsilence.Forms.Drawing.Drawing2D.GraphicsContainer (_canvas?.Save () ?? 0) { Snapshot = snapshot };
+        }
+
+        /// <summary>
+        /// Opens a new graphics container that also maps <paramref name="srcrect"/> onto
+        /// <paramref name="dstrect"/> — drawing inside the container uses <paramref name="srcrect"/>'s
+        /// coordinate space and lands in <paramref name="dstrect"/>, clipped to it.
+        /// </summary>
+        public Majorsilence.Forms.Drawing.Drawing2D.GraphicsContainer BeginContainer (
+            RectangleF dstrect, RectangleF srcrect, Majorsilence.Forms.Drawing.GraphicsUnit unit)
+        {
+            var container = BeginContainer ();
+            if (_canvas is null || srcrect.Width == 0 || srcrect.Height == 0)
+                return container;
+
+            _canvas.ClipRect (new SKRect (dstrect.Left, dstrect.Top, dstrect.Right, dstrect.Bottom));
+            _canvas.Translate (dstrect.Left, dstrect.Top);
+            _canvas.Scale (dstrect.Width / srcrect.Width, dstrect.Height / srcrect.Height);
+            _canvas.Translate (-srcrect.Left, -srcrect.Top);
+            return container;
+        }
+
+        /// <inheritdoc cref="BeginContainer(RectangleF, RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public Majorsilence.Forms.Drawing.Drawing2D.GraphicsContainer BeginContainer (
+            Rectangle dstrect, Rectangle srcrect, Majorsilence.Forms.Drawing.GraphicsUnit unit)
+            => BeginContainer ((RectangleF)dstrect, (RectangleF)srcrect, unit);
+
+        /// <summary>Closes a container opened by <see cref="BeginContainer()"/>, restoring the saved state.</summary>
+        public void EndContainer (Majorsilence.Forms.Drawing.Drawing2D.GraphicsContainer container)
+        {
+            if (_canvas is null)
+                return;
+            if (container is null) {
+                _canvas.Restore ();
+                return;
+            }
+
+            _canvas.RestoreToCount (container.Count);
+            ReapplyState (container.Snapshot as StateSnapshot);
+        }
+
+        /// <summary>Gets or sets the smoothing mode, which decides whether shapes are anti-aliased.</summary>
+        public SmoothingMode SmoothingMode { get; set; } = SmoothingMode.Default;
+
+        /// <summary>
+        /// Whether the current <see cref="SmoothingMode"/> asks for anti-aliasing.
+        /// </summary>
+        /// <remarks>
+        /// GFX-07: GDI+ anti-aliases for <c>AntiAlias</c> and <c>HighQuality</c> only; <c>Default</c>,
+        /// <c>HighSpeed</c> and <c>None</c> all draw hard edges. The paint builders used to test
+        /// <c>SmoothingMode != None</c>, and since the property's default value is <c>Default</c> (0)
+        /// that meant every fill was anti-aliased unless the caller explicitly asked for None, so a
+        /// row of adjacent filled rectangles (a grid, a gradient ramp) grew half-intensity seams. One
+        /// property read shared by all four paint builders keeps the fill and stroke sides from
+        /// drifting apart again, which is how GFX-23's stroke paint ended up with the opposite bug.
+        /// </remarks>
+        private bool Antialias
+            => SmoothingMode is SmoothingMode.AntiAlias or SmoothingMode.HighQuality;
+
+        /// <summary>Gets or sets how an image is resampled when <c>DrawImage</c> scales it.</summary>
+        /// <remarks>
+        /// GFX-08: read by every image draw (see <see cref="Sampling"/>). It was stored and never read,
+        /// and Skia's default sampling is nearest-neighbour -- not the bilinear GDI+ uses for
+        /// <c>Default</c> -- so a scaled photo came out blocky while <c>NearestNeighbor</c>, the mode
+        /// image viewers, barcode and pixel-art code set to keep magnified pixels crisp, happened to be
+        /// right only by accident.
+        /// </remarks>
+        public InterpolationMode InterpolationMode { get; set; } = InterpolationMode.Default;
+
+        /// <summary>Gets or sets how glyphs are rasterised.</summary>
+        /// <remarks>
+        /// GFX-08: <c>SingleBitPerPixel*</c> draws aliased glyphs, <c>AntiAlias*</c> greyscale-antialiased
+        /// ones, <c>ClearTypeGridFit</c> subpixel-antialiased ones; <c>SystemDefault</c> keeps the
+        /// library's own rendering. The <c>GridFit</c> variants add full hinting. See <see cref="TextPaint"/>.
+        /// </remarks>
+        public Majorsilence.Forms.Drawing.Text.TextRenderingHint TextRenderingHint { get; set; } = Majorsilence.Forms.Drawing.Text.TextRenderingHint.SystemDefault;
+
+        /// <summary>Gets or sets the compositing quality.</summary>
+        /// <remarks>
+        /// Stored, carried by <see cref="Save"/>/<see cref="Restore"/>, and not otherwise applied:
+        /// <c>GammaCorrected</c> blending needs a linear-colour-space surface, which the 8-bit sRGB
+        /// surfaces here are not, and the other values only trade speed for quality.
+        /// </remarks>
+        public Majorsilence.Forms.Drawing.Drawing2D.CompositingQuality CompositingQuality { get; set; } = Majorsilence.Forms.Drawing.Drawing2D.CompositingQuality.Default;
+
+        /// <summary>Gets or sets the pixel offset mode.</summary>
+        /// <remarks>
+        /// Stored, carried by <see cref="Save"/>/<see cref="Restore"/>, and not otherwise applied. Skia
+        /// samples at pixel centres, which is what <c>Half</c> and <c>HighQuality</c> ask for; the
+        /// half-pixel shift of the other modes is GDI+'s own artefact -- the seam along a scaled image's
+        /// top and left edges that callers set <c>Half</c> to get rid of -- and is not reproduced.
+        /// </remarks>
+        public Majorsilence.Forms.Drawing.Drawing2D.PixelOffsetMode PixelOffsetMode { get; set; } = Majorsilence.Forms.Drawing.Drawing2D.PixelOffsetMode.Default;
+
+        /// <summary>The Skia sampling <see cref="InterpolationMode"/> asks for.</summary>
+        /// <remarks>
+        /// GDI+'s <c>Default</c>, <c>Low</c> and <c>Bilinear</c> are bilinear; the high-quality modes
+        /// prefilter (mipmaps for bilinear, a cubic for bicubic) so a large downscale does not alias.
+        /// </remarks>
+        private SKSamplingOptions Sampling => InterpolationMode switch {
+            InterpolationMode.NearestNeighbor => new SKSamplingOptions (SKFilterMode.Nearest, SKMipmapMode.None),
+            InterpolationMode.HighQualityBilinear => new SKSamplingOptions (SKFilterMode.Linear, SKMipmapMode.Linear),
+            InterpolationMode.Bicubic => new SKSamplingOptions (SKCubicResampler.CatmullRom),
+            InterpolationMode.High or InterpolationMode.HighQualityBicubic => new SKSamplingOptions (SKCubicResampler.Mitchell),
+            _ => new SKSamplingOptions (SKFilterMode.Linear, SKMipmapMode.None),
+        };
+
+        /// <summary>Draws <paramref name="bitmap"/> through the <see cref="Sampling"/> the caller asked for.</summary>
+        private void DrawBitmapSampled (SKBitmap bitmap, SKRect source, SKRect destination, SKPaint? paint = null)
+        {
+            if (_canvas is null)
+                return;
+
+            using var image = SKImage.FromBitmap (bitmap);
+            _canvas.DrawImage (image, source, destination, Sampling, paint);
+        }
+
+        private void DrawBitmapSampled (SKBitmap bitmap, SKRect destination, SKPaint? paint = null)
+            => DrawBitmapSampled (bitmap, new SKRect (0, 0, bitmap.Width, bitmap.Height), destination, paint);
+
+        /// <summary>
+        /// Draws <paramref name="source"/> of <paramref name="bitmap"/> into <paramref name="destination"/>,
+        /// honouring <see cref="Majorsilence.Forms.Drawing.Imaging.ImageAttributes.WrapMode"/> where the
+        /// source rectangle runs past the image.
+        /// </summary>
+        /// <remarks>
+        /// GFX-43: GDI+ uses the attributes' wrap mode for the part of the source rectangle outside the
+        /// image -- the tiling modes repeat or mirror the image there, and <c>Clamp</c> shows the clamp
+        /// colour (transparent unless <c>SetWrapMode (mode, color)</c> gave one). The mode was stored and
+        /// never read, so a texture drawn through <c>DrawImage</c> with an oversized source rectangle
+        /// showed one copy and nothing beside it. A source inside the image takes the plain draw, which
+        /// already samples only inside the source rectangle.
+        /// </remarks>
+        private void DrawBitmapWrapped (SKBitmap bitmap, SKRect source, SKRect destination, SKPaint? paint,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? attributes)
+        {
+            if (_canvas is null)
+                return;
+
+            var bounds = new SKRect (0, 0, bitmap.Width, bitmap.Height);
+            var clampColor = attributes?.ClampColor ?? System.Drawing.Color.Transparent;
+            var plainClamp = attributes is null
+                || (attributes.WrapMode == Majorsilence.Forms.Drawing.Drawing2D.WrapMode.Clamp && clampColor.A == 0);
+            if (plainClamp || source.Width <= 0 || source.Height <= 0 || bounds.Contains (source)) {
+                DrawBitmapSampled (bitmap, source, destination, paint);
+                return;
+            }
+
+            // Image space onto the destination: the source rectangle lands exactly on it, and the image's
+            // own origin anchors the tiling, as it does for GDI+.
+            var sx = destination.Width / source.Width;
+            var sy = destination.Height / source.Height;
+            var toDestination = SKMatrix.CreateScaleTranslation (sx, sy, destination.Left - source.Left * sx, destination.Top - source.Top * sy);
+
+            _canvas.Save ();
+            _canvas.ClipRect (destination, antialias: Antialias);
+
+            if (attributes!.WrapMode == Majorsilence.Forms.Drawing.Drawing2D.WrapMode.Clamp) {
+                _canvas.Save ();
+                _canvas.ClipRect (toDestination.MapRect (bounds), SKClipOperation.Difference);
+                using var fill = new SKPaint { Color = clampColor.ToSKColor (), BlendMode = BlendMode };
+                _canvas.DrawRect (destination, fill);
+                _canvas.Restore ();
+            }
+
+            using var image = SKImage.FromBitmap (bitmap);
+            using var shader = image.ToShader (attributes.TileModeX, attributes.TileModeY, Sampling, toDestination);
+            using var tiled = new SKPaint {
+                Shader = shader,
+                ColorFilter = paint?.ColorFilter,
+                BlendMode = BlendMode,
+                IsAntialias = paint?.IsAntialias ?? false,
+            };
+            _canvas.DrawRect (destination, tiled);
+            _canvas.Restore ();
+        }
+
+        /// <summary>
+        /// The paint an image draw needs, or null when the defaults do: a colour filter from
+        /// <c>ImageAttributes</c>, and the <see cref="CompositingMode"/> blend, which images ignored
+        /// while every shape honoured it -- so a <c>SourceCopy</c> stamp of a translucent image still
+        /// blended over what was there.
+        /// </summary>
+        /// <remarks>Antialiased edges follow <see cref="SmoothingMode"/>, so an image at a fractional
+        /// position covers the pixels it straddles partly rather than snapping to one (GFX-21).</remarks>
+        private SKPaint? ImagePaint (SKColorFilter? colorFilter)
+            => colorFilter is null && BlendMode == SKBlendMode.SrcOver && !Antialias
+                ? null
+                : new SKPaint { ColorFilter = colorFilter, IsAntialias = colorFilter is not null || Antialias, BlendMode = BlendMode };
+
+        // One instance per rasterisation, shared: RichTextKit reads the options during Paint and keeps no
+        // reference. Null is the library default (subpixel antialiasing), which SystemDefault keeps.
+        private static readonly Topten.RichTextKit.TextPaintOptions aliased_text = new () { Edging = SKFontEdging.Alias, Hinting = SKFontHinting.None };
+        private static readonly Topten.RichTextKit.TextPaintOptions aliased_grid_fit_text = new () { Edging = SKFontEdging.Alias, Hinting = SKFontHinting.Full };
+        private static readonly Topten.RichTextKit.TextPaintOptions antialiased_text = new () { Edging = SKFontEdging.Antialias, Hinting = SKFontHinting.None };
+        private static readonly Topten.RichTextKit.TextPaintOptions antialiased_grid_fit_text = new () { Edging = SKFontEdging.Antialias, Hinting = SKFontHinting.Full };
+        private static readonly Topten.RichTextKit.TextPaintOptions clear_type_text = new () { Edging = SKFontEdging.SubpixelAntialias, Hinting = SKFontHinting.Full };
+
+        /// <summary>The glyph rasterisation <see cref="TextRenderingHint"/> asks for; null for the default.</summary>
+        private Topten.RichTextKit.TextPaintOptions? TextPaint => TextRenderingHint switch {
+            Majorsilence.Forms.Drawing.Text.TextRenderingHint.SingleBitPerPixel => aliased_text,
+            Majorsilence.Forms.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit => aliased_grid_fit_text,
+            Majorsilence.Forms.Drawing.Text.TextRenderingHint.AntiAlias => antialiased_text,
+            Majorsilence.Forms.Drawing.Text.TextRenderingHint.AntiAliasGridFit => antialiased_grid_fit_text,
+            Majorsilence.Forms.Drawing.Text.TextRenderingHint.ClearTypeGridFit => clear_type_text,
+            _ => null,
+        };
+
+        /// <summary>Gets or sets how drawn pixels are combined with the ones already on the surface.</summary>
+        public Majorsilence.Forms.Drawing.Drawing2D.CompositingMode CompositingMode { get; set; } = Majorsilence.Forms.Drawing.Drawing2D.CompositingMode.SourceOver;
+
+        /// <summary>The Skia blend mode the current <see cref="CompositingMode"/> asks for.</summary>
+        /// <remarks>
+        /// GFX-08 (in part): <c>SourceCopy</c> is how a caller stamps a pre-composited layer, or clears
+        /// a surface to a transparent colour; it must REPLACE the destination pixels, alpha included.
+        /// The property was stored and never read, so those draws alpha-blended instead and a
+        /// "transparent" stamp left the old pixels showing through.
+        /// </remarks>
+        private SKBlendMode BlendMode
+            => CompositingMode == Majorsilence.Forms.Drawing.Drawing2D.CompositingMode.SourceCopy
+                ? SKBlendMode.Src
+                : SKBlendMode.SrcOver;
+
+        /// <summary>Applies a scale transform.</summary>
+        public void ScaleTransform (float sx, float sy) => _canvas?.Scale (sx, sy);
+
+        /// <summary>Translates the coordinate origin.</summary>
+        public void TranslateTransform (float dx, float dy) => _canvas?.Translate (dx, dy);
+
+        /// <summary>Resets the world transform to identity.</summary>
+        /// <remarks>
+        /// Restores the baseline rather than calling SKCanvas.ResetMatrix, which would reset to the
+        /// identity of the whole surface and so discard the control's own origin.
+        /// </remarks>
+        public void ResetTransform () => _canvas?.SetMatrix (_baseline);
+
+        // --- Clipping ---
+
+        /// <summary>
+        /// The canvas save count captured before any clip was applied, i.e. the depth to unwind to in
+        /// order to get back to an unclipped surface. Null until the first clip operation.
+        /// </summary>
+        private int? _clipBaseline;
+
+        /// <summary>
+        /// Unwinds any clip previously applied through this Graphics, leaving the canvas as it was
+        /// before the first clip, and re-arms the baseline for the next one.
+        /// </summary>
+        /// <remarks>
+        /// Skia's clip is cumulative -- <c>ClipRect</c> can only ever narrow, never widen -- whereas
+        /// <c>Graphics.SetClip</c> replaces. Bridging the two needs save/restore: the baseline save
+        /// records the unclipped state, and replacing the clip means restoring to it first.
+        /// </remarks>
+        private void RestoreClipBaseline ()
+        {
+            if (_canvas is null)
+                return;
+
+            // Only unwind when the canvas is still at the depth where the baseline was armed. Skia's
+            // Restore pops MATRIX and clip together, for every frame above the target -- so firing a
+            // baseline recorded at some other nesting level does not merely replace a clip, it pops
+            // frames that belong to someone else. The paint pipeline saves around every child it
+            // paints, and a themed renderer replaces the clip from inside those frames (save old clip,
+            // clip to the rounded border path, draw, put the old clip back): a stale baseline from a
+            // sibling's paint would unwind the child's whole canvas state -- observed as text drawn
+            // with the translation popped and the clip resurrected from an icon's 32x32 glyph scope,
+            // i.e. quick-rejected into nothing. A baseline at a foreign depth is abandoned instead:
+            // within one scope (constant depth) replace still works, which is the GDI+ contract the
+            // save-old/set-new/restore-old idiom actually exercises.
+            if (_clipBaseline is { } depth && _canvas.SaveCount == _clipBaselineArmedAt)
+                RestoreKeepingMatrix (depth);
+
+            _clipBaseline = _canvas.Save ();
+            _clipBaselineArmedAt = _canvas.SaveCount;
+        }
+
+        /// <summary>
+        /// Unwinds the canvas to <paramref name="depth"/> while leaving the current transform in place.
+        /// </summary>
+        /// <remarks>
+        /// Skia's Restore pops the MATRIX along with the clip, because both live in the same saved
+        /// frame. In System.Drawing they are independent: changing the clip must not move the drawing,
+        /// and <see cref="Transform"/> survives any number of SetClip calls. Since the clip is emulated
+        /// with save/restore frames, the matrix has to be carried across by hand.
+        ///
+        /// Without this, replacing a clip silently reset the world transform -- and the failure was
+        /// invisible in the common case, because code that clips usually is not also translating. Where
+        /// both were in play (an SVG renderer, which restores the clip after every single element while
+        /// a nested &lt;g transform&gt; is active) the first shape inside each group landed correctly and
+        /// every later sibling drew at the untransformed origin.
+        /// </remarks>
+        private void RestoreKeepingMatrix (int depth)
+        {
+            if (_canvas is null)
+                return;
+
+            var matrix = _canvas.TotalMatrix;
+            _canvas.RestoreToCount (depth);
+            _canvas.SetMatrix (matrix);
+        }
+
+        // The canvas save-count right after the baseline save: the guard that tells "our save is the
+        // top of the stack" apart from "someone saved (or restored) around us since".
+        private int _clipBaselineArmedAt;
+
+        /// <summary>
+        /// The clip as a region, mirroring what was applied to the canvas. Null until the first clip
+        /// operation goes through this Graphics.
+        /// </summary>
+        /// <remarks>
+        /// GFX-13: Skia reports its live clip only as a bounding rectangle
+        /// (<c>SKCanvas.LocalClipBounds</c>), so the region-shaped answer <see cref="Clip"/> owes its
+        /// caller (and the region arithmetic <c>CombineMode.Union</c>/<c>Xor</c>/<c>Complement</c>
+        /// need) has to be tracked alongside it. Without this the save/restore idiom
+        /// <c>var saved = g.Clip; g.SetClip(x); ...; g.Clip = saved;</c> restored only the bounding box
+        /// of a non-rectangular clip, quietly widening it so later drawing leaked out.
+        /// </remarks>
+        private Majorsilence.Forms.Drawing.Region? _clipRegion;
+
+        /// <summary>Replaces the tracked clip region, disposing the one it supersedes.</summary>
+        private void SetClipShadow (Majorsilence.Forms.Drawing.Region? region)
+        {
+            if (ReferenceEquals (_clipRegion, region))
+                return;
+
+            _clipRegion?.Dispose ();
+            _clipRegion = region;
+        }
+
+        /// <summary>
+        /// The current clip as a fresh region the caller owns: the tracked one when this Graphics has
+        /// clipped before, otherwise the canvas' own clip bounds (which is all Skia can report).
+        /// </summary>
+        private Majorsilence.Forms.Drawing.Region CurrentClipRegion ()
+        {
+            if (_clipRegion is not null)
+                return _clipRegion.Clone ();
+
+            if (_canvas is { } canvas && !canvas.LocalClipBounds.IsEmpty) {
+                var b = canvas.LocalClipBounds;
+
+                // A canvas with no device bounds (a recording canvas) reports a clip near float's
+                // limits, which would round into a garbage SKRectI and overflow the moment two of
+                // them were combined. That is the unclipped case, so answer it as GDI+ does: infinite.
+                if (IsModest (b.Left) && IsModest (b.Top) && IsModest (b.Right) && IsModest (b.Bottom))
+                    return new Majorsilence.Forms.Drawing.Region (
+                        new RectangleF (b.Left, b.Top, b.Width, b.Height));
+            }
+
+            return new Majorsilence.Forms.Drawing.Region ();
+
+            // Not float.IsFinite: this assembly also targets netstandard2.0, which does not have it.
+            static bool IsModest (float value)
+                => !float.IsNaN (value) && !float.IsInfinity (value) && Math.Abs (value) <= 1 << 24;
+        }
+
+        /// <summary>
+        /// Arms the clip baseline without unwinding, for the operations that narrow the existing clip
+        /// (<see cref="IntersectClip(RectangleF)"/>, <see cref="ExcludeClip(Rectangle)"/>) rather than
+        /// replacing it, because Skia's clip already intersects, so those must not restore first.
+        /// </summary>
+        private void ArmClipBaseline ()
+        {
+            if (_clipBaseline is null && _canvas is not null) {
+                _clipBaseline = _canvas.Save ();
+                _clipBaselineArmedAt = _canvas.SaveCount;
+            }
+        }
+
+        /// <summary>
+        /// Replaces the clip with <paramref name="region"/> exactly, taking ownership of it.
+        /// </summary>
+        private void ReplaceClip (Majorsilence.Forms.Drawing.Region region)
+        {
+            if (_canvas is null) {
+                region.Dispose ();
+                return;
+            }
+
+            if (region.IsInfinite (this)) {
+                ResetClip ();       // also drops the tracked region
+                region.Dispose ();
+                return;
+            }
+
+            RestoreClipBaseline ();
+            ClipToRegion (region, SKClipOperation.Intersect);
+            SetClipShadow (region);
+        }
+
+        /// <summary>Applies <paramref name="region"/> to the canvas clip under <paramref name="op"/>.</summary>
+        /// <remarks>
+        /// GFX-44: by the region's float shape, not its integer scanlines, so a fractional region masks
+        /// exactly the pixels its edges cover; and without antialiasing, as a GDI+ region clip has hard
+        /// edges. <c>ClipPath</c> also goes through the current transform as GDI+'s world-coordinate
+        /// region does, where <c>ClipRegion</c> took device pixels. Empty and infinite are spelled out:
+        /// Skia does not treat an empty path as "clip everything".
+        /// </remarks>
+        private void ClipToRegion (Majorsilence.Forms.Drawing.Region region, SKClipOperation op)
+        {
+            if (_canvas is null)
+                return;
+
+            if (region.IsInfinite ()) {
+                if (op == SKClipOperation.Difference)
+                    _canvas.ClipRect (SKRect.Empty);
+                return;
+            }
+
+            if (region.IsEmpty ()) {
+                if (op == SKClipOperation.Intersect)
+                    _canvas.ClipRect (SKRect.Empty);
+                return;
+            }
+
+            _canvas.ClipPath (region.GetSKPath (), op, antialias: false);
+        }
+
+        /// <summary>Sets the clipping region to the given rectangle, replacing any current clip.</summary>
+        public void SetClip (Rectangle rect) => SetClip ((RectangleF)rect);
+
+        /// <summary>Resets the clipping region, so that drawing is unrestricted again.</summary>
+        public void ResetClip ()
+        {
+            if (_canvas is null)
+                return;
+
+            SetClipShadow (null);
+
+            if (_clipBaseline is { } depth && _canvas.SaveCount == _clipBaselineArmedAt) {
+                RestoreKeepingMatrix (depth);
+                _clipBaseline = null;
+            } else {
+                _clipBaseline = null;   // stale baseline: abandon rather than pop foreign frames
+            }
+        }
+
+        /// <summary>Gets whether the current clipping region is empty.</summary>
+        public bool IsClipEmpty => _canvas?.LocalClipBounds.IsEmpty ?? false;
+
+        /// <summary>Translates the clipping region by the specified amounts.</summary>
+        /// <remarks>
+        /// Moves the clip alone. It used to translate the canvas, which moved every subsequent drawing
+        /// operation along with it. The shape is carried across as a region rather than as its bounding
+        /// rectangle, so translating a rounded-rect or L-shaped clip keeps its shape (GFX-13).
+        /// </remarks>
+        public void TranslateClip (float dx, float dy)
+        {
+            if (_canvas is null)
+                return;
+
+            var moved = CurrentClipRegion ();
+            moved.Translate (dx, dy);
+            ReplaceClip (moved);
+        }
+
+        /// <inheritdoc cref="TranslateClip(float, float)"/>
+        public void TranslateClip (int dx, int dy) => TranslateClip ((float)dx, dy);
+
+        /// <summary>Gets or sets the rendering origin, used to align dithering and hatch brushes.</summary>
+        /// <remarks>
+        /// GFX-17: a hatch brush's pattern is phased from this point (see <see cref="CreateFillPaint"/>),
+        /// which is how a background hatched in pieces -- per row, per scrolled strip -- is kept seamless.
+        /// It was stored and never read, so every piece restarted the pattern at the surface origin.
+        /// </remarks>
+        public Point RenderingOrigin { get; set; }
+
+        /// <summary>Gets or sets the gamma-correction value used when rendering text (0..12).</summary>
+        /// <remarks>Stored and round-tripped; Skia's text rendering exposes no equivalent knob.</remarks>
+        public int TextContrast { get; set; } = 4;
+
+        /// <summary>Forces any pending drawing to be written to the surface.</summary>
+        /// <remarks>Real as of W6 mechanisms: it flushes the canvas, which is what a caller who reads
+        /// the surface's pixels straight after drawing needs. It used to do nothing, so those pixels
+        /// could still be empty.</remarks>
+        public void Flush () => _canvas?.Flush ();
+
+        /// <inheritdoc cref="Flush()"/>
+        /// <remarks>The intention is accepted and ignored: Skia has one flush, with no sync and async
+        /// distinction to honour.</remarks>
+        public void Flush (Majorsilence.Forms.Drawing.Drawing2D.FlushIntention intention) => Flush ();
+
+        /// <summary>
+        /// Returns the nearest color representable on this surface. Every surface here is 32bpp, so the
+        /// color comes back unchanged rather than quantized to a palette.
+        /// </summary>
+        public Color GetNearestColor (Color color) => color;
+
+        /// <summary>Transforms an array of points between two coordinate spaces.</summary>
+        /// <remarks>
+        /// World and page space coincide here (no page transform or page unit is applied to the canvas),
+        /// so this applies the canvas's current transform going to device space and its inverse coming
+        /// back, and is the identity between world and page.
+        /// </remarks>
+        public void TransformPoints (Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace destSpace,
+            Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace srcSpace, PointF[] pts)
+        {
+            if (pts is null || _canvas is null || destSpace == srcSpace)
+                return;
+
+            var deviceIsDestination = destSpace == Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace.Device;
+            var deviceIsSource = srcSpace == Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace.Device;
+            if (!deviceIsDestination && !deviceIsSource)
+                return;     // world <-> page is the identity here
+
+            var matrix = _canvas.TotalMatrix;
+            if (deviceIsSource && !matrix.TryInvert (out matrix))
+                return;
+
+            for (var i = 0; i < pts.Length; i++) {
+                var mapped = matrix.MapPoint (new SKPoint (pts[i].X, pts[i].Y));
+                pts[i] = new PointF (mapped.X, mapped.Y);
+            }
+        }
+
+        /// <inheritdoc cref="TransformPoints(Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace, Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace, PointF[])"/>
+        public void TransformPoints (Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace destSpace,
+            Majorsilence.Forms.Drawing.Drawing2D.CoordinateSpace srcSpace, Point[] pts)
+        {
+            if (pts is null)
+                return;
+            var asFloat = Array.ConvertAll (pts, p => new PointF (p.X, p.Y));
+            TransformPoints (destSpace, srcSpace, asFloat);
+            for (var i = 0; i < pts.Length; i++)
+                pts[i] = new Point ((int)Math.Round (asFloat[i].X), (int)Math.Round (asFloat[i].Y));
+        }
+
+        /// <summary>Fills the interior of a region using the specified brush.</summary>
+        public void FillRegion (Majorsilence.Forms.Drawing.Brush brush, Majorsilence.Forms.Drawing.Region region)
+        {
+            if (_canvas is null || brush is null || region is null)
+                return;
+
+            if (region.IsEmpty ())
+                return;
+
+            // The float shape, aliased like a region clip (GFX-44); an infinite region fills everything.
+            using var handle = RentFillPaint (brush);
+            SKPaint paint = handle;
+            paint.IsAntialias = false;     // a pooled paint is re-armed on every rent
+
+            if (region.IsInfinite ())
+                _canvas.DrawPaint (paint);
+            else
+                _canvas.DrawPath (region.GetSKPath (), paint);
+        }
+
+        /// <summary>Draws a closed cardinal spline through the specified points.</summary>
+        public void DrawClosedCurve (Majorsilence.Forms.Drawing.Pen pen, PointF[] points)
+            => DrawClosedCurve (pen, points, 0.5f, Majorsilence.Forms.Drawing.Drawing2D.FillMode.Alternate);
+
+        /// <inheritdoc cref="DrawClosedCurve(Majorsilence.Forms.Drawing.Pen, PointF[])"/>
+        public void DrawClosedCurve (Majorsilence.Forms.Drawing.Pen pen, PointF[] points, float tension,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillmode)
+        {
+            if (_canvas is null || pen is null || points is null || points.Length < 2)
+                return;
+
+            using var path = new Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath (fillmode);
+            path.AddClosedCurve (points, tension);
+            DrawPath (pen, path);
+        }
+
+        /// <inheritdoc cref="DrawClosedCurve(Majorsilence.Forms.Drawing.Pen, PointF[])"/>
+        public void DrawClosedCurve (Majorsilence.Forms.Drawing.Pen pen, Point[] points)
+            => DrawClosedCurve (pen, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)));
+
+        /// <summary>Fills the interior of a closed cardinal spline through the specified points.</summary>
+        public void FillClosedCurve (Majorsilence.Forms.Drawing.Brush brush, PointF[] points)
+            => FillClosedCurve (brush, points, Majorsilence.Forms.Drawing.Drawing2D.FillMode.Alternate);
+
+        /// <inheritdoc cref="FillClosedCurve(Majorsilence.Forms.Drawing.Brush, PointF[])"/>
+        public void FillClosedCurve (Majorsilence.Forms.Drawing.Brush brush, PointF[] points,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillmode, float tension = 0.5f)
+        {
+            if (_canvas is null || brush is null || points is null || points.Length < 2)
+                return;
+
+            using var path = new Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath (fillmode);
+            path.AddClosedCurve (points, tension);
+            FillPath (brush, path);
+        }
+
+        /// <inheritdoc cref="FillClosedCurve(Majorsilence.Forms.Drawing.Brush, PointF[])"/>
+        public void FillClosedCurve (Majorsilence.Forms.Drawing.Brush brush, Point[] points)
+            => FillClosedCurve (brush, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)));
+
+        /// <summary>Draws the image at its native size, clipped to the specified rectangle.</summary>
+        public void DrawImageUnscaledAndClipped (Majorsilence.Forms.Drawing.Image image, Rectangle rect)
+        {
+            if (_canvas is null || image?.GetSKBitmap () is not { } bitmap)
+                return;
+
+            _canvas.Save ();
+            _canvas.ClipRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom));
+            using var paint = ImagePaint (null);
+            DrawBitmapSampled (bitmap, new SKRect (rect.Left, rect.Top, rect.Left + bitmap.Width, rect.Top + bitmap.Height), paint);
+            _canvas.Restore ();
+        }
+
+        /// <summary>Callback invoked during a long-running <c>DrawImage</c> to allow cancellation.</summary>
+        public delegate bool DrawImageAbort (IntPtr callbackdata);
+
+        // ---------------------------------------------------------------------------------------
+        // Overload completion (Phase 7 of docs/gdi-gap-plan.md).
+        //
+        // Every member below delegates to an existing implementation. They are not sugar: GDI+ has a
+        // very wide overload surface and *.Designer.cs emits integer literals, so a missing shape is a
+        // compile error in exactly the generated files a migration cannot hand-edit. The overload
+        // scanner in tools/Majorsilence.Forms.GdiDiff found these; it could not see them before,
+        // because a name-level check reports "DrawImage exists" and stops there.
+        // ---------------------------------------------------------------------------------------
+
+        // -- shapes: integer and RectangleF variants --
+
+        /// <inheritdoc cref="DrawArc(Majorsilence.Forms.Drawing.Pen, float, float, float, float, float, float)"/>
+        public void DrawArc (Majorsilence.Forms.Drawing.Pen pen, int x, int y, int width, int height, int startAngle, int sweepAngle)
+            => DrawArc (pen, (float)x, y, width, height, startAngle, sweepAngle);
+
+        /// <inheritdoc cref="DrawArc(Majorsilence.Forms.Drawing.Pen, float, float, float, float, float, float)"/>
+        public void DrawArc (Majorsilence.Forms.Drawing.Pen pen, RectangleF rect, float startAngle, float sweepAngle)
+            => DrawArc (pen, rect.X, rect.Y, rect.Width, rect.Height, startAngle, sweepAngle);
+
+        /// <inheritdoc cref="DrawBezier(Majorsilence.Forms.Drawing.Pen, PointF, PointF, PointF, PointF)"/>
+        public void DrawBezier (Majorsilence.Forms.Drawing.Pen pen, float x1, float y1, float x2, float y2,
+            float x3, float y3, float x4, float y4)
+            => DrawBezier (pen, new PointF (x1, y1), new PointF (x2, y2), new PointF (x3, y3), new PointF (x4, y4));
+
+        /// <inheritdoc cref="DrawEllipse(Majorsilence.Forms.Drawing.Pen, float, float, float, float)"/>
+        public void DrawEllipse (Majorsilence.Forms.Drawing.Pen pen, int x, int y, int width, int height)
+            => DrawEllipse (pen, (float)x, y, width, height);
+
+        /// <inheritdoc cref="FillEllipse(Majorsilence.Forms.Drawing.Brush, float, float, float, float)"/>
+        public void FillEllipse (Majorsilence.Forms.Drawing.Brush brush, int x, int y, int width, int height)
+            => FillEllipse (brush, (float)x, y, width, height);
+
+        /// <summary>Draws a pie section defined by an ellipse and two radial lines.</summary>
+        public void DrawPie (Majorsilence.Forms.Drawing.Pen pen, float x, float y, float width, float height,
+            float startAngle, float sweepAngle)
+        {
+            if (_canvas is null || pen is null)
+                return;
+            using var path = new Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath ();
+            path.AddPie (x, y, width, height, startAngle, sweepAngle);
+            DrawPath (pen, path);
+        }
+
+        /// <inheritdoc cref="DrawPie(Majorsilence.Forms.Drawing.Pen, float, float, float, float, float, float)"/>
+        public void DrawPie (Majorsilence.Forms.Drawing.Pen pen, int x, int y, int width, int height, int startAngle, int sweepAngle)
+            => DrawPie (pen, (float)x, y, width, height, startAngle, sweepAngle);
+
+        /// <inheritdoc cref="DrawPie(Majorsilence.Forms.Drawing.Pen, float, float, float, float, float, float)"/>
+        public void DrawPie (Majorsilence.Forms.Drawing.Pen pen, RectangleF rect, float startAngle, float sweepAngle)
+            => DrawPie (pen, rect.X, rect.Y, rect.Width, rect.Height, startAngle, sweepAngle);
+
+        /// <inheritdoc cref="FillPie(Majorsilence.Forms.Drawing.Brush, float, float, float, float, float, float)"/>
+        public void FillPie (Majorsilence.Forms.Drawing.Brush brush, int x, int y, int width, int height, int startAngle, int sweepAngle)
+            => FillPie (brush, (float)x, y, width, height, startAngle, sweepAngle);
+
+        /// <summary>Fills a polygon using the specified fill mode.</summary>
+        public void FillPolygon (Majorsilence.Forms.Drawing.Brush brush, PointF[] points,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillMode)
+        {
+            if (_canvas is null || brush is null || points is null || points.Length < 2)
+                return;
+            using var path = new Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath (fillMode);
+            path.AddPolygon (points);
+            FillPath (brush, path);
+        }
+
+        /// <inheritdoc cref="FillPolygon(Majorsilence.Forms.Drawing.Brush, PointF[], Majorsilence.Forms.Drawing.Drawing2D.FillMode)"/>
+        public void FillPolygon (Majorsilence.Forms.Drawing.Brush brush, Point[] points,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillMode)
+            => FillPolygon (brush, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)), fillMode);
+
+        /// <inheritdoc cref="FillPolygon(Majorsilence.Forms.Drawing.Brush, PointF[], Majorsilence.Forms.Drawing.Drawing2D.FillMode)"/>
+        /// <remarks>Span overload, as upstream has: points are commonly built on the stack, and a span
+        /// does not implicitly convert to the array the other overloads take.</remarks>
+        public void FillPolygon (Majorsilence.Forms.Drawing.Brush brush, ReadOnlySpan<PointF> points,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillMode = Majorsilence.Forms.Drawing.Drawing2D.FillMode.Alternate)
+            => FillPolygon (brush, points.ToArray (), fillMode);
+
+        /// <inheritdoc cref="FillPolygon(Majorsilence.Forms.Drawing.Brush, ReadOnlySpan{PointF}, Majorsilence.Forms.Drawing.Drawing2D.FillMode)"/>
+        public void FillPolygon (Majorsilence.Forms.Drawing.Brush brush, ReadOnlySpan<Point> points,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillMode = Majorsilence.Forms.Drawing.Drawing2D.FillMode.Alternate)
+            => FillPolygon (brush, points.ToArray (), fillMode);
+
+        // -- curves --
+
+        /// <inheritdoc cref="DrawCurve(Majorsilence.Forms.Drawing.Pen, PointF[])"/>
+        public void DrawCurve (Majorsilence.Forms.Drawing.Pen pen, PointF[] points, float tension)
+            => DrawCurve (pen, points, 0, (points?.Length ?? 1) - 1, tension);
+
+        /// <inheritdoc cref="DrawCurve(Majorsilence.Forms.Drawing.Pen, PointF[])"/>
+        public void DrawCurve (Majorsilence.Forms.Drawing.Pen pen, PointF[] points, int offset, int numberOfSegments)
+            => DrawCurve (pen, points, offset, numberOfSegments, 0.5f);
+
+        /// <inheritdoc cref="DrawCurve(Majorsilence.Forms.Drawing.Pen, PointF[])"/>
+        public void DrawCurve (Majorsilence.Forms.Drawing.Pen pen, Point[] points, float tension)
+            => DrawCurve (pen, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)), tension);
+
+        /// <inheritdoc cref="DrawCurve(Majorsilence.Forms.Drawing.Pen, PointF[])"/>
+        public void DrawCurve (Majorsilence.Forms.Drawing.Pen pen, Point[] points, int offset, int numberOfSegments, float tension)
+            => DrawCurve (pen, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)), offset, numberOfSegments, tension);
+
+        /// <inheritdoc cref="DrawClosedCurve(Majorsilence.Forms.Drawing.Pen, PointF[])"/>
+        public void DrawClosedCurve (Majorsilence.Forms.Drawing.Pen pen, Point[] points, float tension,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillmode)
+            => DrawClosedCurve (pen, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)), tension, fillmode);
+
+        /// <inheritdoc cref="FillClosedCurve(Majorsilence.Forms.Drawing.Brush, PointF[])"/>
+        public void FillClosedCurve (Majorsilence.Forms.Drawing.Brush brush, Point[] points,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillmode)
+            => FillClosedCurve (brush, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)), fillmode);
+
+        /// <inheritdoc cref="FillClosedCurve(Majorsilence.Forms.Drawing.Brush, PointF[])"/>
+        public void FillClosedCurve (Majorsilence.Forms.Drawing.Brush brush, Point[] points,
+            Majorsilence.Forms.Drawing.Drawing2D.FillMode fillmode, float tension)
+            => FillClosedCurve (brush, Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y)), fillmode, tension);
+
+        // -- images --
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, int, int)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, float x, float y)
+            => DrawImage (image, x, y, image?.Width ?? 0, image?.Height ?? 0);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, int, int)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, PointF point)
+            => DrawImage (image, point.X, point.Y);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, int, int)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Point point)
+            => DrawImage (image, point.X, point.Y);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, Rectangle, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, float x, float y, RectangleF srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+            => DrawImage (image, new RectangleF (x, y, srcRect.Width, srcRect.Height), srcRect, srcUnit);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, Rectangle, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, int x, int y, Rectangle srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+            => DrawImage (image, new Rectangle (x, y, srcRect.Width, srcRect.Height), srcRect, srcUnit);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, Rectangle, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, float srcX, float srcY,
+            float srcWidth, float srcHeight, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+            => DrawImage (image, (RectangleF)destRect, new RectangleF (srcX, srcY, srcWidth, srcHeight), srcUnit);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, Rectangle, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, int srcX, int srcY,
+            int srcWidth, int srcHeight, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+            => DrawImage (image, destRect, new Rectangle (srcX, srcY, srcWidth, srcHeight), srcUnit);
+
+        /// <summary>
+        /// Draws an image into the parallelogram defined by three destination points (upper-left,
+        /// upper-right, lower-left).
+        /// </summary>
+        /// <remarks>
+        /// The affine transform implied by the three points is applied to the canvas, so rotation and
+        /// skew render correctly rather than being reduced to the bounding box.
+        /// </remarks>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, PointF[] destPoints)
+            => DrawImageParallelogram (image, destPoints, null, null);
+
+        /// <summary>
+        /// Shared implementation of the three-point (parallelogram) DrawImage family, honouring the
+        /// source rectangle and the color adjustments when given.
+        /// </summary>
+        /// <remarks>
+        /// The <paramref name="imageAttrs"/> part matters more than a color-remapping corner case
+        /// suggests: this is the overload GDI+ callers use to composite a layer at partial opacity,
+        /// by handing it an alpha-scaling <c>ColorMatrix</c>. While the attributes were dropped, such
+        /// a layer drew fully opaque -- so an element asking for <c>opacity="0"</c> rendered as a
+        /// solid block of its fill colour instead of vanishing.
+        /// </remarks>
+        private void DrawImageParallelogram (Majorsilence.Forms.Drawing.Image image, PointF[] destPoints,
+            RectangleF? srcRect, Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttrs)
+        {
+            if (_canvas is null || image?.GetSKBitmap () is not { } bitmap || destPoints is null || destPoints.Length < 3)
+                return;
+
+            // Lookup-style adjustments (transparent color key, remap table) cannot be expressed as a
+            // channel filter, so they are baked into a copy first; the matrix and gamma ride on the paint.
+            using var adjusted = imageAttrs?.ApplyPixelAdjustments (bitmap);
+            var source = adjusted ?? bitmap;
+
+            using var colorFilter = imageAttrs?.ToSKColorFilter ();
+            using var paint = ImagePaint (colorFilter);
+
+            var src = srcRect is { Width: > 0, Height: > 0 } r
+                ? new SKRect (r.Left, r.Top, r.Right, r.Bottom)
+                : new SKRect (0, 0, source.Width, source.Height);
+
+            // Map the source rectangle onto the parallelogram: the two edge vectors from the
+            // upper-left corner give the matrix columns directly.
+            var origin = destPoints[0];
+            var xAxis = new PointF (destPoints[1].X - origin.X, destPoints[1].Y - origin.Y);
+            var yAxis = new PointF (destPoints[2].X - origin.X, destPoints[2].Y - origin.Y);
+            var width = Math.Max (1f, src.Width);
+            var height = Math.Max (1f, src.Height);
+
+            var matrix = new SKMatrix (
+                xAxis.X / width, yAxis.X / height, origin.X,
+                xAxis.Y / width, yAxis.Y / height, origin.Y,
+                0, 0, 1);
+
+            _canvas.Save ();
+            _canvas.Concat (matrix);
+            DrawBitmapWrapped (source, src, new SKRect (0, 0, width, height), paint, imageAttrs);
+            _canvas.Restore ();
+        }
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[])"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Point[] destPoints)
+            => DrawImage (image, ToPointF (destPoints));
+
+        /// <summary>
+        /// <paramref name="source"/>, given in <paramref name="unit"/>, as pixels of <paramref name="image"/>.
+        /// </summary>
+        /// <remarks>
+        /// GFX-22: GDI+ interprets a DrawImage source rectangle in its unit, converted through the image's
+        /// own resolution. The unit was accepted and ignored, which is right by accident for
+        /// <c>Pixel</c> (nearly every call) and draws a crop hundreds of times too small for the
+        /// <c>Inch</c> or <c>Point</c> some printing code passes. <c>World</c> and <c>Display</c>, which
+        /// GDI+ rejects for a source unit, are left as pixels rather than throwing.
+        /// </remarks>
+        private static RectangleF SourceInPixels (Majorsilence.Forms.Drawing.Image? image, RectangleF source, Majorsilence.Forms.Drawing.GraphicsUnit unit)
+        {
+            if (image is null)
+                return source;
+
+            float PerUnit (float dpi) => unit switch {
+                Majorsilence.Forms.Drawing.GraphicsUnit.Inch => dpi,
+                Majorsilence.Forms.Drawing.GraphicsUnit.Point => dpi / 72f,
+                Majorsilence.Forms.Drawing.GraphicsUnit.Millimeter => dpi / 25.4f,
+                Majorsilence.Forms.Drawing.GraphicsUnit.Document => dpi / 300f,
+                _ => 1f,
+            };
+
+            var sx = PerUnit (image.HorizontalResolution);
+            var sy = PerUnit (image.VerticalResolution);
+            return sx == 1f && sy == 1f ? source : new RectangleF (source.X * sx, source.Y * sy, source.Width * sx, source.Height * sy);
+        }
+
+        private static PointF[] ToPointF (Point[]? points)
+            => Array.ConvertAll (points ?? [], p => new PointF (p.X, p.Y));
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[])"/>
+        /// <remarks>The source rectangle is in <paramref name="srcUnit"/>; see <see cref="SourceInPixels"/>.</remarks>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, PointF[] destPoints, RectangleF srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+            => DrawImageParallelogram (image, destPoints, SourceInPixels (image, srcRect, srcUnit), null);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[], RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, PointF[] destPoints, RectangleF srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr)
+            => DrawImageParallelogram (image, destPoints, SourceInPixels (image, srcRect, srcUnit), imageAttr);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[], RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Point[] destPoints, Rectangle srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+            => DrawImageParallelogram (image, ToPointF (destPoints), SourceInPixels (image, srcRect, srcUnit), null);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[], RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Point[] destPoints, Rectangle srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr)
+            => DrawImageParallelogram (image, ToPointF (destPoints), SourceInPixels (image, srcRect, srcUnit), imageAttr);
+
+        // The abort-callback shapes. GDI+ polls the callback during a long draw; nothing here is
+        // interruptible (a Skia bitmap draw is a single call), so the callback is accepted and never
+        // invoked rather than being left absent and failing to compile.
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[], RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, PointF[] destPoints, RectangleF srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr,
+            DrawImageAbort? callback)
+            => DrawImageParallelogram (image, destPoints, SourceInPixels (image, srcRect, srcUnit), imageAttr);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[], RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, PointF[] destPoints, RectangleF srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr,
+            DrawImageAbort? callback, int callbackData)
+            => DrawImageParallelogram (image, destPoints, SourceInPixels (image, srcRect, srcUnit), imageAttr);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[], RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Point[] destPoints, Rectangle srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr,
+            DrawImageAbort? callback)
+            => DrawImageParallelogram (image, ToPointF (destPoints), SourceInPixels (image, srcRect, srcUnit), imageAttr);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, PointF[], RectangleF, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Point[] destPoints, Rectangle srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr,
+            DrawImageAbort? callback, int callbackData)
+            => DrawImageParallelogram (image, ToPointF (destPoints), SourceInPixels (image, srcRect, srcUnit), imageAttr);
+
+        // GFX-15: these four forwarded to the srcUnit overload and dropped imageAttr on the floor, while
+        // their no-callback siblings honoured it -- so whether a transparent colour key, a disabled
+        // ColorMatrix or a watermark's opacity applied at all depended on which arguments the caller
+        // passed. The callback itself is still ignored (it exists to let a caller abort a long
+        // GDI+ draw; a Skia DrawBitmap is not interruptible), but the attributes now go through.
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, int, int, int, int, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, int srcX, int srcY,
+            int srcWidth, int srcHeight, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr, DrawImageAbort? callback)
+            => DrawImage (image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttr);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, int, int, int, int, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, int srcX, int srcY,
+            int srcWidth, int srcHeight, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr, DrawImageAbort? callback, IntPtr callbackData)
+            => DrawImage (image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttr);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, float, float, float, float, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, float srcX, float srcY,
+            float srcWidth, float srcHeight, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr, DrawImageAbort? callback)
+            => DrawImage (image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttr);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, float, float, float, float, Majorsilence.Forms.Drawing.GraphicsUnit)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, float srcX, float srcY,
+            float srcWidth, float srcHeight, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttr, DrawImageAbort? callback, IntPtr callbackData)
+            => DrawImage (image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttr);
+
+        /// <inheritdoc cref="DrawImageUnscaled(Majorsilence.Forms.Drawing.Image, int, int)"/>
+        public void DrawImageUnscaled (Majorsilence.Forms.Drawing.Image image, Point point)
+            => DrawImageUnscaled (image, point.X, point.Y);
+
+        /// <inheritdoc cref="DrawImageUnscaled(Majorsilence.Forms.Drawing.Image, int, int)"/>
+        /// <remarks>The width and height are ignored, as in System.Drawing: "unscaled" means the image's own size.</remarks>
+        public void DrawImageUnscaled (Majorsilence.Forms.Drawing.Image image, int x, int y, int width, int height)
+            => DrawImageUnscaled (image, x, y);
+
+        // -- clipping --
+
+        /// <inheritdoc cref="SetClip(Rectangle)"/>
+        public void SetClip (Rectangle rect, Majorsilence.Forms.Drawing.Drawing2D.CombineMode combineMode)
+            => SetClip ((RectangleF)rect, combineMode);
+
+        /// <inheritdoc cref="SetClip(RectangleF)"/>
+        /// <remarks>Every <c>CombineMode</c> is honoured; see <see cref="CombineClip"/>.</remarks>
+        public void SetClip (RectangleF rect, Majorsilence.Forms.Drawing.Drawing2D.CombineMode combineMode)
+        {
+            switch (combineMode) {
+            // The two Skia expresses natively, kept off the region path so a fractional rectangle is
+            // not rounded to whole pixels on the way through SKRegion's integer scanlines.
+            case Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Replace:
+                SetClip (rect);
+                break;
+            case Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Intersect:
+                IntersectClip (rect);
+                break;
+            default: {
+                using var incoming = new Majorsilence.Forms.Drawing.Region (rect);
+                CombineClip (incoming, combineMode);
+                break;
+            }
+            }
+        }
+
+        /// <inheritdoc cref="SetClip(Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath)"/>
+        /// <remarks>
+        /// The combine mode used to be discarded, so every mode behaved as Replace (GFX-13).
+        /// </remarks>
+        public void SetClip (Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath path,
+            Majorsilence.Forms.Drawing.Drawing2D.CombineMode combineMode)
+        {
+            if (path is null)
+                return;
+
+            if (combineMode == Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Replace) {
+                SetClip (path);     // the path-shaped fast path: no region rasterisation needed
+                return;
+            }
+
+            using var incoming = new Majorsilence.Forms.Drawing.Region (path);
+            CombineClip (incoming, combineMode);
+        }
+
+        /// <inheritdoc cref="SetClip(Majorsilence.Forms.Drawing.Region)"/>
+        public void SetClip (Majorsilence.Forms.Drawing.Region region,
+            Majorsilence.Forms.Drawing.Drawing2D.CombineMode combineMode)
+        {
+            if (region is not null)
+                CombineClip (region, combineMode);
+        }
+
+        /// <summary>
+        /// Combines <paramref name="incoming"/> into the current clip under
+        /// <paramref name="combineMode"/>, honouring all six modes.
+        /// </summary>
+        /// <remarks>
+        /// GFX-12/GFX-13: Intersect and Exclude go straight onto the canvas, which is what Skia's clip
+        /// stack does natively. The other three (Union, Xor and Complement), which *widen* the clip and
+        /// so cannot be expressed as a Skia clip operation at all, are computed on the region tracked
+        /// by <see cref="_clipRegion"/> and then applied as a replace. They used to silently fall back
+        /// to Replace, which is a different shape whenever the current clip was not already contained in
+        /// the incoming one.
+        /// </remarks>
+        private void CombineClip (Majorsilence.Forms.Drawing.Region incoming,
+            Majorsilence.Forms.Drawing.Drawing2D.CombineMode combineMode)
+        {
+            if (_canvas is null)
+                return;
+
+            switch (combineMode) {
+            case Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Intersect:
+                IntersectClip (incoming);
+                break;
+            case Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Exclude:
+                ExcludeClip (incoming);
+                break;
+            case Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Union: {
+                var combined = CurrentClipRegion ();
+                combined.Union (incoming);
+                ReplaceClip (combined);
+                break;
+            }
+            case Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Xor: {
+                var combined = CurrentClipRegion ();
+                combined.Xor (incoming);
+                ReplaceClip (combined);
+                break;
+            }
+            case Majorsilence.Forms.Drawing.Drawing2D.CombineMode.Complement: {
+                // Complement is "the incoming region minus the current clip", i.e. Exclude with the
+                // operands the other way round -- which is what Region.Complement computes.
+                var combined = CurrentClipRegion ();
+                combined.Complement (incoming);
+                ReplaceClip (combined);
+                break;
+            }
+            default:
+                SetClip (incoming);
+                break;
+            }
+        }
+
+        /// <summary>Sets this Graphics' clip to that of another Graphics.</summary>
+        /// <remarks>
+        /// The source's clip is carried across as a region when it tracks one, so a non-rectangular
+        /// clip survives the copy (GFX-13); otherwise all Skia can report for it is its bounds.
+        /// </remarks>
+        public void SetClip (Graphics graphics)
+        {
+            if (graphics?._canvas is null)
+                return;
+
+            ReplaceClip (graphics.CurrentClipRegion ());
+        }
+
+        /// <inheritdoc cref="SetClip(Graphics)"/>
+        /// <remarks>The combine mode used to be discarded, so every mode behaved as Replace (GFX-13).</remarks>
+        public void SetClip (Graphics graphics, Majorsilence.Forms.Drawing.Drawing2D.CombineMode combineMode)
+        {
+            if (graphics?._canvas is null)
+                return;
+
+            using var incoming = graphics.CurrentClipRegion ();
+            CombineClip (incoming, combineMode);
+        }
+
+        /// <summary>Narrows the clipping region to its intersection with the given region.</summary>
+        /// <remarks>
+        /// GFX-12: this used to forward to <see cref="SetClip(Majorsilence.Forms.Drawing.Region)"/>,
+        /// which *replaces*, so intersecting with a region larger than the current clip WIDENED it,
+        /// and painting that was meant to be confined to a cell or a viewport escaped over its
+        /// siblings. Like the rectangle overloads it can now only ever narrow.
+        /// </remarks>
+        public void IntersectClip (Majorsilence.Forms.Drawing.Region region)
+        {
+            if (_canvas is null || region is null)
+                return;
+
+            ArmClipBaseline ();
+            ClipToRegion (region, SKClipOperation.Intersect);
+
+            var narrowed = CurrentClipRegion ();
+            narrowed.Intersect (region);
+            SetClipShadow (narrowed);
+        }
+
+        /// <summary>Returns whether the specified point is inside the visible clip region.</summary>
+        public bool IsVisible (PointF point) => IsVisible (new RectangleF (point.X, point.Y, 1, 1));
+
+        /// <inheritdoc cref="IsVisible(PointF)"/>
+        public bool IsVisible (float x, float y) => IsVisible (new PointF (x, y));
+
+        /// <inheritdoc cref="IsVisible(PointF)"/>
+        public bool IsVisible (int x, int y) => IsVisible (new PointF (x, y));
+
+        /// <inheritdoc cref="IsVisible(RectangleF)"/>
+        public bool IsVisible (float x, float y, float width, float height)
+            => IsVisible (new RectangleF (x, y, width, height));
+
+        /// <inheritdoc cref="IsVisible(RectangleF)"/>
+        public bool IsVisible (int x, int y, int width, int height)
+            => IsVisible (new RectangleF (x, y, width, height));
+
+        // -- transforms and measurement --
+
+        /// <inheritdoc cref="ScaleTransform(float, float)"/>
+        /// <remarks>
+        /// The canvas can only prepend, so an <see cref="Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder.Append"/>
+        /// request is composed through the world <see cref="Transform"/> instead. Prepend is
+        /// System.Drawing's default and stays on the direct canvas path.
+        /// </remarks>
+        public void ScaleTransform (float sx, float sy, Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder order)
+        {
+            if (order == Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder.Prepend) {
+                ScaleTransform (sx, sy);
+                return;
+            }
+
+            using var m = new Majorsilence.Forms.Drawing.Drawing2D.Matrix ();
+            m.Scale (sx, sy);
+            MultiplyTransform (m, order);
+        }
+
+        /// <inheritdoc cref="TranslateTransform(float, float)"/>
+        /// <remarks>See <see cref="ScaleTransform(float, float, Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder)"/> for the order parameter.</remarks>
+        public void TranslateTransform (float dx, float dy, Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder order)
+        {
+            if (order == Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder.Prepend) {
+                TranslateTransform (dx, dy);
+                return;
+            }
+
+            using var m = new Majorsilence.Forms.Drawing.Drawing2D.Matrix ();
+            m.Translate (dx, dy);
+            MultiplyTransform (m, order);
+        }
+
+        /// <inheritdoc cref="MeasureString(string, Majorsilence.Forms.Drawing.Font)"/>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font, int width)
+            => MeasureString (text, font, width, null);
+
+        /// <inheritdoc cref="MeasureString(string, Majorsilence.Forms.Drawing.Font)"/>
+        /// <remarks>The origin does not affect the measured size; it is accepted for API compatibility.</remarks>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font, PointF origin,
+            Majorsilence.Forms.Drawing.StringFormat? stringFormat)
+            => MeasureString (text, font, stringFormat);
+
+        /// <summary>Measures the string and reports how much of it fits in <paramref name="layoutArea"/>.</summary>
+        /// <remarks>
+        /// GFX-14: <paramref name="charactersFitted"/> was always the whole string and
+        /// <paramref name="linesFilled"/> was back-computed from the measured height, not from what fits.
+        /// This overload exists almost solely for print pagination -- print <c>charactersFitted</c>
+        /// characters, advance, set <c>HasMorePages</c> while any remain -- so a 50-page report printed as
+        /// one page with everything after the first screenful dropped. The text is laid out with the same
+        /// greedy word wrap <see cref="MeasureCharacterRanges"/> uses, and lines are taken while they fit
+        /// the height: a partly visible last line counts, as GDI+ draws it clipped, unless the format has
+        /// <c>LineLimit</c>, which takes whole lines only. A zero height (or <c>NoClip</c>) is unbounded,
+        /// and <c>NoWrap</c> breaks at newlines only. <paramref name="charactersFitted"/> runs to the start
+        /// of the first line that did not fit, so a caller advancing by it resumes exactly there.
+        /// </remarks>
+        public SizeF MeasureString (string text, Majorsilence.Forms.Drawing.Font font, SizeF layoutArea,
+            Majorsilence.Forms.Drawing.StringFormat? stringFormat, out int charactersFitted, out int linesFilled)
+        {
+            var size = MeasureString (text, font, layoutArea, stringFormat);
+
+            charactersFitted = 0;
+            linesFilled = 0;
+            if (string.IsNullOrEmpty (text) || font is null)
+                return size;
+
+            var flags = stringFormat?.FormatFlags ?? 0;
+            var noWrap = (flags & Majorsilence.Forms.Drawing.StringFormatFlags.NoWrap) != 0;
+            var unboundedHeight = layoutArea.Height <= 0 || (flags & Majorsilence.Forms.Drawing.StringFormatFlags.NoClip) != 0;
+            var wholeLinesOnly = (flags & Majorsilence.Forms.Drawing.StringFormatFlags.LineLimit) != 0;
+
+            var skFont = SkFontFor (font, out var ownedFont);
+            using var owned_font = ownedFont;
+            var lineHeight = skFont.Metrics.Descent - skFont.Metrics.Ascent;
+            var lines = LayoutLines (text, skFont, noWrap ? 0 : layoutArea.Width);
+
+            var fit = lines.Count;
+            if (!unboundedHeight && lineHeight > 0) {
+                // A hair of tolerance, so a box sized to exactly N lines is not judged to show a sliver of N+1.
+                var exact = layoutArea.Height / lineHeight;
+                fit = wholeLinesOnly ? (int)Math.Floor (exact + 1e-3) : (int)Math.Ceiling (exact - 1e-3);
+                fit = Math.Min (Math.Max (0, fit), lines.Count);
+            }
+
+            linesFilled = fit;
+            charactersFitted = fit >= lines.Count ? text.Length : lines[fit].Start;
+
+            if (fit < lines.Count)
+                size = new SizeF (size.Width, Math.Min (size.Height, fit * lineHeight));
+
+            return size;
+        }
+
+        /// <summary>Narrows the clipping region to its intersection with the given rectangle.</summary>
+        public void IntersectClip (Rectangle rect) => IntersectClip ((RectangleF)rect);
+
+        /// <inheritdoc cref="IntersectClip(Rectangle)"/>
+        public void IntersectClip (RectangleF rect)
+        {
+            if (_canvas is null)
+                return;
+
+            // Unlike SetClip this keeps the current clip, so it must not unwind to the baseline:
+            // Skia's ClipRect already intersects.
+            ArmClipBaseline ();
+            _canvas.ClipRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom));
+
+            var narrowed = CurrentClipRegion ();
+            narrowed.Intersect (rect);
+            SetClipShadow (narrowed);
+        }
+
+        /// <summary>Gets or sets the clipping region.</summary>
+        /// <remarks>
+        /// Never null, as in System.Drawing: an unclipped surface reports an infinite region. It used to
+        /// return null, which broke the standard save-and-restore idiom that custom painting is built on
+        /// -- <c>var saved = g.Clip; g.SetClip(...); ...; g.Clip = saved;</c>. Combining against the null
+        /// threw, and because that kind of drawing code often sits inside a broad catch, the rest of the
+        /// paint was silently abandoned rather than reported: a control that drew its first few pieces
+        /// and then simply stopped.
+        /// </remarks>
+        public Majorsilence.Forms.Drawing.Region Clip {
+            // A copy of the tracked region (GFX-13) so the caller can hold and re-apply it, falling
+            // back to the canvas' clip bounds when nothing has clipped through this Graphics yet --
+            // which is also the only thing Skia itself can report.
+            get => CurrentClipRegion ();
+            set {
+                if (value is not null)
+                    SetClip (value);
+            }
+        }
+
+        /// <summary>Excludes a rectangle from the clipping region.</summary>
+        public void ExcludeClip (Rectangle rect)
+        {
+            if (_canvas is null)
+                return;
+
+            ArmClipBaseline ();
+            _canvas.ClipRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom),
+                SKClipOperation.Difference);
+
+            var narrowed = CurrentClipRegion ();
+            narrowed.Exclude (rect);
+            SetClipShadow (narrowed);
+        }
+
+        /// <summary>Excludes a region from the clipping region.</summary>
+        /// <remarks>
+        /// GFX-13: the region used to be reduced to its bounding rectangle, so excluding an L-shaped or
+        /// multi-rectangle region (how "punch a hole for the child control" transparent painting is
+        /// written) blanked out the whole bounding box instead of just the region.
+        /// </remarks>
+        public void ExcludeClip (Majorsilence.Forms.Drawing.Region region)
+        {
+            if (_canvas is null || region is null)
+                return;
+
+            ArmClipBaseline ();
+            ClipToRegion (region, SKClipOperation.Difference);
+
+            var narrowed = CurrentClipRegion ();
+            narrowed.Exclude (region);
+            SetClipShadow (narrowed);
+        }
+
+        /// <summary>Returns whether the specified point is within the clipping region.</summary>
+        /// <param name="point">The point to test, in the current coordinate space.</param>
+        /// <remarks>
+        /// W6.4 (RC-9): these three used to return a bare <c>true</c>. The whole purpose of the family
+        /// is to let a caller skip work that would be clipped away -- a custom-drawn control walking
+        /// rows, a chart skipping off-screen series -- so a constant <c>true</c> means the caller does
+        /// all the work it asked to avoid, and answers "visible" for a point that demonstrably is not.
+        /// <see cref="ClipBounds"/> is real, so the answer was available the whole time.
+        /// </remarks>
+        public bool IsVisible (Point point) => ClipBounds.Contains (point.X, point.Y);
+
+        /// <summary>Returns whether any part of the specified rectangle is within the clipping region.</summary>
+        /// <param name="rect">The rectangle to test, in the current coordinate space.</param>
+        /// <inheritdoc cref="IsVisible(Point)" path="/remarks"/>
+        public bool IsVisible (Rectangle rect) => IsVisible ((RectangleF)rect);
+
+        /// <summary>Returns whether any part of the specified rectangle is within the clipping region.</summary>
+        /// <param name="rect">The rectangle to test, in the current coordinate space.</param>
+        /// <remarks>
+        /// INTERSECTS the clip rather than being contained by it, which is what
+        /// <c>System.Drawing.Graphics.IsVisible</c> means: a rectangle half inside the clip is
+        /// partly visible, and a caller skipping it would leave a hole.
+        /// </remarks>
+        public bool IsVisible (RectangleF rect) => ClipBounds.IntersectsWith (rect);
+
+        /// <summary>Applies a matrix transform to the current world transform.</summary>
+        public void MultiplyTransform (Majorsilence.Forms.Drawing.Drawing2D.Matrix matrix)
+            => MultiplyTransform (matrix, Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder.Prepend);
+
+        /// <summary>Applies a matrix transform to the current world transform in the specified order.</summary>
+        public void MultiplyTransform (Majorsilence.Forms.Drawing.Drawing2D.Matrix matrix,
+            Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder order)
+        {
+            if (_canvas is null || matrix is null) return;
+
+            // Composed through Matrix rather than SKCanvas.Concat because Concat can only prepend;
+            // MatrixOrder.Append needs the incoming matrix on the other side.
+            var world = Transform;
+            world.Multiply (matrix, order);
+            Transform = world;
+        }
+
+        // --- Drawing operations (Skia-backed when canvas is available) ---
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Icon at the specified location. Converts to bitmap internally.</summary>
+#pragma warning disable CA1416
+        public void DrawIcon (Majorsilence.Forms.Drawing.Icon icon, int x, int y)
+        {
+            if (icon == null || _canvas == null) return;
+            using var bmp = icon.ToBitmap ();
+            using var skBmp = bmp.ToSKBitmap ();
+            if (skBmp != null) DrawBitmapSampled (skBmp, new SKRect (x, y, x + skBmp.Width, y + skBmp.Height));
+        }
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Icon stretched to fill the destination rectangle.</summary>
+        public void DrawIcon (Majorsilence.Forms.Drawing.Icon icon, Rectangle targetRect)
+        {
+            if (icon == null || _canvas == null) return;
+            using var bmp = icon.ToBitmap ();
+            using var skBmp = bmp.ToSKBitmap ();
+            if (skBmp != null) DrawBitmapSampled (skBmp, new SKRect (targetRect.Left, targetRect.Top, targetRect.Right, targetRect.Bottom));
+        }
+
+        /// <summary>Draws an unscaled Majorsilence.Forms.Drawing.Icon at the specified location.</summary>
+        public void DrawIconUnstretched (Majorsilence.Forms.Drawing.Icon icon, Rectangle targetRect) => DrawIcon (icon, targetRect.X, targetRect.Y);
+
+        /// <summary>Returns the device context handle.</summary>
+        /// <remarks>Zero: there is no GDI device context behind a Skia canvas. Reported truthfully
+        /// rather than thrown, because callers pass the handle straight to a P/Invoke that is itself
+        /// absent here, and a zero handle is what those APIs already have to check for. This pair is
+        /// what satisfies <see cref="Majorsilence.Forms.Drawing.IDeviceContext"/>.</remarks>
+        public IntPtr GetHdc () => IntPtr.Zero;
+
+        /// <summary>Releases the device context handle. No-op in Majorsilence.Forms (stub).</summary>
+        public void ReleaseHdc (IntPtr hdc) { }
+
+        /// <summary>Releases the device context handle. No-op in Majorsilence.Forms (stub).</summary>
+        public void ReleaseHdc () { }
+
+        /// <summary>Copies the contents of the screen to this Graphics surface. Stub in Majorsilence.Forms.</summary>
+        public void CopyFromScreen (int sourceX, int sourceY, int destinationX, int destinationY, Size blockRegionSize) { }
+
+        /// <summary>Copies the contents of the screen to this Graphics surface. Stub in Majorsilence.Forms.</summary>
+        public void CopyFromScreen (System.Drawing.Point upperLeftSource, System.Drawing.Point upperLeftDestination, Size blockRegionSize) { }
+
+        /// <summary>Copies the contents of the screen to this Graphics surface. Stub in Majorsilence.Forms.</summary>
+        /// <remarks>The raster-operation overload. Screen capture needs a platform screenshot API that no
+        /// backend exposes yet, so like its siblings above this leaves the surface untouched rather than
+        /// throwing -- a screenshot feature comes back blank instead of taking the app down.</remarks>
+        public void CopyFromScreen (int sourceX, int sourceY, int destinationX, int destinationY,
+            Size blockRegionSize, Majorsilence.Forms.Drawing.CopyPixelOperation copyPixelOperation) { }
+
+        private static SKColor ToSKColor (System.Drawing.Color c) => Majorsilence.Forms.Drawing.SystemColorPalette.ToSKColor (c);
+
+        /// <summary>
+        /// Builds a fill <see cref="SKPaint"/> from a brush, honouring its actual type: a solid colour,
+        /// or a gradient/hatch/texture shader. Previously every non-solid brush was collapsed to opaque
+        /// black, which turned e.g. a soft <c>PathGradientBrush</c> glow into a solid black box. Anti-
+        /// aliasing follows the current <see cref="SmoothingMode"/> so solid fills keep their prior look.
+        /// Caller owns disposal.
+        /// </summary>
+        private SKPaint CreateFillPaint (Majorsilence.Forms.Drawing.Brush brush)
+        {
+            var paint = brush.CreatePaint ();
+            paint.IsAntialias = Antialias;
+            paint.BlendMode = BlendMode;
+
+            // GDI+ applies the rendering origin to hatch (and dither) patterns only -- not to textures or
+            // gradients, which have their own transforms (GFX-17).
+            if (brush is Majorsilence.Forms.Drawing.Drawing2D.HatchBrush && RenderingOrigin != Point.Empty && paint.Shader is { } shader) {
+                paint.Shader = shader.WithLocalMatrix (SKMatrix.CreateTranslation (RenderingOrigin.X, RenderingOrigin.Y));
+                shader.Dispose ();
+            }
+
+            return paint;
+        }
+
+        // Reused across every SolidBrush fill call (FillRectangle, FillPolygon, DrawString's brush --
+        // the overwhelming majority of fills) instead of allocating a fresh SKPaint via
+        // Brush.CreatePaint() each time, same rationale and measurement as the stroke paint pool above.
+        // Gradient/hatch/texture brushes are not handled here: their CreatePaint() builds an owned
+        // Shader per call, which isn't safe to pool without a wider audit, so they still go through
+        // CreateFillPaint's fresh-and-disposed path via RentFillPaint below.
+        [ThreadStatic]
+        private static SKPaint? t_fillPaint;
+
+        private static SKPaint GetSolidFillPaint (Majorsilence.Forms.Drawing.SolidBrush brush, bool antialias,
+            SKBlendMode blendMode)
+        {
+            var paint = t_fillPaint ??= new SKPaint ();
+            paint.Color = ToSKColor (brush.Color);
+            paint.Style = SKPaintStyle.Fill;
+            paint.IsAntialias = antialias;
+            paint.BlendMode = blendMode;
+            return paint;
+        }
+
+        // A `using`-able handle around a paint that may be the shared pooled instance (a SolidBrush
+        // fill, or a plain pen's stroke) or a fresh, effect/shader-owning one built from the brush or
+        // pen itself -- Dispose() only frees the fresh one, so callers can
+        // `using var paint = RentFillPaint (brush);` / `RentStrokePaint (pen)` and get the right
+        // disposal behaviour either way without knowing which they got.
+        private readonly struct PaintHandle : IDisposable
+        {
+            private readonly SKPaint paint;
+            private readonly bool ownsPaint;
+
+            public PaintHandle (SKPaint paint, bool ownsPaint)
+            {
+                this.paint = paint;
+                this.ownsPaint = ownsPaint;
+            }
+
+            public static implicit operator SKPaint (PaintHandle handle) => handle.paint;
+
+            public void Dispose ()
+            {
+                if (ownsPaint)
+                    paint.Dispose ();
+            }
+        }
+
+        private PaintHandle RentFillPaint (Majorsilence.Forms.Drawing.Brush brush)
+        {
+            if (brush is Majorsilence.Forms.Drawing.SolidBrush solid)
+                return new PaintHandle (GetSolidFillPaint (solid, Antialias, BlendMode), ownsPaint: false);
+
+            return new PaintHandle (CreateFillPaint (brush), ownsPaint: true);
+        }
+
+        private static float PenWidth (Majorsilence.Forms.Drawing.Pen pen) => pen.Width;
+        private static SKColor PenColor (Majorsilence.Forms.Drawing.Pen pen) => ToSKColor (pen.Color);
+
+        // Reused across every simple stroke draw call (DrawLine, DrawRectangle, DrawEllipse, etc.) on
+        // this thread instead of allocating a fresh SKPaint each time. A benchmark
+        // (benchmarks/Majorsilence.Forms.Benchmarks/PaintConstructionBenchmarks.cs) measured SKPaint
+        // construction+disposal at ~12x the cost of just reassigning fields on an existing instance,
+        // and a full canvas.DrawRect call at ~27% faster with zero allocation when pooled this way.
+        // Safe to share because these call sites never nest (a paint is fully consumed by the single
+        // draw call that follows before the method returns) and Skia copies SKPaint's plain scalar
+        // fields into each draw command rather than holding a live reference to the object -- [ThreadStatic]
+        // keeps it correct if painting ever happens on more than one thread (e.g. parallel headless tests).
+        [ThreadStatic]
+        private static SKPaint? t_strokePaint;
+
+        /// <summary>
+        /// Whether <paramref name="pen"/> is expressible by the pooled stroke paint, i.e. it leaves
+        /// every property the pool cannot carry at its System.Drawing default.
+        /// </summary>
+        /// <remarks>
+        /// GFX-23: the pool only ever reassigns colour, width, miter and anti-aliasing on one shared
+        /// <c>SKPaint</c>. A dash effect, a non-miter join, a cap, a custom cap or a stroking brush all
+        /// need state that would have to be built (and then cleared again) per call, so a pen carrying
+        /// any of them takes <see cref="Majorsilence.Forms.Drawing.Pen.CreatePaint"/> instead: the
+        /// builder that already produced the full property set for <see cref="DrawPath"/> alone. A
+        /// plain pen (overwhelmingly the common case, and the one the pool was measured against)
+        /// still takes the pooled path with no allocation.
+        /// </remarks>
+        private static bool IsPooledPen (Majorsilence.Forms.Drawing.Pen pen)
+            => pen.DashStyle == Majorsilence.Forms.Drawing.Drawing2D.DashStyle.Solid
+                && pen.LineJoin == Majorsilence.Forms.Drawing.Drawing2D.LineJoin.Miter
+                && pen.StartCap == Majorsilence.Forms.Drawing.Drawing2D.LineCap.Flat
+                && pen.EndCap == Majorsilence.Forms.Drawing.Drawing2D.LineCap.Flat
+                && pen.CustomStartCap is null
+                && pen.CustomEndCap is null
+                && pen.Brush is null or Majorsilence.Forms.Drawing.SolidBrush;
+
+        /// <summary>
+        /// Rents the stroke paint for <paramref name="pen"/>: the pooled instance for a plain pen, a
+        /// fresh full-fidelity one for anything else. See <see cref="IsPooledPen"/> (GFX-23).
+        /// </summary>
+        private PaintHandle RentStrokePaint (Majorsilence.Forms.Drawing.Pen pen)
+        {
+            if (!IsPooledPen (pen)) {
+                var built = pen.CreatePaint ();
+                built.IsAntialias = Antialias;
+                built.BlendMode = BlendMode;
+                return new PaintHandle (built, ownsPaint: true);
+            }
+
+            var paint = t_strokePaint ??= new SKPaint ();
+            paint.Color = PenColor (pen);
+            paint.Style = SKPaintStyle.Stroke;
+            paint.StrokeWidth = PenWidth (pen);
+            // Skia defaults StrokeMiter to 4, System.Drawing's Pen.MiterLimit to 10, so a mitred corner
+            // on a thick pen was being bevelled off here while DrawPath kept it (GFX-23).
+            paint.StrokeMiter = pen.MiterLimit;
+            paint.IsAntialias = Antialias;
+            paint.BlendMode = BlendMode;
+            return new PaintHandle (paint, ownsPaint: false);
+        }
+
+        /// <summary>Clears the canvas with the given color.</summary>
+        public void Clear (System.Drawing.Color color) => _canvas?.Clear (ToSKColor (color));
+
+        /// <summary>Fills a rectangle using a Majorsilence.Forms.Drawing.Brush.</summary>
+        public void FillRectangle (Majorsilence.Forms.Drawing.Brush brush, Rectangle rect)
+        {
+            if (_canvas is null) return;
+            using var paint = RentFillPaint (brush);
+            _canvas.DrawRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+        }
+
+        /// <summary>Fills a rectangle using a Majorsilence.Forms.Drawing.Brush.</summary>
+        public void FillRectangle (Majorsilence.Forms.Drawing.Brush brush, RectangleF rect)
+        {
+            if (_canvas is null) return;
+            using var paint = RentFillPaint (brush);
+            _canvas.DrawRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+        }
+
+        /// <summary>Fills a rectangle using a Majorsilence.Forms.Drawing.Brush.</summary>
+        public void FillRectangle (Majorsilence.Forms.Drawing.Brush brush, float x, float y, float width, float height)
+            => FillRectangle (brush, new RectangleF (x, y, width, height));
+
+        /// <summary>Fills a rectangle using a Majorsilence.Forms.Drawing.Brush.</summary>
+        public void FillRectangle (Majorsilence.Forms.Drawing.Brush brush, int x, int y, int width, int height)
+            => FillRectangle (brush, new Rectangle (x, y, width, height));
+
+        /// <summary>Draws a rectangle outline using a Majorsilence.Forms.Drawing.Pen.</summary>
+        public void DrawRectangle (Majorsilence.Forms.Drawing.Pen pen, Rectangle rect)
+        {
+            if (_canvas is null) return;
+            using var paint = RentStrokePaint (pen);
+            _canvas.DrawRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+        }
+
+        /// <summary>Draws a rectangle outline using a Majorsilence.Forms.Drawing.Pen.</summary>
+        public void DrawRectangle (Majorsilence.Forms.Drawing.Pen pen, int x, int y, int width, int height)
+            => DrawRectangle (pen, new Rectangle (x, y, width, height));
+
+        /// <summary>Draws a line using a Majorsilence.Forms.Drawing.Pen.</summary>
+        public void DrawLine (Majorsilence.Forms.Drawing.Pen pen, Point p1, Point p2)
+        {
+            if (_canvas is null) return;
+            using var paint = RentStrokePaint (pen);
+            _canvas.DrawLine (p1.X, p1.Y, p2.X, p2.Y, paint);
+        }
+
+        /// <summary>Draws a line using a Majorsilence.Forms.Drawing.Pen.</summary>
+        public void DrawLine (Majorsilence.Forms.Drawing.Pen pen, int x1, int y1, int x2, int y2)
+            => DrawLine (pen, new Point (x1, y1), new Point (x2, y2));
+
+        /// <summary>Draws a line using a Majorsilence.Forms.Drawing.Pen.</summary>
+        public void DrawLine (Majorsilence.Forms.Drawing.Pen pen, PointF p1, PointF p2)
+        {
+            if (_canvas is null) return;
+            using var paint = RentStrokePaint (pen);
+            _canvas.DrawLine (p1.X, p1.Y, p2.X, p2.Y, paint);
+        }
+
+        /// <summary>Draws a line using a Majorsilence.Forms.Drawing.Pen and float coordinates.</summary>
+        public void DrawLine (Majorsilence.Forms.Drawing.Pen pen, float x1, float y1, float x2, float y2)
+            => DrawLine (pen, new PointF (x1, y1), new PointF (x2, y2));
+
+        /// <summary>Draws a rectangle with float coordinates.</summary>
+        public void DrawRectangle (Majorsilence.Forms.Drawing.Pen pen, float x, float y, float width, float height)
+            => DrawRectangle (pen, new Rectangle ((int)x, (int)y, (int)width, (int)height));
+
+        /// <summary>Draws a rectangle with a RectangleF.</summary>
+        public void DrawRectangle (Majorsilence.Forms.Drawing.Pen pen, RectangleF rect)
+            => DrawRectangle (pen, new Rectangle ((int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height));
+
+        // Rounded rectangles. WinForms and System.Drawing have no rounded-rectangle call (the idiom there is four
+        // AddArc calls into a GraphicsPath), so there are no upstream names to follow; these are named after
+        // FillRectangle/DrawRectangle and take the same arguments plus radii. The framework already paints
+        // border-radius through SKCanvas helpers that app code cannot reach, because the canvas is internal to
+        // Graphics; this is the public route to the same shapes. The geometry is shared with
+        // GraphicsPath.AddRoundedRectangle so a fill, its outline and a clip built from one set of numbers agree.
+
+        /// <summary>Fills a rectangle with the same circular radius on all four corners.</summary>
+        /// <param name="brush">The brush that fills the shape.</param>
+        /// <param name="rect">The rectangle's bounds, in the graphics' current units.</param>
+        /// <param name="radius">
+        /// The corner radius. One that does not fit is scaled down, with the others, until neighbouring corners no
+        /// longer overlap (the CSS <c>border-radius</c> rule), so a very large radius on a wide rectangle gives a pill.
+        /// </param>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="radius"/> is negative, NaN or infinite.</exception>
+        public void FillRoundedRectangle (Majorsilence.Forms.Drawing.Brush brush, RectangleF rect, float radius)
+        {
+            // Validate before the no-surface early return: a bad radius is a caller bug whether or not this Graphics
+            // happens to have a canvas to draw on. The uniform form builds its own geometry, not by forwarding to the
+            // four-radius one, so a bad value is reported as "radius" rather than as "topLeft".
+            using var rounded = Majorsilence.Forms.Drawing.Drawing2D.RoundedRectangleGeometry.Create (rect, radius);
+            FillRounded (brush, rounded);
+        }
+
+        /// <summary>Fills a rectangle whose four corners have their own circular radii, given clockwise from the top-left.</summary>
+        /// <param name="brush">The brush that fills the shape.</param>
+        /// <param name="rect">The rectangle's bounds, in the graphics' current units.</param>
+        /// <param name="topLeft">Radius of the top-left corner.</param>
+        /// <param name="topRight">Radius of the top-right corner.</param>
+        /// <param name="bottomRight">Radius of the bottom-right corner.</param>
+        /// <param name="bottomLeft">Radius of the bottom-left corner.</param>
+        /// <exception cref="ArgumentOutOfRangeException">A radius is negative, NaN or infinite.</exception>
+        /// <remarks>Radii that do not all fit are scaled down by one common factor, so their proportions survive.</remarks>
+        public void FillRoundedRectangle (Majorsilence.Forms.Drawing.Brush brush, RectangleF rect, float topLeft, float topRight, float bottomRight, float bottomLeft)
+        {
+            using var rounded = Majorsilence.Forms.Drawing.Drawing2D.RoundedRectangleGeometry.Create (rect, topLeft, topRight, bottomRight, bottomLeft);
+            FillRounded (brush, rounded);
+        }
+
+        private void FillRounded (Majorsilence.Forms.Drawing.Brush brush, SKRoundRect rounded)
+        {
+            if (_canvas is null) return;
+
+            using var paint = RentFillPaint (brush);
+            _canvas.DrawRoundRect (rounded, paint);
+        }
+
+        /// <summary>Fills a rectangle with the same circular radius on all four corners, using float coordinates.</summary>
+        /// <inheritdoc cref="FillRoundedRectangle(Majorsilence.Forms.Drawing.Brush, RectangleF, float)"/>
+        public void FillRoundedRectangle (Majorsilence.Forms.Drawing.Brush brush, float x, float y, float width, float height, float radius)
+            => FillRoundedRectangle (brush, new RectangleF (x, y, width, height), radius);
+
+        /// <summary>Fills a rectangle with the same circular radius on all four corners, using an integer rectangle.</summary>
+        /// <inheritdoc cref="FillRoundedRectangle(Majorsilence.Forms.Drawing.Brush, RectangleF, float)"/>
+        public void FillRoundedRectangle (Majorsilence.Forms.Drawing.Brush brush, Rectangle rect, float radius)
+            => FillRoundedRectangle (brush, new RectangleF (rect.X, rect.Y, rect.Width, rect.Height), radius);
+
+        /// <summary>Fills a rectangle whose four corners have their own circular radii, using an integer rectangle.</summary>
+        /// <inheritdoc cref="FillRoundedRectangle(Majorsilence.Forms.Drawing.Brush, RectangleF, float, float, float, float)"/>
+        public void FillRoundedRectangle (Majorsilence.Forms.Drawing.Brush brush, Rectangle rect, float topLeft, float topRight, float bottomRight, float bottomLeft)
+            => FillRoundedRectangle (brush, new RectangleF (rect.X, rect.Y, rect.Width, rect.Height), topLeft, topRight, bottomRight, bottomLeft);
+
+        /// <summary>Draws the outline of a rectangle with the same circular radius on all four corners.</summary>
+        /// <param name="pen">The pen that strokes the outline. The stroke is centred on the rectangle's edge, as with <see cref="DrawRectangle(Majorsilence.Forms.Drawing.Pen, RectangleF)"/>.</param>
+        /// <param name="rect">The rectangle's bounds, in the graphics' current units.</param>
+        /// <param name="radius">
+        /// The corner radius. One that does not fit is scaled down, with the others, until neighbouring corners no
+        /// longer overlap (the CSS <c>border-radius</c> rule).
+        /// </param>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="radius"/> is negative, NaN or infinite.</exception>
+        public void DrawRoundedRectangle (Majorsilence.Forms.Drawing.Pen pen, RectangleF rect, float radius)
+        {
+            using var rounded = Majorsilence.Forms.Drawing.Drawing2D.RoundedRectangleGeometry.Create (rect, radius);
+            StrokeRounded (pen, rounded);
+        }
+
+        /// <summary>Draws the outline of a rectangle whose four corners have their own circular radii, given clockwise from the top-left.</summary>
+        /// <param name="pen">The pen that strokes the outline, centred on the rectangle's edge.</param>
+        /// <param name="rect">The rectangle's bounds, in the graphics' current units.</param>
+        /// <param name="topLeft">Radius of the top-left corner.</param>
+        /// <param name="topRight">Radius of the top-right corner.</param>
+        /// <param name="bottomRight">Radius of the bottom-right corner.</param>
+        /// <param name="bottomLeft">Radius of the bottom-left corner.</param>
+        /// <exception cref="ArgumentOutOfRangeException">A radius is negative, NaN or infinite.</exception>
+        /// <remarks>Radii that do not all fit are scaled down by one common factor, so their proportions survive.</remarks>
+        public void DrawRoundedRectangle (Majorsilence.Forms.Drawing.Pen pen, RectangleF rect, float topLeft, float topRight, float bottomRight, float bottomLeft)
+        {
+            using var rounded = Majorsilence.Forms.Drawing.Drawing2D.RoundedRectangleGeometry.Create (rect, topLeft, topRight, bottomRight, bottomLeft);
+            StrokeRounded (pen, rounded);
+        }
+
+        private void StrokeRounded (Majorsilence.Forms.Drawing.Pen pen, SKRoundRect rounded)
+        {
+            if (_canvas is null) return;
+
+            using var paint = RentStrokePaint (pen);
+            _canvas.DrawRoundRect (rounded, paint);
+        }
+
+        /// <summary>Draws the outline of a rectangle with the same circular radius on all four corners, using float coordinates.</summary>
+        /// <inheritdoc cref="DrawRoundedRectangle(Majorsilence.Forms.Drawing.Pen, RectangleF, float)"/>
+        public void DrawRoundedRectangle (Majorsilence.Forms.Drawing.Pen pen, float x, float y, float width, float height, float radius)
+            => DrawRoundedRectangle (pen, new RectangleF (x, y, width, height), radius);
+
+        /// <summary>Draws the outline of a rectangle with the same circular radius on all four corners, using an integer rectangle.</summary>
+        /// <inheritdoc cref="DrawRoundedRectangle(Majorsilence.Forms.Drawing.Pen, RectangleF, float)"/>
+        public void DrawRoundedRectangle (Majorsilence.Forms.Drawing.Pen pen, Rectangle rect, float radius)
+            => DrawRoundedRectangle (pen, new RectangleF (rect.X, rect.Y, rect.Width, rect.Height), radius);
+
+        /// <summary>Draws the outline of a rectangle whose four corners have their own circular radii, using an integer rectangle.</summary>
+        /// <inheritdoc cref="DrawRoundedRectangle(Majorsilence.Forms.Drawing.Pen, RectangleF, float, float, float, float)"/>
+        public void DrawRoundedRectangle (Majorsilence.Forms.Drawing.Pen pen, Rectangle rect, float topLeft, float topRight, float bottomRight, float bottomLeft)
+            => DrawRoundedRectangle (pen, new RectangleF (rect.X, rect.Y, rect.Width, rect.Height), topLeft, topRight, bottomRight, bottomLeft);
+
+        /// <summary>Draws an arc.</summary>
+        public void DrawArc (Majorsilence.Forms.Drawing.Pen pen, Rectangle rect, float startAngle, float sweepAngle)
+        {
+            if (_canvas is null) return;
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.AddArc (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), startAngle, sweepAngle);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws an arc with float coordinates.</summary>
+        public void DrawArc (Majorsilence.Forms.Drawing.Pen pen, float x, float y, float width, float height, float startAngle, float sweepAngle)
+            => DrawArc (pen, new Rectangle ((int)x, (int)y, (int)width, (int)height), startAngle, sweepAngle);
+
+        /// <summary>Draws a pie section.</summary>
+        public void DrawPie (Majorsilence.Forms.Drawing.Pen pen, Rectangle rect, float startAngle, float sweepAngle)
+        {
+            if (_canvas is null) return;
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.MoveTo (rect.X + rect.Width / 2f, rect.Y + rect.Height / 2f);
+            path.AddArc (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), startAngle, sweepAngle);
+            path.Close ();
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Fills a pie section.</summary>
+        public void FillPie (Majorsilence.Forms.Drawing.Brush brush, Rectangle rect, float startAngle, float sweepAngle)
+        {
+            if (_canvas is null) return;
+            using var paint = RentFillPaint (brush);
+            using var path = new SKPath ();
+            path.MoveTo (rect.X + rect.Width / 2f, rect.Y + rect.Height / 2f);
+            path.AddArc (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), startAngle, sweepAngle);
+            path.Close ();
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Fills a pie section with float coordinates.</summary>
+        public void FillPie (Majorsilence.Forms.Drawing.Brush brush, float x, float y, float width, float height, float startAngle, float sweepAngle)
+            => FillPie (brush, new Rectangle ((int)x, (int)y, (int)width, (int)height), startAngle, sweepAngle);
+
+        /// <summary>Draws a cubic Bezier curve.</summary>
+        public void DrawBezier (Majorsilence.Forms.Drawing.Pen pen, PointF pt1, PointF pt2, PointF pt3, PointF pt4)
+        {
+            if (_canvas is null) return;
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.MoveTo (pt1.X, pt1.Y);
+            path.CubicTo (pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws a cubic Bezier curve using integer Point coordinates.</summary>
+        public void DrawBezier (Majorsilence.Forms.Drawing.Pen pen, Point pt1, Point pt2, Point pt3, Point pt4)
+            => DrawBezier (pen, new PointF (pt1.X, pt1.Y), new PointF (pt2.X, pt2.Y), new PointF (pt3.X, pt3.Y), new PointF (pt4.X, pt4.Y));
+
+        /// <summary>Draws multiple cubic Bezier curves.</summary>
+        /// <remarks>
+        /// One path for the whole run, for the reason given on
+        /// <see cref="DrawLines(Majorsilence.Forms.Drawing.Pen, PointF[])"/>: a per-curve draw call
+        /// restarts the pen's dash pattern at every join (GFX-23).
+        /// </remarks>
+        public void DrawBeziers (Majorsilence.Forms.Drawing.Pen pen, PointF[] points)
+        {
+            if (_canvas is null || points is null || points.Length < 4) return;
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 0; i + 3 < points.Length; i += 3)
+                path.CubicTo (points[i + 1].X, points[i + 1].Y, points[i + 2].X, points[i + 2].Y,
+                    points[i + 3].X, points[i + 3].Y);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws multiple cubic Bezier curves using integer Point coordinates.</summary>
+        public void DrawBeziers (Majorsilence.Forms.Drawing.Pen pen, Point[] points)
+            => DrawBeziers (pen, ToPointF (points));
+
+        /// <summary>Draws a cardinal spline curve through the specified points.</summary>
+        public void DrawCurve (Majorsilence.Forms.Drawing.Pen pen, PointF[] points)
+        {
+            if (_canvas is null || points.Length < 2) return;
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 1; i < points.Length; i++) path.LineTo (points[i].X, points[i].Y);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws a cardinal spline curve using integer Point coordinates.</summary>
+        public void DrawCurve (Majorsilence.Forms.Drawing.Pen pen, Point[] points)
+        {
+            if (_canvas is null || points.Length < 2) return;
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 1; i < points.Length; i++) path.LineTo (points[i].X, points[i].Y);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>
+        /// Draws a segment of a cardinal spline through <paramref name="points"/>, starting at
+        /// <paramref name="offset"/> and spanning <paramref name="numberOfSegments"/> segments,
+        /// with the curve's tightness controlled by <paramref name="tension"/> (0 = straight
+        /// lines between points, matching System.Drawing.Graphics.DrawCurve's default of 0.5).
+        /// Unlike the plain (Pen, PointF[]) overload above (which just connects points with
+        /// straight lines), this is a real Catmull-Rom spline through the points.
+        /// </summary>
+        public void DrawCurve (Majorsilence.Forms.Drawing.Pen pen, PointF[] points, int offset, int numberOfSegments, float tension)
+        {
+            if (_canvas is null || points.Length < 2 || numberOfSegments < 1) return;
+
+            int last = offset + numberOfSegments;
+            if (last >= points.Length) last = points.Length - 1;
+            if (offset < 0 || offset >= last) return;
+
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.MoveTo (points[offset].X, points[offset].Y);
+
+            // Catmull-Rom, converted to tension-scaled tangents (matches GDI+'s interpretation
+            // of the `tension` parameter): for each segment P1->P2, use the neighboring points
+            // P0 and P3 (clamped to the array ends) to compute tangents, subdivided into a fixed
+            // number of steps per segment for a smooth curve.
+            const int stepsPerSegment = 24;
+            for (int i = offset; i < last; i++)
+            {
+                var p0 = points[System.Math.Max (i - 1, 0)];
+                var p1 = points[i];
+                var p2 = points[i + 1];
+                var p3 = points[System.Math.Min (i + 2, points.Length - 1)];
+
+                for (int s = 1; s <= stepsPerSegment; s++)
+                {
+                    float t = s / (float)stepsPerSegment;
+                    float t2 = t * t;
+                    float t3 = t2 * t;
+
+                    float m0x = tension * (p2.X - p0.X);
+                    float m0y = tension * (p2.Y - p0.Y);
+                    float m1x = tension * (p3.X - p1.X);
+                    float m1y = tension * (p3.Y - p1.Y);
+
+                    float h00 = 2 * t3 - 3 * t2 + 1;
+                    float h10 = t3 - 2 * t2 + t;
+                    float h01 = -2 * t3 + 3 * t2;
+                    float h11 = t3 - t2;
+
+                    float x = h00 * p1.X + h10 * m0x + h01 * p2.X + h11 * m1x;
+                    float y = h00 * p1.Y + h10 * m0y + h01 * p2.Y + h11 * m1y;
+
+                    path.LineTo (x, y);
+                }
+            }
+
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Fills an ellipse using a Majorsilence.Forms.Drawing.Brush.</summary>
+        public void FillEllipse (Majorsilence.Forms.Drawing.Brush brush, Rectangle rect)
+        {
+            if (_canvas is null) return;
+            using var paint = RentFillPaint (brush);
+            _canvas.DrawOval (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+        }
+
+        /// <summary>Fills an ellipse using a Majorsilence.Forms.Drawing.Brush.</summary>
+        public void FillEllipse (Majorsilence.Forms.Drawing.Brush brush, float x, float y, float width, float height)
+            => FillEllipse (brush, new Rectangle ((int)x, (int)y, (int)width, (int)height));
+
+        /// <summary>Draws an ellipse outline using a Majorsilence.Forms.Drawing.Pen.</summary>
+        public void DrawEllipse (Majorsilence.Forms.Drawing.Pen pen, Rectangle rect)
+        {
+            if (_canvas is null) return;
+            using var paint = RentStrokePaint (pen);
+            _canvas.DrawOval (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+        }
+
+        /// <summary>Draws an ellipse outline using a Majorsilence.Forms.Drawing.Pen (RectangleF overload).</summary>
+        public void DrawEllipse (Majorsilence.Forms.Drawing.Pen pen, RectangleF rect)
+            => DrawEllipse (pen, new Rectangle ((int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height));
+
+        /// <summary>Draws an ellipse outline using a Majorsilence.Forms.Drawing.Pen.</summary>
+        public void DrawEllipse (Majorsilence.Forms.Drawing.Pen pen, float x, float y, float width, float height)
+            => DrawEllipse (pen, new Rectangle ((int)x, (int)y, (int)width, (int)height));
+
+        /// <summary>Fills an ellipse using a Majorsilence.Forms.Drawing.Brush (RectangleF overload).</summary>
+        public void FillEllipse (Majorsilence.Forms.Drawing.Brush brush, RectangleF rect)
+            => FillEllipse (brush, new Rectangle ((int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height));
+
+        /// <summary>Fills a closed polygon.</summary>
+        public void FillPolygon (Majorsilence.Forms.Drawing.Brush brush, Point[] points)
+        {
+            if (_canvas is null || points.Length < 2) return;
+            var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 1; i < points.Length; i++) path.LineTo (points[i].X, points[i].Y);
+            path.Close ();
+            using var paint = RentFillPaint (brush);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws a closed polygon outline.</summary>
+        public void DrawPolygon (Majorsilence.Forms.Drawing.Pen pen, Point[] points)
+        {
+            if (_canvas is null || points.Length < 2) return;
+            using var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 1; i < points.Length; i++) path.LineTo (points[i].X, points[i].Y);
+            path.Close ();
+            using var paint = RentStrokePaint (pen);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws a closed polygon outline using PointF coordinates.</summary>
+        public void DrawPolygon (Majorsilence.Forms.Drawing.Pen pen, PointF[] points)
+        {
+            if (_canvas is null || points.Length < 2) return;
+            using var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 1; i < points.Length; i++) path.LineTo (points[i].X, points[i].Y);
+            path.Close ();
+            using var paint = RentStrokePaint (pen);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Fills a closed polygon using PointF coordinates.</summary>
+        public void FillPolygon (Majorsilence.Forms.Drawing.Brush brush, PointF[] points)
+        {
+            if (_canvas is null || points.Length < 2) return;
+            var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 1; i < points.Length; i++) path.LineTo (points[i].X, points[i].Y);
+            path.Close ();
+            using var paint = RentFillPaint (brush);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws an open polyline.</summary>
+        public void DrawLines (Majorsilence.Forms.Drawing.Pen pen, Point[] points)
+            => DrawLines (pen, ToPointF (points));
+
+        /// <summary>Draws an open polyline using floating-point coordinates.</summary>
+        /// <remarks>
+        /// Drawn as one path rather than a loop of independent <c>DrawLine</c> calls, because both the
+        /// pen's <c>LineJoin</c> and the phase of its dash pattern are properties of the polyline as a
+        /// whole: segment-at-a-time stroking gives every joint two flat butt ends instead of a mitred
+        /// or rounded join, and restarts the dash at every vertex so the dashes visibly bunch up
+        /// (GFX-23).
+        /// </remarks>
+        public void DrawLines (Majorsilence.Forms.Drawing.Pen pen, PointF[] points)
+        {
+            if (_canvas is null || points is null || points.Length < 2) return;
+            using var paint = RentStrokePaint (pen);
+            using var path = new SKPath ();
+            path.MoveTo (points[0].X, points[0].Y);
+            for (int i = 1; i < points.Length; i++)
+                path.LineTo (points[i].X, points[i].Y);
+            _canvas.DrawPath (path, paint);
+        }
+
+        /// <summary>Draws a series of rectangles.</summary>
+        public void DrawRectangles (Majorsilence.Forms.Drawing.Pen pen, Rectangle[] rects)
+        {
+            foreach (var r in rects) DrawRectangle (pen, r);
+        }
+
+        /// <summary>Draws a series of rectangles using floating-point coordinates.</summary>
+        public void DrawRectangles (Majorsilence.Forms.Drawing.Pen pen, RectangleF[] rects)
+        {
+            foreach (var r in rects) DrawRectangle (pen, new Rectangle ((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height));
+        }
+
+        /// <summary>Fills a series of rectangles.</summary>
+        public void FillRectangles (Majorsilence.Forms.Drawing.Brush brush, Rectangle[] rects)
+        {
+            foreach (var r in rects) FillRectangle (brush, r);
+        }
+
+        /// <summary>Fills a series of rectangles using floating-point coordinates.</summary>
+        public void FillRectangles (Majorsilence.Forms.Drawing.Brush brush, RectangleF[] rects)
+        {
+            foreach (var r in rects) FillRectangle (brush, r);
+        }
+
+        /// <summary>Draws a string with the given Majorsilence.Forms.Drawing.Font and Brush.</summary>
+        /// <remarks>As in GDI+, the text starts a sixth of an em right of <paramref name="x"/> (see LeadingPadding).</remarks>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, float x, float y)
+            => DrawStringAt (text, font, brush, x + LeadingPadding (font, null), y);
+
+        // GDI+ insets the layout of every DrawString by a sixth of an em on each side, unless the format
+        // is GenericTypographic. Without it text sat flush against whatever box it was drawn in -- every
+        // report cell and design-surface text box drew 2px (at 10pt) further left than System.Drawing,
+        // touching the cell's left border. TextRenderer (GDI rules, its own padding flags) and the
+        // renderers draw through DrawTextBlock/DrawStringClipped/DrawStringAt, which add none.
+        private float LeadingPadding (Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.StringFormat? format)
+            => IsTypographic (format) ? 0f : FontUnits (font) / 6f;
+
+        private const Majorsilence.Forms.Drawing.StringFormatFlags TypographicFlags =
+            Majorsilence.Forms.Drawing.StringFormatFlags.FitBlackBox
+            | Majorsilence.Forms.Drawing.StringFormatFlags.LineLimit
+            | Majorsilence.Forms.Drawing.StringFormatFlags.NoClip;
+
+        private static bool IsTypographic (Majorsilence.Forms.Drawing.StringFormat? format)
+            => format is { Trimming: Majorsilence.Forms.Drawing.StringTrimming.None }
+               && (format.FormatFlags & TypographicFlags) == TypographicFlags;
+
+        // The layout box GDI+ actually lays text out in: the caller's, less the leading padding on each side.
+        private RectangleF PaddedLayout (RectangleF bounds, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.StringFormat? format)
+        {
+            var pad = LeadingPadding (font, format);
+
+            return pad <= 0 ? bounds : new RectangleF (bounds.X + pad, bounds.Y, Math.Max (0, bounds.Width - 2 * pad), bounds.Height);
+        }
+
+        // DrawString (x, y) without the leading padding: (x, y) is where the text itself starts.
+        private void DrawStringAt (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, float x, float y)
+        {
+            if (_canvas is null || string.IsNullOrEmpty (text)) return;
+
+            // font.GetSKFont() already lazily builds and caches exactly this SKFont (same typeface
+            // resolution TypefaceCache.Resolve used to redo here, same PixelSize); reusing it turns
+            // one allocation per DrawString call into zero, for anything that draws the same Font
+            // repeatedly (Binary Rain's per-glyph rain, any custom-painted label). It is owned by
+            // the Font, not this call, so it must not be disposed here.
+            // A solid brush -- overwhelmingly the case -- goes through the same RichTextKit path the
+            // library's own renderers and MeasureString already use, because that path does FONT FALLBACK
+            // and a bare SKFont does not. Drawing straight to SKCanvas.DrawText renders any codepoint the
+            // chosen typeface lacks as tofu, while MeasureString (RichTextKit) measured it correctly --
+            // so a CJK or emoji string laid out at the right size and then drew as a row of boxes. Found
+            // with a Chinese control library, where every label was tofu.
+            //
+            // Routing both sides through one machinery is also what keeps them from disagreeing again.
+            if (brush is Majorsilence.Forms.Drawing.SolidBrush solid) {
+                // GDI+ DrawString(text, font, brush, x, y) is unbounded, so the layout width has to be
+                // effectively infinite -- but not int.MaxValue, which overflows RichTextKit's own
+                // arithmetic. This is far wider than any real surface and the clip inside DrawText keeps
+                // it honest.
+                const int Unbounded = 1 << 20;
+
+                SkiaTextExtensions.DrawText (_canvas, text, font.GetSKTypeface (), (int)System.Math.Round (FontUnits (font)),
+                    new Rectangle ((int)x, (int)y, Unbounded, Unbounded),
+                    solid.Color.ToSKColor (), ContentAlignment.TopLeft, -1, -1, null, null, false, TextPaint);
+
+                return;
+            }
+
+            // Gradient and texture brushes have no single colour to hand RichTextKit, so they keep the
+            // direct path -- and with it the no-fallback limitation, which is worth knowing but affects
+            // almost nothing: text painted with a gradient brush is rare, and Latin text is unaffected.
+            var skFont = SkFontFor (font, out var ownedFont);
+
+            // The cached font belongs to the Font, so a rasterisation other than the default goes on a copy.
+            if (TextPaint is { } hint && ownedFont is null)
+                skFont = ownedFont = new SKFont (skFont.Typeface, skFont.Size) { Subpixel = skFont.Subpixel };
+            if (TextPaint is { } rasterisation) {
+                skFont.Edging = rasterisation.Edging;
+                skFont.Hinting = rasterisation.Hinting;
+            }
+
+            using var owned_font = ownedFont;
+            using var paint = brush.CreatePaint ();
+
+            // (x, y) is the TOP-LEFT of the text, as in GDI+, but Skia draws from the baseline -- so the
+            // baseline sits one ascent below the top, not one em. The two are close enough that the em was
+            // not obviously wrong, but it disagreed with the line height MeasureString reports, so text
+            // asked to centre vertically landed a few pixels low. Skia's ascent is negative (up from the
+            // baseline), hence the negation.
+            _canvas.DrawText (text, x, y - skFont.Metrics.Ascent, SKTextAlign.Left, skFont, paint);
+        }
+
+        /// <summary>Draws a string at the given PointF.</summary>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, PointF point)
+            => DrawString (text, font, brush, point.X, point.Y);
+
+        /// <summary>Draws a string at the given Point.</summary>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, Point point)
+            => DrawString (text, font, brush, point.X, point.Y);
+
+        /// <summary>Draws a string within the specified rectangle, word-wrapping to its width.</summary>
+        /// <remarks>
+        /// GDI+ draws this overload with <c>StringFormat.GenericDefault</c>, whose flags do NOT include
+        /// <c>NoWrap</c> -- so the text wraps inside the layout rectangle and is clipped vertically.
+        /// This used to clip to the rectangle and then call the unbounded point overload, so a
+        /// paragraph, a wrapped cell value, a tooltip body or a report text box drew as ONE clipped
+        /// line. It was made worse by <see cref="MeasureString(string, Majorsilence.Forms.Drawing.Font, SizeF)"/>
+        /// wrapping correctly: an application that measured to size its box and then drew into it got a
+        /// tall empty box with a single line at the top (finding GFX-06).
+        /// </remarks>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, RectangleF bounds)
+        {
+            if (_canvas is null || string.IsNullOrEmpty (text)) return;
+
+            var layout = PaddedLayout (bounds, font, null);
+
+            // The canvas extension lays out to the rectangle's width and clips to it, which is exactly
+            // the contract here. Solid brushes only, matching the point overload: a gradient or texture
+            // brush has no single colour to hand RichTextKit and keeps the direct path below.
+            if (brush is Majorsilence.Forms.Drawing.SolidBrush solid) {
+                SkiaTextExtensions.DrawText (_canvas, text, font.GetSKTypeface (), (int)System.Math.Round (FontUnits (font)),
+                    Rectangle.Round (layout), solid.Color.ToSKColor (), ContentAlignment.TopLeft, -1, -1, null, null, false, TextPaint);
+
+                return;
+            }
+
+            _canvas.Save ();
+            _canvas.ClipRect (new SKRect (bounds.Left, bounds.Top, bounds.Right, bounds.Bottom));
+            DrawStringAt (text, font, brush, layout.Left, layout.Top);
+            _canvas.Restore ();
+        }
+
+        /// <summary>
+        /// Draws a string within the specified rectangle, honouring the format's Alignment and
+        /// LineAlignment, and rotating for <see cref="Majorsilence.Forms.Drawing.StringFormatFlags.DirectionVertical"/>.
+        /// Trimming and the remaining FormatFlags are still ignored.
+        /// </summary>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, RectangleF bounds, Majorsilence.Forms.Drawing.StringFormat? format)
+        {
+            if (format is null) {
+                DrawString (text, font, brush, bounds);
+                return;
+            }
+
+            if (IsVertical (format)) {
+                DrawStringVertical (text, font, brush, bounds, format);
+                return;
+            }
+
+            // Hotkey prefixes are the format's business, as in GDI+: "&Cancel" has to render as "Cancel"
+            // with an underlined C, not with a literal ampersand. Krypton's AccurateText sets this on every
+            // piece of button, tab and menu text it draws, so leaving it unread showed the raw "&" suite-wide.
+            var display = text;
+            var mnemonic = -1;
+
+            if (format.HotkeyPrefix != Majorsilence.Forms.Drawing.Text.HotkeyPrefix.None) {
+                display = Mnemonics.Parse (text, out mnemonic);
+
+                if (format.HotkeyPrefix != Majorsilence.Forms.Drawing.Text.HotkeyPrefix.Show)
+                    mnemonic = -1;   // Hide: strip the prefix, but draw no underline.
+            }
+
+            // GDI+ word-wraps inside the layout rectangle unless NoWrap is set. Only text that does not
+            // fit on one line takes the wrapping path, so a single line keeps the exact placement below.
+            // A matrix column header in a report preview ("Clothing = 15316") was clipped to one line
+            // where System.Drawing broke it onto two.
+            // Laid out in the padded box, clipped to the caller's, as GDI+ does.
+            var layout = PaddedLayout (bounds, font, format);
+
+            if (WrapsInBounds (display, font, brush, layout, format, mnemonic) is { } solid) {
+                DrawTextBlock (display, font, solid.Color, Rectangle.Round (layout),
+                    ToContentAlignment (format.Alignment, format.LineAlignment), maxLines: null, ellipsis: false);
+                return;
+            }
+
+            // Measured on the DISPLAY text: sizing on the raw string would offset centred text by the
+            // width of an ampersand that never appears.
+            var origin = AlignTextInBounds (
+                display, font, layout,
+                ToOffsetFactor (format.Alignment),
+                ToOffsetFactor (format.LineAlignment));
+
+            DrawStringClipped (display, font, brush, origin, bounds);
+
+            if (mnemonic >= 0 && mnemonic < display.Length)
+                DrawMnemonicUnderline (display, mnemonic, font, brush, origin, bounds);
+        }
+
+        /// <summary>
+        /// Draws <paramref name="text"/> rotated 90 degrees clockwise, reading top to bottom, to fill
+        /// a tall, narrow <paramref name="bounds"/> -- what GDI+ does with
+        /// <see cref="Majorsilence.Forms.Drawing.StringFormatFlags.DirectionVertical"/>, and what RDL's
+        /// <c>WritingMode="tb-rl"</c> calls for on axis and category titles.
+        /// </summary>
+        /// <remarks>
+        /// The whole run rotates as one line, as GDI+ draws a Latin run under DirectionVertical. It
+        /// used to rotate the other way (-90, reading bottom to top), so a report chart's vertical
+        /// axis title ("Categories") read upwards in the Majorsilence.Forms viewer and downwards in the
+        /// System.Drawing one. Bottom-to-top is RDL's separate <c>Rotate270</c>, not tb-rl.
+        /// GDI+ also swaps which factor governs which axis for vertical text: <c>Alignment</c> positions
+        /// the run along its reading direction (top to bottom) and <c>LineAlignment</c> positions it
+        /// across the column, Near being the right-hand edge where a vertical line starts.
+        /// </remarks>
+        private void DrawStringVertical (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, RectangleF bounds, Majorsilence.Forms.Drawing.StringFormat format)
+        {
+            if (_canvas is null || string.IsNullOrEmpty (text))
+                return;
+
+            var display = format.HotkeyPrefix != Majorsilence.Forms.Drawing.Text.HotkeyPrefix.None
+                ? Mnemonics.Parse (text, out _)
+                : text;
+
+            // Unrotated: size.Width is the run's length (becomes the box's height once rotated),
+            // size.Height is its thickness (becomes the box's width).
+            var size = MeasureRun (display, font);
+
+            var alongSlack = bounds.Height - size.Width;
+            var acrossSlack = bounds.Width - size.Height;
+
+            // Rotated clockwise about the pivot, the run occupies [pivotX - thickness, pivotX] across
+            // and [pivotY, pivotY + length] along, so the pivot is its top-right corner.
+            var pivotX = bounds.Right - acrossSlack * ToOffsetFactor (format.LineAlignment);
+            var pivotY = bounds.Top + alongSlack * ToOffsetFactor (format.Alignment);
+
+            _canvas.Save ();
+            _canvas.ClipRect (new SKRect (bounds.Left, bounds.Top, bounds.Right, bounds.Bottom));
+            _canvas.RotateDegrees (90, pivotX, pivotY);
+            DrawStringAt (display, font, brush, pivotX, pivotY);
+            _canvas.Restore ();
+        }
+
+        /// <summary>
+        /// Underlines a single character of already-drawn text, the way GDI+ marks a hotkey.
+        /// </summary>
+        /// <remarks>
+        /// Drawn as a rule rather than with an underlined font: only one character is underlined, so
+        /// restyling the whole run would be wrong, and measuring the prefix is how its x position is found.
+        /// Clipped to the same bounds as the text so a mnemonic in overflowing text does not escape the box.
+        /// </remarks>
+        internal void DrawMnemonicUnderline (string display, int index,
+            Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush,
+            PointF origin, RectangleF clip)
+        {
+            if (_canvas is null)
+                return;
+
+            var before = MeasureRun (display[..index], font).Width;
+            var width = MeasureRun (display[index].ToString (), font).Width;
+
+            if (width <= 0)
+                return;
+
+            // Just below the baseline, which DrawString places one ascent below the text's top edge.
+            var y = origin.Y - SkFontFor (font, out var ownedFont).Metrics.Ascent + 1f;
+            ownedFont?.Dispose ();
+
+            using var paint = brush.CreatePaint ();
+            paint.Style = SKPaintStyle.Fill;
+
+            _canvas.Save ();
+            _canvas.ClipRect (new SKRect (clip.Left, clip.Top, clip.Right, clip.Bottom));
+            _canvas.DrawRect (origin.X + before, y, width, 1f, paint);
+            _canvas.Restore ();
+        }
+
+        // The brush to wrap with when DrawString (..., StringFormat) has to wrap, or null to draw a single
+        // line: no NoWrap flag, text wider than the box, and a solid brush (the block layout takes one
+        // colour). As in GDI+, a box too short for the second line still breaks at a word and clips the
+        // rest -- "=sum(Fields!" rather than "=sum(Fields!Sa". A hotkey underline is placed on a single
+        // line, so it opts out.
+        private Majorsilence.Forms.Drawing.SolidBrush? WrapsInBounds (string text, Majorsilence.Forms.Drawing.Font font,
+            Majorsilence.Forms.Drawing.Brush brush, RectangleF bounds, Majorsilence.Forms.Drawing.StringFormat format, int mnemonic)
+        {
+            if (brush is not Majorsilence.Forms.Drawing.SolidBrush solid || mnemonic >= 0 || bounds.Width <= 0
+                || (format.FormatFlags & Majorsilence.Forms.Drawing.StringFormatFlags.NoWrap) != 0)
+                return null;
+
+            return MeasureRun (text, font).Width > bounds.Width ? solid : null;
+        }
+
+        private static ContentAlignment ToContentAlignment (Majorsilence.Forms.Drawing.StringAlignment horizontal, Majorsilence.Forms.Drawing.StringAlignment vertical)
+            => (horizontal, vertical) switch {
+                (Majorsilence.Forms.Drawing.StringAlignment.Center, Majorsilence.Forms.Drawing.StringAlignment.Near) => ContentAlignment.TopCenter,
+                (Majorsilence.Forms.Drawing.StringAlignment.Far, Majorsilence.Forms.Drawing.StringAlignment.Near) => ContentAlignment.TopRight,
+                (Majorsilence.Forms.Drawing.StringAlignment.Near, Majorsilence.Forms.Drawing.StringAlignment.Center) => ContentAlignment.MiddleLeft,
+                (Majorsilence.Forms.Drawing.StringAlignment.Center, Majorsilence.Forms.Drawing.StringAlignment.Center) => ContentAlignment.MiddleCenter,
+                (Majorsilence.Forms.Drawing.StringAlignment.Far, Majorsilence.Forms.Drawing.StringAlignment.Center) => ContentAlignment.MiddleRight,
+                (Majorsilence.Forms.Drawing.StringAlignment.Near, Majorsilence.Forms.Drawing.StringAlignment.Far) => ContentAlignment.BottomLeft,
+                (Majorsilence.Forms.Drawing.StringAlignment.Center, Majorsilence.Forms.Drawing.StringAlignment.Far) => ContentAlignment.BottomCenter,
+                (Majorsilence.Forms.Drawing.StringAlignment.Far, Majorsilence.Forms.Drawing.StringAlignment.Far) => ContentAlignment.BottomRight,
+                _ => ContentAlignment.TopLeft,
+            };
+
+        // Near -> 0 (no shift), Center -> half the slack, Far -> all of it.
+        private static float ToOffsetFactor (Majorsilence.Forms.Drawing.StringAlignment alignment) => alignment switch {
+            Majorsilence.Forms.Drawing.StringAlignment.Center => 0.5f,
+            Majorsilence.Forms.Drawing.StringAlignment.Far => 1f,
+            _ => 0f,
+        };
+
+        /// <summary>
+        /// Positions <paramref name="text"/> inside <paramref name="bounds"/>, shifting it by the
+        /// given fraction of the leftover space on each axis. A factor of 0 leaves it at the
+        /// top-left, 0.5 centres it, 1 pushes it to the far edge.
+        /// </summary>
+        /// <remarks>
+        /// Text longer than the box yields a negative offset, so it overhangs symmetrically the way
+        /// GDI's DT_CENTER does, rather than being pinned to the near edge.
+        /// </remarks>
+        internal PointF AlignTextInBounds (string text, Majorsilence.Forms.Drawing.Font font, RectangleF bounds, float xFactor, float yFactor)
+        {
+            var size = MeasureRun (text, font);
+            return new PointF (
+                bounds.X + ((bounds.Width - size.Width) * xFactor),
+                bounds.Y + ((bounds.Height - size.Height) * yFactor));
+        }
+
+        /// <summary>
+        /// Draws text laid out as a block inside <paramref name="bounds"/> — wrapping to its width,
+        /// optionally limited to a number of lines and ellipsised when it does not fit.
+        /// </summary>
+        /// <remarks>
+        /// The single-run path (<c>DrawStringClipped</c>) cannot express either, so
+        /// <c>TextRenderer.DrawText</c> routes the <c>WordBreak</c> and ellipsis flags here.
+        /// RichTextKit already implements both; nothing was reaching them.
+        /// </remarks>
+        internal void DrawTextBlock (string text, Majorsilence.Forms.Drawing.Font font,
+            System.Drawing.Color color, Rectangle bounds, ContentAlignment alignment,
+            int? maxLines, bool ellipsis)
+        {
+            if (_canvas is null || string.IsNullOrEmpty (text))
+                return;
+
+            SkiaTextExtensions.DrawText (_canvas, text, font.GetSKTypeface (), (int)System.Math.Round (FontUnits (font)),
+                bounds, color.ToSKColor (), alignment, -1, -1, null, maxLines, ellipsis, TextPaint);
+        }
+
+        /// <summary>
+        /// Draws text at <paramref name="origin"/> while clipping to a separate rectangle, or to
+        /// nothing when <paramref name="clip"/> is null.
+        /// </summary>
+        /// <remarks>
+        /// The two have to be independent: GDI's alignment flags move text around inside the layout
+        /// rectangle, but clipping still happens against that rectangle -- so the position the text
+        /// is drawn at is not the corner of the box it is clipped to.
+        /// </remarks>
+        internal void DrawStringClipped (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, PointF origin, RectangleF? clip)
+        {
+            if (_canvas is null || string.IsNullOrEmpty (text)) return;
+
+            if (clip is null) {
+                DrawStringAt (text, font, brush, origin.X, origin.Y);
+                return;
+            }
+
+            var rect = clip.Value;
+            _canvas.Save ();
+            _canvas.ClipRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom));
+            DrawStringAt (text, font, brush, origin.X, origin.Y);
+            _canvas.Restore ();
+        }
+
+        /// <summary>Draws a string within the specified rectangle.</summary>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, RectangleF bounds, object? format)
+            => DrawString (text, font, brush, bounds);
+
+        /// <summary>Draws a string anchored at the given point, honouring the format's alignment and hotkey prefix.</summary>
+        /// <remarks>
+        /// GFX-19: the format was dropped. In GDI+ the point is the near, centre or far anchor that
+        /// <c>Alignment</c> and <c>LineAlignment</c> name -- the "centre this label on a point" call chart
+        /// labels and gauge readouts are written with -- and <c>HotkeyPrefix</c> strips (and with
+        /// <c>Show</c> underlines) the ampersand. Unclipped, as point-anchored text is.
+        /// </remarks>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, PointF point, Majorsilence.Forms.Drawing.StringFormat? format)
+        {
+            if (format is null || IsVertical (format)) {
+                DrawStringAt (text, font, brush, point.X + LeadingPadding (font, format), point.Y);
+                return;
+            }
+
+            if (_canvas is null || string.IsNullOrEmpty (text))
+                return;
+
+            var display = text;
+            var mnemonic = -1;
+
+            if (format.HotkeyPrefix != Majorsilence.Forms.Drawing.Text.HotkeyPrefix.None) {
+                display = Mnemonics.Parse (text, out mnemonic);
+
+                if (format.HotkeyPrefix != Majorsilence.Forms.Drawing.Text.HotkeyPrefix.Show)
+                    mnemonic = -1;
+            }
+
+            // A zero-size box at the point: the alignment factors then move the text by its own size.
+            // GDI+'s sixth-of-an-em padding sits between the anchor and the text: right of a near anchor,
+            // left of a far one, and cancels out around a centred one.
+            var horizontal = ToOffsetFactor (format.Alignment);
+            var anchor = new PointF (point.X + LeadingPadding (font, format) * (1 - 2 * horizontal), point.Y);
+            var origin = AlignTextInBounds (display, font, new RectangleF (anchor, SizeF.Empty),
+                horizontal, ToOffsetFactor (format.LineAlignment));
+
+            DrawStringClipped (display, font, brush, origin, null);
+
+            if (mnemonic >= 0 && mnemonic < display.Length) {
+                var size = MeasureRun (display, font);
+                DrawMnemonicUnderline (display, mnemonic, font, brush, origin, new RectangleF (origin, new SizeF (size.Width, size.Height + 2)));
+            }
+        }
+
+        /// <inheritdoc cref="DrawString(string, Majorsilence.Forms.Drawing.Font, Majorsilence.Forms.Drawing.Brush, PointF, Majorsilence.Forms.Drawing.StringFormat?)"/>
+        public void DrawString (string text, Majorsilence.Forms.Drawing.Font font, Majorsilence.Forms.Drawing.Brush brush, float x, float y, Majorsilence.Forms.Drawing.StringFormat? format)
+            => DrawString (text, font, brush, new PointF (x, y), format);
+
+        // The SKBitmap/SKColor overloads below (through DrawImage(SKBitmap, float, float, float, float))
+        // are Skia-native convenience helpers, not part of the GDI+ surface real WinForms code calls by
+        // name -- SKBitmap/SKColor mean nothing to ported code, which only ever has an Image/Pen/Brush to
+        // hand. Kept internal (not deleted; nothing in this assembly calls them either, but they cost
+        // nothing to keep for a future renderer fast path) rather than public: left public, they silently
+        // widened this method's public overload set, so a real WinForms call using target-typed `new(...)`
+        // -- `g.DrawRectangle(new(color), rect)`, `g.DrawLine(new(color), p1, p2)`, an image drawn through
+        // a bitmap variable -- became ambiguous (CS0121) between the real overload and one of these,
+        // despite nothing in the call ever mentioning Skia.
+
+        /// <summary>Draws an SKBitmap image at the given rectangle.</summary>
+        internal void DrawImage (SKBitmap image, Rectangle destRect)
+        {
+            if (_canvas is null || image is null) return;
+            using var paint = ImagePaint (null);
+            DrawBitmapSampled (image, new SKRect (destRect.Left, destRect.Top, destRect.Right, destRect.Bottom), paint);
+        }
+
+        /// <summary>Draws an SKBitmap image at the given position.</summary>
+        internal void DrawImage (SKBitmap image, int x, int y)
+        {
+            if (_canvas is null || image is null) return;
+            using var paint = ImagePaint (null);
+            DrawBitmapSampled (image, new SKRect (x, y, x + image.Width, y + image.Height), paint);
+        }
+
+        /// <summary>Draws a focus rectangle (stub — draws a dotted border).</summary>
+        public void DrawFocusRectangle (Rectangle rect)
+            => DrawFocusRectangle (rect, Majorsilence.Forms.SystemColors.ControlText, Majorsilence.Forms.SystemColors.Control);
+
+        /// <summary>
+        /// Draws a dotted focus rectangle in the given foreground colour, dithered against the given
+        /// background.
+        /// </summary>
+        /// <remarks>
+        /// Three fixes over the hardcoded version (GFX-03). The colour was always black, so the focus
+        /// indicator vanished on a dark theme -- an accessibility regression, not a cosmetic one. The
+        /// stroke covered the full rectangle where upstream decrements the width and height, so a focus
+        /// rect drawn at ClientRectangle was clipped on the right and bottom. And the dash had no phase,
+        /// so adjacent rectangles did not tile: upstream picks it from (X + Y) % 2 so the corner pixel is
+        /// always penned.
+        /// </remarks>
+        public void DrawFocusRectangle (Rectangle rect, System.Drawing.Color foreColor, System.Drawing.Color backColor)
+        {
+            if (_canvas is null)
+                return;
+
+            // The dots are the XOR of the two colours, which is what makes them visible against either --
+            // the colours as painted, so a system colour XORs with this library's palette value.
+            foreColor = Majorsilence.Forms.Drawing.SystemColorPalette.Resolve (foreColor);
+            backColor = Majorsilence.Forms.Drawing.SystemColorPalette.Resolve (backColor);
+            var colour = new SKColor (
+                (byte)(foreColor.R ^ backColor.R),
+                (byte)(foreColor.G ^ backColor.G),
+                (byte)(foreColor.B ^ backColor.B),
+                255);
+
+            using var paint = new SKPaint { Color = colour, Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+            paint.PathEffect = SKPathEffect.CreateDash ([1, 1], (rect.X + rect.Y) % 2);
+
+            // Inside the rectangle, not around it: a 10x10 focus rect strokes 0..9, not 0..10.
+            var right = Math.Max (rect.Left, rect.Right - 1);
+            var bottom = Math.Max (rect.Top, rect.Bottom - 1);
+
+            _canvas.DrawRect (new SKRect (rect.Left, rect.Top, right, bottom), paint);
+        }
+
+        // --- SKColor overloads (internal usage) ---
+
+        /// <summary>Fills a rectangle with the given SKColor.</summary>
+        internal void FillRectangle (SKColor color, Rectangle rect)
+        {
+            if (_canvas is null) return;
+            using var paint = new SKPaint { Color = color, Style = SKPaintStyle.Fill };
+            _canvas.DrawRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+        }
+
+        /// <summary>Draws a rectangle outline with the given SKColor.</summary>
+        internal void DrawRectangle (SKColor color, Rectangle rect)
+        {
+            if (_canvas is null) return;
+            using var paint = new SKPaint { Color = color, Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+            _canvas.DrawRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+        }
+
+        /// <summary>Draws a line with the given SKColor.</summary>
+        internal void DrawLine (SKColor color, Point p1, Point p2)
+        {
+            if (_canvas is null) return;
+            using var paint = new SKPaint { Color = color, Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+            _canvas.DrawLine (p1.X, p1.Y, p2.X, p2.Y, paint);
+        }
+
+        /// <summary>Draws a string with the given SKColor.</summary>
+        public void DrawString (string text, SKTypeface font, SKColor color, float x, float y)
+        {
+            if (_canvas is null || string.IsNullOrEmpty (text)) return;
+            using var skFont = new SKFont (font, Theme.FontSize);
+            using var paint = new SKPaint { Color = color };
+            _canvas.DrawText (text, x, y + Theme.FontSize, SKTextAlign.Left, skFont, paint);
+        }
+
+        /// <summary>Draws a string within bounds with the given SKColor.</summary>
+        public void DrawString (string text, SKTypeface font, SKColor color, RectangleF bounds)
+        {
+            if (_canvas is null || string.IsNullOrEmpty (text)) return;
+            _canvas.Save ();
+            _canvas.ClipRect (new SKRect (bounds.Left, bounds.Top, bounds.Right, bounds.Bottom));
+            DrawString (text, font, color, bounds.Left, bounds.Top);
+            _canvas.Restore ();
+        }
+
+        /// <summary>Draws an SKBitmap at its original size at the given position.</summary>
+        internal void DrawImageUnscaled (SKBitmap image, int x, int y) => DrawImage (image, x, y);
+
+        /// <summary>Draws an SKBitmap at its original size at the given point.</summary>
+        internal void DrawImageUnscaled (SKBitmap image, Point point) => DrawImage (image, point.X, point.Y);
+
+        /// <summary>Draws an SKBitmap at its original size, clipped to the given rectangle.</summary>
+        internal void DrawImageUnscaled (SKBitmap image, Rectangle rect) => DrawImage (image, rect);
+
+        /// <summary>Draws an SKBitmap clipped to the destination rectangle from a source rectangle.</summary>
+        internal void DrawImage (SKBitmap image, Rectangle destRect, Rectangle srcRect, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+        {
+            if (_canvas is null || image is null) return;
+            var src = new SKRect (srcRect.Left, srcRect.Top, srcRect.Right, srcRect.Bottom);
+            var dst = new SKRect (destRect.Left, destRect.Top, destRect.Right, destRect.Bottom);
+            using var paint = ImagePaint (null);
+            DrawBitmapSampled (image, src, dst, paint);
+        }
+
+        /// <summary>Draws an SKBitmap scaled to fill the destination rectangle.</summary>
+        internal void DrawImage (SKBitmap image, float x, float y, float width, float height)
+            => DrawImage (image, new Rectangle ((int)x, (int)y, (int)width, (int)height));
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Image at the specified location.</summary>
+#pragma warning disable CA1416
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, int x, int y)
+        {
+            using var bmp = image?.ToSKBitmap ();
+            if (bmp != null) DrawImage (bmp, x, y);
+        }
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Image at the specified location and size (int overload).</summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, int x, int y, int width, int height)
+            => DrawImage (image, new Rectangle (x, y, width, height));
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Image scaled to fill the destination rectangle.</summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect)
+        {
+            image?.PrepareForDraw (destRect.Width, destRect.Height);
+
+            using var bmp = image?.ToSKBitmap ();
+            if (bmp != null) DrawImage (bmp, destRect);
+        }
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Image scaled to fill the destination rectangle.</summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, RectangleF destRect)
+            => DrawImage (image, Rectangle.Round (destRect));
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Image at (x,y) scaled to (width,height).</summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, float x, float y, float width, float height)
+            => DrawImage (image, new Rectangle ((int)x, (int)y, (int)width, (int)height));
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Bitmap at the specified location.</summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Bitmap bitmap, int x, int y) => DrawImage ((Majorsilence.Forms.Drawing.Image)bitmap, x, y);
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Bitmap scaled to fill the destination rectangle.</summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Bitmap bitmap, Rectangle destRect) => DrawImage ((Majorsilence.Forms.Drawing.Image)bitmap, destRect);
+
+        /// <summary>Draws a portion of a Majorsilence.Forms.Drawing.Image to the destination rectangle.</summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, Rectangle srcRect, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+            => DrawImage (image, (RectangleF)destRect, (RectangleF)srcRect, srcUnit);
+
+        /// <summary>Draws a portion of a Majorsilence.Forms.Drawing.Image to the destination rectangle, at subpixel precision.</summary>
+        /// <remarks>
+        /// GFX-21: both rectangles used to be rounded to integers, so an image panned or zoomed in
+        /// fractional steps juddered a whole pixel at a time, and a sprite-sheet cell computed in floats
+        /// snapped and pulled in a row of its neighbour. GDI+ never rounds the caller's rectangles. The
+        /// source is in <paramref name="srcUnit"/> (GFX-22).
+        /// </remarks>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, RectangleF destRect, RectangleF srcRect, Majorsilence.Forms.Drawing.GraphicsUnit srcUnit)
+        {
+            if (_canvas is null || image is null)
+                return;
+
+            image.PrepareForDraw ((int)Math.Round (destRect.Width), (int)Math.Round (destRect.Height));
+
+            using var bmp = image.ToSKBitmap ();
+            if (bmp is null)
+                return;
+
+            var src = SourceInPixels (image, srcRect, srcUnit);
+            using var paint = ImagePaint (null);
+            DrawBitmapSampled (bmp, new SKRect (src.Left, src.Top, src.Right, src.Bottom),
+                new SKRect (destRect.Left, destRect.Top, destRect.Right, destRect.Bottom), paint);
+        }
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Image unscaled at a point.</summary>
+        public void DrawImageUnscaled (Majorsilence.Forms.Drawing.Image image, int x, int y) => DrawImage (image, x, y);
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Image unscaled at a point.</summary>
+        public void DrawImageUnscaled (Majorsilence.Forms.Drawing.Image image, Rectangle rect) => DrawImage (image, rect);
+
+        /// <summary>
+        /// Draws a portion of an image into <paramref name="destRect"/>, applying the color
+        /// adjustments described by <paramref name="imageAttrs"/> (color matrix, gamma, transparent
+        /// color key, remap table). This is the GDI+ image color-remapping path: the matrix and gamma
+        /// become an <c>SKColorFilter</c> on the draw paint, and the lookup-style adjustments are
+        /// baked into a temporary copy of the source pixels first.
+        /// </summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect,
+            float srcX, float srcY, float srcWidth, float srcHeight,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttrs)
+        {
+            if (_canvas is null || image is null)
+                return;
+
+            using var bmp = image.ToSKBitmap ();
+            if (bmp is null)
+                return;
+
+            using var adjusted = imageAttrs?.ApplyPixelAdjustments (bmp);
+            var source = adjusted ?? bmp;
+
+            using var colorFilter = imageAttrs?.ToSKColorFilter ();
+            using var paint = ImagePaint (colorFilter);
+
+            var inPixels = SourceInPixels (image, new RectangleF (srcX, srcY, srcWidth, srcHeight), srcUnit);
+            var src = new SKRect (inPixels.Left, inPixels.Top, inPixels.Right, inPixels.Bottom);
+            var dst = new SKRect (destRect.Left, destRect.Top, destRect.Right, destRect.Bottom);
+            DrawBitmapWrapped (source, src, dst, paint, imageAttrs);
+        }
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, float, float, float, float, Majorsilence.Forms.Drawing.GraphicsUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect,
+            int srcX, int srcY, int srcWidth, int srcHeight,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttrs)
+            => DrawImage (image, destRect, (float)srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttrs);
+
+        /// <inheritdoc cref="DrawImage(Majorsilence.Forms.Drawing.Image, Rectangle, float, float, float, float, Majorsilence.Forms.Drawing.GraphicsUnit, Majorsilence.Forms.Drawing.Imaging.ImageAttributes)"/>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect, Rectangle srcRect,
+            Majorsilence.Forms.Drawing.GraphicsUnit srcUnit,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttrs)
+            => DrawImage (image, destRect, (float)srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height, srcUnit, imageAttrs);
+
+        /// <summary>
+        /// Draws the whole image into <paramref name="destRect"/> with the given color adjustments.
+        /// </summary>
+        public void DrawImage (Majorsilence.Forms.Drawing.Image image, Rectangle destRect,
+            Majorsilence.Forms.Drawing.Imaging.ImageAttributes? imageAttrs)
+            => DrawImage (image, destRect, 0f, 0f, image?.Width ?? 0, image?.Height ?? 0,
+                Majorsilence.Forms.Drawing.GraphicsUnit.Pixel, imageAttrs);
+#pragma warning restore CA1416
+
+        /// <summary>Rotates the current transform by the specified angle in degrees.</summary>
+        public void RotateTransform (float angle) => _canvas?.RotateDegrees (angle);
+
+        /// <summary>Applies a rotation in degrees, composed in the specified order.</summary>
+        /// <remarks>See <see cref="ScaleTransform(float, float, Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder)"/>.</remarks>
+        public void RotateTransform (float angle, Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder order)
+        {
+            if (order == Majorsilence.Forms.Drawing.Drawing2D.MatrixOrder.Prepend) {
+                RotateTransform (angle);
+                return;
+            }
+
+            using var m = new Majorsilence.Forms.Drawing.Drawing2D.Matrix ();
+            m.Rotate (angle);
+            MultiplyTransform (m, order);
+        }
+
+        /// <summary>Gets or sets the current world transformation matrix.</summary>
+        /// <remarks>
+        /// Measured against <see cref="_baseline"/>, so this reports and accepts exactly the transform
+        /// the caller applied, the way GDI+ does -- see the field's remarks. Assigning REPLACES the
+        /// world transform rather than composing with it, which is also GDI+ behaviour and is what
+        /// makes the save/modify/restore pattern work:
+        /// <c>var saved = g.Transform; ...; g.Transform = saved;</c>
+        /// That pattern is how every SVG renderer applies a nested <c>&lt;g transform&gt;</c>, and
+        /// while the setter was a no-op such transforms silently vanished -- collapsing every
+        /// translated group onto the same spot instead of failing visibly.
+        /// </remarks>
+#pragma warning disable CA1416
+        public Majorsilence.Forms.Drawing.Drawing2D.Matrix Transform {
+            get {
+                if (_canvas is null || !_baseline.TryInvert (out var inverse))
+                    return new Majorsilence.Forms.Drawing.Drawing2D.Matrix ();
+
+                return new Majorsilence.Forms.Drawing.Drawing2D.Matrix (
+                    inverse.PreConcat (_canvas.TotalMatrix));
+            }
+            set {
+                if (_canvas is null) return;
+
+                _canvas.SetMatrix (value is null
+                    ? _baseline
+                    : _baseline.PreConcat (value.ToSKMatrix ()));
+            }
+        }
+#pragma warning restore CA1416
+
+        /// <summary>Draws a Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath outline using the specified pen.</summary>
+#pragma warning disable CA1416
+        public void DrawPath (Majorsilence.Forms.Drawing.Pen pen, Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath path)
+        {
+            if (_canvas is null || path is null) return;
+
+            // Stroke the path itself rather than a polyline rebuilt from PathPoints: replaying only the
+            // points turns every curve into straight segments, which is very visible for a path built
+            // by AddString or AddEllipse. The rented paint picks up the pen's dash pattern, caps, join
+            // and brush -- this method used to be the ONLY one that did, which is GFX-23; it now shares
+            // the same builder as every other stroke call, so the two cannot drift apart again.
+            using var paint = RentStrokePaint (pen);
+
+            _canvas.DrawPath (path.ToSKPath (), paint);
+        }
+
+        /// <summary>Fills the interior of a Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath using the specified brush.</summary>
+        public void FillPath (Majorsilence.Forms.Drawing.Brush brush, Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath path)
+        {
+            if (_canvas is null || path is null) return;
+
+            using var paint = RentFillPaint (brush);
+
+            // As in DrawPath: fill the real path, so curves and the path's own fill mode survive.
+            var skPath = path.ToSKPath ();
+            skPath.FillType = path.FillMode == Majorsilence.Forms.Drawing.Drawing2D.FillMode.Winding
+                ? SKPathFillType.Winding
+                : SKPathFillType.EvenOdd;
+
+            _canvas.DrawPath (skPath, paint);
+        }
+#pragma warning restore CA1416
+
+        /// <summary>Sets the clipping region to a Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath, replacing any current clip.</summary>
+        /// <remarks>
+        /// GFX-24: this used to rebuild the path as a polyline through <c>PathPoints</c>, so every curve
+        /// was replaced by straight segments between its Bezier *control* points; for a rounded
+        /// rectangle or an ellipse that is not an approximation of the outline but a different, larger
+        /// shape. The rounded-corner idiom (build a rounded-rect path, clip to it, paint) therefore
+        /// clipped to an octagon and content bled past the intended outline. It clips to the real path
+        /// now, the same <c>ToSKPath</c> geometry <see cref="DrawPath"/> and <see cref="FillPath"/> use.
+        /// </remarks>
+#pragma warning disable CA1416
+        public void SetClip (Majorsilence.Forms.Drawing.Drawing2D.GraphicsPath path)
+        {
+            if (_canvas is null || path is null) return;
+
+            // Not disposed: ToSKPath hands back the GraphicsPath's own SKPath rather than a copy.
+            var skPath = path.ToSKPath ();
+            skPath.FillType = path.FillMode == Majorsilence.Forms.Drawing.Drawing2D.FillMode.Winding
+                ? SKPathFillType.Winding
+                : SKPathFillType.EvenOdd;
+
+            RestoreClipBaseline ();
+            _canvas.ClipPath (skPath, SKClipOperation.Intersect, antialias: Antialias);
+            SetClipShadow (new Majorsilence.Forms.Drawing.Region (path));
+        }
+#pragma warning restore CA1416
+
+        /// <summary>Sets the clipping region to a rectangle, replacing any current clip.</summary>
+        public void SetClip (RectangleF rect)
+        {
+            if (_canvas is null)
+                return;
+
+            RestoreClipBaseline ();
+            _canvas.ClipRect (new SKRect (rect.Left, rect.Top, rect.Right, rect.Bottom));
+            SetClipShadow (new Majorsilence.Forms.Drawing.Region (rect));
+        }
+
+        /// <summary>Sets the clipping region to an existing region, replacing any current clip.</summary>
+        /// <remarks>
+        /// GFX-13: the region used to be applied as its bounding rectangle, which is how clipping to a
+        /// rounded-rectangle or elliptical region came out square-cornered. GFX-44: it clips by the
+        /// region's float shape now, not the integer scanlines it used to be quantised to, so a region
+        /// built from a fractional rectangle or a scaled path masks the pixels its edges actually cover.
+        /// </remarks>
+#pragma warning disable CA1416
+        public void SetClip (Majorsilence.Forms.Drawing.Region region)
+        {
+            if (_canvas is null || region is null)
+                return;
+
+            ReplaceClip (region.Clone ());
+        }
+#pragma warning restore CA1416
+
+        /// <summary>Whether <see cref="Dispose"/> has run. Test seam.</summary>
+        internal bool IsDisposed => _disposed;
+
+        /// <inheritdoc/>
+        public void Dispose ()
+        {
+            if (!_disposed) {
+                _disposed = true;
+
+                // Clipping is implemented with a canvas save, so leave the canvas at the depth we found
+                // it -- when it is borrowed rather than owned, the next user inherits whatever is left.
+                // ResetClip also releases the tracked clip region.
+                ResetClip ();
+                SetClipShadow (null);
+
+                if (_ownsCanvas)
+                    _canvas?.Dispose ();
+            }
+        }
+    }
+
+}
+
+namespace Majorsilence.Forms
+{
+    public partial class Control
+    {
+        /// <summary>
+        /// Creates a <see cref="Graphics"/> object for the control's drawing surface.
+        /// Use for text measurement only; for actual drawing, use <see cref="PaintEventArgs.Canvas"/>.
+        /// </summary>
+        public Graphics CreateGraphics () => new Graphics (this);
+    }
+}

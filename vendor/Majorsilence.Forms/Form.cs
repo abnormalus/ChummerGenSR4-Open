@@ -1,0 +1,2687 @@
+﻿using System.ComponentModel;
+using Majorsilence.Forms.Layout;
+using SkiaSharp;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a top-level window to display to the user.
+    /// </summary>
+    public partial class Form : WindowBase, IWin32Window
+    {
+        // If the border is only 1 pixel it's too hard to resize, so we may steal some pixels from the client area
+        private const int MINIMUM_RESIZE_PIXELS = 4;
+
+        private WindowBase? dialog_parent;
+        private DialogResult dialog_result = DialogResult.None;
+        internal TaskCompletionSource<DialogResult>? dialog_task;
+        private System.Drawing.Size minimum_size;
+        private System.Drawing.Size maximum_size;
+
+        private bool show_focus_cues;
+        private string text = string.Empty;
+        private bool use_system_decorations;
+        private bool extends_content_into_title_bar;
+        private Form? mdi_parent;
+
+        // MDI state. On a container form, MdiClientControl is the client area hosting children. On a child
+        // form, MdiHost is the frame hosting it inside its parent's client (and the child has no on-screen
+        // OS window). Both are null for an ordinary top-level form.
+        internal MdiClient? MdiClientControl;
+        internal MdiChildWindow? MdiHost;
+
+        // Set when this form was added to an ordinary control tree via Controls.Add(Form) -- the
+        // "form.TopLevel = false; panel.Controls.Add (form)" idiom. Like MdiHost it means the form owns
+        // no on-screen OS window and is composited by its frame instead, so the same properties that
+        // branch on MdiHost below branch on this too.
+        internal FormHost? PanelHost;
+
+        // True while this form is drawn inside another control tree rather than its own OS window.
+        internal override bool IsFrameHosted => MdiHost != null || PanelHost != null;
+
+        /// <summary>
+        /// Initializes a new instance of the Form class.
+        /// </summary>
+        public Form ()
+        {
+            InitWindow (CreateBackendWindow (this, isPopup: false));
+
+            // Both are implicit children of the root adapter; `Controls` hands out the CLIENT area's
+            // collection, so the title bar is invisible to application code and takes no space from
+            // it -- which is what makes (0, 0) mean "below the caption", as it does in WinForms.
+            //
+            // The client area is added FIRST even though it sits second on screen. Dock layout runs in
+            // z-order and the loop walks children BACKWARDS (DockAndAnchorLayout: "we decided to use
+            // z-order as the docking order"), so the last child added is docked first. Adding the Fill
+            // last would have let it claim the whole window before the caption had taken its strip.
+            client_area = adapter.Controls.AddImplicitControl (new FormClientArea (this));
+            TitleBar = adapter.Controls.AddImplicitControl (new FormTitleBar ());
+
+            Resizeable = true;
+            Backend.SetSystemDecorations (false);
+
+            // Single-view host (browser / Android / iOS): there is no OS window to caption, move or
+            // close, so the form fills the whole view. The client area still insets itself by the
+            // device safe area (Form.SafeArea), so content stays clear of the status bar / notch.
+            if (Backend.IsSingleView)
+                TitleBar.Visible = false;
+
+            // The native-close (Closing) hook is delivered via WindowBase.OnBackendClosing → OnClosing.
+
+            // Windows/Linux draw fully custom chrome. macOS uses the NATIVE title bar (traffic lights,
+            // rounded corners, shadow). A form that wants to paint into the title bar opts in with
+            // ExtendsContentIntoTitleBar = true (Avalonia 12 full-size content view) — see RadTabbedForm.
+            // MF_FORCE_CUSTOM_CHROME=1 makes a macOS process take the Windows/Linux branch. macOS is the
+            // ONLY platform that uses system decorations, and CI runs the test suite on Windows only --
+            // so anything touching the caption (client-area geometry, hit-testing near the top of a
+            // form, tab order through the caption buttons) passes vacuously on a developer's Mac and
+            // fails in CI. This has cost two round trips already. Same shape as the backend's
+            // MF_HEADLESS_SCALE, and inert unless the variable is set.
+            if (OperatingSystemCompat.IsMacOS ()
+                && Environment.GetEnvironmentVariable ("MF_FORCE_CUSTOM_CHROME") != "1")
+                UseSystemDecorations = true;
+
+            Backend.Size = DefaultSize;
+
+            // Forward the internal adapter's own mouse events as public Form-level events --
+            // WindowBase routes all mouse input through `adapter` (a Control) via
+            // adapter.RaiseMouseDown/RaiseMouseMove, which already raise the adapter's own
+            // MouseDown/MouseMove/Leave; Form itself just didn't expose them. Needed for
+            // top-level windows that track the mouse over their own surface directly (e.g.
+            // borderless popup pickers), the same way ported WinForms code commonly does on Form.
+            client_area.Click += (s, e) => OnClick (e);
+            client_area.MouseDown += (s, e) => OnMouseDown (e);
+            client_area.MouseUp += (s, e) => OnMouseUp (e);
+            client_area.MouseMove += (s, e) => OnMouseMove (e);
+            client_area.MouseClick += (s, e) => OnMouseClick (e);
+            client_area.MouseLeave += (s, e) => Leave?.Invoke (this, e);
+
+            // ActiveControl remembers the last control to hold focus, as upstream's _activeControl does
+            // (ContainerControl.UpdateFocusedControl), so it still answers while nothing is focused.
+            adapter.SelectedControlChanged += (_, focused) => {
+                if (focused is not null)
+                    active_control = focused;
+            };
+        }
+
+        /// <summary>
+        /// Raised when the form's own surface is clicked. Inherited from Control on a WinForms Form;
+        /// declared here because Form derives from WindowBase instead, and designer code attaches a
+        /// form-level click handler routinely (a splash screen dismissing itself, say).
+        /// </summary>
+        public event EventHandler? Click;
+
+        /// <summary>Raises the Click event.</summary>
+        protected virtual void OnClick (EventArgs e) => Click?.Invoke (this, e);
+
+        // Control declares OnMouseDown/OnMouseUp/OnMouseMove as protected virtuals and WinForms code
+        // overrides them on a Form as a matter of course; Form derives from WindowBase here, so they
+        // have to be declared alongside the events rather than inherited.
+
+        /// <summary>Raises the MouseDown event.</summary>
+        protected virtual void OnMouseDown (MouseEventArgs e) => MouseDown?.Invoke (this, e);
+
+        /// <summary>Raises the MouseUp event.</summary>
+        protected virtual void OnMouseUp (MouseEventArgs e) => MouseUp?.Invoke (this, e);
+
+        /// <summary>Raises the MouseMove event.</summary>
+        protected virtual void OnMouseMove (MouseEventArgs e) => MouseMove?.Invoke (this, e);
+
+        /// <summary>Raises the MouseClick event.</summary>
+        protected virtual void OnMouseClick (MouseEventArgs e) => MouseClick?.Invoke (this, e);
+
+        /// <summary>Raised when a mouse button is pressed over the form's own surface.</summary>
+        public event MouseEventHandler? MouseDown;
+
+        /// <summary>Raised when a mouse button is released over the form's own surface.</summary>
+        public event MouseEventHandler? MouseUp;
+
+        /// <summary>Raised when the mouse moves over the form's own surface.</summary>
+        public event MouseEventHandler? MouseMove;
+
+        /// <summary>
+        /// Raised when the form's own surface is clicked. Declared here (with an <c>On</c> hook,
+        /// like <see cref="Click"/> and the other mouse events above) rather than left in WindowBase's
+        /// generic event-forwarding block, because ported WinForms code overrides
+        /// <c>OnMouseClick</c> on a Form as a matter of course -- that only works if the method is a
+        /// real protected virtual declared here, not just an add/remove pair forwarding to the adapter.
+        /// </summary>
+        public event MouseEventHandler? MouseClick;
+
+        /// <summary>Raised when the mouse leaves the form's own surface.</summary>
+        public event EventHandler? Leave;
+
+        /// <summary>Gets or sets whether the form causes validation to be performed on any controls that require validation when it receives focus. Matches Control.CausesValidation.</summary>
+        // Forwards to the root adapter, which is where WindowBase.CausesValidationChanged listens: a stored
+        // value here left PrintPreviewDialog.CausesValidationChanged (and the window's own) silent (W6.1).
+        public bool CausesValidation {
+            get => adapter.CausesValidation;
+            set => adapter.CausesValidation = value;
+        }
+
+        // Validating is on WindowBase now, forwarded to the root adapter alongside Validated so the pair
+        // cannot come from different objects. It used to be a discarding stub here (`add { } remove { }`),
+        // so a handler attached to it was thrown away.
+
+        /// <summary>Attempts to set focus to the form. Matches Control.Focus's shape (returns whether the focus request succeeded).</summary>
+        public bool Focus ()
+        {
+            // A frame-hosted form owns no OS window, and must not be given one here. The backend's
+            // Activate orders the native window on screen WITHOUT going through Show, so the window
+            // appears while Avalonia's IsVisible stays false -- which also makes a later Hide a no-op,
+            // so the window cannot be taken back down. That left a full-size stray window beside the
+            // host every time something focused a hosted form. Focusing a hosted form means selecting
+            // the frame that composites it, inside the tree that hosts it.
+            if (HostFrame is { } frame) {
+                frame.Select ();
+                return true;
+            }
+
+            // Nor when the form owns no shown window for another reason: it was told it is not top-level,
+            // or it simply is not visible. Activate() on the platform ORDERS THE WINDOW ON SCREEN without
+            // going through Show, so IsVisible stays false and a later Hide is a no-op -- the window can
+            // then never be taken back down. A docking library detaches a form (Parent = null) and focuses
+            // it mid-re-dock, which is exactly this case, and left a blank window stranded over the
+            // application.
+            if (!visible || !TopLevel)
+                return true;
+
+            Backend.Activate ();
+            return true;
+        }
+
+        // The control standing in for this form while it is hosted in someone else's tree, or null when
+        // the form is a real top-level window. Panel hosting and MDI hosting both go through a frame.
+        private Control? HostFrame => (Control?)PanelHost ?? MdiHost;
+
+        /// <summary>
+        /// The control this form is hosted in, when it has been put inside another control rather than
+        /// shown as its own top-level window (see <see cref="Control.ControlCollection.Add(Form)"/>).
+        /// Null for an ordinary top-level form.
+        /// </summary>
+        internal Control? HostingControl => HostFrame;
+
+        /// <inheritdoc/>
+        internal override WindowBase PresentationWindow {
+            get {
+                // Walk out through the host chain (a hosted form can itself be hosted) to the form that
+                // owns a real window. FindForm climbs the parent chain, so this terminates.
+                var host = HostFrame?.FindForm ();
+
+                return host is not null && host != this ? host.PresentationWindow : this;
+            }
+        }
+
+        /// <summary>Gets or sets the button that is activated when Enter is pressed.</summary>
+        /// <remarks>
+        /// Typed <see cref="IButtonControl"/>, as WinForms types it — the point of the interface is that a
+        /// form's default button need not be a <see cref="Button"/> at all. A control library that
+        /// re-declares the property to narrow or hide it (<c>public new IButtonControl AcceptButton</c>)
+        /// could not compile against a <see cref="Button"/>-typed one.
+        /// </remarks>
+        public IButtonControl? AcceptButton {
+            get => accept_button;
+            set {
+                if (ReferenceEquals (accept_button, value))
+                    return;
+
+                // SMP-07: the setter was a bare auto-property, so NotifyDefault -- which exists, and
+                // sets the IsDefault flag a renderer can draw the heavier border from -- was never
+                // called by anything. The default button on every dialog looked like all the others,
+                // leaving no way to see which one Enter would press. Upstream's UpdateDefaultButton
+                // does exactly this pair of calls.
+                accept_button?.NotifyDefault (false);
+                accept_button = value;
+                accept_button?.NotifyDefault (true);
+            }
+        }
+
+        private IButtonControl? accept_button;
+
+        /// <summary>Gets or sets whether the form can be maximized.</summary>
+        public bool AllowMaximize {
+            get => TitleBar.AllowMaximize;
+            set => TitleBar.AllowMaximize = value;
+        }
+
+        /// <summary>Gets or sets whether the form can be minimized.</summary>
+        public bool AllowMinimize {
+            get => TitleBar.AllowMinimize;
+            set => TitleBar.AllowMinimize = value;
+        }
+
+        /// <summary>Gets or sets the button that is activated when Escape is pressed.</summary>
+        /// <inheritdoc cref="AcceptButton" path="/remarks"/>
+        public IButtonControl? CancelButton { get; set; }
+
+        /// <summary>Gets or sets whether the form receives key events before child controls.</summary>
+        public bool KeyPreview { get; set; }
+
+        /// <summary>
+        /// Activates <see cref="AcceptButton"/> on Enter and <see cref="CancelButton"/> on Escape, and
+        /// cancels a modal dialog on Escape when it has no cancel button.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the last link in the pre-processing chain: it runs only once the focused control and
+        /// every container above it have declined the key. That ordering is the fix for a long-standing
+        /// divergence — these three behaviours used to be hard-coded at the very top of
+        /// <c>WindowBase.HandleKeyDown</c>, ahead of everything, so a multiline text box could never
+        /// see Enter and a control could never claim Escape.
+        /// </para>
+        /// <para>
+        /// The <c>Alt</c>/<c>Control</c> guard is upstream's (<c>Form.ProcessDialogKey</c>): Ctrl+Enter
+        /// and Alt+Enter are not the accept gesture, and treating them as one fires the default button
+        /// on shortcuts that were meant for something else.
+        /// </para>
+        /// </remarks>
+        /// <summary>
+        /// Gives the form's menu shortcuts first refusal on a key, before any control sees it.
+        /// </summary>
+        /// <remarks>
+        /// This is what makes <see cref="ToolStripMenuItem.ShortcutKeys"/> and the legacy
+        /// <c>MenuItem.Shortcut</c> work: both stored a value nothing ever consulted, so Ctrl+S on a
+        /// form with a wired-up Save menu item did nothing at all. Shortcuts are checked ahead of
+        /// <c>IsInputKey</c> deliberately — Ctrl+S must reach the menu even while a text box has focus,
+        /// which is the whole reason <c>ProcessCmdKey</c> runs first in WinForms' chain.
+        /// </remarks>
+        protected override bool ProcessCmdKey (ref Message msg, Keys keyData)
+        {
+            // Alt, alone or with a key, is what reveals the access keys upstream.
+            if ((keyData & Keys.Alt) == Keys.Alt || IsAltKey (keyData))
+                ShowKeyboardCues = true;
+
+            return KeyboardShortcuts.TryInvokeMenuShortcut (this, keyData)
+                || TryEnterMenuMode (keyData)
+                || base.ProcessCmdKey (ref msg, keyData);
+        }
+
+        // F10 puts the selection on the menu bar, which is how menu mode is entered from the keyboard;
+        // from there MenuBase.HandleNavigationKey owns the arrows, Enter and Escape (finding TSM-13).
+        // A bare Alt does the same when it is released (WindowBase.HandleKeyUpCore), not here on its
+        // key-down. Alt+letter is a different mechanism and goes through ProcessDialogChar.
+        private bool TryEnterMenuMode (Keys keyData)
+            => (keyData & Keys.KeyCode) == Keys.F10 && KeyboardShortcuts.TryEnterMenuMode (this);
+
+        /// <summary>
+        /// Offers an access key (Alt+letter) to the form's menus and then to its controls.
+        /// </summary>
+        protected override bool ProcessDialogChar (char charCode)
+            => KeyboardShortcuts.TryInvokeMnemonic (this, charCode)
+                || base.ProcessDialogChar (charCode);
+
+        /// <inheritdoc cref="WindowBase.ProcessDialogKey(Keys)"/>
+        protected override bool ProcessDialogKey (Keys keyData)
+        {
+            if ((keyData & (Keys.Alt | Keys.Control)) == Keys.None) {
+                switch (keyData & Keys.KeyCode) {
+                    case Keys.Return:
+                        if (AcceptButton is { } accept) {
+                            accept.PerformClick ();
+                            return true;
+                        }
+                        break;
+
+                    case Keys.Escape:
+                        if (CancelButton is { } cancel) {
+                            cancel.PerformClick ();
+                            return true;
+                        }
+
+                        // No cancel button, but a modal dialog still closes on Escape.
+                        if (dialog_task is not null) {
+                            DialogResult = DialogResult.Cancel;
+                            return true;
+                        }
+                        break;
+                }
+            }
+
+            return base.ProcessDialogKey (keyData);
+        }
+
+        /// <summary>Begins dragging the window to move it.</summary>
+        /// <remarks>Raises <see cref="ResizeBegin"/> first, as upstream does for a move as well as a
+        /// resize (<c>WM_ENTERSIZEMOVE</c> covers both); the matching <see cref="ResizeEnd"/> follows
+        /// the pointer release that ends the drag.</remarks>
+        public void BeginMoveDrag ()
+        {
+            BeginSizeMove ();
+            Backend.BeginMoveDrag ();
+        }
+
+        // ResizeBegin/ResizeEnd (W6 mechanisms). Upstream raises them from WM_ENTERSIZEMOVE and
+        // WM_EXITSIZEMOVE; here the start is the gesture that asks the backend to drag (a border press,
+        // the caption, or the public Begin*Drag methods) and the end is the pointer release that
+        // follows it. One flag, so a caption drag that hands off to the backend cannot begin twice.
+        private bool size_move_active;
+
+        private void BeginSizeMove ()
+        {
+            if (size_move_active)
+                return;
+
+            size_move_active = true;
+            OnResizeBegin (EventArgs.Empty);
+        }
+
+        internal override void EndSizeMove ()
+        {
+            if (!size_move_active)
+                return;
+
+            size_move_active = false;
+            OnResizeEnd (EventArgs.Empty);
+        }
+
+        /// <summary>Begins dragging the given window edge to resize the window.</summary>
+        /// <remarks>
+        /// The counterpart of <see cref="BeginMoveDrag"/>, which was public while this was reachable
+        /// only from inside this class. Both exist so that a borderless form can implement its own
+        /// title bar and resize grips: on Windows that is done by faking a non-client mouse-down
+        /// (<c>ReleaseCapture</c> then <c>WM_NCLBUTTONDOWN</c>), which has no equivalent off Windows,
+        /// so ported code needs a managed way to ask for the same gesture.
+        /// </remarks>
+        public void BeginResizeDrag (Backends.WindowEdge edge)
+        {
+            BeginSizeMove ();
+            Backend.BeginResizeDrag (edge);
+        }
+
+        /// <summary>Gets or sets the bounds of the Window.</summary>
+        public new System.Drawing.Rectangle Bounds {
+            get => new System.Drawing.Rectangle (Location, Size);
+            set {
+                Location = value.Location;
+                Size = value.Size;
+            }
+        }
+
+        /// <inheritdoc/>
+        public override void Close ()
+        {
+            // An MDI child has no OS window to close — remove its frame from the parent's client instead.
+            if (MdiHost != null) {
+                var args = new CancelEventArgs ();
+                OnClosing (args);
+                if (args.Cancel)
+                    return;
+
+                var host = MdiHost;
+                Application.OpenForms.Remove (this);
+                host.Client.RemoveChild (host);   // clears MdiHost
+                OnBackendClosed ();               // raises Closed + FormClosed (once)
+                return;
+            }
+
+            // Same for a panel-hosted form: closing it means taking its frame out of the control tree
+            // it was added to. The dashboard idiom depends on this -- "close the old page, add the new
+            // one" is how those apps swap content, and leaving the frame parented would stack pages on
+            // top of each other.
+            if (PanelHost != null) {
+                var args = new CancelEventArgs ();
+                OnClosing (args);
+                if (args.Cancel)
+                    return;
+
+                var host = PanelHost;
+                Application.OpenForms.Remove (this);
+                host.Parent?.Controls.Remove (host);   // clears PanelHost via FormHost.DetachChild
+                PanelHost = null;
+                OnBackendClosed ();                    // raises Closed + FormClosed (once)
+                return;
+            }
+
+            base.Close ();
+
+            // If close was cancelled by OnClosing, don't proceed with dialog cleanup
+            if (Application.OpenForms.Contains (this))
+                return;
+
+            CompleteClose ();
+        }
+
+        /// <summary>
+        /// Finishes a close that has actually gone through: hands the result back to
+        /// <see cref="ShowDialog()"/> and re-enables the window that opened this one.
+        /// </summary>
+        /// <remarks>
+        /// Separate from <see cref="Close"/> because a close started by the window's own close button
+        /// never calls Close at all -- the backend raises its Closed callback directly -- so
+        /// <c>OnBackendClosed</c> has to reach this too. While it did not, dismissing a modal dialog
+        /// with its close button made the window disappear while ShowDialog never returned and its
+        /// owner stayed disabled: the whole app was left unusable and could not be shut down.
+        /// Idempotent, because Close and the backend callback both run during a programmatic close.
+        /// </remarks>
+        internal void CompleteClose ()
+        {
+            // Everything this dialog disabled, not just its owner -- see DisableWindowsForModalLoop.
+            RestoreWindowsAfterModalLoop ();
+
+            if (dialog_parent is not null) {
+                // Raise the window that presents the opener, not the opener's own backend: an MDI
+                // child's backend is an unshown window, and activating it made a blank duplicate of
+                // that form appear on screen every time a dialog it opened was dismissed.
+                var parentWindow = dialog_parent.PresentationWindow;
+
+                parentWindow.Backend.Enabled = true;
+                parentWindow.Backend.Activate ();
+
+                // Activation still belongs to the opener, so hand it back within the MDI client too --
+                // otherwise whichever child was active before the dialog keeps the caption highlight.
+                if (dialog_parent is Form { MdiParent: { } mdiParent } child)
+                    mdiParent.ActivateMdiChild (child);
+
+                dialog_parent = null;
+            }
+
+            if (dialog_task is not null) {
+                var task = dialog_task;
+                dialog_task = null;
+
+                // Dismissing a dialog without setting a result is a cancel, as in WinForms.
+                task.SetResult (dialog_result == DialogResult.None ? DialogResult.Cancel : dialog_result);
+            }
+
+            // Pop only if we are the innermost modal -- always true for correctly-nested show/close
+            // pairs, and this method is idempotent, so a second CompleteClose for the same dialog is
+            // a no-op here. Outside the dialog_parent block above because an ownerless modal is still
+            // pushed by ShowDialogAsync.
+            if (Application.ModalStack.Count > 0 && Application.ModalStack.Peek () == this)
+                Application.ModalStack.Pop ();
+
+            Modal = false;
+        }
+
+        /// <summary>Whether a modal <see cref="ShowDialog()"/> is currently running for this form.</summary>
+        internal bool IsModalDialog => dialog_task is not null;
+
+        // Lets WindowBase run the closing sequence on a Form it holds a reference to.
+        internal void RaiseClosing (CancelEventArgs e) => OnClosing (e);
+
+        /// <summary>Raised before the form is closed, allowing close to be programatically canceled.</summary>
+        public event CancelEventHandler? Closing;
+
+        /// <summary>Raised before the form is closed (WinForms compatibility alias for Closing).</summary>
+        public event FormClosingEventHandler? FormClosing;
+
+        /// <summary>Raised after the form is closed.</summary>
+        public event FormClosedEventHandler? FormClosed;
+
+        private bool _formClosedFired;
+
+        // Raises FormClosed exactly once, regardless of how many close callbacks reach it (programmatic
+        // Close, close button, MDI removal can each drive OnBackendClosed). Called from OnBackendClosed.
+        /// <summary>Raises the <see cref="FormClosed"/> event.</summary>
+        /// <remarks>The overridable WinForms routes the event through, so a form that cleans up on
+        /// close overrides this rather than subscribing to itself. On the real close path here too.</remarks>
+        protected virtual void OnFormClosed (FormClosedEventArgs e) => FormClosed?.Invoke (this, e);
+
+        // `raise_event` is false when the window goes because the form was disposed rather than closed:
+        // the menu bookkeeping below still applies, the event does not (FRM-29).
+        internal void RaiseFormClosed (bool raise_event = true)
+        {
+            if (_formClosedFired)
+                return;
+
+            _formClosedFired = true;
+
+            // A closed form must not leave its menu bar as Application.ActiveMenu. Nothing cleared it
+            // except MenuBase.Deactivate, which a close does not run, so the strip of a dead form
+            // stayed "active" -- harmless while nothing consulted it, and a keystroke routed into a
+            // window that no longer exists once menu-mode navigation started asking (TSM-13).
+            // A shown context menu lives in its own popup window, so FindWindow names that popup, not the form
+            // it was opened on; FindForm falls back to the form it was shown from.
+            if (Application.ActiveMenu is { } menu
+                && (ReferenceEquals (menu.FindWindow (), this) || ReferenceEquals (menu.FindForm (), this))) {
+                Application.ClosePopups ();
+
+                // A context menu can veto ClosePopups (a cancelled Closing, or AutoClose off). The window
+                // it hangs off is gone, so it must not stay as Application.ActiveMenu, where it would
+                // keep every later menu from becoming the active one (TSM-21).
+                if (ReferenceEquals (Application.ActiveMenu, menu))
+                    (menu as ContextMenu)?.CloseUnconditionally ();
+            }
+
+            if (raise_event)
+                OnFormClosed (new FormClosedEventArgs (PendingCloseReason));
+        }
+
+        /// <summary>
+        /// Returns the form to its pre-show state after its window has been destroyed, so showing it
+        /// again is a fresh cycle.
+        /// </summary>
+        /// <remarks>
+        /// WinForms gets this for free by destroying the handle: <c>Load</c>, <c>Shown</c> and
+        /// <c>FormClosed</c> are gated on handle state, so every show/close pair raises all three. Here
+        /// they were gated on flags that were set once and never cleared, which made a form correct
+        /// only the first time it was used. Called from <c>OnBackendClosed</c> after the handle is
+        /// destroyed. <c>DialogResult</c> is deliberately NOT reset here — the caller of
+        /// <c>ShowDialog</c> reads it after the close, so it is cleared at the start of the next show
+        /// instead.
+        /// </remarks>
+        internal void ResetLifecycleForReshow ()
+        {
+            _loadFired = false;
+            _formClosedFired = false;
+            PendingCloseReason = CloseReason.UserClosing;
+        }
+
+        /// <summary>
+        /// Closes the forms this one owns, as upstream's <c>WmClose</c> does, telling each that its
+        /// owner is what closed it.
+        /// </summary>
+        /// <remarks>
+        /// Over a copy: closing a child clears its <see cref="Owner"/>, which mutates the list being
+        /// walked. Runs before this form's own close completes so an owned tool window cannot outlive
+        /// the window it belongs to -- which it previously did, because nothing walked the graph.
+        /// </remarks>
+        internal void CloseOwnedForms ()
+        {
+            if (_ownedForms is null || _ownedForms.Count == 0)
+                return;
+
+            foreach (var owned in _ownedForms.ToArray ()) {
+                owned.PendingCloseReason = CloseReason.FormOwnerClosing;
+                owned.Close ();
+                owned.Owner = null;
+            }
+        }
+
+
+        /// <summary>Raised when the form is first shown (WinForms compatibility alias; raised together with Shown).</summary>
+        public event EventHandler? Load;
+
+        /// <summary>Raised when the user begins to resize or move the form.</summary>
+        /// <remarks>Raised when a border press, a caption drag or <see cref="BeginResizeDrag"/> /
+        /// <see cref="BeginMoveDrag"/> hands a size-move gesture to the backend (W6 mechanisms); upstream
+        /// raises it from <c>WM_ENTERSIZEMOVE</c>, which covers moves too. A programmatic
+        /// <see cref="Size"/> change does not raise it, matching upstream.</remarks>
+        public event EventHandler? ResizeBegin;
+
+        /// <summary>Raises the <see cref="ResizeBegin"/> event.</summary>
+        protected virtual void OnResizeBegin (EventArgs e) => ResizeBegin?.Invoke (this, e);
+
+        /// <summary>Raised when the user finishes resizing or moving the form.</summary>
+        /// <remarks>Raised by the pointer release that ends a gesture <see cref="ResizeBegin"/>
+        /// announced (W6 mechanisms). A backend whose window system owns the drag delivers that release
+        /// when the drag returns to the window.</remarks>
+        public event EventHandler? ResizeEnd;
+
+        /// <summary>Raises the <see cref="ResizeEnd"/> event.</summary>
+        protected virtual void OnResizeEnd (EventArgs e) => ResizeEnd?.Invoke (this, e);
+
+        /// <summary>
+        /// Gets the window's default padding. Mirrors Control.DefaultPadding, which WinForms forms
+        /// override to reserve space for their own chrome.
+        /// </summary>
+        protected virtual Padding DefaultPadding => Padding.Empty;
+
+        /// <summary>
+        /// The device safe-area insets in logical pixels — the strips along the window edges covered by
+        /// a status bar, camera notch, rounded corner or home indicator. <see cref="Padding.Empty"/>
+        /// everywhere except Android and iOS. The form already keeps its docked and anchored controls
+        /// clear of these strips; read this only to place free-floating chrome yourself (a full-bleed
+        /// background image behind the safe area, say).
+        /// </summary>
+        public Padding SafeAreaPadding => SafeArea;
+
+        /// <inheritdoc/>
+        private protected override void OnSafeAreaChanged ()
+        {
+            // The adapter bounds don't change when only the safe area does, so SyncAdapterBounds would
+            // early-out -- relayout the client area explicitly so docked/anchored children re-inset.
+            client_area.PerformLayout ();
+            Invalidate ();
+        }
+
+        /// <summary>Raised when the form is activated by the backend.</summary>
+        public new event EventHandler? Activated {
+            add => base.Activated += value;
+            remove => base.Activated -= value;
+        }
+
+        /// <summary>Raised when the form is deactivated by the backend.</summary>
+        public event EventHandler? Deactivate {
+            add => base.Deactivated += value;
+            remove => base.Deactivated -= value;
+        }
+
+        /// <summary>Raised on the MDI container when one of its child forms is activated.</summary>
+        public event EventHandler? MdiChildActivate {
+            add => mdi_child_activate += value;
+            remove => mdi_child_activate -= value;
+        }
+
+        /// <summary>Raised when the DPI the form is displayed at changes.</summary>
+        /// <remarks>
+        /// Typed with the args WinForms uses, so a handler can read the old and new DPI -- the two numbers
+        /// a form needs to rescale anything it sized itself. Raised when the window's scaling changes:
+        /// the window is drawn at a new scale (moved to another monitor) or <see cref="Application.UiScale"/>
+        /// is set. It was declared and never raised (EVT-32).
+        /// </remarks>
+        public event EventHandler<DpiChangedEventArgs>? DpiChanged;
+
+        /// <summary>Raises the <see cref="DpiChanged"/> event.</summary>
+        protected virtual void OnDpiChanged (DpiChangedEventArgs e) => DpiChanged?.Invoke (this, e);
+
+        private protected override void OnWindowDpiChanged (int deviceDpiOld, int deviceDpiNew)
+            => OnDpiChanged (new DpiChangedEventArgs (deviceDpiOld, deviceDpiNew, Bounds));
+
+#pragma warning disable CS0067
+        /// <summary>Raised when the input language changes. Stub in Majorsilence.Forms.</summary>
+        public event EventHandler<InputLanguageChangedEventArgs>? InputLanguageChanged;
+
+        /// <summary>Raised when the input language is changing. Stub in Majorsilence.Forms.</summary>
+        public event EventHandler<InputLanguageChangingEventArgs>? InputLanguageChanging;
+#pragma warning restore CS0067
+
+        /// <summary>Raised when the form is first displayed to the user.</summary>
+        public new event EventHandler? Shown {
+            add => base.Shown += value;
+            remove => base.Shown -= value;
+        }
+
+        private bool _loadFired;
+
+        // WinForms raises Load once, during the show sequence, BEFORE the form is displayed -- distinct
+        // from Shown (which fires after first display). EnsureLoaded is called from WindowBase.Show/
+        // ShowDialog (and the MDI-hosted path) just before the backend shows the window.
+        internal override void EnsureLoaded ()
+        {
+            if (_loadFired)
+                return;
+
+            _loadFired = true;
+            OnLoad (EventArgs.Empty);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnShown (EventArgs e)
+        {
+            // Load is raised earlier (EnsureLoaded, before the window is shown); Shown fires after display.
+            base.OnShown (e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnClientLayoutChanged ()
+        {
+            base.OnClientLayoutChanged ();
+            UpdateCaptionRegions ();
+        }
+
+        // Publishes the draggable title-bar region to the backend (declarative window-drag for backends
+        // that can't begin a drag from code, e.g. Uno). Nothing to declare under system decorations —
+        // the OS owns the title bar then.
+        private void UpdateCaptionRegions ()
+        {
+            if (use_system_decorations || !TitleBar.Visible) {
+                Backend.SetCaptionRegions (System.Array.Empty<System.Drawing.Rectangle> ());
+                return;
+            }
+
+            // Logical, window-relative: the title-bar strip inside the border, minus the caption buttons
+            // (close/maximize/minimize stay client area so their clicks reach Majorsilence.Forms). The
+            // buttons sit on the right on Windows/Linux and on the left on macOS (traffic lights), so
+            // shift the draggable region past them on whichever side they occupy.
+            var border = CurrentStyle.Border;
+            var top = border.Top.GetWidth ();
+            var buttons = TitleBar.CaptionButtonsWidth;
+            var left = border.Left.GetWidth () + (TitleBar.CaptionButtonsOnLeft ? buttons : 0);
+            var width = Backend.ClientSize.Width - border.Left.GetWidth () - border.Right.GetWidth () - buttons;
+            var height = TitleBar.Height;
+
+            if (width <= 0 || height <= 0) {
+                Backend.SetCaptionRegions (System.Array.Empty<System.Drawing.Rectangle> ());
+                return;
+            }
+
+            Backend.SetCaptionRegions (new[] { new System.Drawing.Rectangle (left, top, width, height) });
+        }
+
+        /// <inheritdoc/>
+        protected override System.Drawing.Size DefaultSize => new System.Drawing.Size (300, 300);
+
+        /// <summary>Gets the default style for all forms.</summary>
+        public new static readonly ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle,
+            (style) => {
+                style.BackgroundColor = Theme.BackgroundColor;
+                style.Border.Color = Theme.AccentColor2;
+                style.Border.Width = 1;
+            });
+
+        /// <summary>Gets or sets the dialog result for the form.</summary>
+        public DialogResult DialogResult {
+            get => dialog_result;
+            set {
+                dialog_result = value;
+
+                // Closes for any modal dialog, not only one that has an owner window. The
+                // `dialog_parent is not null` test left an ownerless ShowDialog -- the first dialog of
+                // an application, before Application.Run -- unable to close itself by setting
+                // DialogResult, which is how every OK button does it.
+                if (dialog_result != DialogResult.None && (dialog_task is not null || dialog_parent is not null))
+                    Close ();
+            }
+        }
+
+        /// <summary>Gets the next control in tab order.</summary>
+        public Control? GetNextControl (Control? start, bool forward = true) => adapter.GetNextControl (start, forward);
+
+        private Majorsilence.Forms.Drawing.Icon? _formIcon;
+
+        /// <summary>
+        /// Gets or sets the icon for the form. Accepts <see cref="Majorsilence.Forms.Drawing.Icon"/> for WinForms compatibility.
+        /// </summary>
+#pragma warning disable CA1416
+        public Majorsilence.Forms.Drawing.Icon? Icon {
+            get => _formIcon;
+            set {
+                _formIcon = value;
+                if (value is null)
+                    Image = null;
+                else
+                    Image = value.ToBitmap ();
+            }
+        }
+#pragma warning restore CA1416
+
+        /// <summary>Gets or sets the image shown in the form's title bar.</summary>
+#pragma warning disable CA1416
+        public Majorsilence.Forms.Drawing.Image? Image {
+            get => TitleBar.Image;
+            set {
+                TitleBar.Image = value;
+
+                if (value is null) {
+                    Backend.SetIcon (null);
+                } else {
+                    using var sk = value.ToSKBitmap ();
+                    if (sk is not null) {
+                        using var ms = new System.IO.MemoryStream ();
+                        sk.Encode (ms, SKEncodedImageFormat.Png, 100);
+                        Backend.SetIcon (ms.ToArray ());
+                    }
+                }
+            }
+        }
+#pragma warning restore CA1416
+
+        /// <summary>
+        /// Gets or sets the unscaled location of the control. For an MDI child this is its position within
+        /// the parent's MDI client area, for a panel-hosted form the position of its frame within that
+        /// panel; otherwise it's the window's screen position.
+        /// </summary>
+        public new System.Drawing.Point Location {
+            get {
+                if (MdiHost != null)
+                    return new System.Drawing.Point (MdiHost.Left, MdiHost.Top);
+                if (PanelHost != null)
+                    return new System.Drawing.Point (PanelHost.Left, PanelHost.Top);
+                return Backend.Location;
+            }
+            set {
+                // A disposed window has no business moving. Without this, a stale timer or async
+                // continuation that sets Location/Bounds after the form was closed and disposed
+                // reached Backend.Location, which on the Avalonia backend brought the torn-down
+                // window back on screen -- found in ReportDesigner, where a wait dialog's 50ms
+                // tracking timer resurrected the dialog it had just closed.
+                if (IsDisposed)
+                    return;
+
+                // Compared through the getter so the check covers all three hosting cases uniformly.
+                if (Location == value)
+                    return;
+
+                if (MdiHost != null)
+                    MdiHost.Client.MoveChild (MdiHost, value.X, value.Y);
+                else if (PanelHost != null)
+                    PanelHost.Location = value;
+                else
+                    Backend.Location = value;
+
+                OnGeometryChanged ();
+
+                // WinForms raises Move/LocationChanged for a programmatic Location assignment, not only
+                // for an OS-driven move. This setter shadows WindowBase.Location (`new`), so without
+                // this the notification was lost for every Form -- code repositioning a satellite
+                // window (a drop shadow, a tool window) from Move never ran.
+                OnMove (EventArgs.Empty);
+            }
+        }
+
+        private WindowElement GetElementAtLocation (int x, int y)
+        {
+            if (IsOverSizeGrip (x, y))
+                return WindowElement.BottomRightCorner;
+
+            var left = false;
+            var right = false;
+
+            if (x < Math.Max (Style.Border.Left.GetWidth (), MINIMUM_RESIZE_PIXELS))
+                left = true;
+            else if (x >= ScaledSize.Width - Math.Max (Style.Border.Right.GetWidth (), MINIMUM_RESIZE_PIXELS))
+                right = true;
+
+            if (y < Math.Max (Style.Border.Top.GetWidth (), MINIMUM_RESIZE_PIXELS))
+                return left ? WindowElement.TopLeftCorner : right ? WindowElement.TopRightCorner : WindowElement.TopBorder;
+            else if (y >= ScaledSize.Height - Math.Max (Style.Border.Bottom.GetWidth (), MINIMUM_RESIZE_PIXELS))
+                return left ? WindowElement.BottomLeftCorner : right ? WindowElement.BottomRightCorner : WindowElement.BottomBorder;
+
+            return left ? WindowElement.LeftBorder : right ? WindowElement.RightBorder : WindowElement.Client;
+        }
+
+        internal override bool HandleMouseDown (int x, int y)
+        {
+            var element = GetElementAtLocation (x, y);
+
+            switch (element) {
+                case WindowElement.TopBorder:         BeginResizeDrag (Backends.WindowEdge.North);     return true;
+                case WindowElement.RightBorder:       BeginResizeDrag (Backends.WindowEdge.East);      return true;
+                case WindowElement.BottomBorder:      BeginResizeDrag (Backends.WindowEdge.South);     return true;
+                case WindowElement.LeftBorder:        BeginResizeDrag (Backends.WindowEdge.West);      return true;
+                case WindowElement.TopLeftCorner:     BeginResizeDrag (Backends.WindowEdge.NorthWest); return true;
+                case WindowElement.TopRightCorner:    BeginResizeDrag (Backends.WindowEdge.NorthEast); return true;
+                case WindowElement.BottomLeftCorner:  BeginResizeDrag (Backends.WindowEdge.SouthWest); return true;
+                case WindowElement.BottomRightCorner: BeginResizeDrag (Backends.WindowEdge.SouthEast); return true;
+            }
+
+            return false;
+        }
+
+        internal override bool HandleMouseMove (int x, int y)
+        {
+            var element = GetElementAtLocation (x, y);
+
+            switch (element) {
+                case WindowElement.TopBorder:         ApplyBackendCursor (Cursors.TopSide.CursorType);         return true;
+                case WindowElement.RightBorder:       ApplyBackendCursor (Cursors.RightSide.CursorType);       return true;
+                case WindowElement.BottomBorder:      ApplyBackendCursor (Cursors.BottomSide.CursorType);      return true;
+                case WindowElement.LeftBorder:        ApplyBackendCursor (Cursors.LeftSide.CursorType);        return true;
+                case WindowElement.TopLeftCorner:     ApplyBackendCursor (Cursors.TopLeftCorner.CursorType);   return true;
+                case WindowElement.TopRightCorner:    ApplyBackendCursor (Cursors.TopRightCorner.CursorType);  return true;
+                case WindowElement.BottomLeftCorner:  ApplyBackendCursor (Cursors.BottomLeftCorner.CursorType); return true;
+                case WindowElement.BottomRightCorner: ApplyBackendCursor (Cursors.BottomRightCorner.CursorType); return true;
+            }
+
+            return base.HandleMouseMove (x, y);
+        }
+
+        /// <summary>Gets or sets the maximum size of the Window.</summary>
+        public System.Drawing.Size MaximumSize {
+            get => maximum_size;
+            set {
+                if (maximum_size != value) {
+                    maximum_size = value;
+
+                    if (!minimum_size.IsEmpty && !maximum_size.IsEmpty)
+                        minimum_size = new System.Drawing.Size (Math.Min (minimum_size.Width, maximum_size.Width), Math.Min (minimum_size.Height, maximum_size.Height));
+
+                    ApplyMinMaxSize ();
+
+                    var size = Size;
+                    if (!value.IsEmpty && (size.Width > value.Width || size.Height > value.Height))
+                        Size = new System.Drawing.Size (Math.Min (size.Width, value.Width), Math.Min (size.Height, value.Height));
+
+                    OnMaximumSizeChanged (EventArgs.Empty);
+                }
+            }
+        }
+
+        /// <summary>Gets or sets the minimum size of the Window.</summary>
+        public System.Drawing.Size MinimumSize {
+            get => minimum_size;
+            set {
+                if (minimum_size != value) {
+                    minimum_size = value;
+
+                    if (!minimum_size.IsEmpty && !maximum_size.IsEmpty)
+                        maximum_size = new System.Drawing.Size (Math.Max (minimum_size.Width, maximum_size.Width), Math.Max (minimum_size.Height, maximum_size.Height));
+
+                    ApplyMinMaxSize ();
+
+                    var size = Size;
+                    if (size.Width < value.Width || size.Height < value.Height)
+                        Size = new System.Drawing.Size (Math.Max (size.Width, value.Width), Math.Max (size.Height, value.Height));
+
+                    OnMinimumSizeChanged (EventArgs.Empty);
+                }
+            }
+        }
+
+        private void ApplyMinMaxSize ()
+        {
+            Backend.MinimumSize = minimum_size;
+            Backend.MaximumSize = maximum_size;
+        }
+
+        /// <summary>Gets or sets the name of the form.</summary>
+        public string Name { get; set; } = string.Empty;
+        // Why this form is closing, for the FormClosing/FormClosed args. Set by whichever path started
+        // the close and reset afterwards. It was hard-coded UserClosing everywhere, which matters now
+        // that Application.Exit and the owner cascade really do close forms: the standard "minimise to
+        // tray on UserClosing, actually exit on ApplicationExitCall" pattern reads this to tell the two
+        // apart, and would have hidden the window instead of exiting.
+        internal CloseReason PendingCloseReason { get; set; } = CloseReason.UserClosing;
+
+
+        /// <summary>Raises the Closing event.</summary>
+        /// <remarks>
+        /// Protected, as in WinForms. <see cref="WindowBase"/> reaches it through
+        /// <see cref="RaiseClosing"/>, since a base class cannot call a protected member through a
+        /// derived-typed reference.
+        /// </remarks>
+        protected virtual void OnClosing (CancelEventArgs e)
+        {
+            Closing?.Invoke (this, e);
+
+            var form_closing_args = new FormClosingEventArgs (PendingCloseReason, e.Cancel);
+            OnFormClosing (form_closing_args);
+
+            if (form_closing_args.Cancel)
+                e.Cancel = true;
+        }
+
+        /// <summary>Raises the <see cref="FormClosing"/> event.</summary>
+        /// <remarks>
+        /// The hook a form overrides to veto its own close -- "you have unsaved changes, really quit?" is
+        /// written this way as often as with a handler, and it has to be reachable for that code to compile.
+        /// Routed through by <see cref="OnClosing"/>, so an override sees every close the event does.
+        /// </remarks>
+        protected virtual void OnFormClosing (FormClosingEventArgs e) => FormClosing?.Invoke (this, e);
+
+        /// <summary>
+        /// Destroys the handle associated with this form. In real WinForms, inherited from Control and
+        /// called once as the window is torn down, immediately before <c>OnHandleDestroyed</c>/
+        /// <c>HandleDestroyed</c> fire -- ported code commonly overrides it to release window-lifetime
+        /// resources at that exact point. Form derives from WindowBase rather than Control here, so it
+        /// has to be declared afresh; <see cref="WindowBase.OnBackendClosed"/> calls it (in place of
+        /// raising <c>OnHandleDestroyed</c> directly) for every Form, right where WinForms' own
+        /// DestroyHandle would have fired it.
+        /// </summary>
+        protected virtual void DestroyHandle () => OnHandleDestroyed (EventArgs.Empty);
+
+        /// <summary>
+        /// Invokes <see cref="DestroyHandle"/> from <see cref="WindowBase.OnBackendClosed"/> -- a base
+        /// class cannot call a protected member through a derived-typed reference (same reason
+        /// <see cref="RaiseClosing"/> exists alongside <see cref="OnClosing"/>).
+        /// </summary>
+        internal void RaiseDestroyHandle () => DestroyHandle ();
+
+        /// <summary>
+        /// Picks the form a modal dialog should be owned by: the first open form that is not the dialog
+        /// itself and actually owns a window.
+        /// </summary>
+        /// <remarks>
+        /// See <see cref="Application.ModalOwnerCandidates"/> for why frame-hosted forms are excluded.
+        /// Factored out of ShowDialog so it is testable without entering the modal loop, where a
+        /// regression would hang the test run instead of failing it.
+        /// </remarks>
+        internal static Form? FindModalOwner (Form dialog) =>
+            Application.ModalOwnerCandidates.FirstOrDefault (f => f != dialog);
+
+        /// <summary>Displays the window modally, owned by the innermost currently-shown modal dialog
+        /// if one is open, otherwise the first open form.</summary>
+        public DialogResult ShowDialog ()
+        {
+            BlockingModal.ThrowIfUnsupported ("Form.ShowDialog", "Form.ShowDialogAsync");
+
+            // A dialog opened from inside another modal dialog belongs to that dialog, not to the
+            // main window sitting behind it (which FindModalOwner would pick). Same reasoning as
+            // Application.ModalStack.
+            var parent = (Application.ActiveModalForm != this ? Application.ActiveModalForm : null)
+                ?? FindModalOwner (this);
+
+            return parent is null
+                ? RunModal (ShowDialogAsync (null))
+                : ShowDialog (parent);
+        }
+
+        /// <summary>Shows the form as a modal dialog owned by the given window.</summary>
+        /// <remarks>
+        /// Both this and <see cref="Show(IWin32Window)"/> used to discard the argument entirely, so
+        /// <c>dialog.ShowDialog (this)</c> picked whatever <see cref="Application.OpenForms"/> happened
+        /// to yield first — the dialog centred on the wrong window and disabled the wrong one.
+        /// </remarks>
+        public DialogResult ShowDialog (IWin32Window owner)
+        {
+            var parent = OwnerFormOf (owner);
+
+            return parent is null ? ShowDialog () : ShowDialog (parent);
+        }
+
+        /// <summary>Shows the form owned by the given window.</summary>
+        /// <inheritdoc cref="ShowDialog(IWin32Window)" path="/remarks"/>
+        public void Show (IWin32Window owner)
+        {
+            if (OwnerFormOf (owner) is { } parent)
+                Owner = parent;
+
+            Show ();
+        }
+
+        /// <summary>
+        /// Resolves an <see cref="IWin32Window"/> to the form it belongs to — the window itself, or the
+        /// form hosting it when a control was passed.
+        /// </summary>
+        /// <remarks>There is no HWND to look up here, so the resolution is by object rather than by
+        /// handle; a caller passing something that is neither gets the ownerless behaviour.</remarks>
+        private static Form? OwnerFormOf (IWin32Window? owner) => owner switch {
+            Form form => form,
+            Control control => control.FindForm (),
+            _ => null,
+        };
+
+        /// <summary>Implements IWin32Window: returns IntPtr.Zero (Majorsilence.Forms has no Win32 handle).</summary>
+        IntPtr IWin32Window.Handle => IntPtr.Zero;
+
+        // Blocks the current call while the backend runs a nested message loop so the modal
+        // dialog can receive and handle input events without deadlocking the UI thread.
+        internal static T RunModal<T> (Task<T> modalTask)
+        {
+            Application.RaiseEnterThreadModal ();
+            try {
+                Backends.Platform.Backend.RunModalLoop (modalTask);
+                return modalTask.GetAwaiter ().GetResult ();
+            } finally {
+                Application.RaiseLeaveThreadModal ();
+            }
+        }
+
+        /// <summary>Called when the theme changes.</summary>
+        protected internal virtual void OnThemeChanged (EventArgs e)
+        {
+            foreach (var control in Controls.GetAllControls ())
+                control.OnThemeChanged (e);
+
+            // Repaint the window (backends that only paint on demand, e.g. Uno, won't otherwise refresh).
+            Invalidate ();
+        }
+
+        internal override void SetWindowStartupLocation (WindowBase? owner = null)
+        {
+            // Upstream's AdjustFormPosition, run as the window is first shown (Form.cs). CenterParent
+            // with no owner falls back to the screen there too -- it used to leave the window wherever
+            // the OS put it.
+            if (StartPosition == FormStartPosition.CenterScreen)
+                CenterToScreen (owner);
+            else if (StartPosition == FormStartPosition.CenterParent)
+                CenterToParent (owner);
+        }
+
+        /// <summary>Displays the window modally with the given owner and blocks until closed.
+        /// Mirrors WinForms Form.ShowDialog(owner); the modal loop keeps the UI pumped.</summary>
+        public DialogResult ShowDialog (Form parent)
+        {
+            // Checked before ShowDialogAsync: once that runs the dialog is on screen and its owner
+            // disabled, and a refusal from the loop itself would strand both (issue #406).
+            BlockingModal.ThrowIfUnsupported ("Form.ShowDialog", "Form.ShowDialogAsync");
+
+            var result = RunModal (ShowDialogAsync (parent));
+            // FormClosed is raised once from OnBackendClosed during the dialog's close, before this returns.
+            return result;
+        }
+
+        /// <summary>Displays the window to the user modally, preventing interaction with other windows until closed.</summary>
+        public Task<DialogResult> ShowDialogAsync (Form? parent)
+        {
+            dialog_task = new TaskCompletionSource<DialogResult> ();
+
+            // Clear the previous answer before showing, as upstream does (Form.ShowDialog sets
+            // _dialogResult = None up front). There used to be an "already decided, return it" check
+            // here instead, and because nothing ever cleared the field it fired on every reuse: a
+            // dialog kept as a field -- a Find or Options window, the common shape -- handed back last
+            // time's result without ever appearing on screen.
+            dialog_result = DialogResult.None;
+
+            // Modal for the duration, so `if (Modal) DialogResult = OK; else Close ();` -- how a form
+            // usable both as a dialog and as a window is written -- takes the right branch. It was a
+            // private-set property nothing ever assigned.
+            Modal = true;
+
+            dialog_parent = parent;
+            Application.ModalStack.Push (this);
+
+            // A modal dialog is owned by the form it was shown against, as upstream's ShowDialog does.
+            // Without this the owner graph is empty for the commonest way of opening a dialog.
+            if (parent is not null)
+                Owner = parent;
+
+            // A Load handler that sets DialogResult closes the form during the call below, which
+            // completes dialog_task; RunModal then returns without pumping. That is upstream's
+            // "decided before it was ever shown" path, and it works here because the result is cleared
+            // above rather than carried over from the previous use.
+
+            // Call the base window-show-modally helpers, NOT this Form.ShowDialog(Form) overload.
+            // With no owner there is nothing to disable, but the dialog is still modal: the caller
+            // blocks on dialog_task either way.
+            if (parent is null)
+                ShowDialogOwnerless ();
+            else
+                base.ShowDialog (parent);
+
+            return dialog_task.Task;
+        }
+
+        /// <summary>Gets a value indicating a focus rectangle should be drawn on the selected control.</summary>
+        public bool ShowFocusCues {
+            get => show_focus_cues;
+            internal set {
+                if (show_focus_cues != value) {
+                    show_focus_cues = value;
+
+                    // Upstream's WM_UPDATEUISTATE reaches every control (EVT-28).
+                    adapter.RaiseChangeUICues (new UICuesEventArgs (UICues.ChangeFocus | (value ? UICues.ShowFocus : UICues.None)));
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>Gets whether access keys are underlined in this form.</summary>
+        /// <remarks>
+        /// Upstream hides them until the user presses Alt (Windows' default), and then shows them for
+        /// the life of the window; an MDI child follows its parent, which receives the keys. An app that
+        /// has not chosen a font with <see cref="Application.SetDefaultFont"/> keeps the theme's look,
+        /// with the underline always shown.
+        /// </remarks>
+        public bool ShowKeyboardCues {
+            get => keyboard_cues_shown || !SystemFonts.HasDefaultFontOverride || (MdiParent?.ShowKeyboardCues ?? false);
+            internal set {
+                if (keyboard_cues_shown != value) {
+                    var shown_before = ShowKeyboardCues;
+                    keyboard_cues_shown = value;
+
+                    // Only when what is drawn changes: with no default font chosen the underline is
+                    // always shown, and pressing Alt changes nothing a control could react to.
+                    if (ShowKeyboardCues != shown_before)
+                        adapter.RaiseChangeUICues (new UICuesEventArgs (UICues.ChangeKeyboard | (ShowKeyboardCues ? UICues.ShowKeyboard : UICues.None)));
+
+                    Invalidate ();
+                }
+            }
+        }
+
+        private bool keyboard_cues_shown;
+
+        /// <summary>
+        /// Gets or sets the unscaled size of the window. For an MDI child this is the size of its content
+        /// area inside the host frame, for a panel-hosted form the size of its frame; otherwise it's the
+        /// window's client size.
+        /// </summary>
+        public new System.Drawing.Size Size {
+            get {
+                if (MdiHost != null)
+                    return MdiHost.ContentSize;
+                if (PanelHost != null)
+                    return PanelHost.Size;
+                return Backend.ClientSize;
+            }
+            set {
+                // See the Location setter: a disposed window must not reach the backend, or a stale
+                // timer / late continuation setting Size or Bounds resurrects a torn-down window.
+                if (IsDisposed)
+                    return;
+
+                // Clamp instead of throwing. WinForms hands the size to SetWindowPos, which treats a
+                // negative extent as zero, so laying a window out to a negative size is something
+                // WinForms code does and survives -- a docking pane whose available area has collapsed
+                // computes exactly that while the user drags a splitter past its neighbour. The Avalonia
+                // backend rejects it with ArgumentException, which crashed the app mid-layout.
+                value = new System.Drawing.Size (Math.Max (0, value.Width), Math.Max (0, value.Height));
+
+                // Writing an unchanged size is not free: it is a round trip to the window server, and a
+                // drag that recomputes geometry per mouse-move sets the same value over and over. Measured
+                // on a float-window drag, 61 of 85 size writes were no-ops -- enough platform traffic to
+                // make the drag visibly lag behind the cursor until the mouse stopped.
+                if (value == Size)
+                    return;
+
+                if (MdiHost != null)
+                    MdiHost.SetContentSize (value);
+                else if (PanelHost != null)
+                    PanelHost.Size = value;
+                else {
+                    Backend.Size = value;
+
+                    // Resize, SizeChanged and the layout pass run before the setter returns, as
+                    // upstream's SetBoundsCore -> UpdateBounds does (Control.cs). They waited for the
+                    // backend to report the new client size or for the next frame, so
+                    // `form.Width = 500; var w = docked.Width;` read the old geometry (FRM-37).
+                    SyncAdapterBounds ();
+                }
+
+                OnGeometryChanged ();
+            }
+        }
+
+        /// <summary>Gets or sets the width of the window, in pixels. Equivalent to Size.Width.</summary>
+        public int Width {
+            get => Size.Width;
+            set => Size = new System.Drawing.Size (value, Size.Height);
+        }
+
+        /// <summary>Gets or sets the height of the window, in pixels. Equivalent to Size.Height.</summary>
+        public int Height {
+            get => Size.Height;
+            set => Size = new System.Drawing.Size (Size.Width, value);
+        }
+
+        /// <summary>Gets the form that currently has activation, or null when none of this application's forms has.</summary>
+        /// <remarks>
+        /// Upstream returns the foreground window. Here it is the form whose window the backend last
+        /// reported activated (or that was shown activated), until it deactivates to something outside
+        /// the application or closes. A form drawn inside another (an MDI child, a panel-hosted form)
+        /// owns no window, so the window presenting it answers instead -- as upstream, where an MDI
+        /// child is never the foreground window.
+        /// </remarks>
+        public static Form? ActiveForm => ActiveFormWindow?.PresentationWindow as Form;
+
+        /// <summary>
+        /// The height the library's own title bar takes off the top of the window, or zero when the
+        /// caption is the OS's or there is none.
+        /// </summary>
+        /// <remarks>
+        /// The caption is non-client in WinForms terms, so it is exactly the difference between the
+        /// window's backend client size and the <see cref="ClientSize"/> the application sees.
+        /// </remarks>
+        internal int NonClientCaptionHeight => TitleBar is { Visible: true, NativeOverlay: false }
+            ? TitleBar.PreferredHeight
+            : 0;
+
+        /// <inheritdoc/>
+        private protected override System.Drawing.Size ClientAreaSize {
+            get {
+                var size = base.ClientAreaSize;
+                return new System.Drawing.Size (size.Width, Math.Max (0, size.Height - NonClientCaptionHeight));
+            }
+        }
+
+        /// <summary>Gets or sets the size of the form's client area — the region below the caption.</summary>
+        /// <remarks>
+        /// <para>
+        /// This reported the whole backend client size, caption included, and assigning it sized the
+        /// window to exactly that. Since the library draws its own title bar everywhere but macOS, a
+        /// designer form built as <c>ClientSize = (800, 450)</c> got 450 pixels of which the top
+        /// caption-height was behind the caption -- so the first row of controls was hidden and an
+        /// <c>Anchor = Bottom</c> row hung off the bottom of the window by the same amount.
+        /// </para>
+        /// <para>
+        /// Unlike <see cref="Control.ClientSize"/>, this one is logical, not device pixels: it is built
+        /// from <see cref="WindowBase.Size"/> (itself unscaled) rather than from a device-scaled
+        /// <c>ClientRectangle</c> -- <see cref="Form"/> derives from <see cref="WindowBase"/>, not
+        /// <see cref="Control"/>, so it declares its own <c>ClientSize</c> rather than inheriting
+        /// <see cref="Control"/>'s. A <see cref="Form"/>'s <c>ClientSize</c> therefore mixes safely with
+        /// its own <c>Width</c>/<c>Height</c>; a child <see cref="Control"/>'s does not.
+        /// </para>
+        /// </remarks>
+        public System.Drawing.Size ClientSize {
+            get {
+                var size = Size;
+                return new System.Drawing.Size (size.Width, Math.Max (0, size.Height - NonClientCaptionHeight));
+            }
+            set => SetClientSizeCore (value.Width, value.Height);
+        }
+
+        /// <summary>
+        /// Performs the work of setting the client size. The override point WinForms code reaches for
+        /// when a custom-chrome form needs to intercept a ClientSize assignment (e.g. to size itself
+        /// off the raw value in design mode, bypassing whatever border math a real Win32 client-area
+        /// distinction would otherwise apply). Majorsilence.Forms treats ClientSize as Size, so the
+        /// base implementation just forwards; a Windows-only override that adjusts for a non-client
+        /// border still compiles and runs here, it just has no border to adjust for.
+        /// </summary>
+        protected virtual void SetClientSizeCore (int x, int y)
+            => Size = new System.Drawing.Size (x, y + NonClientCaptionHeight);
+
+        /// <summary>Gets or sets the automatic scaling mode.</summary>
+        /// <remarks>
+        /// <para>
+        /// Real as of 2026-08-31 (<c>W3.6</c>, finding <c>FRM-17</c>). It used to be stored and
+        /// returned with a remark saying the backend owns DPI scaling and there was therefore nothing
+        /// to do -- which conflated the two modes. The backend does own DPI, but it does not own the
+        /// FONT: every designer file records the dimensions of the font it was laid out with
+        /// (<c>AutoScaleDimensions = new SizeF(6F, 13F)</c> and the like), and this library's default
+        /// font is a different family at a different size. Without the font ratio, a form drawn for
+        /// 6px-per-character was laid out at nearer 7 with no compensation -- clipped labels,
+        /// ellipsized buttons, table columns too narrow. That is the exact breakage AutoScale exists
+        /// to prevent, and the reason every designer file sets it.
+        /// </para>
+        /// <para>
+        /// <see cref="AutoScaleMode.Font"/> scales once, before the window is shown, by
+        /// <see cref="CurrentAutoScaleDimensions"/> over <see cref="AutoScaleDimensions"/>.
+        /// <see cref="AutoScaleMode.Dpi"/> is deliberately inert -- see
+        /// <see cref="AutoScaleEngine.TryGetFactor"/> for why applying a DPI ratio here would scale
+        /// every form twice on a HiDPI display.
+        /// </para>
+        /// </remarks>
+        public AutoScaleMode AutoScaleMode { get; set; } = AutoScaleMode.Font;
+
+        /// <summary>Gets or sets the dimensions the designer laid this form out at.</summary>
+        /// <remarks>Empty means "not recorded", and nothing scales -- so a form built in code is
+        /// untouched, and only a form carrying a designer's own numbers is corrected.</remarks>
+        public System.Drawing.SizeF AutoScaleDimensions { get; set; }
+
+        /// <summary>Gets the scale the form is currently laid out at.</summary>
+        /// <inheritdoc cref="ContainerControl.CurrentAutoScaleDimensions" path="/remarks"/>
+        public System.Drawing.SizeF CurrentAutoScaleDimensions
+            => AutoScaleEngine.CurrentDimensions (AutoScaleMode, Font, (int)(Scaling * 96));
+
+        /// <summary>
+        /// Scales the form and its children to the difference between the recorded and current
+        /// dimensions, and records the new dimensions so a second call is a no-op.
+        /// </summary>
+        public void PerformAutoScale ()
+        {
+            var current = CurrentAutoScaleDimensions;
+
+            if (!AutoScaleEngine.TryGetFactor (AutoScaleMode, AutoScaleDimensions, current, out var factor))
+                return;
+
+            ScaleClientAndChildren (factor);
+
+            AutoScaleDimensions = current;
+        }
+
+        // Scales the explicit children and the client area by factor, as one layout change.
+        private void ScaleClientAndChildren (System.Drawing.SizeF factor)
+        {
+            var root = ContentRoot;
+
+            root.SuspendLayout ();
+
+            try {
+                // Explicit children only. The implicit list is this library's own chrome -- the title
+                // bar and the scrollbars -- which is sized from its own metrics on every layout and
+                // would be scaled twice, or scaled and then reset, depending on the order.
+                foreach (var child in root.Controls.GetAllControls (includeImplicit: false))
+                    child.Scale (factor);
+
+                // The client area, not Size: the caption is non-client and is not part of what the
+                // designer measured. SetClientSizeCore adds it back.
+                var client = ClientSize;
+
+                ClientSize = new System.Drawing.Size (
+                    (int)System.Math.Round (client.Width * factor.Width),
+                    (int)System.Math.Round (client.Height * factor.Height));
+            } finally {
+                root.ResumeLayout ();
+            }
+        }
+
+        /// <inheritdoc/>
+        internal override void PrepareForFirstShow ()
+        {
+            base.PrepareForFirstShow ();
+
+            // Before the backend window opens, which is both faithful and necessary. Upstream scales on
+            // the form's first layout, ahead of any handler that measures anything; here it also has to
+            // precede Backend.Show () because the window takes its size from the form as it opens.
+            // The legacy scale first, as upstream applies it in OnLoad ahead of anything else.
+            ApplyLegacyAutoScaling ();
+            PerformAutoScale ();
+        }
+
+        // Notifies on change; the event was declared and raised by nothing (W6.1).
+        private AutoValidate auto_validate = AutoValidate.EnablePreventFocusChange;
+
+        /// <summary>Gets or sets how the form performs implicit validation when focus leaves a child control.</summary>
+        public AutoValidate AutoValidate {
+            get => auto_validate;
+            set {
+                if (auto_validate == value)
+                    return;
+
+                auto_validate = value;
+                AutoValidateChanged?.Invoke (this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Validates all selectable child controls, returning false if any handler cancelled.</summary>
+        /// <remarks>
+        /// This used to `return true` without validating anything -- while the
+        /// <see cref="ValidateChildren(ValidationConstraints)"/> overload right next to it was real. The
+        /// parameterless one is the one nearly everybody calls, so the working overload was the one nobody
+        /// reached. Both now run the same walk.
+        /// </remarks>
+        public bool ValidateChildren () => ValidateChildren (ValidationConstraints.Selectable);
+
+        private BindingContext? binding_context;
+
+        /// <summary>
+        /// Gets or sets the BindingContext for the form. Mirrors WinForms Form.BindingContext:
+        /// binding managers are cached per (dataSource, dataMember) pair so all lookups on the form
+        /// share position state.
+        /// </summary>
+        /// <remarks>Setting it moves the bindings of the form and of every control that inherits the
+        /// form's context onto the new context's managers, and raises <c>BindingContextChanged</c>, as
+        /// upstream's <c>Control.BindingContext</c> setter does.</remarks>
+        public BindingContext BindingContext {
+            get => binding_context ??= new BindingContext ();
+            set {
+                if (ReferenceEquals (binding_context, value))
+                    return;
+
+                binding_context = value;
+                OnWindowBindingContextChanged ();
+            }
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>Routed to this form's own <see cref="BindingContext"/> so the public property and the
+        /// <c>IBindableComponent</c> one cannot drift apart.</remarks>
+        internal override BindingContext? BindingContextCore {
+            get => BindingContext;
+            set => BindingContext = value ?? new BindingContext ();
+        }
+
+        /// <summary>Gets or sets the border style of the form.</summary>
+        /// <remarks>
+        /// <para>
+        /// <see cref="FormBorderStyle.None"/> means no caption and no border at all. An app that wants
+        /// to draw its own title bar sets it and then paints the caption itself, so honouring it has to
+        /// suppress <em>both</em> chromes: the OS decorations, and the <see cref="TitleBar"/> this
+        /// library draws in their place. Suppressing only one leaves the window wearing two title bars.
+        /// </para>
+        /// <para>
+        /// The fixed styles keep a caption but drop the resize grip; <see cref="UseSystemDecorations"/>
+        /// still chooses <em>whose</em> caption that is.
+        /// </para>
+        /// </remarks>
+        public FormBorderStyle FormBorderStyle {
+            get => form_border_style;
+            set {
+                SourceGenerated.EnumValidator.Validate (value);
+
+                if (form_border_style == value)
+                    return;
+
+                form_border_style = value;
+
+                Backend.SetSystemDecorations (use_system_decorations && !IsBorderless);
+                Style.Border.Width = IsBorderless || use_system_decorations ? 0 : 1;
+                Resizeable = value is FormBorderStyle.Sizable or FormBorderStyle.SizableToolWindow;
+
+                // Whether the user can resize the window is the border style's call alone (upstream
+                // maps the sizable styles to WS_THICKFRAME in Form.CreateParams). MaximizeBox used to
+                // write this, so a fixed dialog drawn by the OS stayed resizable and a sizable one with
+                // MaximizeBox = false could not be resized at all (FRM-18).
+                Backend.CanResize = Resizeable;
+                UpdateTitleBarChrome ();
+            }
+        }
+        private FormBorderStyle form_border_style = FormBorderStyle.Sizable;
+
+        // Whether the form asked for no chrome whatsoever.
+        private bool IsBorderless => form_border_style == FormBorderStyle.None;
+
+        /// <summary>Gets or sets whether a maximize button appears in the title bar.</summary>
+        /// <remarks>
+        /// <para>
+        /// Both boxes used to stop short of the caption this library draws: MaximizeBox only forwarded to
+        /// the backend and MinimizeBox was stored, so a designer's <c>MaximizeBox = False</c> still showed
+        /// a live maximize button. Each now re-applies the caption-button rules (see ApplyControlBox).
+        /// </para>
+        /// <para>
+        /// It does not decide whether the window can be resized: upstream it toggles only
+        /// <c>WS_MAXIMIZEBOX</c> (Form.cs), and resizability is <see cref="FormBorderStyle"/>'s. It used
+        /// to forward to the backend's resizability, so the designer's <c>MaximizeBox = false</c> made
+        /// every "resizable but not maximizable" dialog fixed-size. Where the OS draws the caption
+        /// (macOS) no backend seam exists for its zoom button, so that button stays.
+        /// </para>
+        /// </remarks>
+        public bool MaximizeBox {
+            get => maximize_box;
+            set {
+                maximize_box = value;
+                ApplyControlBox ();
+            }
+        }
+
+        private bool maximize_box = true;
+
+        /// <summary>Gets or sets whether a minimize button appears in the title bar.</summary>
+        public bool MinimizeBox {
+            get => minimize_box;
+            set {
+                minimize_box = value;
+                ApplyControlBox ();
+            }
+        }
+
+        private bool minimize_box = true;
+
+        /// <summary>Gets or sets whether the form is displayed in the taskbar.</summary>
+        public bool ShowInTaskbar {
+            get => Backend.ShowInTaskbar;
+            set => Backend.ShowInTaskbar = value;
+        }
+
+        /// <summary>Gets or sets whether the form is displayed on top of all other windows.</summary>
+        public bool TopMost {
+            get => Backend.Topmost;
+            set => Backend.Topmost = value;
+        }
+
+        /// <summary>Gets or sets whether the form draws a size grip in the bottom-right corner of its client area.</summary>
+        /// <remarks>
+        /// As upstream: only a sizable form (<see cref="FormBorderStyle.Sizable"/> or
+        /// <see cref="FormBorderStyle.SizableToolWindow"/>) has one; <see cref="SizeGripStyle.Show"/> always
+        /// draws it, <see cref="SizeGripStyle.Hide"/> never does, and <see cref="SizeGripStyle.Auto"/> draws
+        /// it while the form is shown modally. The grip is painted after the form's <c>Paint</c> handlers
+        /// and under its controls, and pressing it starts a bottom-right resize.
+        /// </remarks>
+        public SizeGripStyle SizeGripStyle {
+            get => size_grip_style;
+            set {
+                SourceGenerated.EnumValidator.Validate (value);
+
+                if (size_grip_style == value)
+                    return;
+
+                size_grip_style = value;
+                Invalidate ();
+            }
+        }
+        private SizeGripStyle size_grip_style = SizeGripStyle.Auto;
+
+        // Upstream Form.SizeGripSize, in logical pixels.
+        private const int SIZE_GRIP_SIZE = 16;
+
+        // Upstream Form.UpdateRenderSizeGrip: the border style decides whether a grip is possible at all,
+        // then SizeGripStyle (Auto = while modal).
+        internal bool RendersSizeGrip
+            => form_border_style is FormBorderStyle.Sizable or FormBorderStyle.SizableToolWindow
+                && size_grip_style switch {
+                    SizeGripStyle.Show => true,
+                    SizeGripStyle.Hide => false,
+                    _ => Modal,
+                };
+
+        // Upstream draws the grip in Form.OnPaint after base.OnPaint (the Paint handlers), in the client
+        // area's bottom-right corner; RenderFrame calls this at that point, with the canvas at the client
+        // origin. Not an OnPaint override, so a subclass overriding OnPaint without calling base still
+        // gets it here -- a small difference kept rather than adding an override to the public surface.
+        internal override void PaintSizeGrip (PaintEventArgs e)
+        {
+            if (!RendersSizeGrip)
+                return;
+
+            var size = client_area.Size;
+            ControlPaint.DrawSizeGrip (e.Graphics, BackColor,
+                size.Width - SIZE_GRIP_SIZE, size.Height - SIZE_GRIP_SIZE, SIZE_GRIP_SIZE, SIZE_GRIP_SIZE);
+        }
+
+        // Upstream WmNCHitTest answers HTBOTTOMRIGHT over the grip, unless the client area is too short to
+        // hold all of it (it would then overlap the caption). x and y are device pixels in window space.
+        private bool IsOverSizeGrip (int x, int y)
+        {
+            if (!RendersSizeGrip || client_area.Height < SIZE_GRIP_SIZE)
+                return false;
+
+            var scaling = Scaling > 0 ? Scaling : 1;
+            var border = Style.Border;
+            var lx = x / scaling - border.Left.GetWidth () - client_area.Left;
+            var ly = y / scaling - border.Top.GetWidth () - client_area.Top;
+
+            return lx >= client_area.Width - SIZE_GRIP_SIZE && lx < client_area.Width
+                && ly >= client_area.Height - SIZE_GRIP_SIZE && ly < client_area.Height;
+        }
+
+        /// <summary>Gets or sets the form opacity (0.0 = transparent, 1.0 = opaque). Values are clamped to the range [0, 1].</summary>
+        public double Opacity {
+            get => Backend.Opacity;
+            set {
+                if (value > 1.0)
+                    value = 1.0;
+                else if (value < 0.0)
+                    value = 0.0;
+
+                Backend.Opacity = value;
+            }
+        }
+
+        /// <summary>Gets or sets the color treated as transparent. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color TransparencyKey { get; set; } = System.Drawing.Color.Empty;
+
+        /// <inheritdoc/>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+
+        /// <summary>Clears the form's title. Part of the designer Reset* pattern.</summary>
+        /// <remarks>Declared here rather than on <see cref="WindowBase"/> because <see cref="Text"/> is,
+        /// so this is the only place that can clear the same storage the property writes.</remarks>
+        public virtual void ResetText () => Text = string.Empty;
+
+        /// <summary>Gets or sets the text for the form title bar.</summary>
+        public virtual string Text {
+            get => text;
+            set {
+                if (text != value) {
+                    text = value;
+                    ApplyTitle ();
+
+                    // A maximized child's title is part of its parent's caption.
+                    MdiHost?.Client.SyncMergedChrome ();
+                    OnTextChanged (EventArgs.Empty);
+                }
+            }
+        }
+
+        /// <summary>Gets the title bar for the form.</summary>
+        public FormTitleBar TitleBar { get; }
+
+        /// <summary>
+        /// Gets or sets whether the form should use the operating system's title bar and decorations.
+        /// Must be changed before the form is shown for the first time.
+        /// </summary>
+        public bool UseSystemDecorations {
+            get => use_system_decorations;
+            set {
+                if (shown)
+                    throw new InvalidOperationException ($"Cannot change {nameof (UseSystemDecorations)} once a Form has been shown.");
+
+                if (use_system_decorations != value) {
+                    use_system_decorations = value;
+                    Style.Border.Width = IsBorderless || use_system_decorations ? 0 : 1;
+                    Backend.SetSystemDecorations (value && !IsBorderless);
+                    UpdateTitleBarChrome ();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the form's content (and its <see cref="TitleBar"/>) is extended up into
+        /// the native OS title bar, so the application can paint into it while the OS keeps drawing the
+        /// native caption buttons, rounded corners and window shadow. Only has an effect together with
+        /// <see cref="UseSystemDecorations"/> (the platform must provide a native title bar — macOS).
+        /// On macOS this is enabled by default. Must be changed before the form is shown.
+        /// </summary>
+        public bool ExtendsContentIntoTitleBar {
+            get => extends_content_into_title_bar;
+            set {
+                if (shown)
+                    throw new InvalidOperationException ($"Cannot change {nameof (ExtendsContentIntoTitleBar)} once a Form has been shown.");
+
+                if (extends_content_into_title_bar != value) {
+                    extends_content_into_title_bar = value;
+                    UpdateTitleBarChrome ();
+                }
+            }
+        }
+
+        // Reconciles the title bar's visibility/overlay mode and the backend's title-bar extension with
+        // the current UseSystemDecorations + ExtendsContentIntoTitleBar combination.
+        private void UpdateTitleBarChrome ()
+        {
+            var extend = use_system_decorations && extends_content_into_title_bar && !IsBorderless;
+
+            // The custom title bar is shown for fully-custom chrome, or when merged into a native bar --
+            // but never on a borderless form (asked for no caption from anyone) and never on a
+            // single-view host (no window to caption; the form fills the view -- see the constructor).
+            TitleBar.Visible = !IsBorderless && !Backend.IsSingleView && (!use_system_decorations || extend);
+            // In the merged case the OS draws the caption buttons, so the title bar runs in overlay mode.
+            TitleBar.NativeOverlay = extend;
+
+            Backend.SetExtendClientIntoTitleBar (extend, TitleBar.PreferredHeight);
+        }
+
+        /// <summary>Gets or sets the state of the form (normal/minimized/maximized).</summary>
+        /// <remarks>
+        /// An MDI child's state is its frame's: it owns no OS window, so the backend's state is never
+        /// seen. A state assigned before the child is shown is applied when its frame is created --
+        /// <c>child.WindowState = Maximized; child.Show ()</c> is how a tabbed MDI shell (ReportDesigner)
+        /// opens every document, and it used to open them at their restored size instead.
+        /// </remarks>
+        public FormWindowState WindowState {
+            get => MdiHost?.WindowState ?? Backend.WindowState;
+            set {
+                SourceGenerated.EnumValidator.Validate (value);
+
+                if (MdiHost is { } frame) {
+                    if (frame.WindowState == value)
+                        return;
+
+                    switch (value) {
+                        case FormWindowState.Maximized: frame.Maximize (); break;
+                        case FormWindowState.Minimized: frame.Minimize (); break;
+                        default: frame.Restore (); break;
+                    }
+
+                    return;
+                }
+
+                requested_mdi_state = value;
+
+                // Leaving the normal state: whatever geometry changes reach us from here on belong to
+                // the maximized or minimized window, so the normal bounds are taken now.
+                if (value != FormWindowState.Normal)
+                    OnGeometryChanged ();
+
+                Backend.WindowState = value;
+            }
+        }
+
+        // The WindowState assigned while this form had no MDI frame; applied by ApplyRequestedMdiState.
+        private FormWindowState requested_mdi_state = FormWindowState.Normal;
+
+        // Called once the MDI frame exists (MdiClient.AddChild).
+        internal void ApplyRequestedMdiState ()
+        {
+            if (MdiHost is null || requested_mdi_state == FormWindowState.Normal)
+                return;
+
+            WindowState = requested_mdi_state;
+        }
+
+        private Control? active_control;
+
+        /// <summary>Gets or sets the active control on the form.</summary>
+        /// <remarks>
+        /// The getter reports where focus is, the setter moves it there -- the same path as
+        /// <see cref="ContainerControl.ActiveControl"/>, which upstream's Form inherits. It used to answer
+        /// <c>GetNextControl (null, true)</c>, the first control in tab order whatever had focus (FRM-10),
+        /// so an Edit menu's <c>if (ActiveControl is TextBoxBase tb) tb.Copy ()</c> copied from the wrong
+        /// box. With focus inside a nested container (a <see cref="UserControl"/>), the answer is that
+        /// container, as upstream; its own <c>ActiveControl</c> names the control inside it.
+        /// </remarks>
+        public Control? ActiveControl {
+            get => ContainerFocus.ActiveControlOf (client_area, active_control);
+            set => ContainerFocus.SetActiveControl (client_area, value, ref active_control);
+        }
+
+        /// <summary>
+        /// Gets or sets whether the form is an MDI container. Setting this true creates the client area
+        /// that hosts MDI child forms (Majorsilence.Forms emulates MDI by hosting children inside the
+        /// parent's client rather than as native OS windows).
+        /// </summary>
+        public bool IsMdiContainer {
+            get => MdiClientControl != null;
+            set {
+                if (value == (MdiClientControl != null))
+                    return;
+
+                if (value) {
+                    MdiClientControl = new MdiClient { Owner = this };
+                    // Appended, i.e. left at the BACK of the z-order, which is where WinForms puts it
+                    // and where it has to stay: index 0 is the front, and the front is painted last, so
+                    // a front MDI client covers every sibling -- the menu, the toolbar, and any Fill'd
+                    // panel (a docking host's whole UI) drawn beneath it.
+                    //
+                    // It gets the leftover space regardless of that position, because
+                    // DockAndAnchorLayout defers the MDI client to the end of the dock pass rather than
+                    // taking it in z-order.
+                    Controls.Add (MdiClientControl);
+                } else if (MdiClientControl != null) {
+                    Controls.Remove (MdiClientControl);
+                    MdiClientControl = null;
+                }
+            }
+        }
+
+        /// <summary>Gets or sets whether the form accepts data dragged onto it.</summary>
+        /// <remarks>Read by the drag-and-drop session as of W6 mechanisms: when no control under the
+        /// pointer accepts drops, a form that does is the target of <see cref="DragEnter"/>,
+        /// <see cref="DragOver"/> and <see cref="DragDrop"/>.</remarks>
+        public bool AllowDrop { get; set; }
+
+        // The drag-and-drop session's doors to the hooks below.
+        internal void RaiseDragEnter (DragEventArgs e) => OnDragEnter (e);
+        internal void RaiseDragOver (DragEventArgs e) => OnDragOver (e);
+        internal void RaiseDragDrop (DragEventArgs e) => OnDragDrop (e);
+
+        // Real handler storage rather than `{ add { } remove { } }`, which discarded the handler
+        // outright: `form.DragEnter += h` looked wired up and h was thrown away, so an override of
+        // OnDragEnter could never be reached even once something raised these. The in-process drag
+        // session raises them as of W6 mechanisms when the form itself is the drop target.
+        private DragEventHandler? drag_enter;
+        private DragEventHandler? drag_over;
+        private DragEventHandler? drag_drop;
+
+        /// <summary>Raised when a drag-and-drop operation enters the form; see <see cref="AllowDrop"/>.</summary>
+        public event DragEventHandler? DragEnter {
+            add => drag_enter += value;
+            remove => drag_enter -= value;
+        }
+
+        /// <summary>Raised as a drag-and-drop operation moves over the form. Never fires yet — see <see cref="AllowDrop"/>.</summary>
+        public event DragEventHandler? DragOver {
+            add => drag_over += value;
+            remove => drag_over -= value;
+        }
+
+        /// <summary>Raised when a drag-and-drop operation completes over the form. Never fires yet — see <see cref="AllowDrop"/>.</summary>
+        public event DragEventHandler? DragDrop {
+            add => drag_drop += value;
+            remove => drag_drop -= value;
+        }
+
+        /// <summary>Raises the <see cref="DragEnter"/> event.</summary>
+        /// <remarks>
+        /// Declared here because WinForms' Form inherits it from Control and ported code overrides it;
+        /// WindowBase is not a Control. Matches Control.OnDragEnter.
+        /// </remarks>
+        protected virtual void OnDragEnter (DragEventArgs e) => drag_enter?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="DragOver"/> event.</summary>
+        /// <inheritdoc cref="OnDragEnter"/>
+        protected virtual void OnDragOver (DragEventArgs e) => drag_over?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="DragDrop"/> event.</summary>
+        /// <inheritdoc cref="OnDragEnter"/>
+        protected virtual void OnDragDrop (DragEventArgs e) => drag_drop?.Invoke (this, e);
+
+        /// <summary>
+        /// Gets or sets the MDI parent. Set this (and call <see cref="WindowBase.Show"/>) to host this form
+        /// as a child inside <paramref name="value"/>'s MDI client area instead of as a top-level window.
+        /// </summary>
+        public Form? MdiParent {
+            get => mdi_parent;
+            set => mdi_parent = value;
+        }
+
+        /// <summary>Gets the MDI child forms hosted by this container, in creation order.</summary>
+        public Form[] MdiChildren => MdiClientControl?.ChildForms.ToArray () ?? [];
+
+        /// <summary>Gets whether this form is hosted as the child of an MDI container.</summary>
+        public bool IsMdiChild => mdi_parent != null;
+
+        /// <summary>
+        /// Gets the form this form is parented to. Mirrors WinForms Control.ParentForm as it applies
+        /// to a Form: the MDI parent when hosted as an MDI child, otherwise null (top-level window).
+        /// </summary>
+        public Form? ParentForm => mdi_parent;
+
+        private Control? parent;
+
+        /// <summary>
+        /// Gets or sets the control this form is hosted in. Mirrors WinForms Control.Parent as it
+        /// applies to a Form: while hosted as an MDI child the parent is the container's
+        /// <see cref="MdiClient"/> (exactly as in WinForms, where an MDI child's Parent is the
+        /// MdiClient control), and a top-level window reports null.
+        /// </summary>
+        /// <remarks>
+        /// Assigning this really hosts the form, by the same route as
+        /// <c>parent.Controls.Add (form)</c> -- the form is wrapped in a frame and composited into that
+        /// control tree instead of owning a top-level window. Assigning null takes it back out.
+        ///
+        /// It used to only store the value. That made <c>form.Parent = panel</c> a silent no-op: the
+        /// form stayed a separate top-level window, so an app that hosts forms inside a container by
+        /// assigning Parent -- which is how WinForms code does it, and how a docking library puts a
+        /// document into a pane -- got a stray empty window per form and nothing in the container.
+        /// </remarks>
+        public Control? Parent {
+            // A panel-hosted form reports the control its frame was added to, not the frame itself --
+            // the frame is an implementation detail, and WinForms code reaches for Parent to add
+            // siblings alongside the hosted form ("Parent.Controls.Add (otherForm)").
+            get => MdiHost?.Client ?? PanelHost?.Parent ?? parent;
+            set {
+                parent = value;
+
+                // An MDI child's parent is owned by MdiParent, not settable through here -- WinForms
+                // reports the MdiClient and ignores writes just the same.
+                if (MdiHost != null)
+                    return;
+
+                if (value is null) {
+                    // Detach without closing: taking a hosted form out of the tree is not the same as
+                    // disposing it, and callers move forms between containers.
+                    if (PanelHost is { } host) {
+                        host.Parent?.Controls.Remove (host);
+                        PanelHost = null;
+                    }
+
+                    return;
+                }
+
+                // Add handles the already-hosted case as a move, so this is safe to re-assign.
+                if (PanelHost?.Parent != value)
+                    value.Controls.Add (this);
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the preferred rounding of the window's corners. Stored for source parity with
+        /// the WinForms property; corner rounding is decided by the platform backend (or the OS, under
+        /// <see cref="UseSystemDecorations"/>) and this value is not applied to it.
+        /// </summary>
+        public FormCornerPreference FormCornerPreference {
+            get => form_corner_preference;
+            set {
+                SourceGenerated.EnumValidator.Validate (value);
+
+                if (form_corner_preference == value)
+                    return;
+
+                form_corner_preference = value;
+                FormCornerPreferenceChanged?.Invoke (this, EventArgs.Empty);
+            }
+        }
+        private FormCornerPreference form_corner_preference = FormCornerPreference.Default;
+
+        // Notifies on change; the event was declared and raised by nothing (W6.1).
+        private System.Drawing.Rectangle maximized_bounds;
+
+        /// <summary>Gets or sets the bounds the form uses when maximized, in screen coordinates.</summary>
+        /// <remarks>
+        /// Handed to the backend as a maximize hint, as upstream hands it to the window manager through
+        /// <c>WM_GETMINMAXINFO</c>; the form still reports <see cref="FormWindowState.Maximized"/>. Honoured
+        /// where the platform has such a hint -- the WinForms host. Avalonia, GTK 4, WPF and Uno windows
+        /// have none, so there a maximized form fills the work area and this value is only stored
+        /// (see <see cref="Backends.IMaximizedBoundsBackend"/>). An MDI child ignores it, as upstream's
+        /// MDI client maximizes its children to the client area. Empty (the default) means no hint.
+        /// </remarks>
+        public System.Drawing.Rectangle MaximizedBounds {
+            get => maximized_bounds;
+            set {
+                if (maximized_bounds == value)
+                    return;
+
+                maximized_bounds = value;
+                (Backend as Backends.IMaximizedBoundsBackend)?.SetMaximizedBounds (value);
+                MaximizedBoundsChanged?.Invoke (this, EventArgs.Empty);
+            }
+        }
+
+        private System.Drawing.Size auto_scale_base_size;
+        private bool legacy_auto_scale_pending;
+
+        /// <summary>Gets or sets the base size used for autoscaling.</summary>
+        /// <remarks>
+        /// The .NET 1.x designer's scaling, still honoured by WinForms: assigning it arms a one-time
+        /// scale before the form is first shown, by the ratio of the form font's average character size
+        /// (measured as WinForms measures it) to this one, as upstream's <c>ApplyAutoScaling</c> does.
+        /// It was stored and ignored, so a dialog designed against an older, smaller font opened at its
+        /// recorded size here and about 30% larger under WinForms -- ReportDesigner's data source,
+        /// data set and other legacy dialogs among them.
+        /// </remarks>
+        public System.Drawing.Size AutoScaleBaseSize {
+            get => auto_scale_base_size;
+            set {
+                auto_scale_base_size = value;
+                legacy_auto_scale_pending = true;
+            }
+        }
+
+        // Upstream's ApplyAutoScaling: scales once, to the font's average character size over the
+        // recorded one, and records the new size so a second call does nothing.
+        private void ApplyLegacyAutoScaling ()
+        {
+            if (!legacy_auto_scale_pending)
+                return;
+
+            legacy_auto_scale_pending = false;
+
+            var recorded = auto_scale_base_size;
+
+            if (recorded.Width <= 0 || recorded.Height <= 0)
+                return;
+
+            // A form with no font of its own draws with the default one, which is what WinForms
+            // measures too (Form.Font falls back to Control.DefaultFont there).
+            var measured = LegacyAutoScaleSize (Font ?? DefaultFont);
+            var current = new System.Drawing.Size ((int)Math.Round (measured.Width), (int)Math.Round (measured.Height));
+
+            if (current == recorded)
+                return;
+
+            Control.InLegacyAutoScale = true;
+
+            try {
+                ScaleClientAndChildren (new System.Drawing.SizeF (
+                    AdjustLegacyScale (current.Width / (float)recorded.Width),
+                    AdjustLegacyScale (current.Height / (float)recorded.Height)));
+            } finally {
+                Control.InLegacyAutoScale = false;
+            }
+
+            auto_scale_base_size = current;
+        }
+
+        // Upstream's AdjustScale, kept for the sizes it produces: a ratio clearly above or below 1 is
+        // pushed a further 8% the same way, and one just under 1 is treated as 1.
+        private static float AdjustLegacyScale (float scale)
+        {
+            if (scale < .92f)
+                return scale + .08f;
+            if (scale < 1)
+                return 1;
+            if (scale > 1.01f)
+                return scale + .08f;
+            return scale;
+        }
+
+        // The average character size the legacy designer recorded in AutoScaleBaseSize, measured the way
+        // upstream's GetAutoScaleSize does: GDI+ MeasureString of a fixed sentence (which includes a sixth
+        // of an em of padding on each side) over a fixed divisor, and the font's line height. A different
+        // reference string would not reproduce the recorded numbers, and so not the ratio WinForms uses.
+        private static System.Drawing.SizeF LegacyAutoScaleSize (Majorsilence.Forms.Drawing.Font font)
+        {
+            const string Reference = "The quick brown fox jumped over the lazy dog.";
+            const double Divisor = 44.549996948242189;
+
+            var pixels = font.PixelSize;
+            var measured = TextMeasurer.MeasureText (Reference, TypefaceCache.Resolve (font), (int)Math.Round (pixels));
+
+            return new System.Drawing.SizeF ((float)((measured.Width + pixels / 3f) / Divisor), font.Height);
+        }
+
+        /// <summary>
+        /// Gets the Win32 creation parameters. WinForms compatibility for the classic
+        /// remove-close-button override pattern; the compat window ignores the values.
+        /// </summary>
+        protected virtual CreateParams CreateParams => new CreateParams ();
+
+        /// <summary>
+        /// Gets whether the window is shown without taking focus from whatever is currently active.
+        /// Overridden to <see langword="true"/> by overlay windows — a drag preview, a translucent
+        /// highlight, a notification — which must appear without stealing the caret from the form the
+        /// user is working in. Honoured by <see cref="WindowBase.Show"/>.
+        /// </summary>
+        protected virtual bool ShowWithoutActivation => false;
+
+        internal override bool ShowsActivated => !ShowWithoutActivation;
+
+        /// <summary>Gets the active MDI child form, or null.</summary>
+        public Form? ActiveMdiChild => MdiClientControl?.ActiveChild;
+
+        /// <summary>Activates (brings to front and focuses) the specified MDI child form.</summary>
+        public void ActivateMdiChild (Form? form) => MdiClientControl?.Activate (form);
+
+        /// <summary>Arranges the MDI child forms in the given layout (cascade, tile, or arrange icons).</summary>
+        public void LayoutMdi (MdiLayout value) => MdiClientControl?.LayoutMdi (value);
+
+        // ── MDI internals ─────────────────────────────────────────────────────────
+
+        /// <summary>Raises <see cref="MdiChildActivate"/> on the container.</summary>
+        internal void RaiseMdiChildActivate () => mdi_child_activate?.Invoke (this, EventArgs.Empty);
+        private EventHandler? mdi_child_activate;
+
+        /// <summary>Lets a child react to its MDI frame being resized (re-lays out its client area).</summary>
+        internal void RaiseMdiResize () => OnClientLayoutChanged ();
+
+        // The designer-set client size, used to size a child's frame when it's first hosted. We read
+        // Backend.Size (the size set via the Size setter) rather than Backend.ClientSize: a hosted child
+        // never owns a realized OS window, so its backend's client size is unreliable before Show — on
+        // some platforms it reports a default/monitor-sized value, which would make the child far too
+        // wide. Backend.Size reflects exactly what was assigned. Falls back to a sensible default when
+        // the form never set one. The MdiClient additionally clamps the frame to the parent's bounds.
+        internal System.Drawing.Size InitialMdiContentSize {
+            get {
+                var s = Backend.Size;
+                return s.Width > 0 && s.Height > 0 ? s : new System.Drawing.Size (300, 200);
+            }
+        }
+
+        // Configures this form for being hosted as an MDI child: no self-drawn title bar/border (the frame
+        // draws them) and no window-edge resize routing (the frame handles resize).
+        private void PrepareAsMdiChild () => PrepareAsHostedChild ();
+
+        // Configures this form for being drawn inside a frame in someone else's control tree: no
+        // self-drawn title bar or border (the host owns any chrome there is) and no window-edge resize
+        // routing. Shared by MDI children and Controls.Add(Form) hosting.
+        internal void PrepareAsHostedChild ()
+        {
+            Resizeable = false;
+            TitleBar.Visible = false;
+            Style.Border.Width = 0;
+        }
+
+        // Takes down the OS window this form may already have shown, on becoming frame-hosted.
+        //
+        // Deliberately not Hide (): Hide would set visible = false and raise VisibleChanged, but the form
+        // is not becoming invisible -- it is about to be painted inside its host, and callers that set
+        // Visible = true before parenting expect it to still read true afterwards.
+        //
+        // Unconditional, and not guarded on `shown`: that flag records whether the Shown *event* has
+        // been raised, which is not the same as owning a window right now. EnsureShownBookkeeping
+        // returns early once `visible` is true, so a form shown again while already visible ends up
+        // with a live OS window and shown == false -- exactly the case a guard here would skip, leaving
+        // the window stranded on screen beside its host. Hiding a window that was never shown is
+        // harmless.
+        internal void HideOwnWindowForHosting () => Backend.Hide ();
+
+        internal override bool TryShowHosted ()
+        {
+            // Told it is not top-level and not yet parented: it owns no OS window, so becoming visible is
+            // bookkeeping until something hosts it. WinForms behaves the same -- a non-top-level form
+            // with no parent simply is not on screen.
+            if (!TopLevel && !IsFrameHosted) {
+                ShowHostedSequence (RaiseLoadDeferringFocus);
+                return true;
+            }
+
+            // Already sitting in a control tree via Controls.Add (form): Show() must not create an OS
+            // window, it just makes the frame visible. Checked first because the frame is what the
+            // caller actually parented the form into -- an MdiParent assignment left over from earlier
+            // does not override where it currently lives.
+            if (PanelHost is { } frame) {
+                frame.Visible = true;
+                Application.OpenForms.Add (this);
+
+                ShowHostedSequence (EnsureLoaded);
+
+                frame.Invalidate ();
+                return true;
+            }
+
+            if (mdi_parent?.MdiClientControl is not { } client)
+                return false;
+
+            PrepareAsMdiChild ();
+            client.AddChild (this);
+            Application.OpenForms.Add (this);
+
+            ShowHostedSequence (EnsureLoaded);
+
+            return true;
+        }
+
+        // The show sequence of a form that owns no OS window, in upstream's order -- the handle, Load,
+        // then Visible, with Shown posted to the next turn of the loop -- the same as a top-level form's
+        // (WindowBase.ShowBookkeeping, EVT-10/EVT-11).
+        private void ShowHostedSequence (Action load)
+        {
+            var firstShow = !shown;
+
+            if (firstShow) {
+                MarkHandleCreated ();
+                adapter.CreateControl ();   // the form's controls go live here, as in ShowBookkeeping (CTL-05)
+            }
+
+            load ();
+            visible = true;
+
+            if (firstShow)
+                BeginInvoke (() => OnShown (EventArgs.Empty));
+        }
+
+        /// <inheritdoc/>
+        public override void Invalidate ()
+        {
+            // A hosted form has no surface of its own; repainting means dirtying the frame that
+            // composites it, so the request travels up that control tree instead.
+            if (MdiHost != null)
+                MdiHost.Invalidate ();
+            else if (PanelHost != null)
+                PanelHost.Invalidate ();
+            else
+                base.Invalidate ();
+        }
+
+        private Form? _owner;
+
+        /// <summary>Gets or sets the form that owns this form.</summary>
+        /// <remarks>
+        /// The setter maintains the other side of the relationship, as upstream's does: it removes this
+        /// form from the previous owner's <see cref="OwnedForms"/> and adds it to the new one's. It was
+        /// a bare auto-property, so <c>child.Owner = parent</c> left <c>parent.OwnedForms</c> empty and
+        /// nothing downstream — closing owned forms with their owner, keeping them above it — had a
+        /// graph to walk.
+        /// </remarks>
+        public Form? Owner {
+            get => _owner;
+            set {
+                if (ReferenceEquals (_owner, value))
+                    return;
+
+                // A form cannot own itself, and an ownership cycle would make the close cascade
+                // infinite. Upstream throws for both; refusing quietly here would hide a real mistake.
+                if (ReferenceEquals (value, this))
+                    throw new ArgumentException ("A form cannot own itself.", nameof (value));
+
+                for (var candidate = value; candidate is not null; candidate = candidate._owner) {
+                    if (ReferenceEquals (candidate, this))
+                        throw new ArgumentException ("Setting this owner would create a cycle.", nameof (value));
+                }
+
+                _owner?._ownedForms?.Remove (this);
+                _owner = value;
+
+                if (value is not null) {
+                    value._ownedForms ??= [];
+
+                    if (!value._ownedForms.Contains (this))
+                        value._ownedForms.Add (this);
+                }
+            }
+        }
+
+        private List<Form>? _ownedForms;
+
+        /// <summary>Gets the array of forms that are owned by this form.</summary>
+        public Form[] OwnedForms => _ownedForms?.ToArray () ?? [];
+
+        /// <summary>Adds an owned form to this form.</summary>
+        public void AddOwnedForm (Form form)
+        {
+            Guard.ThrowIfNull (form);
+
+            // One direction only: the Owner setter is what maintains the list now, so doing it here as
+            // well would double-add.
+            form.Owner = this;
+        }
+
+        /// <summary>Removes an owned form from this form.</summary>
+        public void RemoveOwnedForm (Form form)
+        {
+            Guard.ThrowIfNull (form);
+
+            if (ReferenceEquals (form._owner, this))
+                form.Owner = null;
+            else
+                _ownedForms?.Remove (form);
+        }
+
+        private readonly FormClientArea client_area;
+
+        /// <summary>The controls inside the form's client area — everything below the title bar.</summary>
+        /// <remarks>
+        /// This used to hand out the root adapter's collection, which spans the whole window including
+        /// the title bar the library draws. Every designer form therefore lost its top caption-height
+        /// of usable area: a child at (0, 0) sat behind the caption, <c>ClientSize</c> counted space the
+        /// application could not use, and an <c>Anchor = Bottom</c> row was pushed off the window by the
+        /// same amount. Upstream's caption is non-client and (0, 0) is below it.
+        /// </remarks>
+        public override Control.ControlCollection Controls => client_area.Controls;
+
+        /// <inheritdoc/>
+        internal override Control ContentRoot => client_area;
+
+        /// <summary>Gets the size the form would need to show all of its client-area content.</summary>
+        /// <remarks>
+        /// Upstream's <c>ContainerControl.GetPreferredSizeCore</c>: the layout engine's preferred size for
+        /// the children, plus <c>Padding</c>, plus the non-client frame (<c>SizeFromClientSize</c>). The
+        /// frame here is the caption the library draws (<see cref="ClientSize"/> already leaves it out);
+        /// the root adapter spans the caption too, which is why it cannot be asked instead (FRM-38).
+        /// </remarks>
+        public override System.Drawing.Size GetPreferredSize (System.Drawing.Size proposedSize)
+        {
+            var caption = new System.Drawing.Size (0, NonClientCaptionHeight);
+            var proposed = proposedSize == System.Drawing.Size.Empty
+                ? proposedSize
+                : new System.Drawing.Size (Math.Max (1, proposedSize.Width), Math.Max (1, proposedSize.Height - caption.Height));
+
+            return client_area.GetPreferredSize (proposed) + caption;
+        }
+
+        private bool applying_auto_size;
+
+        // Upstream Form.OnLayout (Form.cs): an AutoSize form becomes the larger of its preferred size and
+        // its current size (GrowOnly), or exactly its preferred size (GrowAndShrink). Run from the client
+        // area's layout pass, which is the form's own pass upstream -- a child added, moved or resized
+        // lays the client area out. A maximized or minimized window keeps its size, as Win32 does.
+        internal void ApplyAutoSize ()
+        {
+            if (!AutoSize || applying_auto_size || IsDisposed || WindowState != FormWindowState.Normal)
+                return;
+
+            applying_auto_size = true;
+
+            try {
+                var preferred = PreferredSize;
+                Size = AutoSizeMode == AutoSizeMode.GrowAndShrink
+                    ? preferred
+                    : LayoutUtils.UnionSizes (preferred, Size);
+            } finally {
+                applying_auto_size = false;
+            }
+        }
+
+        /// <summary>
+        /// The form's client region: a fill-docked container holding everything the application puts
+        /// on the form.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A container rather than a coordinate offset because everything downstream — dock and anchor
+        /// layout, hit-testing, painting, focus traversal — already handles nesting. Offsetting the
+        /// adapter instead would have meant teaching each of those about a region that is not where the
+        /// control says it is.
+        /// </para>
+        /// <para>
+        /// A <see cref="ScrollableControl"/> specifically, matching the adapter it takes over from:
+        /// that is the type whose <c>DisplayRectangle</c> is deflated by <c>Padding</c>, so the form's
+        /// padding still insets docked children, and the one <c>AutoScroll</c> forwards to.
+        /// </para>
+        /// </remarks>
+        private sealed class FormClientArea : ScrollableControl
+        {
+            private readonly Form _owner;
+
+            public FormClientArea (Form owner)
+            {
+                _owner = owner;
+                Dock = DockStyle.Fill;
+
+                // Chrome, not content: it must never take focus.
+                SetControlBehavior (ControlBehaviors.Selectable, false);
+                TabStop = false;
+            }
+
+            /// <inheritdoc/>
+            internal override bool IsAutomationTransparent => true;
+
+            // Upstream's ContainerControl.GetPreferredSizeCore without the border term: the client area
+            // has no frame of its own, so the children's preferred extent plus Padding is the whole answer.
+            internal override System.Drawing.Size GetPreferredSizeCore (System.Drawing.Size proposedSize)
+                => LayoutEngine.GetPreferredSize (this, proposedSize - Padding.Size) + Padding.Size;
+
+            // This pass IS the form's layout upstream, where Form.OnLayout auto-sizes before laying out.
+            protected override void OnLayout (LayoutEventArgs e)
+            {
+                base.OnLayout (e);
+                _owner.ApplyAutoSize ();
+            }
+
+            /// <summary>
+            /// The base <see cref="ScrollableControl"/> rectangle, further deflated by the window's
+            /// device <see cref="WindowBase.SafeArea"/> — so on Android/iOS every docked and anchored
+            /// child stays clear of the status bar / notch / home indicator with no app code change
+            /// (<c>DockAndAnchorLayout</c> lays out against this rectangle).
+            /// </summary>
+            public override System.Drawing.Rectangle DisplayRectangle {
+                get {
+                    var rect = base.DisplayRectangle;
+                    var inset = _owner.SafeAreaWithKeyboard;
+                    return inset == Padding.Empty
+                        ? rect
+                        : LayoutUtils.DeflateRect (rect, inset);
+                }
+            }
+
+            /// <summary>Paints nothing of its own.</summary>
+            /// <remarks>
+            /// The window paints the background and border (WindowBase.RenderFrame) and the form's own
+            /// Paint handler draws over that, so painting here would cover both.
+            /// <para>
+            /// Suppressed by overriding the paint rather than by setting this control's background to
+            /// transparent, which is the trap that sank the first attempt at this change: ambient
+            /// colour is resolved by walking the PARENT CHAIN, so an explicit transparent here became
+            /// the answer for every descendant. Buttons and labels then painted transparent and
+            /// whatever was behind them showed through, which reads exactly like a child being
+            /// overpainted by its parent.
+            /// </para>
+            /// </remarks>
+            protected override void OnPaintBackground (PaintEventArgs e) { }
+        }
+
+        /// <summary>Gets or sets the MenuStrip that is the main menu for the form.</summary>
+        public MenuStrip? MainMenuStrip { get; set; }
+
+        /// <summary>Gets or sets whether the form is a top-level window.</summary>
+        /// <remarks>
+        /// Setting this false is how WinForms code says "stop owning an OS window" before parenting a
+        /// form into a control tree — the <c>form.TopLevel = false; panel.Controls.Add (form)</c> idiom,
+        /// and what a docking library does on every dock-state change. Stored and never acted on, the
+        /// form kept its own window: re-docking a floated document left its old window behind as a large
+        /// blank rectangle over the application.
+        /// </remarks>
+        public bool TopLevel {
+            get => top_level;
+            set {
+                if (top_level == value)
+                    return;
+
+                top_level = value;
+
+                if (!value)
+                    Backend.Hide ();        // composited by whatever hosts it from here on
+                else if (visible && !IsFrameHosted)
+                    Backend.Show ();
+            }
+        }
+
+        private bool top_level = true;
+
+        /// <summary>Gets or sets the start position of the form when it is first shown.</summary>
+        public new FormStartPosition StartPosition {
+            get => start_position;
+            set {
+                SourceGenerated.EnumValidator.Validate (value);
+                start_position = value;
+            }
+        }
+        private FormStartPosition start_position = FormStartPosition.WindowsDefaultLocation;
+
+        /// <summary>Gets or sets the desktop bounds of the form.</summary>
+        public System.Drawing.Rectangle DesktopBounds {
+            get => new System.Drawing.Rectangle (Location.X, Location.Y, Size.Width, Size.Height);
+            set { Location = new System.Drawing.Point (value.X, value.Y); Size = new System.Drawing.Size (value.Width, value.Height); }
+        }
+
+        /// <summary>Gets or sets the desktop location of the form.</summary>
+        public System.Drawing.Point DesktopLocation {
+            get => new System.Drawing.Point (Location.X, Location.Y);
+            set => Location = value;
+        }
+
+        /// <summary>Activates the form and gives it focus.</summary>
+        /// <remarks>
+        /// Was an empty stub, so <c>form.Activate ()</c> silently did nothing -- the WinForms idiom for
+        /// bringing an already-open window to the user rather than opening a second one. Routed through
+        /// the same path as <see cref="Focus"/>, which keeps a hosted form from acquiring a stray OS
+        /// window of its own.
+        /// </remarks>
+        public void Activate ()
+        {
+            // A frame-hosted form (an MDI child, or one placed in a control tree) is activated
+            // *within its host* -- raise its frame to the front of the sibling z-order and make it
+            // the active MDI child -- which is exactly what BringToFront does for a hosted form
+            // (MdiClient.Activate). Focus() alone only moved keyboard focus, so an MDI shell's
+            // "activate this document" action -- e.g. clicking its tab in a document strip -- left
+            // the child sitting behind the others.
+            if (HostFrame is not null)
+                BringToFront ();
+
+            Focus ();
+        }
+
+        /// <summary>Activates the form. Mirrors WinForms Control.Select as it applies to a Form.</summary>
+        public void Select () => BringToFront ();
+
+        /// <summary>Moves the form to the centre of the working area of its owner's screen, or of the screen under the mouse when it has no owner.</summary>
+        /// <remarks>
+        /// Moves the window now, as upstream does. It used to set <see cref="StartPosition"/> instead
+        /// (and nothing at all under <see cref="FormStartPosition.Manual"/>), so it took effect only if
+        /// called before the first show -- and recentring a form from <c>Load</c> or after resizing it,
+        /// what the method is for, did nothing. A form drawn inside another (MDI child, panel-hosted)
+        /// has no screen position to centre, so is left where it is.
+        /// </remarks>
+        public void CenterToScreen () => CenterToScreen (null);
+
+        /// <summary>Moves the form to the centre of its owner, kept within the owner's screen, or centres it on screen when it has no owner.</summary>
+        public void CenterToParent () => CenterToParent (null);
+
+        // Upstream Form.CenterToScreen (Form.cs): the owner's screen if there is one -- the dialog
+        // owner at show time -- else the screen under the mouse; never above or left of its working
+        // area.
+        private void CenterToScreen (WindowBase? owner)
+        {
+            if (IsFrameHosted)
+                return;
+
+            owner ??= Owner?.PresentationWindow;
+
+            var desktop = owner is not null ? Screen.FromControl (owner) : Screen.FromPoint (MousePosition);
+
+            if (desktop is null)
+                return;
+
+            var area = desktop.WorkingArea;
+            var size = ScreenBounds.Size;
+
+            Location = new System.Drawing.Point (
+                Math.Max (area.X, area.X + (area.Width - size.Width) / 2),
+                Math.Max (area.Y, area.Y + (area.Height - size.Height) / 2));
+        }
+
+        // Upstream Form.CenterToParent (Form.cs): centred over the owner window, then pulled back
+        // inside the working area of the owner's screen; no owner means the screen instead.
+        private void CenterToParent (WindowBase? owner)
+        {
+            if (!TopLevel || IsFrameHosted)
+                return;
+
+            owner ??= Owner?.PresentationWindow;
+
+            if (owner is null || Screen.FromControl (owner) is not { } desktop) {
+                CenterToScreen (null);
+                return;
+            }
+
+            var area = desktop.WorkingArea;
+            var parent = owner.ScreenBounds;
+            var size = ScreenBounds.Size;
+
+            var x = (parent.Left + parent.Right - size.Width) / 2;
+            if (x < area.X)
+                x = area.X;
+            else if (x + size.Width > area.Right)
+                x = area.Right - size.Width;
+
+            var y = (parent.Top + parent.Bottom - size.Height) / 2;
+            if (y < area.Y)
+                y = area.Y;
+            else if (y + size.Height > area.Bottom)
+                y = area.Bottom - size.Height;
+
+            Location = new System.Drawing.Point (x, y);
+        }
+
+        /// <summary>Brings the form to the front of the z-order.</summary>
+        public void BringToFront ()
+        {
+            // For a hosted form "front" means front of the frame's sibling z-order, not of the desktop.
+            if (MdiHost != null)
+                MdiHost.Client.Activate (this);
+            else if (PanelHost != null)
+                PanelHost.BringToFront ();
+            else if (visible && TopLevel)
+                Backend.Activate ();   // see Focus(): activating strands a window the form does not own
+        }
+
+        /// <summary>Sends the form to the back of the z-order.</summary>
+        /// <remarks>
+        /// The counterpart of <see cref="BringToFront"/>, whose absence was an asymmetry rather than a
+        /// decision: a form could be raised but not lowered. Hosted forms move within their frame's
+        /// sibling order; a top-level window has no cross-application "send to back" the backend
+        /// exposes, so that case is a no-op rather than a pretence.
+        /// </remarks>
+        public void SendToBack ()
+        {
+            if (PanelHost != null)
+                PanelHost.SendToBack ();
+        }
+
+        /// <summary>Gets the bounds of the form when it is not minimized or maximized.</summary>
+        /// <remarks>
+        /// The bounds the form last had in the normal state, as upstream tracks them (Form.cs
+        /// RestoreBounds). It returned the current bounds, so "save the window placement on close"
+        /// code stored the maximized rectangle, and the next launch opened a normal-state window
+        /// filling the screen (FRM-36).
+        /// </remarks>
+        public System.Drawing.Rectangle RestoreBounds =>
+            WindowState == FormWindowState.Normal || restore_bounds is not { } normal ? Bounds : normal;
+
+        // The last bounds seen while the form was in the normal state.
+        private System.Drawing.Rectangle? restore_bounds;
+
+        internal override void OnGeometryChanged ()
+        {
+            if (MdiHost is null && WindowState == FormWindowState.Normal)
+                restore_bounds = Bounds;
+        }
+
+        /// <summary>Gets or sets whether the form is displayed in the Windows taskbar.</summary>
+        public bool ControlBox {
+            get => control_box;
+            set {
+                if (control_box == value)
+                    return;
+
+                control_box = value;
+                ApplyControlBox ();
+            }
+        }
+
+        private bool control_box = true;
+
+        // ControlBox turns the whole caption-button cluster off -- the shape a tool window or a
+        // splash screen wants. It was stored and read by nothing, so a form that asked for no control
+        // box still got minimise, maximise and close.
+        //
+        // MinimizeBox and MaximizeBox keep their own say: ControlBox = false hides everything, and
+        // turning it back on restores whatever those two were set to rather than forcing all three on.
+        //
+        // The rest is the Win32 caption rule upstream inherits (WS_MINIMIZEBOX/WS_MAXIMIZEBOX with
+        // WS_EX_CONTEXTHELP): minimize and maximize are shown or hidden as a PAIR -- turning off just one
+        // leaves both visible with that one disabled -- and the help button appears only when both are
+        // off, since it would otherwise have no room beside them.
+        private void ApplyControlBox ()
+        {
+            var any_box = minimize_box || maximize_box;
+
+            TitleBar.AllowClose = control_box;
+            TitleBar.AllowMinimize = control_box && any_box;
+            TitleBar.AllowMaximize = control_box && any_box;
+            TitleBar.SetCaptionButtonsEnabled (minimize_box, maximize_box);
+            TitleBar.AllowHelp = control_box && help_button && !any_box;
+        }
+
+        /// <summary>Gets or sets whether the caption shows a help button; it appears only when both <see cref="MinimizeBox"/> and <see cref="MaximizeBox"/> are off, as upstream.</summary>
+        public bool HelpButton {
+            get => help_button;
+            set {
+                help_button = value;
+                ApplyControlBox ();
+            }
+        }
+
+        private bool help_button;
+
+        /// <summary>Gets or sets whether to display the icon in the title bar this library draws.</summary>
+        public bool ShowIcon {
+            get => TitleBar.ShowImage;
+            set => TitleBar.ShowImage = value;
+        }
+
+        /// <summary>Raises the Load event.</summary>
+        /// <remarks>
+        /// <c>protected virtual</c>, as in WinForms. It was public and non-virtual, so the standard
+        /// <c>protected override void OnLoad</c> a ported form is built around failed to compile (CS0506)
+        /// — the derived form could only reach its own startup work by subscribing to its own event.
+        /// </remarks>
+        protected virtual void OnLoad (EventArgs e) => Load?.Invoke (this, e);
+
+        /// <summary>Gets whether the form is displayed as a modal dialog.</summary>
+        public bool Modal { get; private set; }
+
+        /// <summary>Gets or sets the description of the form as an accessible object. Stub in Majorsilence.Forms.</summary>
+        public string? AccessibleDescription { get; set; }
+
+        /// <summary>Gets or sets the name of the form as an accessible object. Stub in Majorsilence.Forms.</summary>
+        public string? AccessibleName { get; set; }
+
+
+        /// <summary>Returns the currently focused control within the form, or null.</summary>
+        public Control? GetFocusedControl () => Controls.GetAllControls ().FirstOrDefault (c => c.Focused);
+
+        /// <summary>Sets the form position to the specified screen coordinates.</summary>
+        public void SetDesktopBounds (int x, int y, int width, int height) { Location = new System.Drawing.Point (x, y); Size = new System.Drawing.Size (width, height); }
+
+        /// <summary>Sets the location of the form in screen coordinates.</summary>
+        public void SetDesktopLocation (int x, int y) { Location = new System.Drawing.Point (x, y); }
+
+        private enum WindowElement
+        {
+            Client,
+            TopBorder,
+            RightBorder,
+            BottomBorder,
+            LeftBorder,
+            TopLeftCorner,
+            TopRightCorner,
+            BottomLeftCorner,
+            BottomRightCorner
+        }
+    }
+}

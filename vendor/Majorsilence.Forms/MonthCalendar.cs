@@ -1,0 +1,440 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using Majorsilence.Forms.Renderers;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a MonthCalendar control for selecting a date or range of dates.
+    /// </summary>
+    /// <remarks>
+    /// The grid, its hit-testing and its mouse and keyboard selection live in the other half of this
+    /// partial class (<c>MonthCalendarGrid.cs</c>) and are drawn by
+    /// <see cref="MonthCalendarRenderer"/>. Until W5.20c (finding SMP-42, P0) this class documented
+    /// itself as a stub that "renders as a simple label showing the selected date", which is exactly
+    /// what it did: one centred date string in an empty 220x162 box, with no input handling at all.
+    /// </remarks>
+    public partial class MonthCalendar : Control
+    {
+        /// <summary>The minimum date a MonthCalendar can display (1753-01-01).</summary>
+        public static readonly DateTime MinimumDateTime = new DateTime (1753, 1, 1);
+
+        /// <summary>The maximum date a MonthCalendar can display (9998-12-31).</summary>
+        public static readonly DateTime MaximumDateTime = new DateTime (9998, 12, 31);
+
+        private const int DefaultMaxSelectionCount = 7;
+
+        // Raw backing fields default to DateTime.MinValue / MaxValue so they can be
+        // distinguished from an explicitly-set value; the public MinDate/MaxDate
+        // getters clamp them to the effective 1753..9998 range (matching WinForms).
+        private DateTime _minDate = DateTime.MinValue;
+        private DateTime _maxDate = DateTime.MaxValue;
+        private int _maxSelectionCount = DefaultMaxSelectionCount;
+
+        private DateTime _selectionStart = DateTime.Now.Date;
+        private DateTime _selectionEnd = DateTime.Now.Date;
+
+        private static DateTime EffectiveMinDate (DateTime minDate) => minDate < MinimumDateTime ? MinimumDateTime : minDate;
+
+        private static DateTime EffectiveMaxDate (DateTime maxDate) => maxDate > MaximumDateTime ? MaximumDateTime : maxDate;
+
+        /// <summary>Gets or sets the start date of the selected range.</summary>
+        public DateTime SelectionStart {
+            get => _selectionStart;
+            set {
+                if (_selectionStart == value)
+                    return;
+
+                                // Against the RAW fields, which default to DateTime.MinValue/MaxValue, exactly as
+                // upstream's SelectionStart is (Controls/MonthCalendar/MonthCalendar.cs); only its
+                // SelectionEnd validates against the effective range (SMP-45).
+                Guard.ThrowIfLessThan (value, _minDate);
+                Guard.ThrowIfGreaterThan (value, _maxDate);
+
+                // If we've moved SelectionStart beyond SelectionEnd, move SelectionEnd forward.
+                if (_selectionEnd < value)
+                    _selectionEnd = value;
+
+                // If we've moved SelectionStart too far back from SelectionEnd, move SelectionEnd back.
+                if ((_selectionEnd - value).Days >= _maxSelectionCount)
+                    _selectionEnd = value.AddDays (_maxSelectionCount - 1);
+
+                SetSelRange (value, _selectionEnd);
+            }
+        }
+
+        /// <summary>Gets or sets the end date of the selected range.</summary>
+        public DateTime SelectionEnd {
+            get => _selectionEnd;
+            set {
+                if (_selectionEnd == value)
+                    return;
+
+                                // Against the EFFECTIVE range (1753..9998), as upstream's SelectionEnd is -- unlike its
+                // SelectionStart, SetDate, SetSelectionRange and TodayDate, which use the raw fields.
+                // This used the raw ones, so SelectionEnd = 1200-01-01 was accepted where WinForms
+                // throws (SMP-45).
+                Guard.ThrowIfLessThan (value, MinDate);
+                Guard.ThrowIfGreaterThan (value, MaxDate);
+
+                // If we've moved SelectionEnd before SelectionStart, move SelectionStart back.
+                if (_selectionStart > value)
+                    _selectionStart = value;
+
+                // If we've moved SelectionEnd too far beyond SelectionStart, move SelectionStart forward.
+                if ((value - _selectionStart).Days >= _maxSelectionCount)
+                    _selectionStart = value.AddDays (1 - _maxSelectionCount);
+
+                SetSelRange (_selectionStart, value);
+            }
+        }
+
+        /// <summary>Gets or sets the selected range of dates.</summary>
+        public SelectionRange SelectionRange {
+            get => new SelectionRange (_selectionStart, _selectionEnd);
+            set => SetSelectionRange (value.Start, value.End);
+        }
+
+        /// <summary>Gets or sets the minimum selectable date.</summary>
+        public DateTime MinDate {
+            get => EffectiveMinDate (_minDate);
+            set {
+                if (value == _minDate)
+                    return;
+
+                Guard.ThrowIfGreaterThan (value, EffectiveMaxDate (_maxDate));
+                Guard.ThrowIfLessThan (value, MinimumDateTime);
+
+                _minDate = value;
+                SetRange ();
+            }
+        }
+
+        /// <summary>Gets or sets the maximum selectable date.</summary>
+        public DateTime MaxDate {
+            get => EffectiveMaxDate (_maxDate);
+            set {
+                if (value == _maxDate)
+                    return;
+
+                Guard.ThrowIfLessThan (value, EffectiveMinDate (_minDate));
+
+                _maxDate = value;
+                SetRange ();
+            }
+        }
+
+        /// <summary>Gets or sets the number of months to display at once, as columns by rows.</summary>
+        /// <remarks>The control is resized to fit them, each <see cref="SingleMonthSize"/> with a gap
+        /// between, as upstream's is; and resizing the control changes them, to as many months as fit
+        /// (SMP-46). Setting it goes through <see cref="SetCalendarDimensions(int, int)"/>, as upstream's
+        /// setter does, so the same validation and twelve-month cap apply.</remarks>
+        public Size CalendarDimensions {
+            get => calendar_dimensions;
+            set {
+                if (calendar_dimensions != value)
+                    SetCalendarDimensions (value.Width, value.Height);
+            }
+        }
+
+        private Size calendar_dimensions = new Size (1, 1);
+
+        /// <summary>Gets or sets the maximum number of days that can be selected.</summary>
+        public int MaxSelectionCount {
+            get => _maxSelectionCount;
+            set {
+                Guard.ThrowIfLessThan (value, 1);
+
+                _maxSelectionCount = value;
+            }
+        }
+
+        /// <summary>Gets or sets the first day of the week the grid and its header start on.</summary>
+        public Day FirstDayOfWeek { get; set; } = Day.Default;
+
+        /// <summary>Gets or sets whether a leading week-number column is shown.</summary>
+        /// <remarks>The control grows by the column rather than narrowing the days, as upstream's
+        /// setter calls <c>AdjustSize</c>.</remarks>
+        public bool ShowWeekNumbers {
+            get => show_week_numbers;
+            set {
+                if (show_week_numbers == value)
+                    return;
+
+                show_week_numbers = value;
+                AdjustSize ();
+            }
+        }
+
+        private bool show_week_numbers;
+
+        /// <summary>Gets or sets whether today's date is shown in a strip at the foot.</summary>
+        /// <remarks>The doc comments on this and <see cref="ShowTodayCircle"/> were the wrong way round
+        /// before W5.20c: neither was read by anything, so nothing contradicted them. The control is
+        /// resized for the strip, as upstream's setter calls <c>AdjustSize</c>.</remarks>
+        public bool ShowToday {
+            get => show_today;
+            set {
+                if (show_today == value)
+                    return;
+
+                show_today = value;
+                AdjustSize ();
+            }
+        }
+
+        private bool show_today = true;
+
+        /// <summary>Gets or sets whether today's date is outlined in the grid.</summary>
+        public bool ShowTodayCircle { get; set; } = true;
+
+        private DateTime _todaysDate = DateTime.Now.Date;
+        private bool _todayDateSet;
+
+        /// <summary>Gets or sets today's date.</summary>
+        public DateTime TodayDate {
+            get => _todayDateSet ? _todaysDate : DateTime.Now.Date;
+            set {
+                if (!_todayDateSet || DateTime.Compare (value, _todaysDate) != 0) {
+                    Guard.ThrowIfGreaterThan (value, _maxDate);
+                    Guard.ThrowIfLessThan (value, _minDate);
+
+                    _todaysDate = value.Date;
+                    _todayDateSet = true;
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>Gets whether TodayDate has been set explicitly.</summary>
+        public bool TodayDateSet => _todayDateSet;
+
+        // SMP-44: these three were auto-properties beside the lists Add*/Remove*/IsBoldedDate use, so
+        // an assigned array was neither bolded nor seen by IsBoldedDate, and UpdateBoldedDates then
+        // overwrote it from the (empty) list. Upstream's setters replace the very list the paint code
+        // reads, and the getters copy it out; so do these.
+
+        /// <summary>Gets or sets the dates drawn bold on that day only.</summary>
+        /// <remarks>The getter returns a copy; assigning replaces the set the Add/Remove methods edit.</remarks>
+        public DateTime[] BoldedDates {
+            get => [.. bolded];
+            set => ReplaceBolded (bolded, value);
+        }
+
+        /// <summary>Gets or sets the dates drawn bold every year on that month and day.</summary>
+        /// <remarks>The getter returns a copy; assigning replaces the set the Add/Remove methods edit.</remarks>
+        public DateTime[] AnnuallyBoldedDates {
+            get => [.. annually_bolded];
+            set => ReplaceBolded (annually_bolded, value);
+        }
+
+        /// <summary>Gets or sets the dates drawn bold every month on that day.</summary>
+        /// <remarks>The getter returns a copy; assigning replaces the set the Add/Remove methods edit.</remarks>
+        public DateTime[] MonthlyBoldedDates {
+            get => [.. monthly_bolded];
+            set => ReplaceBolded (monthly_bolded, value);
+        }
+
+        private void ReplaceBolded (List<DateTime> target, DateTime[]? dates)
+        {
+            target.Clear ();
+
+            foreach (var date in dates ?? [])
+                Add (target, date);
+
+            Invalidate ();
+        }
+
+        /// <summary>Gets or sets the title's text and scroll-arrow colour; <c>Color.Empty</c> uses the theme's.</summary>
+        public Color TitleForeColor { get; set; } = Color.Empty;
+
+        /// <summary>Gets or sets the title band's background colour; <c>Color.Empty</c> uses the theme's.</summary>
+        public Color TitleBackColor { get; set; } = Color.Empty;
+
+        /// <summary>Gets or sets the colour of the adjacent months' days; <c>Color.Empty</c> uses the theme's.</summary>
+        public Color TrailingForeColor { get; set; } = Color.Empty;
+
+        /// <summary>Raised when the selected date changes.</summary>
+        public event DateRangeEventHandler? DateChanged;
+
+        /// <summary>Raised when the user finishes selecting a date or range.</summary>
+        /// <remarks>Field-backed as of W5.20c (finding SMP-42, P0). It was declared
+        /// <c>add { } remove { }</c>, so every subscription compiled and was thrown away.</remarks>
+        public event DateRangeEventHandler? DateSelected;
+
+        /// <summary>Raises the <see cref="DateChanged"/> event.</summary>
+        protected virtual void OnDateChanged (DateRangeEventArgs e) => DateChanged?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="DateSelected"/> event.</summary>
+        protected virtual void OnDateSelected (DateRangeEventArgs e) => DateSelected?.Invoke (this, e);
+
+        /// <summary>
+        /// Sets <paramref name="date"/> as the current selected date. The start and end of
+        /// the selection range will both be equal to date.
+        /// </summary>
+        public void SetDate (DateTime date)
+        {
+            Guard.ThrowIfLessThan (date, _minDate);
+            Guard.ThrowIfGreaterThan (date, _maxDate);
+
+            SetSelectionRange (date, date);
+        }
+
+        /// <summary>Sets the selection range to the given dates.</summary>
+        public void SetSelectionRange (DateTime date1, DateTime date2)
+        {
+            Guard.ThrowIfLessThan (date1, _minDate);
+            Guard.ThrowIfGreaterThan (date1, _maxDate);
+            Guard.ThrowIfLessThan (date2, _minDate);
+            Guard.ThrowIfGreaterThan (date2, _maxDate);
+
+            // If date1 > date2, we just select date2 (compat).
+            if (date1 > date2)
+                date2 = date1;
+
+            // If the range exceeds maxSelectionCount, compare with the previous range and adjust
+            // whichever limit hasn't changed.
+            if ((date2 - date1).Days >= _maxSelectionCount) {
+                if (date1.Ticks == _selectionStart.Ticks)
+                    date1 = date2.AddDays (1 - _maxSelectionCount);
+                else
+                    date2 = date1.AddDays (_maxSelectionCount - 1);
+            }
+
+            SetSelRange (date1, date2);
+        }
+
+        // Keeps the current selection within the effective min/max range, then applies it.
+        private void SetRange ()
+        {
+            var minDate = EffectiveMinDate (_minDate);
+            var maxDate = EffectiveMaxDate (_maxDate);
+
+            if (_selectionStart < minDate)
+                _selectionStart = minDate;
+            if (_selectionStart > maxDate)
+                _selectionStart = maxDate;
+            if (_selectionEnd < minDate)
+                _selectionEnd = minDate;
+            if (_selectionEnd > maxDate)
+                _selectionEnd = maxDate;
+
+            SetSelRange (_selectionStart, _selectionEnd);
+        }
+
+        // Applies a new selection range and raises DateChanged if it actually changed.
+        private void SetSelRange (DateTime lower, DateTime upper)
+        {
+            var changed = false;
+
+            if (_selectionStart != lower || _selectionEnd != upper) {
+                changed = true;
+                _selectionStart = lower;
+                _selectionEnd = upper;
+            }
+
+            if (changed) {
+                // A selection the grid is not showing would be invisible, so the view follows it --
+                // the native control scrolls to the date a programmatic SetDate picks, and code that
+                // pre-selects a date on load depends on seeing that month.
+                ScrollInto (lower);
+
+                OnDateChanged (new DateRangeEventArgs (lower, upper));
+                Invalidate ();
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override void OnPaint (PaintEventArgs e)
+        {
+            base.OnPaint (e);
+            RenderManager.Render (this, e);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>One month at the current font, as upstream's <c>DefaultSize</c> is
+        /// <c>GetMinReqRect ()</c>. It was a fixed 220x162.</remarks>
+        protected override Size DefaultSize => MinimumSizeFor (1, 1);
+
+        /// <inheritdoc/>
+        /// <remarks>A new font changes how big a month is, so the control is resized to fit its months
+        /// again, as upstream's <c>OnFontChanged</c> calls <c>AdjustSize</c>.</remarks>
+        protected override void OnFontChanged (EventArgs e)
+        {
+            base.OnFontChanged (e);
+            AdjustSize ();
+        }
+
+        // Auto-scaling must not turn a bigger box into more months: upstream's SetBoundsCore leaves the
+        // dimensions alone while scaling is in progress, and the font change that comes with the scale
+        // re-fits the control.
+        internal override bool IsFixedWidthForScaling => true;
+
+        internal override bool IsFixedHeightForScaling => true;
+
+        /// <summary>
+        /// The default <see cref="ControlStyle"/> for all <see cref="MonthCalendar"/> instances. Gives the type
+        /// its own layer in the style chain so a CSS theme rule (<c>MonthCalendar { ... }</c>) can target it.
+        /// </summary>
+        public new static readonly ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle);
+
+        /// <inheritdoc/>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+    }
+
+    /// <summary>Provides data for the MonthCalendar DateChanged and DateSelected events.</summary>
+    public class DateRangeEventArgs : EventArgs
+    {
+        /// <summary>Initializes a new instance of the DateRangeEventArgs class.</summary>
+        public DateRangeEventArgs (DateTime start, DateTime end)
+        {
+            Start = start;
+            End = end;
+        }
+
+        /// <summary>Gets the first date in the range.</summary>
+        public DateTime Start { get; }
+
+        /// <summary>Gets the last date in the range.</summary>
+        public DateTime End { get; }
+    }
+
+    /// <summary>Represents a range of dates.</summary>
+    public class SelectionRange
+    {
+        /// <summary>Initializes a new instance with the given start and end.</summary>
+        public SelectionRange (DateTime start, DateTime end)
+        {
+            Start = start < end ? start : end;
+            End = start < end ? end : start;
+        }
+
+        /// <summary>Gets or sets the start of the range.</summary>
+        public DateTime Start { get; set; }
+
+        /// <summary>Gets or sets the end of the range.</summary>
+        public DateTime End { get; set; }
+    }
+
+    /// <summary>Specifies the day of the week.</summary>
+    public enum Day
+    {
+        /// <summary>Monday.</summary>
+        Monday,
+        /// <summary>Tuesday.</summary>
+        Tuesday,
+        /// <summary>Wednesday.</summary>
+        Wednesday,
+        /// <summary>Thursday.</summary>
+        Thursday,
+        /// <summary>Friday.</summary>
+        Friday,
+        /// <summary>Saturday.</summary>
+        Saturday,
+        /// <summary>Sunday.</summary>
+        Sunday,
+        /// <summary>The default day (system setting).</summary>
+        Default = 7
+    }
+}

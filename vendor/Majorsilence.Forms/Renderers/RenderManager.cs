@@ -1,0 +1,105 @@
+﻿namespace Majorsilence.Forms.Renderers
+{
+    /// <summary>
+    /// Represents a class to manage rendering.
+    /// </summary>
+    public static class RenderManager
+    {
+        // Read on every paint and changed by the public SetRenderer, so it is replaced as a whole (copy on write)
+        // and never modified once published: readers need no lock, and a SetRenderer on another thread cannot
+        // corrupt an enumeration in progress.
+        private static readonly object renderers_gate = new ();
+        private static volatile Dictionary<Type, Renderer> renderers = [];
+
+        static RenderManager ()
+        {
+            SetRenderer<Button> (new ButtonRenderer ());
+            SetRenderer<CheckBox> (new CheckBoxRenderer ());
+            SetRenderer<ComboBox> (new ComboBoxRenderer ());
+            SetRenderer<DataGridView> (new DataGridViewRenderer ());
+            SetRenderer<FormTitleBar> (new FormTitleBarRenderer ());
+            SetRenderer<Label> (new LabelRenderer ());
+            SetRenderer<LinkLabel> (new LinkLabelRenderer ());
+            SetRenderer<CheckedListBox> (new CheckedListBoxRenderer ());
+            SetRenderer<ListBox> (new ListBoxRenderer ());
+            SetRenderer<ListView> (new ListViewRenderer ());
+            SetRenderer<Menu> (new MenuRenderer ());
+            SetRenderer<MonthCalendar> (new MonthCalendarRenderer ());
+            SetRenderer<MenuDropDown> (new MenuDropDownRenderer ());
+            SetRenderer<NavigationPane> (new NavigationPaneRenderer ());
+            SetRenderer<Panel> (new PanelRenderer ());
+            SetRenderer<PictureBox> (new PictureBoxRenderer ());
+            SetRenderer<PrintPreviewControl> (new PrintPreviewRenderer ());
+            SetRenderer<ProgressBar> (new ProgressBarRenderer ());
+            SetRenderer<PropertyGrid> (new PropertyGridRenderer ());
+            SetRenderer<RadioButton> (new RadioButtonRenderer ());
+            SetRenderer<Ribbon> (new RibbonRenderer ());
+            SetRenderer<ScrollableControl> (new ScrollableControlRenderer ());
+            SetRenderer<ScrollBar> (new ScrollBarRenderer ());
+            SetRenderer<SplitContainer> (new SplitContainerRenderer ());
+            SetRenderer<Splitter> (new SplitterRenderer ());
+            SetRenderer<StatusBar> (new StatusBarRenderer ());
+            SetRenderer<StatusStrip> (new StatusStripRenderer ());
+            SetRenderer<GroupBox> (new GroupBoxRenderer ());
+            SetRenderer<NumericUpDown> (new NumericUpDownRenderer ());
+            SetRenderer<TabControl> (new TabControlRenderer ());
+            SetRenderer<TabStrip> (new TabStripRenderer ());
+            SetRenderer<TextBox> (new TextBoxRenderer ());
+            SetRenderer<ToolBar> (new ToolBarRenderer ());
+            SetRenderer<TrackBar> (new TrackBarRenderer ());
+            SetRenderer<TreeView> (new TreeViewRenderer ());
+        }
+
+        /// <summary>
+        /// Gets a renderer of the requested type.
+        /// </summary>
+        public static T? GetRenderer<T> () where T : Renderer
+        {
+            return renderers.Values.OfType<T> ().FirstOrDefault ();
+        }
+
+        /// <summary>
+        /// Gets a renderer for the requested control.
+        /// </summary>
+        public static T? GetRenderer<T> (Control control) where T : Renderer
+        {
+            var type = (Type?)control.GetType ();
+
+            while (type != null && type != typeof (object)) {
+                if (renderers.TryGetValue (type, out var renderer)) {
+                    return renderer as T;
+                }
+
+                type = type.BaseType;
+            }
+
+            throw new InvalidOperationException ($"No renderer found for type {typeof (T).FullName}");
+        }
+
+        /// <summary>
+        /// Renders the specified control.
+        /// </summary>
+        public static void Render<T> (T control, PaintEventArgs e) where T : Control
+        {
+            var renderer = GetRenderer<Renderer> (control);
+
+            // Renderers lay out in device pixels; this runs from inside an OnPaint override, where the
+            // canvas is in logical units for application code (EVT-37).
+            using var device = e.DeviceSpace ();
+            renderer?.Render (control, e);
+        }
+
+        /// <summary>
+        /// Registers a renderer for a control class.
+        /// </summary>
+        public static void SetRenderer<T> (Renderer renderer) where T : Control
+        {
+            if (renderer.Type != typeof (T))
+                throw new InvalidOperationException ($"Invalid renderer for type {typeof (T).FullName}");
+
+            lock (renderers_gate) {
+                renderers = new Dictionary<Type, Renderer> (renderers) { [typeof (T)] = renderer };
+            }
+        }
+    }
+}

@@ -1,0 +1,4315 @@
+﻿using System.Collections;
+using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
+using System.Reflection;
+using Majorsilence.Forms.Renderers;
+
+namespace Majorsilence.Forms
+{
+    /// <summary>
+    /// Represents a DataGridView control for displaying tabular data.
+    /// </summary>
+    public partial class DataGridView : Control, System.ComponentModel.ISupportInitialize
+    {
+        private int header_height = 23;
+        private int row_headers_width = 41;
+        private bool row_headers_visible = true;
+        private int top_index;
+        private int horizontal_scroll_offset;
+        private int selected_row_index = -1;
+        private int selected_column_index = -1;
+        private int hovered_row_index = -1;
+        private int resize_column_index = -1;
+        private int resize_row_index = -1;
+        private int resize_start_x;
+        private int resize_start_y;
+        private int resize_start_width;
+        private int resize_start_height;
+        private bool is_resizing_column;
+        private bool is_resizing_row;
+        private bool column_headers_visible = true;
+        private DataGridViewSelectionMode selection_mode = DataGridViewSelectionMode.RowHeaderSelect;
+        private bool read_only;
+        private IList? data_source;
+        // The hosted editor. A Control, not a TextBox, since DGV-26: a combo-box column edits in a combo
+        // box. edit_textbox is the text-box view of it, for the paths that are genuinely text-only.
+        private Control? edit_control;
+
+        private TextBox? edit_textbox => edit_control as TextBox;
+        private int editing_row_index = -1;
+        private int editing_column_index = -1;
+
+        // VScrollBar/HScrollBar, not the VerticalScrollBar/HorizontalScrollBar bases, because these are
+        // PUBLIC children (see the Controls.Add calls in the constructor) and WinForms' DataGridView uses
+        // exactly these types -- code that scans a grid's Controls for its scrollbars does so by type, and
+        // an exact-type comparison against VScrollBar does not match a VerticalScrollBar.
+        private readonly VScrollBar vscrollbar;
+        private readonly HScrollBar hscrollbar;
+
+        /// <summary>
+        /// Initializes a new instance of the DataGridView class.
+        /// </summary>
+        public DataGridView ()
+        {
+            Columns = new DataGridViewColumnCollection (this);
+            Rows = new DataGridViewRowCollection (this);
+
+            vscrollbar = new VScrollBar {
+                Minimum = 0,
+                Maximum = 0,
+                SmallChange = 1,
+                LargeChange = 1,
+                Visible = false,
+                Dock = DockStyle.Right
+            };
+
+            // The bar announces a user scroll before it moves; the grid announces its own scroll after
+            // the view has moved, carrying that gesture's type (see RaiseGridScroll).
+            vscrollbar.Scroll += (o, e) => pending_scroll_type = e.Type;
+            vscrollbar.ValueChanged += (o, e) => {
+                var old_top = top_index;
+                top_index = Math.Max (vscrollbar.Value, 0);
+                UpdateEditTextBoxPosition ();
+                Invalidate ();
+                RaiseGridScroll (old_top, top_index, ScrollOrientation.VerticalScroll);
+            };
+
+            hscrollbar = new HScrollBar {
+                Minimum = 0,
+                Maximum = 0,
+                SmallChange = 10,
+                LargeChange = 50,
+                Visible = false,
+                Dock = DockStyle.Bottom
+            };
+
+            hscrollbar.Scroll += (o, e) => pending_scroll_type = e.Type;
+            hscrollbar.ValueChanged += (o, e) => {
+                var old_offset = horizontal_scroll_offset;
+                horizontal_scroll_offset = Math.Max (hscrollbar.Value, 0);
+                UpdateEditTextBoxPosition ();
+                Invalidate ();
+                RaiseGridScroll (old_offset, horizontal_scroll_offset, ScrollOrientation.HorizontalScroll);
+            };
+
+            // ORDINARY children, not implicit chrome. WinForms' DataGridView adds its scrollbars to
+            // Controls, and real code relies on that -- a themed control library scans `grid.Controls`
+            // for them to mirror their state onto its own skinned scrollbars, and found nothing here
+            // because implicit controls are invisible to the public collection.
+            //
+            // Note this is deliberately NOT a blanket change: ScrollableControl keeps its own scrollbars
+            // implicit, because in WinForms `new Panel ().Controls` is empty too. Only the controls that
+            // WinForms itself exposes internals for expose them here.
+            Controls.Add (vscrollbar);
+            Controls.Add (hscrollbar);
+
+            // Seed the per-edge border styles from the coarse CellBorderStyle default (Single), then
+            // repaint whenever an edge is hand-edited (which, as in WinForms, makes the coarse property
+            // report Custom).
+            ApplyCellBorderStyle (cell_border_style);
+            advanced_column_headers_border_style.All (DataGridViewAdvancedCellBorderStyle.Single);
+            advanced_row_headers_border_style.All (DataGridViewAdvancedCellBorderStyle.Single);
+
+            advanced_cell_border_style.Changed += (o, e) => {
+                if (!applying_cell_border_style)
+                    cell_border_style = DataGridViewCellBorderStyle.Custom;
+
+                Invalidate ();
+            };
+
+            advanced_column_headers_border_style.Changed += (o, e) => Invalidate ();
+            advanced_row_headers_border_style.Changed += (o, e) => Invalidate ();
+        }
+
+        /// <summary>
+        /// Begins editing the specified cell.
+        /// </summary>
+        public void BeginEdit (int rowIndex, int columnIndex)
+        {
+            if (read_only || rowIndex < 0 || rowIndex >= RowCountWithNewRow || columnIndex < 0 || columnIndex >= Columns.Count)
+                return;
+
+            // The column, the row and the cell each get a veto, not just the grid (DGV-07). A read-only
+            // column is in every LOB grid, and without this it edited and wrote back to the bound object.
+            if (!IsCellEditable (rowIndex, columnIndex))
+                return;
+
+            // End any current edit
+            EndEdit ();
+
+            editing_row_index = rowIndex;
+            editing_column_index = columnIndex;
+
+            var cell_bounds = GetCellBounds (rowIndex, columnIndex);
+
+            if (cell_bounds.IsEmpty)
+                return;
+
+            var cell_value = columnIndex < Rows[rowIndex].Cells.Count
+                ? Rows[rowIndex].Cells[columnIndex].Value?.ToString () ?? string.Empty
+                : string.Empty;
+
+            // A bound list that forbids editing forbids it here too (IBindingList.AllowEdit; a
+            // BindingSource's AllowEdit is that flag) -- W6.2 sweep.
+            if (bound_list is { AllowEdit: false })
+                return;
+
+            // Raise CellBeginEdit event
+            var begin_args = new DataGridViewCellCancelEventArgs (columnIndex, rowIndex);
+            OnCellBeginEdit (begin_args);
+
+            if (begin_args.Cancel)
+                return;
+
+            // The editor the COLUMN wants: a combo-box column edits in a combo box bound to the same
+            // list its display text is looked up in, so the user picks from what they were reading
+            // (DGV-26). Everything else edits in a text box, as before.
+            var editor = CreateEditorFor (columnIndex < Columns.Count ? Columns[columnIndex] : null,
+                Rows[rowIndex].Cells[columnIndex], cell_value);
+
+            // GetCellBounds returns device pixel coordinates; child control bounds are
+            // in logical units, so convert before positioning the editor.
+            editor.Left = DeviceToLogicalUnits (cell_bounds.Left) + 1;
+            editor.Top = DeviceToLogicalUnits (cell_bounds.Top) + 1;
+            editor.Width = DeviceToLogicalUnits (cell_bounds.Width) - 2;
+            editor.Height = DeviceToLogicalUnits (cell_bounds.Height) - 2;
+
+            edit_control = editor;
+            editor.Style.Border.Width = 0;
+
+            // The CELL seeds its editor (W6 mechanisms): InitializeEditingControl is the override
+            // point a custom cell type uses, so it has to be called for the base's seeding to matter.
+            Rows[rowIndex].Cells[columnIndex].InitializeEditingControl (rowIndex, cell_value, Rows[rowIndex].Cells[columnIndex].InheritedStyle);
+
+            editor.KeyDown += EditTextBox_KeyDown;
+            editor.LostFocus += EditTextBox_LostFocus;
+            editor.TextChanged += EditTextBox_TextChanged;
+
+            // An edit begins CLEAN. IsCurrentCellDirty used to be "an editor exists", so it reported
+            // true right here, before the user had touched anything (DGV-08).
+            SetCurrentCellDirty (false);
+
+            Controls.Add (editor);
+
+            // Everything from here can re-enter and tear the edit down again, so work through the local
+            // and re-check the field after each step rather than dereferencing it.
+            //
+            // Two ways in. A handler of the event below may call EndEdit itself -- that is allowed. And
+            // Select () moves focus, which deselects whatever held it; if that raises LostFocus back into
+            // this grid, EditTextBox_LostFocus calls EndEdit, which disposes the editor and nulls the
+            // field. Reading edit_textbox afterwards then threw a NullReferenceException out of a
+            // double-click, killing the application.
+
+            // Let handlers customise/inspect the editing control before it is shown (WinForms).
+            OnEditingControlShowing (new DataGridViewEditingControlShowingEventArgs (editor,
+                Rows[rowIndex].Cells[columnIndex].InheritedStyle));
+
+            if (!ReferenceEquals (edit_control, editor))
+                return;
+
+            editor.Select ();
+
+            if (!ReferenceEquals (edit_control, editor))
+                return;
+
+            PrepareEditorForEdit (editor, selectAll: true);
+        }
+
+        // The editor's own PrepareEditingControlForEdit, which is the WinForms entry point (W6
+        // mechanisms); a plain text box that is not an editing control still gets its text selected.
+        private static void PrepareEditorForEdit (Control editor, bool selectAll)
+        {
+            switch (editor) {
+            case DataGridViewTextBoxEditingControl text:
+                text.PrepareEditingControlForEdit (selectAll);
+                break;
+            case DataGridViewComboBoxEditingControl combo:
+                combo.PrepareEditingControlForEdit (selectAll);
+                break;
+            case TextBox box:
+                if (selectAll)
+                    box.SelectAll ();
+                break;
+            }
+        }
+
+        // The cell releases its editor before the grid disposes it (W6 mechanisms).
+        private void DetachEditorThroughCell ()
+        {
+            if (editing_row_index < 0 || editing_row_index >= Rows.Count)
+                return;
+
+            var row = Rows[editing_row_index];
+
+            if (editing_column_index >= 0 && editing_column_index < row.Cells.Count)
+                row.Cells[editing_column_index].DetachEditingControl ();
+        }
+
+        /// <summary>
+        /// Raised when a cell begins editing.
+        /// </summary>
+        /// <summary>Raised when a cell is clicked.</summary>
+        public event DataGridViewCellEventHandler? CellClick;
+
+        // Raised from OnMouseUp via OnCellClick -- see DataGridView.MouseEvents.cs.
+
+        /// <summary>Raised when the current cell moves off a cell. Mirrors WinForms DataGridView.CellLeave.</summary>
+        public event DataGridViewCellEventHandler? CellLeave;
+
+        /// <summary>Raises the <see cref="CellLeave"/> event.</summary>
+        protected virtual void OnCellLeave (DataGridViewCellEventArgs e) => CellLeave?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="CurrentCellChanged"/> event.</summary>
+        protected virtual void OnCurrentCellChanged (EventArgs e) => _currentCellChanged?.Invoke (this, e);
+
+        /// <summary>Raised when a cell's tooltip text is needed.</summary>
+        public event EventHandler<DataGridViewCellToolTipTextNeededEventArgs>? CellToolTipTextNeeded;
+
+        /// <summary>Raised when a cell begins editing. Args typed DataGridViewCellCancelEventArgs to match System.Windows.Forms.</summary>
+        public event EventHandler<DataGridViewCellCancelEventArgs>? CellBeginEdit;
+
+        /// <summary>Raised when a cell ends editing.</summary>
+        public event DataGridViewCellEventHandler? CellEndEdit;
+
+        /// <summary>Raised when a cell value has changed.</summary>
+        public event DataGridViewCellEventHandler? CellValueChanged;
+
+        /// <summary>Raised when the <see cref="DataSource"/> changes. WinForms compatibility.</summary>
+        public event EventHandler? DataSourceChanged;
+
+        private EventHandler<DataGridViewCellFormattingEventArgs>? _cellFormatting;
+        /// <summary>Raised when a cell is being formatted for display.</summary>
+        public event EventHandler<DataGridViewCellFormattingEventArgs>? CellFormatting { add => _cellFormatting += value; remove => _cellFormatting -= value; }
+
+        private DataGridViewRowsAddedEventHandler? _rowsAdded;
+        /// <summary>Raised when a row is added.</summary>
+        public event DataGridViewRowsAddedEventHandler? RowsAdded { add => _rowsAdded += value; remove => _rowsAdded -= value; }
+
+        private DataGridViewRowsRemovedEventHandler? _rowsRemoved;
+        /// <summary>Raised when rows are removed.</summary>
+        public event DataGridViewRowsRemovedEventHandler? RowsRemoved { add => _rowsRemoved += value; remove => _rowsRemoved -= value; }
+
+        private DataGridViewRowCancelEventHandler? _userDeletingRow;
+        /// <summary>Raised when the user is about to delete a row.</summary>
+        public event DataGridViewRowCancelEventHandler? UserDeletingRow { add => _userDeletingRow += value; remove => _userDeletingRow -= value; }
+
+        private DataGridViewRowEventHandler? _userDeletedRow;
+        /// <summary>Raised after the user has deleted a row.</summary>
+        public event DataGridViewRowEventHandler? UserDeletedRow { add => _userDeletedRow += value; remove => _userDeletedRow -= value; }
+
+        private EventHandler<DataGridViewDataErrorEventArgs>? _dataError;
+        /// <summary>Raised when a data error occurs (e.g., binding failure).</summary>
+        public event EventHandler<DataGridViewDataErrorEventArgs>? DataError { add => _dataError += value; remove => _dataError -= value; }
+
+        /// <summary>Raised when a data-binding operation has finished: after a bind, and after every
+        /// change the bound list reports, with that change's <see cref="System.ComponentModel.ListChangedType"/>.</summary>
+        /// <remarks>Typed as upstream's <see cref="DataGridViewBindingCompleteEventHandler"/>: it was an
+        /// <c>EventHandler&lt;EventArgs&gt;</c>, so the designer-generated
+        /// <c>grid_DataBindingComplete (object, DataGridViewBindingCompleteEventArgs)</c> did not compile (DGV-04).</remarks>
+        public event DataGridViewBindingCompleteEventHandler? DataBindingComplete;
+
+        /// <summary>Raises the <see cref="DataBindingComplete"/> event.</summary>
+        protected virtual void OnDataBindingComplete (DataGridViewBindingCompleteEventArgs e) => DataBindingComplete?.Invoke (this, e);
+
+        // Upstream raises it only while a data connection exists, so an unbound grid -- DataSource set
+        // back to null, or a DataMember set with nothing to follow -- reports no binding.
+        private void RaiseDataBindingComplete (System.ComponentModel.ListChangedType listChangedType)
+        {
+            if (data_source is null)
+                return;
+
+            OnDataBindingComplete (new DataGridViewBindingCompleteEventArgs (listChangedType));
+        }
+
+        private EventHandler? _currentCellChanged;
+        /// <summary>Raised when the current cell changes.</summary>
+        public event EventHandler? CurrentCellChanged { add => _currentCellChanged += value; remove => _currentCellChanged -= value; }
+
+        /// <summary>Raised in <see cref="VirtualMode"/> when <see cref="IsCurrentRowDirty"/> is read, so the
+        /// application -- which holds the data -- can answer whether the current row has uncommitted changes.</summary>
+        /// <remarks>Typed as upstream's <see cref="QuestionEventHandler"/>, and raised from the getter as upstream
+        /// does (<c>DataGridView.cs</c>, IsCurrentRowDirty). It was an <c>EventHandler</c> nothing raised (DGV-38).</remarks>
+        public event QuestionEventHandler? RowDirtyStateNeeded;
+
+        /// <summary>Raises the <see cref="RowDirtyStateNeeded"/> event.</summary>
+        protected virtual void OnRowDirtyStateNeeded (QuestionEventArgs e) => RowDirtyStateNeeded?.Invoke (this, e);
+
+        /// <summary>Raised when a cell is double-clicked.</summary>
+        public event DataGridViewCellEventHandler? CellDoubleClick;
+
+        /// <summary>Raised on a mouse click in a cell.</summary>
+        public event DataGridViewCellMouseEventHandler? CellMouseClick;
+
+
+
+
+
+        /// <summary>Raised when the mouse enters a cell.</summary>
+        public event DataGridViewCellEventHandler? CellMouseEnter;
+
+        /// <summary>Raised when the mouse leaves a cell.</summary>
+        public event DataGridViewCellEventHandler? CellMouseLeave;
+
+        /// <summary>Raised when a cell is validating its content.</summary>
+        public event EventHandler<DataGridViewCellValidatingEventArgs>? CellValidating;
+
+        /// <summary>Raised after a cell has been validated.</summary>
+        public event DataGridViewCellEventHandler? CellValidated;
+
+        private EventHandler<DataGridViewRowPrePaintEventArgs>? _rowPrePaint;
+        /// <summary>
+        /// Raised by the renderer before a row's background, header and cells are drawn. A handler can
+        /// draw its own row content and set <see cref="DataGridViewRowPrePaintEventArgs.Handled"/> to
+        /// suppress the grid's default painting for that row.
+        /// </summary>
+        public event EventHandler<DataGridViewRowPrePaintEventArgs>? RowPrePaint { add => _rowPrePaint += value; remove => _rowPrePaint -= value; }
+
+        /// <summary>Raised by the renderer after a row has been painted.</summary>
+        public event EventHandler<DataGridViewRowPostPaintEventArgs>? RowPostPaint;
+
+        private EventHandler<DataGridViewCellCancelEventArgs>? _rowValidating;
+        /// <summary>
+        /// Raised when the current row is about to be left (row commit). A handler can set
+        /// <see cref="System.ComponentModel.CancelEventArgs.Cancel"/> to keep the current row current.
+        /// </summary>
+        public event EventHandler<DataGridViewCellCancelEventArgs>? RowValidating { add => _rowValidating += value; remove => _rowValidating -= value; }
+
+        private DataGridViewCellEventHandler? _rowValidated;
+        /// <summary>Raised after a row has been validated (i.e. <see cref="RowValidating"/> was not cancelled).</summary>
+        public event DataGridViewCellEventHandler? RowValidated { add => _rowValidated += value; remove => _rowValidated -= value; }
+
+        /// <summary>Raised to supply default values for the new row.</summary>
+        /// <remarks>Real as of W6 mechanisms: raised when the current cell enters the new row, with the
+        /// placeholder as <see cref="DataGridViewRowEventArgs.Row"/>; values a handler puts in its cells
+        /// are shown and are committed with the row.</remarks>
+        public event DataGridViewRowEventHandler? DefaultValuesNeeded;
+
+        /// <summary>Raises the <see cref="DefaultValuesNeeded"/> event.</summary>
+        protected virtual void OnDefaultValuesNeeded (DataGridViewRowEventArgs e) => DefaultValuesNeeded?.Invoke (this, e);
+
+        // Real handler storage rather than `{ add { } remove { } }`, which discarded the handler: the
+        // event looked wired up and nothing could ever be called, so neither a subscriber nor an
+        // override of the On* hooks below was reachable.
+        private DataGridViewColumnEventHandler? _columnAdded;
+        private EventHandler<DataGridViewColumnEventArgs>? _columnRemoved;
+
+        /// <summary>Raised when a column is added to the grid.</summary>
+        public event DataGridViewColumnEventHandler? ColumnAdded {
+            add => _columnAdded += value;
+            remove => _columnAdded -= value;
+        }
+
+        /// <summary>Raised when a column is removed from the grid.</summary>
+        public event EventHandler<DataGridViewColumnEventArgs>? ColumnRemoved {
+            add => _columnRemoved += value;
+            remove => _columnRemoved -= value;
+        }
+
+        /// <summary>Raises the <see cref="ColumnAdded"/> event.</summary>
+        /// <remarks>
+        /// Grids that decorate their own columns override this -- AdvancedDataGridView swaps in a
+        /// filtering header cell here -- so the collection routes through it rather than raising the
+        /// event directly.
+        /// </remarks>
+        protected virtual void OnColumnAdded (DataGridViewColumnEventArgs e) => _columnAdded?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="ColumnRemoved"/> event.</summary>
+        protected virtual void OnColumnRemoved (DataGridViewColumnEventArgs e) => _columnRemoved?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="RowsAdded"/> event.</summary>
+        protected virtual void OnRowsAdded (DataGridViewRowsAddedEventArgs e) => _rowsAdded?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="RowsRemoved"/> event.</summary>
+        protected virtual void OnRowsRemoved (DataGridViewRowsRemovedEventArgs e) => _rowsRemoved?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="DataSourceChanged"/> event.</summary>
+        /// <remarks>
+        /// Overload of the private parameterless OnDataSourceChanged, which rebuilds rows and columns
+        /// from the binding source. This one is the WinForms-shaped hook that derived grids override.
+        /// </remarks>
+        protected virtual void OnDataSourceChanged (EventArgs e) => DataSourceChanged?.Invoke (this, e);
+
+        // Called by the column/row collections, which cannot reach the protected hooks directly.
+        internal void RaiseColumnAdded (DataGridViewColumn column) => OnColumnAdded (new DataGridViewColumnEventArgs (column));
+        internal void RaiseColumnRemoved (DataGridViewColumn column) => OnColumnRemoved (new DataGridViewColumnEventArgs (column));
+        internal void RaiseRowsAdded (int rowIndex, int rowCount) => OnRowsAdded (new DataGridViewRowsAddedEventArgs (rowIndex, rowCount));
+        internal void RaiseRowsRemoved (int rowIndex, int rowCount) => OnRowsRemoved (new DataGridViewRowsRemovedEventArgs (rowIndex, rowCount));
+
+        /// <summary>Raises the <see cref="ColumnWidthChanged"/> event.</summary>
+        protected virtual void OnColumnWidthChanged (DataGridViewColumnEventArgs e) => ColumnWidthChanged?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="RowHeightChanged"/> event.</summary>
+        protected virtual void OnRowHeightChanged (DataGridViewRowEventArgs e) => RowHeightChanged?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="ColumnSortModeChanged"/> event.</summary>
+        protected virtual void OnColumnSortModeChanged (DataGridViewColumnEventArgs e) => ColumnSortModeChanged?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="ColumnHeadersHeightChanged"/> event.</summary>
+        protected virtual void OnColumnHeadersHeightChanged (EventArgs e) => ColumnHeadersHeightChanged?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="RowHeadersWidthChanged"/> event.</summary>
+        protected virtual void OnRowHeadersWidthChanged (EventArgs e) => RowHeadersWidthChanged?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="AutoSizeColumnModeChanged"/> event.</summary>
+        protected virtual void OnAutoSizeColumnModeChanged (DataGridViewAutoSizeColumnModeEventArgs e) => AutoSizeColumnModeChanged?.Invoke (this, e);
+
+        // Called by DataGridViewColumn/DataGridViewRow, which cannot reach the protected hooks directly.
+        internal void RaiseColumnWidthChanged (DataGridViewColumn column) => OnColumnWidthChanged (new DataGridViewColumnEventArgs (column));
+        internal void RaiseRowHeightChanged (DataGridViewRow row) => OnRowHeightChanged (new DataGridViewRowEventArgs (row));
+        internal void RaiseColumnSortModeChanged (DataGridViewColumn column) => OnColumnSortModeChanged (new DataGridViewColumnEventArgs (column));
+        internal void RaiseAutoSizeColumnModeChanged (DataGridViewColumn column, DataGridViewAutoSizeColumnMode previousMode) => OnAutoSizeColumnModeChanged (new DataGridViewAutoSizeColumnModeEventArgs (column, previousMode));
+
+
+        private DataGridViewCellEventHandler? _rowEnter;
+        /// <summary>Raised when a row becomes the current row.</summary>
+        public event DataGridViewCellEventHandler? RowEnter { add => _rowEnter += value; remove => _rowEnter -= value; }
+
+        private DataGridViewCellEventHandler? _rowLeave;
+        /// <summary>Raised when a row stops being the current row.</summary>
+        public event DataGridViewCellEventHandler? RowLeave { add => _rowLeave += value; remove => _rowLeave -= value; }
+
+        /// <summary>Raised when a cell's content is clicked.</summary>
+        public event DataGridViewCellEventHandler? CellContentClick;
+
+
+        private EventHandler<DataGridViewCellPaintingEventArgs>? _cellPainting;
+        /// <summary>
+        /// Raised by the renderer for each data cell before it is drawn. A handler can paint the cell
+        /// itself (optionally calling <see cref="DataGridViewCellPaintingEventArgs.PaintBackground"/> /
+        /// <see cref="DataGridViewCellPaintingEventArgs.PaintContent"/> for the parts it does not draw)
+        /// and set <see cref="DataGridViewCellPaintingEventArgs.Handled"/> to suppress default painting.
+        /// </summary>
+        public event EventHandler<DataGridViewCellPaintingEventArgs>? CellPainting { add => _cellPainting += value; remove => _cellPainting -= value; }
+
+        private EventHandler<DataGridViewCellParsingEventArgs>? _cellParsing;
+        /// <summary>
+        /// Raised when an edit is committed, before the edited text is stored. A handler can convert the
+        /// text to a typed value and set <see cref="DataGridViewCellParsingEventArgs.ParsingApplied"/>
+        /// to have the grid store that value verbatim.
+        /// </summary>
+        public event EventHandler<DataGridViewCellParsingEventArgs>? CellParsing { add => _cellParsing += value; remove => _cellParsing -= value; }
+
+        /// <summary>Raised when the state of a row changes.</summary>
+        public event DataGridViewRowStateChangedEventHandler? RowStateChanged;
+
+        /// <summary>Raises <see cref="RowStateChanged"/>.</summary>
+        protected virtual void OnRowStateChanged (int rowIndex, DataGridViewRowStateChangedEventArgs e) => RowStateChanged?.Invoke (this, e);
+
+        /// <summary>Raised when the state of a cell changes. Stub in Majorsilence.Forms.</summary>
+        public event EventHandler<DataGridViewCellStateChangedEventArgs>? CellStateChanged;
+
+        /// <summary>Raises <see cref="CellStateChanged"/>.</summary>
+        protected virtual void OnCellStateChanged (DataGridViewCellStateChangedEventArgs e) => CellStateChanged?.Invoke (this, e);
+
+        /// <summary>Raised when a cell enters editing mode and the editing control is about to be shown. Stub in Majorsilence.Forms.</summary>
+        public event DataGridViewEditingControlShowingEventHandler? EditingControlShowing;
+
+        /// <summary>Raised when a column header cell is clicked.</summary>
+        public event DataGridViewCellMouseEventHandler? ColumnHeaderMouseClick;
+
+
+        /// <summary>Raised when the width of a column changes.</summary>
+        public event EventHandler<DataGridViewColumnEventArgs>? ColumnWidthChanged;
+
+        /// <summary>Raised in virtual mode when the current cell enters the new row.</summary>
+        /// <remarks>Real as of W6 mechanisms; raised before <see cref="DefaultValuesNeeded"/>, as upstream.</remarks>
+        public event DataGridViewRowEventHandler? NewRowNeeded;
+
+        /// <summary>Raises the <see cref="NewRowNeeded"/> event.</summary>
+        protected virtual void OnNewRowNeeded (DataGridViewRowEventArgs e) => NewRowNeeded?.Invoke (this, e);
+
+        /// <summary>Raised when the height of a row changes.</summary>
+        public event DataGridViewRowEventHandler? RowHeightChanged;
+
+
+        /// <summary>Raised when a commit in the new row has made it a real row.</summary>
+        /// <remarks>Real as of W6 mechanisms: raised after the value is stored and <c>CellValueChanged</c>
+        /// has fired, with the promoted row; a fresh placeholder follows it.</remarks>
+        public event DataGridViewRowEventHandler? UserAddedRow;
+
+        /// <summary>Raises the <see cref="UserAddedRow"/> event.</summary>
+        protected virtual void OnUserAddedRow (DataGridViewRowEventArgs e) => UserAddedRow?.Invoke (this, e);
+
+        /// <summary>Raised when a column's <see cref="DataGridViewColumn.SortMode"/> changes.</summary>
+        public event EventHandler<DataGridViewColumnEventArgs>? ColumnSortModeChanged;
+
+        /// <summary>Raised when a column's display index changes.</summary>
+        /// <remarks>Real as of W6 mechanisms: raised for every column whose
+        /// <see cref="DataGridViewColumn.DisplayIndex"/> moved, after a set or a removal renumbered them.</remarks>
+        public event EventHandler<DataGridViewColumnEventArgs>? ColumnDisplayIndexChanged;
+
+        /// <summary>Raises the <see cref="ColumnDisplayIndexChanged"/> event.</summary>
+        protected virtual void OnColumnDisplayIndexChanged (DataGridViewColumnEventArgs e) => ColumnDisplayIndexChanged?.Invoke (this, e);
+
+        // ── column display order (W6 mechanisms) ──────────────────────────────────────────────
+        // The collection is the data order; DisplayOrder is what the header, the cells, the keyboard
+        // and the clipboard walk. Geometry needs only "the columns displayed before this one", which
+        // is where GetColumnDeviceLeft reads it.
+
+        /// <summary>The column indices in display order: by <see cref="DataGridViewColumn.DisplayIndex"/>, ties by index.</summary>
+        internal List<int> DisplayOrder
+            => Enumerable.Range (0, Columns.Count).OrderBy (i => Columns[i].DisplayIndex).ThenBy (i => i).ToList ();
+
+        /// <summary>Where a column sits in the display order.</summary>
+        internal int DisplayPositionOf (int columnIndex) => DisplayOrder.IndexOf (columnIndex);
+
+        internal void SetColumnDisplayIndex (DataGridViewColumn column, int displayIndex)
+        {
+            var order = DisplayOrder.Select (i => Columns[i]).ToList ();
+
+            if (!order.Remove (column))
+                return;
+
+            order.Insert (Math.Max (0, Math.Min (displayIndex, order.Count)), column);
+
+            // Frozen columns hold the leading display positions, as upstream requires: a display index
+            // that would put a frozen column after a scrolling one, or a scrolling one before a frozen
+            // one, is refused rather than silently producing a layout the grid cannot draw (W6
+            // mechanisms -- the rule was recorded as missing when DisplayIndex was wired).
+            if (!IsValidFrozenOrder (order))
+                throw new InvalidOperationException (
+                    "A frozen column cannot be displayed after a column that is not frozen, and a column that is not frozen cannot be displayed before a frozen one.");
+
+            RenumberDisplayOrder (order);
+        }
+
+        // True when every frozen column comes before every scrolling one.
+        private static bool IsValidFrozenOrder (List<DataGridViewColumn> order)
+        {
+            var seen_scrolling = false;
+
+            foreach (var column in order) {
+                if (!column.Frozen) {
+                    seen_scrolling = true;
+                    continue;
+                }
+
+                if (seen_scrolling)
+                    return false;
+            }
+
+            return true;
+        }
+
+        // Every column gets its dense position; the ones that moved are announced.
+        internal void RenumberDisplayOrder (List<DataGridViewColumn>? order = null)
+        {
+            order ??= DisplayOrder.Select (i => Columns[i]).ToList ();
+
+            var moved = new List<DataGridViewColumn> ();
+
+            for (var i = 0; i < order.Count; i++) {
+                if (order[i].DisplayIndex != i)
+                    moved.Add (order[i]);
+
+                order[i].SetDisplayIndexInternal (i);
+            }
+
+            foreach (var column in moved)
+                OnColumnDisplayIndexChanged (new DataGridViewColumnEventArgs (column));
+
+            if (moved.Count > 0)
+                Invalidate ();
+        }
+
+        /// <summary>Raised when the column header height changes.</summary>
+        public event EventHandler? ColumnHeadersHeightChanged;
+
+        /// <summary>Raised when the row header width changes.</summary>
+        public event EventHandler? RowHeadersWidthChanged;
+
+        /// <summary>Raised when a column's <see cref="DataGridViewColumn.AutoSizeMode"/> changes.</summary>
+        public event EventHandler<DataGridViewAutoSizeColumnModeEventArgs>? AutoSizeColumnModeChanged;
+
+        /// <summary>Raised in virtual mode to retrieve the value for a cell.</summary>
+        /// <remarks>Real as of W6 mechanisms: an unbound grid with <see cref="VirtualMode"/> set asks
+        /// this on every read of <see cref="DataGridViewCell.Value"/> (and so of the painted text).</remarks>
+        public event EventHandler<DataGridViewCellValueEventArgs>? CellValueNeeded;
+
+        /// <summary>Raised in virtual mode to push a new cell value back to the data source.</summary>
+        /// <remarks>Real as of W6 mechanisms: an unbound grid with <see cref="VirtualMode"/> set reports a
+        /// write to <see cref="DataGridViewCell.Value"/> -- a commit from the editor included -- here
+        /// instead of storing it.</remarks>
+        public event EventHandler<DataGridViewCellValueEventArgs>? CellValuePushed;
+
+        /// <summary>Raises the <see cref="CellValueNeeded"/> event.</summary>
+        protected virtual void OnCellValueNeeded (DataGridViewCellValueEventArgs e) => CellValueNeeded?.Invoke (this, e);
+
+        /// <summary>Raises the <see cref="CellValuePushed"/> event.</summary>
+        protected virtual void OnCellValuePushed (DataGridViewCellValueEventArgs e) => CellValuePushed?.Invoke (this, e);
+
+
+        /// <summary>
+        /// Gets or sets whether column headers are visible.
+        /// </summary>
+        public bool ColumnHeadersVisible {
+            get => column_headers_visible;
+            set {
+                if (column_headers_visible != value) {
+                    column_headers_visible = value;
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the collection of columns in the DataGridView.
+        /// </summary>
+        public DataGridViewColumnCollection Columns { get; }
+
+        /// <summary>
+        /// Gets or sets how column widths are automatically adjusted.
+        /// </summary>
+        public DataGridViewAutoSizeColumnsMode AutoSizeColumnsMode {
+            get => auto_size_columns_mode;
+            set {
+                if (EqualityComparer<DataGridViewAutoSizeColumnsMode>.Default.Equals (auto_size_columns_mode, value))
+                    return;
+
+                auto_size_columns_mode = value;
+                OnAutoSizeColumnsModeChanged (new DataGridViewAutoSizeColumnsModeEventArgs ([]));
+                UpdateScrollBars ();
+                Invalidate ();
+            }
+        }
+
+        private DataGridViewAutoSizeColumnsMode auto_size_columns_mode = DataGridViewAutoSizeColumnsMode.None;
+
+        /// <summary>Gets or sets how row heights are automatically adjusted. Stub in Majorsilence.Forms.</summary>
+        public DataGridViewAutoSizeRowsMode AutoSizeRowsMode {
+            get => auto_size_rows_mode;
+            set {
+                if (EqualityComparer<DataGridViewAutoSizeRowsMode>.Default.Equals (auto_size_rows_mode, value))
+                    return;
+
+                auto_size_rows_mode = value;
+                OnAutoSizeRowsModeChanged (new DataGridViewAutoSizeModeEventArgs (false));
+                Invalidate ();
+            }
+        }
+
+        private DataGridViewAutoSizeRowsMode auto_size_rows_mode = DataGridViewAutoSizeRowsMode.None;
+
+        /// <summary>Gets or sets what is copied to the clipboard. Stub in Majorsilence.Forms.</summary>
+        public DataGridViewClipboardCopyMode ClipboardCopyMode { get; set; } = DataGridViewClipboardCopyMode.EnableWithAutoHeaderText;
+
+        /// <summary>
+        /// Gets or sets how the height of the column header row is adjusted.
+        /// </summary>
+        public DataGridViewColumnHeadersHeightSizeMode ColumnHeadersHeightSizeMode {
+            get => column_headers_height_size_mode;
+            set {
+                if (EqualityComparer<DataGridViewColumnHeadersHeightSizeMode>.Default.Equals (column_headers_height_size_mode, value))
+                    return;
+
+                column_headers_height_size_mode = value;
+                OnColumnHeadersHeightSizeModeChanged (new DataGridViewAutoSizeModeEventArgs (false));
+                Invalidate ();
+            }
+        }
+
+        private DataGridViewColumnHeadersHeightSizeMode column_headers_height_size_mode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+
+        /// <summary>
+        /// Gets or sets whether columns are created automatically when DataSource is set.
+        /// Majorsilence.Forms stub — column creation from DataSource is not automatically generated.
+        /// </summary>
+        public bool AutoGenerateColumns {
+            get => auto_generate_columns;
+            set {
+                if (EqualityComparer<bool>.Default.Equals (auto_generate_columns, value))
+                    return;
+
+                auto_generate_columns = value;
+                OnAutoGenerateColumnsChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool auto_generate_columns = true;
+
+        void System.ComponentModel.ISupportInitialize.BeginInit () { }
+        void System.ComponentModel.ISupportInitialize.EndInit () { }
+
+        /// <summary>
+        /// Gets or sets the data source for the DataGridView.
+        /// Setting this property auto-generates columns from the item type's public properties
+        /// and populates the rows from the collection.
+        /// </summary>
+        public object? DataSource {
+            // What was assigned, not what it resolved to: ((DataTable)grid.DataSource) must work after
+            // grid.DataSource = table, and the getter used to hand back the DataView (DGV-32).
+            get => data_source_object;
+            set {
+                data_source_object = value;
+                RebindDataSource ();
+                OnDataSourceChanged (EventArgs.Empty);
+
+                // After DataSourceChanged, and only when something is bound, as upstream's
+                // OnDataSourceChanged does (DataGridView.Methods.cs).
+                RaiseDataBindingComplete (System.ComponentModel.ListChangedType.Reset);
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override Size DefaultSize => new Size (240, 150);
+
+        /// <inheritdoc/>
+        public new static readonly ControlStyle DefaultStyle = new ControlStyle (Control.DefaultStyle,
+            (style) => {
+                style.BackgroundColor = Theme.ControlLowColor;
+                style.Border.Width = 1;
+            });
+
+        // Part styles: the type-level defaults for the pieces a grid paints inside itself. Each derives
+        // its values from the theme tokens (re-run on every theme change) and is the target of the CSS
+        // pseudo-elements `DataGridView::header`, `::row-header`, `::selection`, `::alternating-row`.
+        // A grid's own ColumnHeadersDefaultCellStyle etc. still win over these, as they always did.
+
+        /// <summary>
+        /// The default style of column headers: background, text colour, font, and the separator
+        /// (border) colours -- <c>Border.Bottom</c> is the line under the header row. CSS:
+        /// <c>DataGridView::header</c>.
+        /// </summary>
+        public static readonly ControlStyle DefaultColumnHeaderStyle = new ControlStyle (null,
+            (style) => {
+                style.BackgroundColor = Theme.ControlMidColor;
+                style.ForegroundColor = Theme.ForegroundColor;
+                style.Font = Theme.UIFontBold;
+                style.FontSize = Theme.ItemFontSize;
+                style.Border.Color = Theme.BorderLowColor;
+                style.Border.Bottom.Color = Theme.BorderMidColor;
+            });
+
+        /// <summary>
+        /// The default style of row headers: background, the selection-indicator colour (foreground)
+        /// and the separator colour. CSS: <c>DataGridView::row-header</c>.
+        /// </summary>
+        public static readonly ControlStyle DefaultRowHeaderStyle = new ControlStyle (null,
+            (style) => {
+                style.BackgroundColor = Theme.ControlMidColor;
+                style.ForegroundColor = Theme.ForegroundColor;
+                style.Border.Color = Theme.BorderLowColor;
+            });
+
+        /// <summary>
+        /// The default style of the selection: the selected row's background and (when set) text
+        /// colour, and the outline (border colour and width) of the selected cell in cell-select mode.
+        /// CSS: <c>DataGridView::selection</c>.
+        /// </summary>
+        public static readonly ControlStyle DefaultSelectionStyle = new ControlStyle (null,
+            (style) => {
+                style.BackgroundColor = Theme.ControlHighlightLowColor;
+                style.Border.Color = Theme.AccentColor;
+                style.Border.Width = 2;
+            });
+
+        /// <summary>
+        /// The default background of alternating rows. Unset by default, in which case the renderer
+        /// derives a slightly darker shade of the grid background. CSS: <c>DataGridView::alternating-row</c>.
+        /// </summary>
+        public static readonly ControlStyle DefaultAlternatingRowStyle = new ControlStyle (null, _ => { });
+
+        /// <summary>Gets or sets the data member within the data source. Stub in Majorsilence.Forms.</summary>
+        public string DataMember {
+            get => data_member;
+            set {
+                if (EqualityComparer<string>.Default.Equals (data_member, value))
+                    return;
+
+                data_member = value;
+
+                // Stored and read by nothing before: grid.DataSource = dataSet; grid.DataMember = "Orders"
+                // showed the DataViewManager instead of the Orders table (DGV-32).
+                if (data_source_object is not null)
+                    RebindDataSource ();
+
+                OnDataMemberChanged (EventArgs.Empty);
+                RaiseDataBindingComplete (System.ComponentModel.ListChangedType.Reset);
+                Invalidate ();
+            }
+        }
+
+        private string data_member = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the border style applied to the grid's data cells. Setting it rewrites
+        /// <see cref="AdvancedCellBorderStyle"/> (as WinForms does) and the renderer draws whatever edges
+        /// that describes, so <see cref="DataGridViewCellBorderStyle.None"/> really does remove the grid
+        /// lines and the *Horizontal/*Vertical variants really do drop one axis.
+        /// </summary>
+        public DataGridViewCellBorderStyle CellBorderStyle {
+            get => cell_border_style;
+            set {
+                if (cell_border_style == value)
+                    return;
+
+                cell_border_style = value;
+
+                if (value != DataGridViewCellBorderStyle.Custom)
+                    ApplyCellBorderStyle (value);
+
+                OnCellBorderStyleChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private DataGridViewCellBorderStyle cell_border_style = DataGridViewCellBorderStyle.Single;
+        private readonly DataGridViewAdvancedBorderStyle advanced_cell_border_style = new DataGridViewAdvancedBorderStyle ();
+        private readonly DataGridViewAdvancedBorderStyle advanced_column_headers_border_style = new DataGridViewAdvancedBorderStyle ();
+        private readonly DataGridViewAdvancedBorderStyle advanced_row_headers_border_style = new DataGridViewAdvancedBorderStyle ();
+
+        /// <summary>
+        /// Gets the per-edge border style used for data cells. Assign to its <c>Left</c>/<c>Right</c>/
+        /// <c>Top</c>/<c>Bottom</c> members (or call <see cref="DataGridViewAdvancedBorderStyle.All"/>) to
+        /// control exactly which cell edges the renderer draws. Changing an edge switches
+        /// <see cref="CellBorderStyle"/> to <see cref="DataGridViewCellBorderStyle.Custom"/>, matching
+        /// WinForms.
+        /// </summary>
+        public DataGridViewAdvancedBorderStyle AdvancedCellBorderStyle => advanced_cell_border_style;
+
+        /// <summary>Gets the per-edge border style used for column header cells.</summary>
+        public DataGridViewAdvancedBorderStyle AdvancedColumnHeadersBorderStyle => advanced_column_headers_border_style;
+
+        /// <summary>Gets the per-edge border style used for row header cells.</summary>
+        public DataGridViewAdvancedBorderStyle AdvancedRowHeadersBorderStyle => advanced_row_headers_border_style;
+
+        // Maps the coarse WinForms CellBorderStyle onto the four edges of AdvancedCellBorderStyle.
+        private void ApplyCellBorderStyle (DataGridViewCellBorderStyle style)
+        {
+            var (horizontal, vertical) = style switch {
+                DataGridViewCellBorderStyle.None => (DataGridViewAdvancedCellBorderStyle.None, DataGridViewAdvancedCellBorderStyle.None),
+                DataGridViewCellBorderStyle.Single => (DataGridViewAdvancedCellBorderStyle.Single, DataGridViewAdvancedCellBorderStyle.Single),
+                DataGridViewCellBorderStyle.Sunken => (DataGridViewAdvancedCellBorderStyle.Inset, DataGridViewAdvancedCellBorderStyle.Inset),
+                DataGridViewCellBorderStyle.Raised => (DataGridViewAdvancedCellBorderStyle.Outset, DataGridViewAdvancedCellBorderStyle.Outset),
+                DataGridViewCellBorderStyle.SingleHorizontal => (DataGridViewAdvancedCellBorderStyle.Single, DataGridViewAdvancedCellBorderStyle.None),
+                DataGridViewCellBorderStyle.SunkenHorizontal => (DataGridViewAdvancedCellBorderStyle.Inset, DataGridViewAdvancedCellBorderStyle.None),
+                DataGridViewCellBorderStyle.RaisedHorizontal => (DataGridViewAdvancedCellBorderStyle.Outset, DataGridViewAdvancedCellBorderStyle.None),
+                DataGridViewCellBorderStyle.SingleVertical => (DataGridViewAdvancedCellBorderStyle.None, DataGridViewAdvancedCellBorderStyle.Single),
+                DataGridViewCellBorderStyle.SunkenVertical => (DataGridViewAdvancedCellBorderStyle.None, DataGridViewAdvancedCellBorderStyle.Inset),
+                DataGridViewCellBorderStyle.RaisedVertical => (DataGridViewAdvancedCellBorderStyle.None, DataGridViewAdvancedCellBorderStyle.Outset),
+                _ => (DataGridViewAdvancedCellBorderStyle.Single, DataGridViewAdvancedCellBorderStyle.Single)
+            };
+
+            // Set the fields through the properties but suppress the Custom switch-over: this is the
+            // grid applying CellBorderStyle, not the user hand-editing an edge.
+            applying_cell_border_style = true;
+            advanced_cell_border_style.Top = horizontal;
+            advanced_cell_border_style.Bottom = horizontal;
+            advanced_cell_border_style.Left = vertical;
+            advanced_cell_border_style.Right = vertical;
+            applying_cell_border_style = false;
+        }
+
+        private bool applying_cell_border_style;
+
+        /// <summary>Gets or sets whether users can add new rows.</summary>
+        /// <remarks>Read as of W6 mechanisms: while set (and the grid is not read-only, and a bound list
+        /// allows adding), an uncommitted new row is laid out and painted after the last row. Entering it
+        /// raises <see cref="DefaultValuesNeeded"/> (and <see cref="NewRowNeeded"/> in virtual mode);
+        /// committing an edit in it makes it a real row and raises <see cref="UserAddedRow"/>.</remarks>
+        public bool AllowUserToAddRows {
+            get => allow_user_to_add_rows;
+            set {
+                if (EqualityComparer<bool>.Default.Equals (allow_user_to_add_rows, value))
+                    return;
+
+                allow_user_to_add_rows = value;
+                OnAllowUserToAddRowsChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool allow_user_to_add_rows = true;
+
+        /// <summary>Gets or sets whether users can delete rows. Stub in Majorsilence.Forms.</summary>
+        public bool AllowUserToDeleteRows {
+            get => allow_user_to_delete_rows;
+            set {
+                if (EqualityComparer<bool>.Default.Equals (allow_user_to_delete_rows, value))
+                    return;
+
+                allow_user_to_delete_rows = value;
+                OnAllowUserToDeleteRowsChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool allow_user_to_delete_rows = true;
+
+        /// <summary>Gets or sets whether users can order columns. Stub in Majorsilence.Forms.</summary>
+        public bool AllowUserToOrderColumns {
+            get => allow_user_to_order_columns;
+            set {
+                if (allow_user_to_order_columns == value)
+                    return;
+
+                allow_user_to_order_columns = value;
+                OnAllowUserToOrderColumnsChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool allow_user_to_order_columns;
+
+        /// <summary>
+        /// Gets or sets whether the user can resize columns by dragging column header borders.
+        /// </summary>
+        public bool AllowUserToResizeColumns {
+            get => allow_user_to_resize_columns;
+            set {
+                if (EqualityComparer<bool>.Default.Equals (allow_user_to_resize_columns, value))
+                    return;
+
+                allow_user_to_resize_columns = value;
+                OnAllowUserToResizeColumnsChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool allow_user_to_resize_columns = true;
+
+        /// <summary>
+        /// Gets or sets whether the user can resize rows by dragging row header borders.
+        /// </summary>
+        public bool AllowUserToResizeRows {
+            get => allow_user_to_resize_rows;
+            set {
+                if (EqualityComparer<bool>.Default.Equals (allow_user_to_resize_rows, value))
+                    return;
+
+                allow_user_to_resize_rows = value;
+                OnAllowUserToResizeRowsChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool allow_user_to_resize_rows = true;
+
+        /// <summary>Gets or sets whether multiple rows can be selected.</summary>
+        public bool MultiSelect {
+            get => multi_select;
+            set {
+                if (EqualityComparer<bool>.Default.Equals (multi_select, value))
+                    return;
+
+                multi_select = value;
+                OnMultiSelectChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool multi_select = true;
+
+        /// <summary>Gets or sets the background color of the DataGridView. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color BackgroundColor {
+            get => background_color;
+            set {
+                if (EqualityComparer<System.Drawing.Color>.Default.Equals (background_color, value))
+                    return;
+
+                background_color = value;
+                OnBackgroundColorChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private System.Drawing.Color background_color = System.Drawing.Color.Empty;
+
+        /// <summary>Gets or sets the color of the grid lines. Stub in Majorsilence.Forms.</summary>
+        public System.Drawing.Color GridColor {
+            get => grid_color;
+            set {
+                if (EqualityComparer<System.Drawing.Color>.Default.Equals (grid_color, value))
+                    return;
+
+                grid_color = value;
+                OnGridColorChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private System.Drawing.Color grid_color = System.Drawing.Color.Empty;
+
+        /// <summary>Gets or sets the edit mode of the DataGridView. Stub in Majorsilence.Forms.</summary>
+        public DataGridViewEditMode EditMode {
+            get => edit_mode;
+            set {
+                if (EqualityComparer<DataGridViewEditMode>.Default.Equals (edit_mode, value))
+                    return;
+
+                edit_mode = value;
+                OnEditModeChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private DataGridViewEditMode edit_mode = DataGridViewEditMode.EditOnKeystrokeOrF2;
+
+        /// <summary>Gets or sets the size mode for the row header width. Stub in Majorsilence.Forms.</summary>
+        public DataGridViewRowHeadersWidthSizeMode RowHeadersWidthSizeMode {
+            get => row_headers_width_size_mode;
+            set {
+                if (EqualityComparer<DataGridViewRowHeadersWidthSizeMode>.Default.Equals (row_headers_width_size_mode, value))
+                    return;
+
+                row_headers_width_size_mode = value;
+                OnRowHeadersWidthSizeModeChanged (new DataGridViewAutoSizeModeEventArgs (false));
+                Invalidate ();
+            }
+        }
+
+        private DataGridViewRowHeadersWidthSizeMode row_headers_width_size_mode = DataGridViewRowHeadersWidthSizeMode.EnableResizing;
+
+        /// <summary>Gets or sets the tab key behavior in the DataGridView. Stub in Majorsilence.Forms.</summary>
+        public bool StandardTab { get; set; }
+
+        /// <summary>
+        /// Gets or sets the default cell style applied to alternating rows. Settable for WinForms
+        /// designer assignments (see <see cref="DefaultCellStyle"/>).
+        /// </summary>
+        public ControlStyle AlternatingRowsDefaultCellStyle {
+            get => alternating_rows_default_cell_style;
+            set {
+                if (EqualityComparer<ControlStyle>.Default.Equals (alternating_rows_default_cell_style, value))
+                    return;
+
+                alternating_rows_default_cell_style = value;
+                OnAlternatingRowsDefaultCellStyleChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private ControlStyle alternating_rows_default_cell_style = new ControlStyle (DataGridViewCell.DefaultCellStyleInternal);
+
+        /// <summary>
+        /// Gets or sets the default cell style applied to cells in the DataGridView. Settable so
+        /// WinForms designer code assigning a DataGridViewCellStyle compiles (via ControlStyle's
+        /// implicit conversion from DataGridViewCellStyle).
+        /// </summary>
+        public ControlStyle DefaultCellStyle {
+            get => default_cell_style;
+            set {
+                if (EqualityComparer<ControlStyle>.Default.Equals (default_cell_style, value))
+                    return;
+
+                default_cell_style = value;
+                OnDefaultCellStyleChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private ControlStyle default_cell_style = new ControlStyle (DataGridViewCell.DefaultCellStyleInternal);
+
+        /// <summary>
+        /// Gets or sets the default cell style applied to column header cells. Stays
+        /// ControlStyle-typed (DataGridViewRenderer actually reads BackgroundColor/
+        /// ForegroundColor/Font/FontSize off this for real header painting) -- WinForms-style
+        /// code assigning a `new DataGridViewCellStyle { BackColor = ..., Font = ..., ... }` here
+        /// goes through ControlStyle's implicit conversion from DataGridViewCellStyle instead.
+        /// </summary>
+        public ControlStyle ColumnHeadersDefaultCellStyle {
+            get => column_headers_default_cell_style;
+            set {
+                if (EqualityComparer<ControlStyle>.Default.Equals (column_headers_default_cell_style, value))
+                    return;
+
+                column_headers_default_cell_style = value;
+                OnColumnHeadersDefaultCellStyleChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private ControlStyle column_headers_default_cell_style = new ControlStyle (DataGridViewCell.DefaultCellStyleInternal);
+
+        /// <summary>
+        /// Gets or sets the default cell style applied to row header cells. Settable for
+        /// WinForms designer assignments (see <see cref="DefaultCellStyle"/>).
+        /// </summary>
+        public ControlStyle RowHeadersDefaultCellStyle {
+            get => row_headers_default_cell_style;
+            set {
+                if (EqualityComparer<ControlStyle>.Default.Equals (row_headers_default_cell_style, value))
+                    return;
+
+                row_headers_default_cell_style = value;
+                OnRowHeadersDefaultCellStyleChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private ControlStyle row_headers_default_cell_style = new ControlStyle (DataGridViewCell.DefaultCellStyleInternal);
+
+        /// <summary>
+        /// Gets or sets the default cell style applied to all rows. Settable for WinForms
+        /// designer assignments (see <see cref="DefaultCellStyle"/>).
+        /// </summary>
+        public ControlStyle RowsDefaultCellStyle {
+            get => rows_default_cell_style;
+            set {
+                if (EqualityComparer<ControlStyle>.Default.Equals (rows_default_cell_style, value))
+                    return;
+
+                rows_default_cell_style = value;
+                OnRowsDefaultCellStyleChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private ControlStyle rows_default_cell_style = new ControlStyle (DataGridViewCell.DefaultCellStyleInternal);
+
+        /// <summary>Commits any pending edit for the specified context. Delegates to EndEdit in Majorsilence.Forms.</summary>
+        public bool CommitEdit (DataGridViewDataErrorContexts context) => EndEdit ();
+
+        /// <summary>
+        /// Creates the column instance used when columns are created by name (string-based
+        /// <see cref="DataGridViewColumnCollection.Add(string)"/> overloads and data-bound
+        /// auto-generation). Derived grids override this so every column they own is of their
+        /// column type (e.g. the Telerik-compat grid returns its data-column type).
+        /// </summary>
+        protected internal virtual DataGridViewColumn CreateColumnInstance (string headerText) => new DataGridViewColumn (headerText);
+
+        // Whether the specified cell is the one currently being edited (used by DataGridViewCell compat members).
+        internal bool IsCellInEditMode (int rowIndex, int columnIndex)
+            => edit_control is not null && editing_row_index == rowIndex && editing_column_index == columnIndex;
+
+        // The uncommitted text of the active editor, if any (used by DataGridViewCell.EditedFormattedValue).
+        internal string? CurrentEditValue => edit_control?.Text;
+
+        /// <summary>Raised when <see cref="IsCurrentCellDirty"/> changes.</summary>
+        public event EventHandler? CurrentCellDirtyStateChanged;
+
+        /// <summary>Raised after the grid finishes sorting.</summary>
+        public event EventHandler? Sorted;
+
+        /// <summary>
+        /// Commits the current edit and hides the edit TextBox.
+        /// </summary>
+        [UnconditionalSuppressMessage ("Trimming", "IL2075", Justification = "Data binding requires runtime reflection over user-provided types.")]
+        [UnconditionalSuppressMessage ("Trimming", "IL2026",
+            Justification = "TypeDescriptor is how WinForms resolves the bound member to write back to; a trimmed descriptor degrades to the reflection path alongside it.")]
+        public bool EndEdit ()
+        {
+            if (edit_control is null || editing_row_index < 0 || editing_column_index < 0)
+                return false;
+
+            // The editor's value, not its text: a combo box commits its SelectedValue -- the id behind
+            // the displayed name -- which is what a lookup column stores (DGV-26).
+            var editor_value = EditorValue ();
+            var new_value = editor_value?.ToString () ?? string.Empty;
+
+            // WinForms validation cycle: a handler can cancel the commit, keeping the cell in edit mode.
+            var validatingArgs = new DataGridViewCellValidatingEventArgs (editing_column_index, editing_row_index, new_value);
+            OnCellValidating (validatingArgs);
+            if (validatingArgs.Cancel)
+                return false;
+
+            var row = Rows[editing_row_index];
+
+            // Ensure enough cells exist
+            while (row.Cells.Count <= editing_column_index)
+                row.Cells.Add (string.Empty);
+
+            var editing_cell = row.Cells[editing_column_index];
+            var promoted = false;
+            var old_value = editing_cell.Value?.ToString () ?? string.Empty;
+
+            // WinForms CellParsing: a handler converts the edited text into a typed value before the
+            // grid stores it.
+            var desired_type = CommitValueType (editing_cell, editing_column_index);
+            object? parsed_value = new_value;
+            var parsing_handled = false;
+
+            if (_cellParsing is not null) {
+                var parsing_args = new DataGridViewCellParsingEventArgs (editing_column_index, editing_row_index,
+                    new_value, desired_type, editing_cell.InheritedStyle);
+                OnCellParsing (parsing_args);
+
+                if (parsing_args.ParsingApplied) {
+                    parsed_value = parsing_args.Value;
+                    parsing_handled = true;
+                }
+            }
+
+            // DGV-10: without a handler the grid used to store the editor's raw string, so a column
+            // declared ValueType = typeof (int) held "5" and every (int)cell.Value cast threw. Upstream
+            // always parses to the cell's type; a handler only pre-empts it.
+            // A combo box commits what it SELECTED. Its SelectedValue is already the ValueMember it was
+            // bound by -- an int id, typically -- and there is no text to parse: routing it through the
+            // text path stored the id as a string, since an unbound lookup column declares no ValueType
+            // for the conversion to aim at (DGV-26).
+            if (!parsing_handled && edit_control is DataGridViewComboBoxEditingControl) {
+                parsed_value = editor_value;
+                parsing_handled = true;
+            }
+
+            if (!parsing_handled) {
+                try {
+                    parsed_value = ParseForCommit (editing_cell, new_value, desired_type);
+                } catch (Exception ex) {
+                    // The conversion failed -- "abc" into an int column. Upstream reports this through
+                    // DataError and STAYS in edit mode, so the bad text is still on screen to correct
+                    // rather than silently vanishing.
+                    // Cancel starts true, as upstream sets it for a commit: a handler that clears it
+                    // asks for the edit to be abandoned and the old value put back, rather than for the
+                    // grid to stay in edit mode on the bad text (W6 mechanisms).
+                    var error = new DataGridViewDataErrorEventArgs (ex, editing_column_index, editing_row_index,
+                        DataGridViewDataErrorContexts.Commit | DataGridViewDataErrorContexts.Parsing) { Cancel = true };
+
+                    if (OnDataError (true, error))
+                        throw;
+
+                    if (!error.Cancel)
+                        CancelEdit ();
+
+                    return false;
+                }
+            }
+
+            // A commit in the new row makes it a real row first, so the store and the write-back below
+            // land in a row that exists -- the value parsed, so the row is worth keeping (W6 mechanisms).
+            if (row.IsNewRow && ShowsNewRow) {
+                row = PromoteNewRow ();
+                editing_cell = row.Cells[editing_column_index];
+                promoted = true;
+            }
+
+            if (old_value != (parsed_value?.ToString () ?? string.Empty) || !Equals (editing_cell.Value, parsed_value)) {
+                // The assignment is suppressed so it does not notify twice: this path parses through
+                // CellParsing first and needs the push's result to drive its own commit/validate
+                // sequence, so it pushes and raises below rather than letting the setter do it
+                // (DGV-02).
+                suppress_cell_value_notification = true;
+
+                try {
+                    editing_cell.Value = parsed_value;
+                } finally {
+                    suppress_cell_value_notification = false;
+                }
+
+                // One shared implementation with the programmatic path -- the inline copy that used to
+                // live here was the only code that knew how to write to a bound item, which is exactly
+                // why setting Value directly never did.
+                var committed = TryPushValueToBoundItem (editing_row_index, editing_column_index, parsed_value);
+
+                if (!committed) {
+                    suppress_cell_value_notification = true;
+
+                    try {
+                        editing_cell.Value = (object)old_value;
+                    } finally {
+                        suppress_cell_value_notification = false;
+                    }
+
+                    // A refused write-back used to revert the cell and say nothing at all -- DataError
+                    // was declared on this type and raised from nowhere in it (DGV-10).
+                    var push_error = new DataGridViewDataErrorEventArgs (
+                        new InvalidOperationException ($"The value could not be written back to the bound item for row {editing_row_index}, column {editing_column_index}."),
+                        editing_column_index, editing_row_index, DataGridViewDataErrorContexts.Commit);
+
+                    if (OnDataError (true, push_error))
+                        throw push_error.Exception;
+                }
+
+                if (committed) {
+                    current_row_dirty = true;
+                    var changed_args = new DataGridViewCellEventArgs (editing_column_index, editing_row_index);
+                    OnCellValueChanged (changed_args);
+                }
+            }
+
+            if (promoted) {
+                OnUserAddedRow (new DataGridViewRowEventArgs (row));
+                UpdateScrollBars ();
+            }
+
+            OnCellValidated (new DataGridViewCellEventArgs (editing_column_index, editing_row_index));
+
+            var end_args = new DataGridViewCellEventArgs (editing_column_index, editing_row_index);
+            OnCellEndEdit (end_args);
+
+            // Clean up the TextBox
+            DetachEditorThroughCell ();
+            edit_control.KeyDown -= EditTextBox_KeyDown;
+            edit_control.LostFocus -= EditTextBox_LostFocus;
+            edit_control.TextChanged -= EditTextBox_TextChanged;
+            ReclaimFocusFromEditor ();
+            Controls.Remove (edit_control);
+            edit_control.Dispose ();
+            edit_control = null;
+            editing_row_index = -1;
+            editing_column_index = -1;
+            SetCurrentCellDirty (false);
+
+            Invalidate ();
+            return true;
+        }
+
+        // Handle key events during editing.
+        private void EditTextBox_KeyDown (object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter) {
+                EndEdit ();
+                e.Handled = true;
+            } else if (e.KeyCode == Keys.Escape) {
+                CancelEdit ();
+                e.Handled = true;
+            } else if (e.KeyCode == Keys.Tab) {
+                EndEdit ();
+
+                if (e.Shift)
+                    NavigateToPreviousCell ();
+                else
+                    NavigateToNextCell ();
+
+                // Begin editing the newly selected cell
+                if (selected_row_index >= 0 && selected_column_index >= 0)
+                    BeginEdit (selected_row_index, selected_column_index);
+
+                e.Handled = true;
+            }
+        }
+
+        // DGV-08: the editor changing is what makes the cell dirty. Routed through SetCurrentCellDirty
+        // so CurrentCellDirtyStateChanged fires once, on the transition.
+        private void EditTextBox_TextChanged (object? sender, EventArgs e)
+        {
+            // The editor's own flag, which IsCurrentCellDirty consults too (W6 mechanisms).
+            if (sender is DataGridViewTextBoxEditingControl editor)
+                editor.EditingControlValueChanged = true;
+            else if (sender is DataGridViewComboBoxEditingControl combo)
+                combo.EditingControlValueChanged = true;
+
+            SetCurrentCellDirty (true);
+        }
+
+        // The grid takes focus back before its editing control leaves, as upstream's
+        // DataGridViewCell.DetachEditingControl does. Otherwise removing the focused editor sends focus
+        // to whatever control is next on the form (EVT-21) rather than to the grid being edited.
+        private void ReclaimFocusFromEditor ()
+        {
+            if (edit_control is { ContainsFocus: true } && !Focused)
+                Focus ();
+        }
+
+        // Handle lost focus during editing.
+        private void EditTextBox_LostFocus (object? sender, EventArgs e)
+        {
+            EndEdit ();
+        }
+
+        /// <summary>
+        /// Cancels the current edit without committing changes.
+        /// </summary>
+        public void CancelEdit ()
+        {
+            if (edit_control is null)
+                return;
+
+            DetachEditorThroughCell ();
+            edit_control.KeyDown -= EditTextBox_KeyDown;
+            edit_control.LostFocus -= EditTextBox_LostFocus;
+            edit_control.TextChanged -= EditTextBox_TextChanged;
+            ReclaimFocusFromEditor ();
+            Controls.Remove (edit_control);
+            edit_control.Dispose ();
+            edit_control = null;
+
+            // In virtual mode the application owns the row's data, so it is asked to roll the row back
+            // (W6 mechanisms). Response reports whether anything in the row had been committed, which
+            // is what IsCurrentCellDirty tracks here.
+            if (IsVirtualUnbound)
+                OnCancelRowEdit (new QuestionEventArgs (IsCurrentCellDirty));
+
+            // Escape ends the edit as surely as Enter does, and the handlers that re-enable buttons or
+            // clear an "editing" status live in CellEndEdit -- they used to stay stuck (DGV-09).
+            var cancelled_args = new DataGridViewCellEventArgs (editing_column_index, editing_row_index);
+
+            // A cancelled edit in the new row puts it back to its defaults, as upstream does.
+            if (editing_row_index == Rows.Count && ShowsNewRow)
+                new_row = null;
+
+            editing_row_index = -1;
+            editing_column_index = -1;
+            SetCurrentCellDirty (false);
+            OnCellEndEdit (cancelled_args);
+
+            Invalidate ();
+        }
+
+        // Repositions the editing TextBox after a scroll; cancels the edit if the cell has scrolled out of view.
+        private void UpdateEditTextBoxPosition ()
+        {
+            if (edit_control is null || editing_row_index < 0 || editing_column_index < 0)
+                return;
+
+            var cell_bounds = GetCellBounds (editing_row_index, editing_column_index);
+
+            if (cell_bounds.IsEmpty) {
+                CancelEdit ();
+                return;
+            }
+
+            edit_control.Left = DeviceToLogicalUnits (cell_bounds.Left) + 1;
+            edit_control.Top = DeviceToLogicalUnits (cell_bounds.Top) + 1;
+            edit_control.Width = DeviceToLogicalUnits (cell_bounds.Width) - 2;
+            edit_control.Height = DeviceToLogicalUnits (cell_bounds.Height) - 2;
+        }
+
+        /// <summary>
+        /// Gets or sets the index of the first row displayed on the DataGridView.
+        /// </summary>
+        public int FirstDisplayedScrollingRowIndex {
+            get => top_index;
+            set {
+                if (top_index == value)
+                    return;
+
+                if (value < 0 || value >= RowCountWithNewRow)
+                    return;
+
+                vscrollbar.Value = Math.Min (value, vscrollbar.EffectiveMaximum);
+            }
+        }
+
+        /// <summary>
+        /// Gets the bounding rectangle for a cell.
+        /// </summary>
+        public Rectangle GetCellBounds (int rowIndex, int columnIndex)
+        {
+            if (columnIndex < 0 || columnIndex >= Columns.Count)
+                return Rectangle.Empty;
+
+            // rowIndex -1 addresses the COLUMN HEADER, not an invalid row -- that is the WinForms
+            // convention, and it is how a custom header cell finds the rectangle it was painted into so
+            // it can place things (a filter button, a glyph) relative to it.
+            if (rowIndex == -1) {
+                if (!ColumnHeadersVisible)
+                    return Rectangle.Empty;
+
+                return new Rectangle (
+                    GetColumnDeviceLeft (columnIndex),
+                    GetContentArea ().Top,
+                    LogicalToDeviceUnits (Columns[columnIndex].Width),
+                    ScaledHeaderHeight);
+            }
+
+            if (rowIndex < 0 || rowIndex >= RowCountWithNewRow)
+                return Rectangle.Empty;
+
+            if (rowIndex < top_index)
+                return Rectangle.Empty;
+
+            var client = GetContentArea ();
+            var row_top = client.Top + RowsTopOffset;
+
+            // Accumulate y by summing individual row heights from the first visible row
+            var y = row_top;
+
+            for (var i = top_index; i < rowIndex; i++)
+                y += RowDeviceHeight (i);
+
+            var scaled_row_height = RowDeviceHeight (rowIndex);
+
+            // A hidden row has no rectangle: returning a zero-height one would put an editor or a
+            // context menu at the position of a row nobody can see.
+            if (scaled_row_height == 0)
+                return Rectangle.Empty;
+
+            // Row is below the visible area
+            if (y >= client.Bottom)
+                return Rectangle.Empty;
+
+            var x = GetColumnDeviceLeft (columnIndex);
+            var col_width = LogicalToDeviceUnits (Columns[columnIndex].Width);
+            return new Rectangle (x, y, col_width, scaled_row_height);
+        }
+
+        /// <summary>
+        /// Total device-pixel width of the visible frozen columns. Frozen columns are pinned to the left
+        /// and do not scroll horizontally.
+        /// </summary>
+        internal int FrozenColumnsWidth {
+            get {
+                var total = 0;
+                foreach (var col in Columns)
+                    if (col.Visible && col.Frozen)
+                        total += LogicalToDeviceUnits (col.Width);
+                return total;
+            }
+        }
+
+        /// <summary>Total device-pixel width of the visible right-pinned columns.</summary>
+        internal int RightPinnedColumnsWidth {
+            get {
+                var total = 0;
+                foreach (var col in Columns)
+                    if (col.Visible && col.PinnedRight)
+                        total += LogicalToDeviceUnits (col.Width);
+                return total;
+            }
+        }
+
+        /// <summary>
+        /// Device-pixel left X of a column's content. Left-frozen columns pin to the left and right-pinned
+        /// columns pin to the right edge (both ignore the horizontal scroll offset); the remaining columns
+        /// occupy the scrolling middle band.
+        /// </summary>
+        internal int GetColumnDeviceLeft (int columnIndex)
+        {
+            var client = GetContentArea ();
+            var left0 = client.Left + (row_headers_visible ? ScaledRowHeadersWidth : 0);
+
+            if (columnIndex < 0 || columnIndex >= Columns.Count)
+                return left0;
+
+            var column = Columns[columnIndex];
+
+            // "Before" is in DISPLAY order (W6 mechanisms): a column moved by DisplayIndex takes its
+            // place among the others, whatever its index in the collection.
+            var before = DisplayOrder.TakeWhile (i => i != columnIndex).Select (i => Columns[i]);
+
+            if (column.Frozen) {
+                var fx = left0;
+                foreach (var other in before)
+                    if (other.Visible && other.Frozen)
+                        fx += LogicalToDeviceUnits (other.Width);
+                return fx;
+            }
+
+            if (column.PinnedRight) {
+                var rx = client.Right - RightPinnedColumnsWidth;
+                foreach (var other in before)
+                    if (other.Visible && other.PinnedRight)
+                        rx += LogicalToDeviceUnits (other.Width);
+                return rx;
+            }
+
+            var x = left0 + FrozenColumnsWidth - horizontal_scroll_offset;
+            foreach (var other in before)
+                if (other.Visible && !other.Frozen && !other.PinnedRight)
+                    x += LogicalToDeviceUnits (other.Width);
+            return x;
+        }
+
+        /// <summary>
+        /// Returns the display rectangle for a cell, in client (logical) coordinates.
+        /// Pass <paramref name="cutOverflow"/> = true to clip the rectangle to the control bounds.
+        /// </summary>
+        public Rectangle GetCellDisplayRectangle (int columnIndex, int rowIndex, bool cutOverflow)
+        {
+            var bounds = DeviceToLogicalUnits (GetCellBounds (rowIndex, columnIndex));
+
+            // W6.3: the clip has to be in the same space as the thing it clips. `bounds` has just been
+            // converted to logical and ClientRectangle is in DEVICE pixels, so on a scaled display the
+            // clip was twice the size it should be and cutOverflow cut nothing -- the method handed
+            // back a rectangle running off the control, which is the one thing the flag exists to stop.
+            if (cutOverflow)
+                bounds = Rectangle.Intersect (bounds, DeviceToLogicalUnits (DeviceClientRectangle));
+
+            return bounds;
+        }
+
+        /// <summary>
+        /// Returns information about the grid element at the given client (logical) coordinates: a cell,
+        /// a column or row header, the top-left header, or one of the scroll bars.
+        /// </summary>
+        /// <remarks>
+        /// It scanned cells only and answered <see cref="HitTestInfo.Nowhere"/> for everything else, so the
+        /// context-menu idiom <c>if (grid.HitTest (e.X, e.Y).Type == DataGridViewHitTestType.ColumnHeader)</c>
+        /// never saw a header (DGV-35). The parts and the -1 conventions are upstream's
+        /// (<c>DataGridView.HitTestInfo.cs</c>): a column header has row -1, a row header column -1, the
+        /// top-left header both. <see cref="HitTestInfo.ColumnX"/> and <see cref="HitTestInfo.RowY"/> are the
+        /// hit element's left and top edges, in the same logical units as the point.
+        /// </remarks>
+        public HitTestInfo HitTest (int x, int y)
+        {
+            var logical = new Point (x, y);
+
+            // The scroll bars are child controls; their Bounds are logical, like the point.
+            if (vscrollbar.Visible && vscrollbar.Bounds.Contains (logical))
+                return new HitTestInfo (-1, -1, -1, -1, DataGridViewHitTestType.VerticalScrollBar);
+
+            if (hscrollbar.Visible && hscrollbar.Bounds.Contains (logical))
+                return new HitTestInfo (-1, -1, -1, -1, DataGridViewHitTestType.HorizontalScrollBar);
+
+            var device = LogicalToDeviceUnits (logical);
+            var client = GetContentArea ();
+
+            if (!client.Contains (device))
+                return HitTestInfo.Nowhere;
+
+            var row_header_right = client.Left + (row_headers_visible ? ScaledRowHeadersWidth : 0);
+            var in_row_header_band = row_headers_visible && device.X < row_header_right;
+
+            if (ColumnHeadersVisible && device.Y < client.Top + ScaledHeaderHeight) {
+                var header_top = DeviceToLogicalUnits (client.Top);
+
+                if (in_row_header_band)
+                    return new HitTestInfo (-1, -1, DeviceToLogicalUnits (client.Left), header_top, DataGridViewHitTestType.TopLeftHeader);
+
+                var header_column = GetColumnAtLocation (device);
+
+                return header_column < 0
+                    ? HitTestInfo.Nowhere
+                    : new HitTestInfo (header_column, -1, DeviceToLogicalUnits (GetColumnDeviceLeft (header_column)), header_top, DataGridViewHitTestType.ColumnHeader);
+            }
+
+            var row = GetRowAtLocation (device);
+
+            if (row < 0)
+                return HitTestInfo.Nowhere;
+
+            var row_top = DeviceToLogicalUnits (RowDeviceTop (row));
+
+            if (in_row_header_band)
+                return new HitTestInfo (-1, row, DeviceToLogicalUnits (client.Left), row_top, DataGridViewHitTestType.RowHeader);
+
+            var column = GetColumnAtLocation (device);
+
+            return column < 0
+                ? HitTestInfo.Nowhere
+                : new HitTestInfo (column, row, DeviceToLogicalUnits (GetColumnDeviceLeft (column)), row_top, DataGridViewHitTestType.Cell);
+        }
+
+        // The device top of a displayed row, walked the way GetRowAtLocation walks them.
+        private int RowDeviceTop (int rowIndex)
+        {
+            var y = GetContentArea ().Top + RowsTopOffset;
+
+            for (var i = top_index; i < rowIndex; i++)
+                y += RowDeviceHeight (i);
+
+            return y;
+        }
+
+        /// <summary>Contains information about a part of the <see cref="DataGridView"/> at a given location.</summary>
+        public sealed class HitTestInfo
+        {
+            /// <summary>Represents a hit test result that is not over any part of the grid.</summary>
+            public static readonly HitTestInfo Nowhere = new HitTestInfo (-1, -1, -1, -1, DataGridViewHitTestType.None);
+
+            internal HitTestInfo (int columnIndex, int rowIndex, int columnX, int rowY, DataGridViewHitTestType type)
+            {
+                ColumnIndex = columnIndex;
+                RowIndex = rowIndex;
+                ColumnX = columnX;
+                RowY = rowY;
+                Type = type;
+            }
+
+            /// <summary>The zero-based column index of the cell under the point, or -1.</summary>
+            public int ColumnIndex { get; }
+
+            /// <summary>The zero-based row index of the cell under the point, or -1.</summary>
+            public int RowIndex { get; }
+
+            /// <summary>The x-coordinate of the left edge of the hit column.</summary>
+            public int ColumnX { get; }
+
+            /// <summary>The y-coordinate of the top edge of the hit row.</summary>
+            public int RowY { get; }
+
+            /// <summary>The part of the grid that was hit.</summary>
+            public DataGridViewHitTestType Type { get; }
+        }
+
+        /// <summary>
+        /// Gets the content area, accounting for scrollbars.
+        /// Use Math.Ceiling to avoid fractional DPI rounding artifacts.
+        /// </summary>
+        internal Rectangle GetContentArea ()
+        {
+            var client = DeviceClientRectangle;
+            var top_offset = Math.Max (0, ContentTopOffset);
+            var w = client.Width - (vscrollbar.Visible ? (int)Math.Ceiling (vscrollbar.Width * ScaleFactor.Width) : 0);
+            var h = client.Height - top_offset - (hscrollbar.Visible ? (int)Math.Ceiling (hscrollbar.Height * ScaleFactor.Height) : 0);
+            return new Rectangle (client.Left, client.Top + top_offset, w, h);
+        }
+
+        /// <summary>
+        /// Gets the height, in device pixels, of a band reserved at the top of the control (above the
+        /// column headers) that the grid does not draw into. Subclasses (e.g. the Telerik-compat
+        /// <c>RadGridView</c>) override this to reserve room for a group panel; because every geometry
+        /// helper and the renderer derive from <see cref="GetContentArea"/>, the whole grid shifts down
+        /// consistently and the reserved band is the subclass's to paint and hit-test. Default 0.
+        /// </summary>
+        protected virtual int ContentTopOffset => 0;
+
+        /// <summary>
+        /// Device-pixel height of an extra fixed band drawn below the column headers and above the data
+        /// rows (e.g. the Telerik-compat <c>RadGridView</c> filter row). Because every geometry helper and
+        /// the renderer derive the row-start from <see cref="RowsTopOffset"/>, the data rows shift down to
+        /// make room and the band is the subclass's to paint and hit-test. Default 0.
+        /// </summary>
+        protected internal virtual int HeaderExtraHeight => 0;
+
+        /// <summary>
+        /// Device-pixel offset from the content top to the first data row: the column-header band (when
+        /// visible) plus <see cref="HeaderExtraHeight"/>.
+        /// </summary>
+        internal int RowsTopOffset => (ColumnHeadersVisible ? ScaledHeaderHeight : 0) + HeaderExtraHeight;
+
+        /// <summary>
+        /// Whether the renderer paints alternating-row striping. Default true (the plain grid always
+        /// stripes). Subclasses (e.g. the Telerik-compat <c>RadGridView</c>, whose
+        /// <c>EnableAlternatingRowColor</c> defaults to false) override to gate it.
+        /// </summary>
+        protected internal virtual bool AlternatingRowColorsEnabled => true;
+
+        /// <summary>
+        /// Gets the column index at the specified location.
+        /// </summary>
+        internal int GetColumnAtLocation (Point location)
+        {
+            var client = GetContentArea ();
+            var left_end = client.Left + (row_headers_visible ? ScaledRowHeadersWidth : 0) + FrozenColumnsWidth;
+            var right_start = client.Right - RightPinnedColumnsWidth;
+
+            // Pinned columns (left and right) sit on top of the scrolling band; test them first.
+            for (var i = 0; i < Columns.Count; i++) {
+                if (!Columns[i].Visible || (!Columns[i].Frozen && !Columns[i].PinnedRight))
+                    continue;
+                var px = GetColumnDeviceLeft (i);
+                var pw = LogicalToDeviceUnits (Columns[i].Width);
+                if (location.X >= px && location.X < px + pw)
+                    return i;
+            }
+
+            // Scrollable columns occupy only the middle band, between the two pinned bands.
+            if (location.X < left_end || location.X >= right_start)
+                return -1;
+
+            for (var i = 0; i < Columns.Count; i++) {
+                if (!Columns[i].Visible || Columns[i].Frozen || Columns[i].PinnedRight)
+                    continue;
+                var x = GetColumnDeviceLeft (i);
+                var w = LogicalToDeviceUnits (Columns[i].Width);
+                if (location.X >= x && location.X < x + w)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets the resize column index if the mouse is near a column border.
+        /// </summary>
+        // Both divider hit-tests take DEVICE coordinates: the geometry they compare against (the content
+        // area, GetColumnDeviceLeft, RowDeviceHeight) is device, and the mouse arrives logical. The
+        // callers convert, which is the RC-8 rule; they used to pass e.Location straight through, so on
+        // a scaled display the divider zone sat at half the column's width (W6 mechanisms).
+        private int GetResizeColumnAtLocation (Point deviceLocation)
+        {
+            var location = deviceLocation;
+            var client = GetContentArea ();
+            var header_rect = new Rectangle (client.Left, client.Top, client.Width, ScaledHeaderHeight);
+
+            if (!header_rect.Contains (location))
+                return -1;
+
+            var left_end = client.Left + (row_headers_visible ? ScaledRowHeadersWidth : 0) + FrozenColumnsWidth;
+            var right_start = client.Right - RightPinnedColumnsWidth;
+            var resize_zone = LogicalToDeviceUnits (4);
+
+            for (var i = 0; i < Columns.Count; i++) {
+                if (!Columns[i].Visible)
+                    continue;
+
+                var right = GetColumnDeviceLeft (i) + LogicalToDeviceUnits (Columns[i].Width);
+
+                // Skip scrollable column edges hidden behind either pinned band.
+                var scrollable = !Columns[i].Frozen && !Columns[i].PinnedRight;
+                if (scrollable && (right < left_end || right > right_start))
+                    continue;
+
+                if (Math.Abs (location.X - right) <= resize_zone)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets the row index if the mouse is near a row border in the row header area.
+        /// </summary>
+        private int GetResizeRowAtLocation (Point deviceLocation)
+        {
+            var location = deviceLocation;
+
+            if (!row_headers_visible)
+                return -1;
+
+            var client = GetContentArea ();
+            var header_offset = RowsTopOffset;
+            var row_header_rect = new Rectangle (client.Left, client.Top + header_offset, ScaledRowHeadersWidth, Math.Max (0, client.Height - header_offset));
+
+            if (!row_header_rect.Contains (location))
+                return -1;
+
+            var row_top = client.Top + header_offset;
+            var resize_zone = LogicalToDeviceUnits (4);
+
+            for (var i = top_index; i < Rows.Count; i++) {
+                var scaled_row_height = RowDeviceHeight (i);   // hidden rows contribute nothing (DGV-20)
+                row_top += scaled_row_height;
+
+                if (row_top > client.Bottom)
+                    break;
+
+                if (Math.Abs (location.Y - row_top) <= resize_zone)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets the row index at the specified location.
+        /// </summary>
+        /// <summary>
+        /// The device-pixel height a row occupies: zero when it is hidden.
+        /// </summary>
+        /// <remarks>
+        /// One expression of "a hidden row has no height", which every site that walks rows vertically
+        /// goes through -- layout, painting, hit-testing, the scroll extent and the displayed-row count.
+        /// Scattering <c>if (!row.Visible) continue</c> across five loops instead invites the next one
+        /// to forget, which is how `Column.Visible` came to be honoured in some places and not others
+        /// (finding <c>DGV-20</c>).
+        /// </remarks>
+        // A row's full LOGICAL height: its own height plus its DividerHeight, which is extra space
+        // BELOW the row and part of its total height as upstream counts it -- the usual way a grid
+        // separates groups of rows. DividerHeight was stored and read by nothing, so setting it did
+        // nothing at all.
+        //
+        // One definition, because there were two: GetRowDisplayRectangle summed Rows[i].Height itself
+        // while the paint path went through RowDeviceHeight. Wiring DividerHeight into one of them
+        // would have made the public rectangle disagree with where the row is actually drawn.
+        internal int RowTotalHeight (int rowIndex)
+            => rowIndex >= 0 && rowIndex < RowCountWithNewRow
+                ? Rows[rowIndex].Height + Math.Max (0, Rows[rowIndex].DividerHeight)
+                : 0;
+
+        internal int RowDeviceHeight (int rowIndex)
+            => rowIndex >= 0 && rowIndex < RowCountWithNewRow && Rows[rowIndex].Visible
+                ? LogicalToDeviceUnits (RowTotalHeight (rowIndex))
+                : 0;
+
+        /// <summary>Called by <see cref="DataGridViewRow.Visible"/> when a row is shown or hidden.</summary>
+        internal void NotifyRowVisibleChanged ()
+        {
+            UpdateScrollBars ();
+            Invalidate ();
+        }
+
+        internal int GetRowAtLocation (Point location)
+        {
+            var client = GetContentArea ();
+            var row_top = client.Top + RowsTopOffset;
+
+            if (location.Y < row_top)
+                return -1;
+
+            var y = row_top;
+
+            for (var i = top_index; i < RowCountWithNewRow; i++) {
+                var h = RowDeviceHeight (i);
+
+                // A hidden row is zero-height, so this can never match it -- which is what keeps
+                // hit-testing and painting agreeing about which row is under the pointer.
+                if (h > 0 && location.Y >= y && location.Y < y + h)
+                    return i;
+
+                y += h;
+
+                if (y >= client.Bottom)
+                    break;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets or sets the height, in pixels, of the column headers row.
+        /// </summary>
+        public int ColumnHeadersHeight {
+            get => header_height;
+            set {
+                if (header_height != value) {
+                    header_height = Math.Max (value, 4);
+                    Invalidate ();
+                    OnColumnHeadersHeightChanged (EventArgs.Empty);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the currently selected cell, or null if no cell is selected.
+        /// </summary>
+        public DataGridViewCell? CurrentCell {
+            get {
+                // RowCountWithNewRow: the current cell can sit in the uncommitted new row (W6).
+                if (selected_row_index < 0 || selected_row_index >= RowCountWithNewRow)
+                    return null;
+
+                if (selected_column_index < 0 || selected_column_index >= Rows[selected_row_index].Cells.Count)
+                    return null;
+
+                return Rows[selected_row_index].Cells[selected_column_index];
+            }
+            set {
+                // Upstream's setter (DataGridView.cs, CurrentCell): null clears the selection and the
+                // current cell; a cell is scrolled into view, the selection collapses onto it, and the
+                // address moves ONCE. It used to move the column and then the row through the two index
+                // setters -- two SelectionChanged, RowValidating run between the halves, a third
+                // CurrentCellChanged on top -- and ignored null, so the documented
+                // `grid.CurrentCell = null` before a rebind did nothing (DGV-12).
+                //
+                // Upstream throws InvalidOperationException when a validating handler refuses the move;
+                // this layer keeps its fail-soft rule and leaves the current cell where it was.
+                if (value is null) {
+                    if (selected_row_index < 0 && selected_column_index < 0)
+                        return;
+
+                    ClearSelection ();
+                    MoveCurrentCell (-1, -1);
+                    return;
+                }
+
+                if (value.DataGridView != this)
+                    throw new ArgumentException ("The cell does not belong to this DataGridView.", nameof (value));
+
+                if (value.RowIndex == selected_row_index && value.ColumnIndex == selected_column_index)
+                    return;
+
+                ScrollIntoView (value.ColumnIndex, value.RowIndex);
+
+                if (!MoveCurrentCell (value.RowIndex, value.ColumnIndex))
+                    return;
+
+                ReplaceSelectionWithCurrentCell ();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the header cells use the system's visual styles. Stub in
+        /// Majorsilence.Forms (headers are theme-rendered) — kept for WinForms compatibility.
+        /// </summary>
+        public bool EnableHeadersVisualStyles { get; set; } = true;
+
+        /// <summary>
+        /// Gets the row and column indices of the currently selected cell.
+        /// </summary>
+        public Point CurrentCellAddress => new Point (selected_column_index, selected_row_index);
+
+        /// <summary>Gets the cell at the specified column and row indices. In WinForms, [columnIndex, rowIndex].</summary>
+        public DataGridViewCell? this[int columnIndex, int rowIndex] {
+            get {
+                if (rowIndex < 0 || rowIndex >= Rows.Count) return null;
+                var row = Rows[rowIndex];
+                if (columnIndex < 0 || columnIndex >= row.Cells.Count) return null;
+                return row.Cells[columnIndex];
+            }
+        }
+
+        /// <summary>Gets the cell at the specified column name and row index.</summary>
+        public DataGridViewCell? this[string columnName, int rowIndex] {
+            get {
+                if (rowIndex < 0 || rowIndex >= Rows.Count) return null;
+                return Rows[rowIndex].Cells[columnName];
+            }
+        }
+
+        /// <summary>
+        /// Gets the row containing the currently selected cell, or null if no row is selected.
+        /// </summary>
+        public DataGridViewRow? CurrentRow {
+            get {
+                if (selected_row_index >= 0 && selected_row_index < Rows.Count)
+                    return Rows[selected_row_index];
+
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the horizontal scroll offset.
+        /// </summary>
+        internal int HorizontalScrollOffset => horizontal_scroll_offset;
+
+        /// <summary>
+        /// Gets or sets the index of the currently hovered row.
+        /// </summary>
+        internal int HoveredRowIndex {
+            get => hovered_row_index;
+            set {
+                if (hovered_row_index != value) {
+                    hovered_row_index = value;
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets whether a cell is currently being edited.
+        /// </summary>
+        public bool IsCurrentCellInEditMode => edit_control is not null;
+
+        /// <summary>
+        /// Raises the CellBeginEdit event.
+        /// </summary>
+        protected virtual void OnCellBeginEdit (DataGridViewCellCancelEventArgs e) => CellBeginEdit?.Invoke (this, e);
+
+        /// <summary>
+        /// Raises the CellEndEdit event.
+        /// </summary>
+        protected virtual void OnCellEndEdit (DataGridViewCellEventArgs e) => CellEndEdit?.Invoke (this, e);
+
+        /// <summary>
+        /// Raises the CellValueChanged event.
+        /// </summary>
+        protected virtual void OnCellValueChanged (DataGridViewCellEventArgs e) => CellValueChanged?.Invoke (this, e);
+
+        /// <summary>
+        /// Called by <see cref="DataGridViewCell.Value"/> after it stores a new value: writes the value
+        /// through to the bound object, repaints, and raises <see cref="CellValueChanged"/>.
+        /// </summary>
+        /// <remarks>
+        /// The single choke point for a value change (finding <c>DGV-02</c>, P0). <c>EndEdit</c> assigns
+        /// <c>Value</c> too, and suppresses this while it does so, because it has already parsed the
+        /// text through <c>CellParsing</c> and needs the push's success to drive its own
+        /// commit/validate sequence -- so the push itself is shared (see
+        /// <see cref="TryPushValueToBoundItem"/>) while the notification happens once, in whichever
+        /// path the caller actually used.
+        /// </remarks>
+        private bool ShowCellContextMenuStrip (Point location)
+        {
+            // The lookups are device, the menu's Show is logical (RC-8).
+            var device = LogicalToDeviceUnits (location);
+            var row_index = GetRowAtLocation (device);
+            var column_index = GetColumnAtLocation (device);
+
+            if (row_index < 0 || row_index >= Rows.Count)
+                return false;
+
+            var row = Rows[row_index];
+            var strip = column_index >= 0 && column_index < row.Cells.Count
+                ? row.Cells[column_index].GetInheritedContextMenuStrip (row_index)
+                : ResolveRowContextMenuStrip (row, row_index);
+
+            if (strip is null || ReferenceEquals (strip, ContextMenuStrip))
+                return false;
+
+            strip.Show (this, location);
+
+            return true;
+        }
+
+        internal void NotifyCellValueSet (DataGridViewCell cell, object? oldValue)
+        {
+            if (suppress_cell_value_notification) {
+                Invalidate ();
+                return;
+            }
+
+            var row_index = cell.RowIndex;
+            var column_index = cell.ColumnIndex;
+
+            // A push that cannot convert reverts the cell, as EndEdit's own path does, rather than
+            // leaving the grid showing a value the object rejected.
+            if (row_index >= 0 && column_index >= 0 && !TryPushValueToBoundItem (row_index, column_index, cell.Value)) {
+                suppress_cell_value_notification = true;
+
+                try {
+                    cell.Value = oldValue;
+                } finally {
+                    suppress_cell_value_notification = false;
+                }
+
+                Invalidate ();
+                return;
+            }
+
+            Invalidate ();
+
+            if (row_index >= 0 && column_index >= 0)
+                OnCellValueChanged (new DataGridViewCellEventArgs (column_index, row_index));
+        }
+
+        // True while EndEdit is assigning Value itself; see NotifyCellValueSet.
+        private bool suppress_cell_value_notification;
+
+        /// <summary>
+        /// Writes <paramref name="value"/> into the bound item behind <paramref name="rowIndex"/>,
+        /// through the column's <c>DataPropertyName</c>. Returns false only when the value could not be
+        /// converted to the bound member's type.
+        /// </summary>
+        /// <remarks>
+        /// Factored out of <c>EndEdit</c>, which was the only place that knew how to do this -- which is
+        /// why a programmatic <c>Value</c> assignment updated the display and not the object
+        /// (<c>DGV-02</c>). Returns true when the grid is unbound or the member cannot be resolved:
+        /// there is nothing to write, which is not a failure.
+        /// </remarks>
+        // The suppressions move with the code: these were on EndEdit, which was the only method doing
+        // this reflection before it was factored out. Release turns trim warnings into errors, so the
+        // extraction fails the build without them rather than degrading silently.
+        [UnconditionalSuppressMessage ("Trimming", "IL2075", Justification = "Data binding requires runtime reflection over user-provided types.")]
+        [UnconditionalSuppressMessage ("Trimming", "IL2026",
+            Justification = "TypeDescriptor is how WinForms resolves the bound member to write back to; a trimmed descriptor degrades to the reflection path alongside it.")]
+        internal bool TryPushValueToBoundItem (int rowIndex, int columnIndex, object? value)
+        {
+            if (data_source is null || rowIndex < 0 || rowIndex >= data_source.Count || columnIndex < 0 || columnIndex >= Columns.Count)
+                return true;
+
+            var item = data_source[rowIndex];
+
+            if (item is null)
+                return true;
+
+            // DataPropertyName is the bound member; HeaderText is only a fallback, because app code
+            // routinely reassigns HeaderText for display. Descriptors first, so DataRowView columns are
+            // writable too.
+            var column = Columns[columnIndex];
+            var member = string.IsNullOrEmpty (column.DataPropertyName) ? column.HeaderText : column.DataPropertyName;
+
+            if (string.IsNullOrEmpty (member))
+                return true;
+
+            var descriptor = System.ComponentModel.TypeDescriptor.GetProperties (item)[member];
+
+            if (descriptor is not null) {
+                if (descriptor.IsReadOnly)
+                    return true;
+
+                try {
+                    descriptor.SetValue (item, Coerce (value, descriptor.PropertyType));
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            var prop = item.GetType ().GetProperty (member, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+
+            if (prop?.CanWrite != true)
+                return true;
+
+            try {
+                prop.SetValue (item, Coerce (value, prop.PropertyType));
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        // A CellParsing handler may already have produced a value of the bound member's type; only fall
+        // back to Convert for anything else.
+        private static object? Coerce (object? value, Type target)
+            => value is not null && target.IsInstanceOfType (value) ? value : Convert.ChangeType (value, target);
+
+        /// <summary>
+        /// Handles a column header click for sorting.
+        /// </summary>
+        private void OnColumnHeaderClick (int columnIndex)
+        {
+            var column = Columns[columnIndex];
+
+            // Toggle from the RECORDED sort, which is what upstream and the app's own toggle code read.
+            var new_order = ReferenceEquals (SortedColumn, column) && SortOrder == SortOrder.Ascending
+                ? SortOrder.Descending
+                : SortOrder.Ascending;
+
+            // SortByColumn records SortedColumn/SortOrder, moves the glyph and raises Sorted.
+            SortByColumn (columnIndex, new_order);
+
+            // Raise the event
+            ColumnHeaderClick?.Invoke (this, new EventArgs<DataGridViewColumn> (column));
+
+            Invalidate ();
+        }
+
+        /// <summary>
+        /// Raised when a column header is clicked.
+        /// </summary>
+        public event EventHandler<EventArgs<DataGridViewColumn>>? ColumnHeaderClick;
+
+        /// <summary>
+        /// Builds the column for a bound member, choosing its type from the member's type.
+        /// </summary>
+        /// <remarks>
+        /// WinForms picks the column class from the bound type -- a bool member gets a checkbox column,
+        /// an image member an image column -- and only falls back to a text column for everything else.
+        /// Generating a text column for every member instead is why a bound bool used to render the
+        /// literal text "True" and an image rendered as its type name.
+        ///
+        /// Name and DataPropertyName are both set to the member name, not just HeaderText: the
+        /// Columns[name] indexer matches Name OR HeaderText, and app code routinely reassigns HeaderText
+        /// and then looks the column up again by its original field name.
+        /// </remarks>
+        /// <remarks>
+        /// Virtual so a derived grid can auto-generate its OWN column type. RadGridView must: its
+        /// Columns collection is typed as Telerik's GridViewDataColumn, so a base WinForms column
+        /// generated here would make every Columns[...] and every enumeration of it throw
+        /// InvalidCastException.
+        /// </remarks>
+        protected virtual DataGridViewColumn CreateBoundColumn (string member, Type? memberType)
+        {
+            var type = memberType is null ? null : Nullable.GetUnderlyingType (memberType) ?? memberType;
+
+            DataGridViewColumn column =
+                type == typeof (bool) ? new DataGridViewCheckBoxColumn ()
+                : IsImageType (type) ? new DataGridViewImageColumn ()
+                : new DataGridViewColumn ();
+
+            column.HeaderText = member;
+            column.Name = member;
+            column.DataPropertyName = member;
+            column.Width = EstimateColumnWidth (member);
+            return column;
+        }
+
+        private static bool IsImageType (Type? type)
+            => type is not null
+               && (typeof (Majorsilence.Forms.Drawing.Image).IsAssignableFrom (type) || type == typeof (byte[]));
+
+        // The list we hold a ListChanged subscription on. Tracked separately from data_source because it
+        // must be detached even after data_source has been replaced.
+        private System.ComponentModel.IBindingList? bound_list;
+
+        private void AttachToBoundList ()
+        {
+            bound_list = data_source as System.ComponentModel.IBindingList;
+
+            if (bound_list is not null)
+                bound_list.ListChanged += OnBoundListChanged;
+        }
+
+        private void DetachFromBoundList ()
+        {
+            if (bound_list is null)
+                return;
+
+            bound_list.ListChanged -= OnBoundListChanged;
+            bound_list = null;
+        }
+
+        // Populates rows and columns from the DataSource: the FULL bind. Runs on assignment, on
+        // ListChangedType.Reset, and on a schema change. Everything incremental goes through
+        // OnBoundListChanged in DataGridView.Binding.cs instead.
+        //
+        // The schema the rows are built from is memoised (bound_descriptors / bound_properties) so a
+        // later ItemAdded or ItemChanged can build or refresh one row the same way this built them all.
+        [UnconditionalSuppressMessage ("Trimming", "IL2075", Justification = "Data binding requires runtime reflection over user-provided types.")]
+        private void OnDataSourceChanged (bool forceColumnRegeneration = false)
+        {
+            bound_descriptors = null;
+            bound_properties = null;
+
+            if (data_source is null) {
+                Rows.Clear ();
+                return;
+            }
+
+            // Preferred bound-list path. DataView, DataTable.DefaultView and BindingSource all implement
+            // ITypedList, which exposes the bound *schema* as property descriptors -- the DataColumns of
+            // a view, or the columns of a BindingSource's resolved list (including a DataSet + DataMember).
+            // Generate columns from those descriptors even when the source has zero rows, matching
+            // WinForms, whose column collection reflects the bound schema regardless of row count. This
+            // is what makes grid.Columns["Foo"] resolvable before any row loads.
+            //
+            // Name/DataPropertyName are set to the member name (not just HeaderText): the Columns[name]
+            // indexer matches Name OR HeaderText, and app code routinely reassigns HeaderText
+            // (grid.Columns["Start"].HeaderText = "Reminder Date") then looks the column up again by its
+            // original field name -- without Name set, that second lookup returns null and the caller NREs.
+            if (data_source is System.ComponentModel.ITypedList typed_list) {
+                bound_descriptors = typed_list.GetItemProperties (null);
+
+                // Columns are regenerated only when the schema changed. A Reset over the SAME schema --
+                // BindingList<T>.ResetBindings, a re-sort, a filter -- keeps the app's header renames,
+                // widths and hidden columns, which a rebuild used to silently put back (DGV-31).
+                if (AutoGenerateColumns && (forceColumnRegeneration || !ColumnsMatchSchema (bound_descriptors))) {
+                    Columns.Clear ();
+
+                    foreach (System.ComponentModel.PropertyDescriptor descriptor in bound_descriptors)
+                        Columns.Add (CreateBoundColumn (descriptor.Name, descriptor.PropertyType));
+                }
+
+                ReplaceBoundRows ();
+                return;
+            }
+
+            if (AutoGenerateColumns) {
+                var element_type = GetElementType (data_source);
+
+                if (element_type is null) {
+                    Rows.Clear ();
+                    return;
+                }
+
+                // Indexers are excluded, and not as a tidy-up: GetValue with no index arguments
+                // throws TargetParameterCountException, so binding to a List<string> -- whose element
+                // type carries string's Chars indexer -- crashed on the first row.
+                bound_properties = element_type.GetProperties (BindingFlags.Public | BindingFlags.Instance)
+                    .Where (p => p.CanRead && p.GetIndexParameters ().Length == 0)
+                    .ToArray ();
+
+                if (forceColumnRegeneration || !ColumnsMatchSchema (bound_properties)) {
+                    Columns.Clear ();
+
+                    foreach (var prop in bound_properties)
+                        Columns.Add (CreateBoundColumn (prop.Name, prop.PropertyType));
+                }
+            }
+
+            ReplaceBoundRows ();
+        }
+
+        // Builds every row from the memoised schema and swaps them in with one notification. Each
+        // individual Rows.Add fires OnRowsChanged, and derived grids (RadGridView) rebuild their whole
+        // view on every change, so adding N rows one at a time is O(N^2) -- slow to display for large
+        // result sets. ReplaceAll notifies once, and raises RowsAdded (0, N) once (DGV-33).
+        private void ReplaceBoundRows ()
+        {
+            var rows = new List<DataGridViewRow> ();
+
+            foreach (var item in data_source!) {
+                if (item is not null)
+                    rows.Add (BuildBoundRow (item));
+            }
+
+            Rows.ReplaceAll (rows);
+            SetInitialCurrentCell ();
+        }
+
+        // WinForms/Telerik make the first cell current as soon as a data source with rows is bound, so
+        // grid.CurrentRow / grid.CurrentCell are non-null immediately -- app code very commonly reads
+        // CurrentRow.Cells["..."] right after binding. Only seed a selection when none exists; never
+        // override a selection the user or app already set. Fields are set directly (rather than through
+        // the SelectedRowIndex property) to avoid raising selection/layout events mid-bind.
+        private void SetInitialCurrentCell ()
+        {
+            var seeded = false;
+
+            if (selected_row_index < 0 && Rows.Count > 0) {
+                selected_row_index = 0;
+                seeded = true;
+            }
+
+            if (selected_column_index < 0 && Columns.Count > 0) {
+                selected_column_index = 0;
+                seeded = true;
+            }
+
+            // The seeded cell has to be SELECTED, not merely current: since DGV-14 the renderer paints
+            // row.Selected/cell.Selected rather than the current-cell indices, so seeding the indices
+            // alone would leave a freshly bound grid with a current row that is not highlighted.
+            // Written through the core setters, silently, for the reason above -- no events mid-bind.
+            if (!seeded)
+                return;
+
+            if (SelectionIsColumnBased) {
+                if (selected_column_index >= 0 && selected_column_index < Columns.Count)
+                    Columns[selected_column_index].SetSelectedCore (true, ++selection_sequence);
+            } else if (SelectionIsRowBased) {
+                if (selected_row_index >= 0 && selected_row_index < Rows.Count)
+                    Rows[selected_row_index].SetSelectedCore (true, ++selection_sequence);
+            } else if (IsCellAddress (selected_row_index, selected_column_index)) {
+                Rows[selected_row_index].Cells[selected_column_index].SetSelectedCore (true, ++selection_sequence);
+            }
+        }
+
+        // Gets the element type from an IList.
+        [UnconditionalSuppressMessage ("Trimming", "IL2075", Justification = "Data binding requires runtime reflection over user-provided types.")]
+        private static Type? GetElementType (IList list)
+        {
+            var list_type = list.GetType ();
+
+            // Check for generic IList<T>
+            foreach (var iface in list_type.GetInterfaces ()) {
+                if (iface.IsGenericType && iface.GetGenericTypeDefinition () == typeof (IList<>))
+                    return iface.GetGenericArguments ()[0];
+            }
+
+            // Fallback: use type of first item
+            if (list.Count > 0 && list[0] is not null)
+                return list[0]!.GetType ();
+
+            return null;
+        }
+
+        // Reads a bound member off a data item, preferring property descriptors: a DataRowView exposes
+        // its columns that way and has no CLR property per column, so reflection alone finds nothing.
+        // Indexers are skipped -- GetValue with no index arguments throws TargetParameterCountException,
+        // which is why binding to a List<string> (whose element type carries string's Chars indexer)
+        // used to crash on the first row.
+        [UnconditionalSuppressMessage ("Trimming", "IL2075",
+            Justification = "Bound item types are only known at runtime — same as WinForms.")]
+        [UnconditionalSuppressMessage ("Trimming", "IL2026",
+            Justification = "TypeDescriptor is how WinForms resolves bound members; a trimmed descriptor degrades to the reflection path below.")]
+        private static object? ReadMember (object item, string? member)
+        {
+            if (string.IsNullOrEmpty (member))
+                return null;
+
+            var descriptor = System.ComponentModel.TypeDescriptor.GetProperties (item)[member];
+
+            if (descriptor is not null)
+                return descriptor.GetValue (item);
+
+            var prop = item.GetType ().GetProperty (member, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+
+            if (prop is null || prop.GetIndexParameters ().Length > 0)
+                return null;
+
+            return prop.GetValue (item);
+        }
+
+        // Orders two cell values by their own type rather than by their text, so a numeric column sorts
+        // 2 before 10 and a date column sorts chronologically. Values of differing or non-comparable
+        // types fall back to a culture-aware text comparison.
+        private static int CompareCellValues (object? a, object? b)
+        {
+            if (a is null && b is null)
+                return 0;
+            if (a is null)
+                return -1;
+            if (b is null)
+                return 1;
+
+            if (a.GetType () == b.GetType () && a is IComparable same_type)
+                return same_type.CompareTo (b);
+
+            // Mixed numeric types (e.g. int against decimal) still compare numerically.
+            if (a is IConvertible && b is IConvertible
+                && a is not string && b is not string) {
+                try {
+                    return Convert.ToDecimal (a).CompareTo (Convert.ToDecimal (b));
+                } catch (Exception e) when (e is FormatException or InvalidCastException or OverflowException) {
+                    // Not actually numeric — fall through to text.
+                }
+            }
+
+            return string.Compare (a.ToString (), b.ToString (), StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        // Estimates a column width based on header text length.
+        private static int EstimateColumnWidth (string headerText)
+        {
+            return Math.Max (80, headerText.Length * 10 + 20);
+        }
+
+        /// <inheritdoc/>
+        // Tracks the cell the pointer is currently over, so CellMouseEnter/CellMouseLeave fire once per
+        // cell transition. Kept separate from HoveredRowIndex (row highlight) to detect transitions.
+        private int hovered_column_index = -1;
+        private int hovered_cell_row = -1;
+
+        // Fires CellMouseLeave for the previously hovered cell and CellMouseEnter for the new one, once
+        // per cell transition. Pass (-1, -1) to signal the pointer left the grid.
+        private void UpdateHoveredCell (int row, int col)
+        {
+            if (row == hovered_cell_row && col == hovered_column_index)
+                return;
+
+            if (hovered_cell_row >= 0 && hovered_column_index >= 0)
+                OnCellMouseLeave (new DataGridViewCellEventArgs (hovered_column_index, hovered_cell_row));
+
+            hovered_cell_row = row;
+            hovered_column_index = col;
+
+            if (row >= 0 && col >= 0)
+                OnCellMouseEnter (new DataGridViewCellEventArgs (col, row));
+        }
+
+        /// <summary>Raises the CellDoubleClick event.</summary>
+        protected virtual void OnCellDoubleClick (DataGridViewCellEventArgs e) => CellDoubleClick?.Invoke (this, e);
+        /// <summary>Raises the CellMouseClick event.</summary>
+        protected virtual void OnCellMouseClick (DataGridViewCellMouseEventArgs e) => CellMouseClick?.Invoke (this, e);
+        /// <summary>Raises the CellContentClick event.</summary>
+        protected virtual void OnCellContentClick (DataGridViewCellEventArgs e) => CellContentClick?.Invoke (this, e);
+        /// <summary>Raises the ColumnHeaderMouseClick event.</summary>
+        protected virtual void OnColumnHeaderMouseClick (DataGridViewCellMouseEventArgs e) => ColumnHeaderMouseClick?.Invoke (this, e);
+        /// <summary>Raises the CellMouseEnter event.</summary>
+        protected virtual void OnCellMouseEnter (DataGridViewCellEventArgs e) => CellMouseEnter?.Invoke (this, e);
+        /// <summary>Raises the CellMouseLeave event.</summary>
+        protected virtual void OnCellMouseLeave (DataGridViewCellEventArgs e) => CellMouseLeave?.Invoke (this, e);
+        /// <summary>Raises the CellValidating event.</summary>
+        protected virtual void OnCellValidating (DataGridViewCellValidatingEventArgs e) => CellValidating?.Invoke (this, e);
+        /// <summary>Raises the CellValidated event.</summary>
+        protected virtual void OnCellValidated (DataGridViewCellEventArgs e) => CellValidated?.Invoke (this, e);
+        /// <summary>Raises the EditingControlShowing event.</summary>
+        protected virtual void OnEditingControlShowing (DataGridViewEditingControlShowingEventArgs e) => EditingControlShowing?.Invoke (this, e);
+        /// <summary>Raises the RowPostPaint event. Called by the renderer after a data row is drawn.</summary>
+        protected internal virtual void RaiseRowPostPaint (int rowIndex) => RaiseRowPostPaint (new DataGridViewRowPostPaintEventArgs (rowIndex));
+
+        /// <summary>Raises the RowPostPaint event with fully populated paint args (renderer path).</summary>
+        protected internal virtual void RaiseRowPostPaint (DataGridViewRowPostPaintEventArgs e) => RowPostPaint?.Invoke (this, e);
+
+        /// <summary>Raises the RowPrePaint event. Called by the renderer before a data row is drawn.</summary>
+        protected virtual void OnRowPrePaint (DataGridViewRowPrePaintEventArgs e) => _rowPrePaint?.Invoke (this, e);
+
+        /// <summary>
+        /// Raises RowPrePaint from the renderer. Returns true when a handler set
+        /// <see cref="DataGridViewRowPrePaintEventArgs.Handled"/>, meaning the renderer must skip its own
+        /// painting of the row. No allocation happens when nothing is subscribed.
+        /// </summary>
+        protected internal virtual bool RaiseRowPrePaint (DataGridViewRowPrePaintEventArgs e)
+        {
+            if (_rowPrePaint is null)
+                return false;
+
+            OnRowPrePaint (e);
+            return e.Handled;
+        }
+
+        /// <summary>Gets whether anything is subscribed to <see cref="RowPrePaint"/> (lets the renderer skip building args).</summary>
+        internal bool HasRowPrePaintHandlers => _rowPrePaint is not null;
+
+        /// <summary>Gets whether anything is subscribed to <see cref="RowPostPaint"/>.</summary>
+        internal bool HasRowPostPaintHandlers => RowPostPaint is not null;
+
+        /// <summary>Gets whether anything is subscribed to <see cref="CellPainting"/>.</summary>
+        internal bool HasCellPaintingHandlers => _cellPainting is not null;
+
+        /// <summary>Raises the CellPainting event.</summary>
+        protected virtual void OnCellPainting (DataGridViewCellPaintingEventArgs e) => _cellPainting?.Invoke (this, e);
+
+        /// <summary>
+        /// Raises CellPainting from the renderer. Returns true when a handler set
+        /// <see cref="DataGridViewCellPaintingEventArgs.Handled"/>, meaning the renderer must skip its
+        /// own painting of that cell.
+        /// </summary>
+        protected internal virtual bool RaiseCellPainting (DataGridViewCellPaintingEventArgs e)
+        {
+            if (_cellPainting is null)
+                return false;
+
+            OnCellPainting (e);
+            return e.Handled;
+        }
+
+        /// <summary>Raises the CellFormatting event.</summary>
+        protected virtual void OnCellFormatting (DataGridViewCellFormattingEventArgs e) => _cellFormatting?.Invoke (this, e);
+
+        /// <summary>Raises the CellParsing event.</summary>
+        protected virtual void OnCellParsing (DataGridViewCellParsingEventArgs e) => _cellParsing?.Invoke (this, e);
+
+        /// <summary>Raises the RowValidating event.</summary>
+        protected virtual void OnRowValidating (DataGridViewCellCancelEventArgs e) => _rowValidating?.Invoke (this, e);
+
+        /// <summary>Raises the RowValidated event.</summary>
+        protected virtual void OnRowValidated (DataGridViewCellEventArgs e) => _rowValidated?.Invoke (this, e);
+
+        /// <summary>Raises the RowEnter event.</summary>
+        protected virtual void OnRowEnter (DataGridViewCellEventArgs e) => _rowEnter?.Invoke (this, e);
+
+        /// <summary>Raises the RowLeave event.</summary>
+        protected virtual void OnRowLeave (DataGridViewCellEventArgs e) => _rowLeave?.Invoke (this, e);
+
+        /// <summary>
+        /// Runs the WinForms row-commit cycle for the row that is about to stop being current: commits a
+        /// pending edit, then raises RowValidating and (unless cancelled) RowValidated followed by
+        /// RowLeave. Returns false when a handler cancelled, in which case the caller must keep the row
+        /// current. Mirrors <see cref="Control"/>'s Validating/Validated cycle, at row granularity.
+        /// </summary>
+        protected virtual bool ValidateRow (int rowIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= Rows.Count)
+                return true;
+
+            // WinForms commits the cell edit before validating the row it belongs to.
+            if (edit_control is not null && editing_row_index == rowIndex && !EndEdit ())
+                return false;
+
+            var args = new DataGridViewCellCancelEventArgs (selected_column_index, rowIndex);
+            OnRowValidating (args);
+
+            if (args.Cancel)
+                return false;
+
+            OnRowValidated (new DataGridViewCellEventArgs (selected_column_index, rowIndex));
+            OnRowLeave (new DataGridViewCellEventArgs (selected_column_index, rowIndex));
+            return true;
+        }
+
+        /// <summary>
+        /// Runs the row-commit cycle for the current row (WinForms <c>EndEdit</c> + row validation), as
+        /// happens when the grid loses focus. Returns false when a handler cancelled.
+        /// </summary>
+        public bool ValidateCurrentRow () => ValidateRow (selected_row_index);
+
+        /// <inheritdoc/>
+        protected override void OnLostFocus (EventArgs e)
+        {
+            // WinForms validates the current row as the grid loses focus, before the control-level
+            // Validating/Validated cycle the base class runs. Not when the focus went to the grid's own
+            // editing control: that is the edit starting, and validating here would end it again.
+            // Upstream's row validation runs from Leave, which focus moving to a child does not raise.
+            if (!ContainsFocus)
+                ValidateRow (selected_row_index);
+
+            base.OnLostFocus (e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnDoubleClick (MouseEventArgs e)
+        {
+            base.OnDoubleClick (e);
+
+            // A double-click on a column or row divider is the auto-size gesture: the event first, and
+            // the resize unless a handler says Handled (W6). Dividers are where the resize drag starts.
+            var divider_column = GetResizeColumnAtLocation (LogicalToDeviceUnits (e.Location));
+
+            if (divider_column >= 0) {
+                var args = new DataGridViewColumnDividerDoubleClickEventArgs (divider_column, new HandledMouseEventArgs (e.Button, e.Clicks, e.X, e.Y, e.Delta));
+                OnColumnDividerDoubleClick (args);
+
+                if (!args.Handled)
+                    AutoResizeColumn (divider_column);
+
+                return;
+            }
+
+            var divider_row = GetResizeRowAtLocation (LogicalToDeviceUnits (e.Location));
+
+            if (divider_row >= 0) {
+                var args = new DataGridViewRowDividerDoubleClickEventArgs (divider_row, new HandledMouseEventArgs (e.Button, e.Clicks, e.X, e.Y, e.Delta));
+                OnRowDividerDoubleClick (args);
+
+                if (!args.Handled)
+                    AutoResizeRow (divider_row);
+
+                return;
+            }
+
+            if (read_only || !Enabled)
+                return;
+
+            var row = GetRowAtLocation (LogicalToDeviceUnits (e.Location));
+            var col = GetColumnAtLocation (LogicalToDeviceUnits (e.Location));
+
+            RaiseCellDoubleClick (e);
+
+            if (row >= 0 && col >= 0) {
+                OnCellDoubleClick (new DataGridViewCellEventArgs (col, row));
+
+                // Every EditMode but EditProgrammatically opens an editor on a double-click; that one
+                // exists precisely so a read-mostly grid with a custom editor is never opened by the
+                // user (DGV-06). It used to open regardless.
+                if (edit_mode != DataGridViewEditMode.EditProgrammatically)
+                    BeginEdit (row, col);
+            }
+        }
+
+        /// <inheritdoc/>
+
+        // ---- Header-cell pointer routing -------------------------------------------------------
+        //
+        // WinForms delivers pointer input to the cell under the pointer, and a custom header cell
+        // relies on that to run its own hit-testing (a filter button, say). Nothing here did that, so
+        // an override of DataGridViewCell.OnMouse* was unreachable. HeaderBounds is set by the
+        // renderer each paint, which is what makes the lookup possible.
+
+        private DataGridViewColumnHeaderCell? hovered_header_cell;
+        private int hovered_header_column = -1;
+
+        /// <summary>Finds the column header under a device-pixel point, or null.</summary>
+        private DataGridViewColumnHeaderCell? HeaderCellAt (Point logical, out int columnIndex, out Point cellRelative)
+        {
+            columnIndex = -1;
+            cellRelative = Point.Empty;
+
+            if (!ColumnHeadersVisible)
+                return null;
+
+            // Logical mouse against device header bounds (RC-8); the relative point stays logical.
+            var location = LogicalToDeviceUnits (logical);
+
+            for (var i = 0; i < Columns.Count; i++) {
+                var column = Columns[i];
+
+                if (!column.Visible || !column.HeaderBounds.Contains (location))
+                    continue;
+
+                columnIndex = i;
+                var origin = DeviceToLogicalUnits (column.HeaderBounds.Location);
+                cellRelative = new Point (logical.X - origin.X, logical.Y - origin.Y);
+                return column.HeaderCell;
+            }
+
+            return null;
+        }
+
+        // -1 is WinForms' row index for a column header.
+        private DataGridViewCellMouseEventArgs HeaderCellMouseArgs (int columnIndex, Point cellRelative, MouseEventArgs e)
+            => new DataGridViewCellMouseEventArgs (columnIndex, -1, cellRelative.X, cellRelative.Y, e);
+
+        private void RouteHeaderMouseDown (MouseEventArgs e)
+        {
+            var cell = HeaderCellAt (e.Location, out var columnIndex, out var cellRelative);
+            cell?.OnMouseDown (HeaderCellMouseArgs (columnIndex, cellRelative, e));
+        }
+
+        private void RouteHeaderMouseUp (MouseEventArgs e)
+        {
+            var cell = HeaderCellAt (e.Location, out var columnIndex, out var cellRelative);
+            cell?.OnMouseUp (HeaderCellMouseArgs (columnIndex, cellRelative, e));
+        }
+
+        private void RouteHeaderMouseMove (MouseEventArgs e)
+        {
+            var cell = HeaderCellAt (e.Location, out var columnIndex, out var cellRelative);
+
+            // Leaving one header for another (or for nothing) has to raise OnMouseLeave on the old
+            // cell, or a hover highlight sticks on after the pointer has gone.
+            if (!ReferenceEquals (cell, hovered_header_cell)) {
+                hovered_header_cell?.OnMouseLeave (-1);
+                hovered_header_cell = cell;
+                hovered_header_column = columnIndex;
+            }
+
+            cell?.OnMouseMove (HeaderCellMouseArgs (columnIndex, cellRelative, e));
+        }
+
+        private void ClearHeaderHover ()
+        {
+            hovered_header_cell?.OnMouseLeave (-1);
+            hovered_header_cell = null;
+            hovered_header_column = -1;
+        }
+
+        /// <summary>Raises the MouseDown event and routes the press to the column header cell under it.</summary>
+        protected override void OnMouseDown (MouseEventArgs e)
+        {
+            base.OnMouseDown (e);
+            RouteHeaderMouseDown (e);
+
+            // Before anything the press does: upstream reports the press, then acts on it. This is the
+            // event the right-click-selects-the-clicked-row idiom hangs off, so it has to fire for
+            // every button, not just the left one the rest of this method handles.
+            RaiseCellMouseDown (e);
+
+            // A right press opens the cell's own menu -- its ContextMenuStrip, the row's, or what a
+            // CellContextMenuStripNeeded handler supplies (W6 mechanisms). The grid-level menu is the
+            // base class's job, so only a menu that differs from it is shown here.
+            if (e.Button == MouseButtons.Right && ShowCellContextMenuStrip (e.Location))
+                return;
+
+            if (!Enabled || !e.Button.HasFlag (MouseButtons.Left))
+                return;
+
+            // If editing, end edit when clicking outside the editor
+            if (edit_control is not null) {
+                var edit_bounds = edit_control.ScaledBounds;
+
+                if (!edit_bounds.Contains (LogicalToDeviceUnits (e.Location)))
+                    EndEdit ();
+            }
+
+            // Check for column resize
+            if (ColumnHeadersVisible && AllowUserToResizeColumns) {
+                var resize_col = GetResizeColumnAtLocation (LogicalToDeviceUnits (e.Location));
+
+                if (resize_col >= 0) {
+                    is_resizing_column = true;
+                    resize_column_index = resize_col;
+                    resize_start_x = LogicalToDeviceUnits (e.Location.X);
+                    resize_start_width = LogicalToDeviceUnits (Columns[resize_col].Width);
+                    return;
+                }
+            }
+
+            // Check for row resize
+            if (row_headers_visible && AllowUserToResizeRows) {
+                var resize_row = GetResizeRowAtLocation (LogicalToDeviceUnits (e.Location));
+
+                if (resize_row >= 0) {
+                    is_resizing_row = true;
+                    resize_row_index = resize_row;
+                    resize_start_y = LogicalToDeviceUnits (e.Location.Y);
+                    resize_start_height = LogicalToDeviceUnits (Rows[resize_row].Height);
+                    return;
+                }
+            }
+
+            // Check for header click (sorting)
+            if (ColumnHeadersVisible) {
+                var client = GetContentArea ();
+                var header_rect = new Rectangle (client.Left, client.Top, client.Width, ScaledHeaderHeight);
+
+                // Device on both sides (RC-8): the header band is device geometry, the mouse is logical.
+                if (header_rect.Contains (LogicalToDeviceUnits (e.Location))) {
+                    var col = GetColumnAtLocation (LogicalToDeviceUnits (e.Location));
+
+                    if (col >= 0) {
+                        // A header press is how a column gets selected from the UI, and the only way in
+                        // ColumnHeaderSelect -- where clicking a cell selects the cell instead. Upstream
+                        // selects on the press too (OnColumnHeaderMouseDown), unless Alt starts a reorder.
+                        if (SelectionIsColumnBased && !(AllowUserToOrderColumns && (e.Modifiers & Keys.Alt) == Keys.Alt))
+                            SelectFromPointer (-1, col, e.Modifiers);
+
+                        // The sort and ColumnHeaderMouseClick wait for the release (EndHeaderPress), where
+                        // upstream raises them: the press may yet become a reorder drag (DGV-23).
+                        BeginHeaderPress (col, e.Location, e.Modifiers);
+                    }
+
+                    return;
+                }
+            }
+
+            // Select row/cell
+            var row = GetRowAtLocation (LogicalToDeviceUnits (e.Location));
+
+            if (row >= 0) {
+                var col = GetColumnAtLocation (LogicalToDeviceUnits (e.Location));
+
+                // The current cell moves first and unconditionally -- a Ctrl-click that DEselects a row
+                // still moves the cursor there -- then the modifiers decide what happens to the
+                // selection. Going through SelectFromPointer rather than the two index setters is what
+                // makes MultiSelect, Ctrl and Shift mean anything (DGV-14) and keeps one click to one
+                // SelectionChanged.
+                // e.Modifiers, not the static Control.ModifierKeys: constructing a MouseEventArgs
+                // ASSIGNS that static from its own keyData, so the static says None for any event args
+                // built without one and cannot be primed from outside.
+                var was_already_current = selected_row_index == row && selected_column_index == col;
+
+                if (MoveCurrentCell (row, col)) {
+                    SelectFromPointer (row, col, e.Modifiers);
+
+                    // Clicking the cell that was already current begins editing it -- single-click-to-
+                    // edit, with no handler written (DGV-06).
+                    TryBeginEditFromClick (row, col, was_already_current);
+                }
+
+            }
+
+            // The click events -- CellClick, CellMouseClick, CellContentClick -- and the check-box
+            // toggle are raised from OnMouseUp, where upstream raises them (DGV-30). This records where
+            // the press landed so the release can tell a click from a drag.
+            mouse_down_target = TargetAt (e.Location);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnMouseLeave (EventArgs e)
+        {
+            base.OnMouseLeave (e);
+            ClearHeaderHover ();
+            HoveredRowIndex = -1;
+            UpdateHoveredCell (-1, -1);
+
+            if (!is_resizing_column && !is_resizing_row)
+                SetCursorDirect (Cursors.Arrow);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnMouseMove (MouseEventArgs e)
+        {
+            base.OnMouseMove (e);
+            RouteHeaderMouseMove (e);
+            RaiseCellMouseMove (e);
+
+            // A header press that has travelled past the drag threshold is a reorder (DGV-23); while one
+            // is tracking, the pointer moves the feedback and nothing else.
+            if (IsRelocatingColumn || TryBeginColumnRelocation (e.Location)) {
+                MoveColumnRelocation (LogicalToDeviceUnits (e.Location.X));
+                return;
+            }
+
+            if (is_resizing_column) {
+                // Device on both sides (RC-8): the start x and the width were device, the delta was not.
+                var delta = LogicalToDeviceUnits (e.Location.X) - resize_start_x;
+                var new_width = DeviceToLogicalUnits (resize_start_width + delta);
+                var resized = Columns[resize_column_index];
+                resized.Width = Math.Min (new_width, resized.MaximumResizeWidth);
+                UpdateScrollBars ();
+                return;
+            }
+
+            if (is_resizing_row) {
+                var delta = LogicalToDeviceUnits (e.Location.Y) - resize_start_y;
+                var new_height = DeviceToLogicalUnits (resize_start_height + delta);
+                Rows[resize_row_index].Height = Math.Max (new_height, 10);
+                UpdateScrollBars ();
+                return;
+            }
+
+            // Update cursor for column resize zones
+            if (ColumnHeadersVisible && AllowUserToResizeColumns) {
+                var resize_col = GetResizeColumnAtLocation (LogicalToDeviceUnits (e.Location));
+
+                if (resize_col >= 0) {
+                    if (Cursor != Cursors.SizeWestEast)
+                        SetCursorDirect (Cursors.SizeWestEast);
+
+                    // Update hovered row
+                    HoveredRowIndex = GetRowAtLocation (LogicalToDeviceUnits (e.Location));
+                    return;
+                }
+            }
+
+            // Update cursor for row resize zones
+            if (row_headers_visible && AllowUserToResizeRows) {
+                var resize_row = GetResizeRowAtLocation (LogicalToDeviceUnits (e.Location));
+
+                if (resize_row >= 0) {
+                    if (Cursor != Cursors.SizeNorthSouth)
+                        SetCursorDirect (Cursors.SizeNorthSouth);
+
+                    HoveredRowIndex = GetRowAtLocation (LogicalToDeviceUnits (e.Location));
+                    return;
+                }
+            }
+
+            if (Cursor != Cursors.Arrow)
+                SetCursorDirect (Cursors.Arrow);
+
+            // Update hovered row
+            var row = GetRowAtLocation (LogicalToDeviceUnits (e.Location));
+            HoveredRowIndex = row;
+
+            UpdateHoveredCell (row, row >= 0 ? GetColumnAtLocation (LogicalToDeviceUnits (e.Location)) : -1);
+
+        }
+
+        /// <summary>
+        /// The tip for the cell under a logical point: the cell's <see cref="DataGridViewCell.ToolTipText"/>,
+        /// else its column's, offered to <see cref="CellToolTipTextNeeded"/> first -- which used to be
+        /// raised from the mouse-move path with its answer thrown away (W6 mechanisms). Null when
+        /// <see cref="ShowCellToolTips"/> is off or the point is not over a cell.
+        /// </summary>
+        internal override string? GetToolTipText (Point location)
+        {
+            if (!ShowCellToolTips)
+                return null;
+
+            var target = TargetAt (location);
+
+            if (!target.IsCell || target.RowIndex >= Rows.Count)
+                return null;
+
+            var text = Rows[target.RowIndex].Cells[target.ColumnIndex].ToolTipText;
+
+            if (string.IsNullOrEmpty (text))
+                text = Columns[target.ColumnIndex].ToolTipText;
+
+            if (CellToolTipTextNeeded is { } needed) {
+                var args = new DataGridViewCellToolTipTextNeededEventArgs (target.ColumnIndex, target.RowIndex) { ToolTipText = text ?? string.Empty };
+                needed (this, args);
+                text = args.ToolTipText;
+            }
+
+            return string.IsNullOrEmpty (text) ? null : text;
+        }
+
+        /// <inheritdoc/>
+        protected override void OnMouseUp (MouseEventArgs e)
+        {
+            RouteHeaderMouseUp (e);
+
+            // Ahead of MouseUp, where upstream's click comes (Control raises MouseClick before MouseUp).
+            if (e.Button.HasFlag (MouseButtons.Left))
+                EndHeaderPress (e);
+
+            base.OnMouseUp (e);
+
+            // A resize drag is not a click: releasing after one must not toggle a check box or run a
+            // CellClick handler, so the click events are raised only when no resize was in progress.
+            if (!is_resizing_column && !is_resizing_row)
+                RaiseCellMouseUp (e);
+
+            mouse_down_target = null;
+
+            if (is_resizing_column) {
+                is_resizing_column = false;
+                resize_column_index = -1;
+                SetCursorDirect (Cursors.Arrow);
+            }
+
+            if (is_resizing_row) {
+                is_resizing_row = false;
+                resize_row_index = -1;
+                SetCursorDirect (Cursors.Arrow);
+            }
+        }
+
+        /// <inheritdoc/>
+        internal override bool HandlesMouseWheel => true;
+
+        /// <inheritdoc/>
+        protected override void OnMouseWheel (MouseEventArgs e)
+        {
+            base.OnMouseWheel (e);
+
+            if (vscrollbar.Visible)
+                vscrollbar.RaiseMouseWheel (e);
+        }
+
+        /// <inheritdoc/>
+        protected override void OnPaint (PaintEventArgs e)
+        {
+            EnsureScrollBarsAtCurrentScale ();
+            RenderManager.Render (this, e);
+
+            base.OnPaint (e);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Only the edit triggers are handled here. The rest of this grid's keyboard still runs on
+        /// <see cref="OnKeyUp"/>, which is its own finding (DGV-25, W5.5) -- moving it wholesale is that
+        /// item's job. F2 and the keystroke trigger have to be on key-down because the character that
+        /// opens the editor has to reach it.
+        /// </remarks>
+        protected override void OnKeyDown (KeyEventArgs e)
+        {
+            base.OnKeyDown (e);
+
+            Guard.ThrowIfNull (e);
+
+            if (e.Handled || !Enabled)
+                return;
+
+            // While an editor is open the editor owns the keyboard, except Enter -- which commits -- so
+            // navigation does not move the current cell out from under a half-typed value.
+            if (IsCurrentCellInEditMode) {
+                if (e.KeyCode == Keys.Enter && HandleNavigationKey (e))
+                    e.Handled = true;
+
+                return;
+            }
+
+            if (e.KeyCode == Keys.F2) {
+                if (TryBeginEditFromF2 ())
+                    e.Handled = true;
+
+                return;
+            }
+
+            // Navigation before the keystroke-opens-an-editor trigger, so Enter, Delete, the arrows and
+            // Tab are not treated as text to seed an editor with.
+            if (HandleNavigationKey (e)) {
+                e.Handled = true;
+                return;
+            }
+
+            if (TryBeginEditFromKeystroke (e))
+                e.Handled = true;
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Navigation runs here, not on key-up, because a key-up handler cannot auto-repeat: holding an
+        /// arrow key moved one row and stopped (DGV-29).
+        /// </remarks>
+        protected override void OnKeyUp (KeyEventArgs e)
+        {
+            base.OnKeyUp (e);
+        }
+
+
+        /// <summary>
+        /// Called when the row collection changes.
+        /// </summary>
+        internal virtual void OnRowsChanged ()
+        {
+            UpdateScrollBars ();
+            Invalidate ();
+        }
+
+        /// <summary>
+        /// Called when the column collection changes.
+        /// </summary>
+        internal virtual void OnColumnsChanged ()
+        {
+            UpdateScrollBars ();
+            Invalidate ();
+        }
+
+        /// <summary>
+        /// Gets or sets whether the DataGridView is read-only.
+        /// </summary>
+        public bool ReadOnly {
+            get => read_only;
+            set {
+                if (read_only != value) {
+                    read_only = value;
+
+                    if (read_only)
+                        CancelEdit ();
+
+                    OnReadOnlyChanged (EventArgs.Empty);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the collection of rows in the DataGridView.
+        /// </summary>
+        public DataGridViewRowCollection Rows { get; }
+
+        /// <summary>
+        /// Gets or sets whether the row header column is displayed.
+        /// </summary>
+        public bool RowHeadersVisible {
+            get => row_headers_visible;
+            set {
+                if (row_headers_visible != value) {
+                    row_headers_visible = value;
+                    UpdateScrollBars ();
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the width, in pixels, of the row header column.
+        /// </summary>
+        public int RowHeadersWidth {
+            get => row_headers_width;
+            set {
+                if (row_headers_width != value) {
+                    row_headers_width = Math.Max (value, 10);
+                    UpdateScrollBars ();
+                    Invalidate ();
+                    OnRowHeadersWidthChanged (EventArgs.Empty);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets how cells in the DataGridView can be selected.
+        /// </summary>
+        public DataGridViewSelectionMode SelectionMode {
+            get => selection_mode;
+            set {
+                if (selection_mode != value) {
+                    selection_mode = value;
+                    Invalidate ();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the scaled height of the header row.
+        /// </summary>
+        internal int ScaledHeaderHeight => LogicalToDeviceUnits (header_height);
+
+        /// <summary>
+        /// Gets the scaled height of each data row.
+        /// </summary>
+        internal int ScaledRowHeight => LogicalToDeviceUnits (row_template.Height);
+
+        /// <summary>
+        /// Gets the scaled width of the row header column.
+        /// </summary>
+        internal int ScaledRowHeadersWidth => LogicalToDeviceUnits (row_headers_width);
+
+        /// <summary>
+        /// Gets or sets the index of the currently selected column.
+        /// </summary>
+        public int SelectedColumnIndex {
+            get => selected_column_index;
+            set {
+                if (selected_column_index == value)
+                    return;
+
+                if (!MoveCurrentCell (selected_row_index, value))
+                    return;
+
+                ReplaceSelectionWithCurrentCell ();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the index of the currently selected row.
+        /// </summary>
+        public int SelectedRowIndex {
+            get => selected_row_index;
+            set {
+                if (selected_row_index == value)
+                    return;
+
+                if (!SetCurrentRowIndex (value))
+                    return;
+
+                // Moving the current row replaces the selection with it -- an unmodified move, which is
+                // what an assignment is. Ctrl/Shift extension goes through SelectFromPointer instead.
+                ReplaceSelectionWithCurrentCell ();
+            }
+        }
+
+        // Makes a row current without touching the selection: validates the row being left, assigns the
+        // index and raises RowEnter. Returns false when a Validating handler cancelled, in which case
+        // the current row has not moved. Separated out because "current" and "selected" are different
+        // things (DGV-14/DGV-15) and the pointer path needs to move one without replacing the other.
+        private bool SetCurrentRowIndex (int value) => MoveCurrentCell (value, selected_column_index);
+
+        /// <summary>
+        /// Called when the current row is about to change, after everything else that could veto the
+        /// move has agreed. Return false to keep the current row. Default: always true.
+        /// </summary>
+        /// <param name="oldRowIndex">The row being left, or -1.</param>
+        /// <param name="newRowIndex">The row being moved to, or -1.</param>
+        /// <remarks>
+        /// A seam rather than an event: WinForms expresses this as <c>RowValidating</c> and adding a
+        /// second cancellable row-change event would be inventing surface. Telerik's
+        /// <c>CurrentRowChanging</c> does exist, so the compat grid overrides this to raise it.
+        /// </remarks>
+        protected internal virtual bool RaiseCurrentRowChanging (int oldRowIndex, int newRowIndex) => true;
+
+        // The one place the current cell moves (DGV-11). Every path -- the two index setters, a click,
+        // a keyboard move -- comes through here, so the leave/validate/enter/changed sequence runs once
+        // per move rather than once per index that happened to change. Before this, CurrentCellChanged
+        // was raised only from the CurrentCell setter, so a click never raised it and master-detail
+        // forms that refresh on it never refreshed.
+        internal bool MoveCurrentCell (int rowIndex, int columnIndex)
+        {
+            var old_row = selected_row_index;
+            var old_column = selected_column_index;
+
+            if (old_row == rowIndex && old_column == columnIndex)
+                return true;
+
+            // WinForms row-commit cycle: leaving a row commits its edit and runs
+            // RowValidating/RowValidated/RowLeave. A cancelling handler keeps the row current.
+            if (old_row != rowIndex && !ValidateRow (old_row))
+                return false;
+
+            // Leaving a cell validates it even when it was never edited -- per-cell validation on Tab
+            // through untouched cells depends on this running without an edit having happened.
+            if (IsCellAddress (old_row, old_column)) {
+                var validating = new DataGridViewCellValidatingEventArgs (old_column, old_row,
+                    Rows[old_row].Cells[old_column].Value);
+                OnCellValidating (validating);
+
+                if (validating.Cancel)
+                    return false;
+
+                OnCellValidated (new DataGridViewCellEventArgs (old_column, old_row));
+                OnCellLeave (new DataGridViewCellEventArgs (old_column, old_row));
+            }
+
+            // The last thing that can stop the move, so "the row is about to change" is true by the
+            // time it is announced. Deliberately AFTER the validate/leave sequence rather than before
+            // it: raising first would tell a handler the row was changing and then let RowValidating
+            // cancel it, which is a false notification -- and a handler that vetoes here has the same
+            // effect a cancelling RowValidating would have had.
+            if (old_row != rowIndex && !RaiseCurrentRowChanging (old_row, rowIndex))
+                return false;
+
+            selected_row_index = rowIndex;
+            selected_column_index = columnIndex;
+
+            if (old_row != rowIndex) {
+                current_row_dirty = false;   // a new row starts undirty (DGV-08)
+
+                // Into the uncommitted new row: the application fills it in first (W6 mechanisms).
+                if (selected_row_index == Rows.Count && ShowsNewRow)
+                    EnterNewRow ();
+
+                if (selected_row_index >= 0 && selected_row_index < RowCountWithNewRow)
+                    OnRowEnter (new DataGridViewCellEventArgs (selected_column_index, selected_row_index));
+            }
+
+            if (IsCellAddress (selected_row_index, selected_column_index))
+                OnCellEnter (new DataGridViewCellEventArgs (selected_column_index, selected_row_index));
+
+            OnCurrentCellChanged (EventArgs.Empty);
+
+            // EditOnEnter opens the editor as soon as the cell becomes current, from any path (DGV-06).
+            TryBeginEditOnEnter ();
+
+            return true;
+        }
+
+        // Selects whatever the current mode selects at the current cell address, dropping the rest of
+        // the selection. Raises SelectionChanged once.
+        private void ReplaceSelectionWithCurrentCell ()
+        {
+            if (SelectionIsColumnBased)
+                SelectSingleColumn (selected_column_index);
+            else if (SelectionIsRowBased)
+                SelectSingleRow (selected_row_index);
+            else
+                SelectSingleCell (selected_row_index, selected_column_index);
+        }
+
+        /// <summary>
+        /// Raises the SelectionChanged event.
+        /// </summary>
+        protected virtual void OnSelectionChanged (EventArgs e) => SelectionChanged?.Invoke (this, e);
+
+        /// <summary>
+        /// Called by the renderer once per row, before its cells are drawn, so subclasses (e.g. the
+        /// Telerik-compat RadGridView) can apply row-level formatting. Default no-op.
+        /// </summary>
+        protected internal virtual void RaiseRowFormatting (DataGridViewRow row, int rowIndex) { }
+
+        /// <summary>
+        /// Called by the renderer for each cell, before it is drawn, so subclasses can apply
+        /// cell-level formatting (e.g. data-driven colors). Default no-op.
+        /// </summary>
+        protected internal virtual void RaiseCellFormatting (DataGridViewRow row, int rowIndex, int columnIndex) { }
+
+        /// <summary>
+        /// The renderer's single formatting entry point for a cell: runs the subclass formatting hook
+        /// (<see cref="RaiseCellFormatting"/>), then raises the WinForms <see cref="CellFormatting"/>
+        /// event, then applies the resolved cell style's format string. Returns the display text the
+        /// renderer should draw, or null to fall back to the cell's own value. Any style the handler
+        /// changed is returned through <paramref name="handlerStyle"/> and applies to this paint only --
+        /// nothing is written back onto the cell, so a conditional format never goes stale.
+        /// </summary>
+        internal string? ApplyCellFormatting (DataGridViewRow row, int rowIndex, int columnIndex, out DataGridViewCellStyle? handlerStyle)
+        {
+            handlerStyle = null;
+
+            RaiseCellFormatting (row, rowIndex, columnIndex);
+
+            if (columnIndex < 0 || columnIndex >= row.Cells.Count)
+                return null;
+
+            var cell = row.Cells[columnIndex];
+            var column = columnIndex < Columns.Count ? Columns[columnIndex] : null;
+
+            // A subclass formatting pass (e.g. RadGridView's CellFormatting) may already have produced
+            // the display text; the renderer picks that up from the cell when we return null.
+            var subclassText = cell.FormattedTextOverride;
+
+            // A lookup column shows the DISPLAY member of the item its value matches, not the value --
+            // the CustomerId cell that should read as the customer's name (DGV-26).
+            var lookup = LookUpDisplayText (column, cell.Value);
+
+            if (_cellFormatting is null) {
+                if (lookup is not null)
+                    return lookup;
+
+                return subclassText is null ? FormatCellValue (cell.Value, cell.InheritedStyle, column) : null;
+            }
+
+            var args = new DataGridViewCellFormattingEventArgs (columnIndex, rowIndex, cell.Value, typeof (string), cell.InheritedStyle);
+            OnCellFormatting (args);
+            handlerStyle = args.CellStyle;
+
+            // WinForms: FormattingApplied means the handler already produced the display value, so the
+            // grid must not format it again.
+            if (args.FormattingApplied)
+                return args.Value?.ToString () ?? string.Empty;
+
+            var formatted = FormatCellValue (args.Value, args.CellStyle, column);
+
+            if (formatted is not null)
+                return formatted;
+
+            // The handler replaced the value but left the default formatting to the grid.
+            if (!Equals (args.Value, cell.Value))
+                return args.Value?.ToString () ?? string.Empty;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Applies a resolved cell style's format string (falling back to the column's
+        /// <see cref="DataGridViewColumn.FormatString"/>) to a raw value. Returns null when there is
+        /// nothing to format, so callers can fall back to <c>value.ToString ()</c>.
+        /// </summary>
+        private static string? FormatCellValue (object? value, DataGridViewCellStyle? style, DataGridViewColumn? column)
+        {
+            if (value is null || value is DBNull)
+                return style?.NullValue?.ToString ();
+
+            var format = style is not null && style.Format.Length > 0 ? style.Format : column?.FormatString;
+
+            if (string.IsNullOrEmpty (format))
+                return null;
+
+            var provider = style?.FormatProvider ?? System.Globalization.CultureInfo.CurrentCulture;
+
+            // Telerik-style "{0:C2}" composite formats and plain ".NET" format specifiers both occur.
+            if (format.Contains ('{'))
+                return string.Format (provider, format, value);
+
+            return value is IFormattable formattable ? formattable.ToString (format, provider) : null;
+        }
+
+        /// <summary>
+        /// Raised when the selection changes.
+        /// </summary>
+        public event EventHandler? SelectionChanged;
+
+        // Sets the cursor and immediately updates the OS cursor.
+        // Setting Cursor alone only takes effect on next OnMouseEnter, so we
+        // must call SetCursor directly to update the cursor during mouse move.
+        private void SetCursorDirect (Cursor cursor)
+        {
+            Cursor = cursor;
+            FindForm ()?.SetCursor (cursor);
+        }
+
+        /// <inheritdoc/>
+        protected override void SetBoundsCore (int x, int y, int width, int height, BoundsSpecified specified)
+        {
+            base.SetBoundsCore (x, y, width, height, specified);
+
+            UpdateScrollBars ();
+        }
+
+        /// <summary>Invalidates a specific cell, forcing it to repaint.</summary>
+        public void InvalidateCell (int columnIndex, int rowIndex) => Invalidate ();
+
+        /// <summary>
+        /// Builds a data object holding the currently selected cells, honoring
+        /// <see cref="ClipboardCopyMode"/> (returns null when copying is disabled or nothing is selected).
+        /// The object carries tab-delimited text (Text/UnicodeText), CSV and an HTML table, so
+        /// <c>Clipboard.SetDataObject (grid.GetClipboardContent ())</c> pastes into a text editor or a
+        /// spreadsheet the same way WinForms does.
+        /// </summary>
+        public virtual DataObject? GetClipboardContent ()
+        {
+            if (ClipboardCopyMode == DataGridViewClipboardCopyMode.Disable)
+                return null;
+
+            // Selected cells, grouped into the rows/columns they occupy so the copy keeps its shape.
+            var rows = new List<int> ();
+            var columns = new SortedSet<int> ();
+
+            for (var r = 0; r < Rows.Count; r++) {
+                var row = Rows[r];
+                var any = false;
+
+                for (var c = 0; c < row.Cells.Count; c++) {
+                    if (!row.Cells[c].Selected && !(row.Selected && SelectionIsRowBased))
+                        continue;
+
+                    if (c < Columns.Count && !Columns[c].Visible)
+                        continue;
+
+                    columns.Add (c);
+                    any = true;
+                }
+
+                if (any)
+                    rows.Add (r);
+            }
+
+            if (rows.Count == 0 || columns.Count == 0)
+                return null;
+
+            var includeHeaders = ClipboardCopyMode is DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText
+                || (ClipboardCopyMode == DataGridViewClipboardCopyMode.EnableWithAutoHeaderText && ColumnHeadersVisible);
+
+            var text = new System.Text.StringBuilder ();
+            var csv = new System.Text.StringBuilder ();
+            var html = new System.Text.StringBuilder ("<table>");
+
+            // Left to right as displayed, not as stored (W6 mechanisms).
+            var ordered = columns.OrderBy (c => DisplayPositionOf (c)).ToList ();
+
+            if (includeHeaders) {
+                var headers = ordered.Select (c => c < Columns.Count ? Columns[c].HeaderText : string.Empty).ToList ();
+                AppendClipboardRow (text, csv, html, headers, isHeader: true);
+            }
+
+            foreach (var r in rows) {
+                var row = Rows[r];
+                var values = ordered
+                    .Select (c => c < row.Cells.Count ? (row.Cells[c].FormattedValue?.ToString () ?? string.Empty) : string.Empty)
+                    .ToList ();
+                AppendClipboardRow (text, csv, html, values, isHeader: false);
+            }
+
+            html.Append ("</table>");
+
+            var data = new DataObject ();
+            var plain = text.ToString ();
+            data.SetData (DataFormats.Text.Name, plain);
+            data.SetData (DataFormats.UnicodeText.Name, plain);
+            data.SetData (DataFormats.CommaSeparatedValue.Name, csv.ToString ());
+            data.SetData (DataFormats.Html.Name, html.ToString ());
+            return data;
+        }
+
+        // Appends one clipboard row in each of the three formats the grid publishes.
+        private static void AppendClipboardRow (System.Text.StringBuilder text, System.Text.StringBuilder csv,
+            System.Text.StringBuilder html, IReadOnlyList<string> values, bool isHeader)
+        {
+            text.AppendLine (string.Join ("\t", values));
+            csv.AppendLine (string.Join (",", values.Select (QuoteCsv)));
+
+            var tag = isHeader ? "TH" : "TD";
+            html.Append ("<TR>");
+
+            foreach (var value in values)
+                html.Append ('<').Append (tag).Append ('>')
+                    .Append (System.Net.WebUtility.HtmlEncode (value))
+                    .Append ("</").Append (tag).Append ('>');
+
+            html.Append ("</TR>");
+        }
+
+        // CSV quoting: only when needed, doubling embedded quotes (RFC 4180).
+        private static string QuoteCsv (string value)
+            => value.IndexOfAny ([',', '"', '\n', '\r']) >= 0
+                ? '"' + value.Replace ("\"", "\"\"") + '"'
+                : value;
+
+        /// <summary>Gets or sets the row that serves as a template for new rows.</summary>
+        /// <remarks>Settable because grids assign a configured prototype (often a derived row type) before
+        /// populating. Assigning null restores a plain default rather than leaving the property null,
+        /// which is what WinForms does.</remarks>
+        public DataGridViewRow RowTemplate {
+            get => row_template;
+            set => row_template = value ?? new DataGridViewRow ();
+        }
+
+        private DataGridViewRow row_template = new DataGridViewRow ();
+
+        /// <summary>Gets the index of the row for new records, or -1 if AllowUserToAddRows is false.</summary>
+        /// <remarks>Real as of W6 mechanisms: the placeholder's index while one is shown -- which is
+        /// <c>Rows.Count</c>, see <see cref="DataGridViewRowCollection"/>'s indexer -- and -1 otherwise.</remarks>
+        public int NewRowIndex => ShowsNewRow ? Rows.Count : -1;
+
+        // ── the new-row object (W6 mechanisms) ─────────────────────────────────────────────────
+        // One placeholder, outside Rows, answering at index Rows.Count. Every piece of geometry and
+        // navigation counts RowCountWithNewRow instead of Rows.Count so the row is laid out, painted,
+        // hit-tested and reachable with the keyboard; a commit in it promotes it (PromoteNewRow).
+        private DataGridViewRow? new_row;
+
+        /// <summary>Whether an uncommitted new row is shown after the last row.</summary>
+        internal bool ShowsNewRow => AllowUserToAddRows && !read_only && BoundListAllowsNew;
+
+        // A bound list has the last word, as upstream's currency manager does: an IBindingList says
+        // so itself; a plain list must at least be growable.
+        private bool BoundListAllowsNew
+            => data_source is null
+               || (bound_list is { } list ? list.AllowNew : data_source is { IsFixedSize: false, IsReadOnly: false });
+
+        /// <summary>The number of rows laid out: the committed rows plus the new row when it is shown.</summary>
+        internal int RowCountWithNewRow => Rows.Count + (ShowsNewRow ? 1 : 0);
+
+        /// <summary>The uncommitted new row, created from <see cref="RowTemplate"/> on first use.</summary>
+        internal DataGridViewRow NewRowPlaceholder {
+            get {
+                if (new_row is null) {
+                    new_row = CreateRowFromTemplate ();
+                    new_row.SetOwner (this);
+                    new_row.IsNewRow = true;
+                }
+
+                // Columns added since the placeholder was built get a cell each, like a real row.
+                while (new_row.Cells.Count < Columns.Count)
+                    new_row.Cells.Add (new DataGridViewCell ());
+
+                return new_row;
+            }
+        }
+
+        // The current cell has just moved into the new row: the application may fill it in.
+        private void EnterNewRow ()
+        {
+            var placeholder = NewRowPlaceholder;
+
+            if (VirtualMode)
+                OnNewRowNeeded (new DataGridViewRowEventArgs (placeholder));
+
+            OnDefaultValuesNeeded (new DataGridViewRowEventArgs (placeholder));
+        }
+
+        // The first commit in the new row makes it real. Unbound: the placeholder itself joins Rows.
+        // Bound: a new item is added to the source (IBindingList.AddNew, else the element type's
+        // constructor) and the row that represents it is the one promoted; the placeholder's cells --
+        // what DefaultValuesNeeded put there -- are pushed into the item first.
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage ("Trimming", "IL2072",
+            Justification = "The bound list's element type is the application's, created by reflection exactly as BindingSource.AddNew creates it upstream; a trimmed constructor degrades to the exception this method already throws.")]
+        private DataGridViewRow PromoteNewRow ()
+        {
+            var placeholder = NewRowPlaceholder;
+            new_row = null;
+
+            if (data_source is null) {
+                placeholder.IsNewRow = false;
+                Rows.AddPromoted (placeholder);
+                return placeholder;
+            }
+
+            object? item;
+
+            if (bound_list is { AllowNew: true } adding)
+                item = adding.AddNew ();
+            else {
+                item = GetElementType (data_source) is { } type ? Activator.CreateInstance (type) : null;
+
+                if (item is null)
+                    throw new InvalidOperationException ("The bound list cannot create a new item; handle a BindingSource's AddingNew to supply one.");
+
+                data_source.Add (item);
+            }
+
+            // An IBindingList announced the add and OnBoundListChanged built the row; a plain list did
+            // not, so the row is built here. Either way it is the row whose item this is.
+            var row = Rows.FirstOrDefault (r => ReferenceEquals (r.DataBoundItem, item));
+
+            if (row is null) {
+                row = BuildBoundRow (item!);
+                Rows.InsertBound (Rows.Count, row);
+            }
+
+            var index = Rows.IndexOf (row);
+
+            for (var c = 0; c < Math.Min (placeholder.Cells.Count, Columns.Count); c++) {
+                if (placeholder.Cells[c].Value is not { } value)
+                    continue;
+
+                TryPushValueToBoundItem (index, c, value);
+
+                suppress_cell_value_notification = true;
+
+                try {
+                    if (c < row.Cells.Count)
+                        row.Cells[c].Value = value;
+                } finally {
+                    suppress_cell_value_notification = false;
+                }
+            }
+
+            return row;
+        }
+
+
+
+        /// <summary>Gets or sets the visual style of the grid's border.</summary>
+        public BorderStyle BorderStyle {
+            get => border_style;
+            set {
+                if (EqualityComparer<BorderStyle>.Default.Equals (border_style, value))
+                    return;
+
+                border_style = value;
+                OnBorderStyleChanged (EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private BorderStyle border_style = BorderStyle.Fixed3D;
+
+        /// <summary>Raised after the grid scrolls, by the user or by code, in either direction.</summary>
+        /// <remarks>
+        /// Declared here because upstream declares it on <c>DataGridView</c> (Control has none). Nothing
+        /// raised it once, and
+        /// <c>OnScroll</c> was an empty seam, so two grids kept in step through it never moved (DGV-34).
+        /// </remarks>
+        public event ScrollEventHandler? Scroll;
+
+        /// <summary>Raises the <see cref="Scroll"/> event.</summary>
+        protected virtual void OnScroll (ScrollEventArgs e) => Scroll?.Invoke (this, e);
+
+        // The gesture the scroll bar last announced, consumed by the next scroll it causes. A scroll
+        // the grid makes itself (ScrollIntoView, FirstDisplayedScrollingRowIndex) has none, and is typed
+        // from its size instead -- as upstream types its own programmatic scrolls.
+        private ScrollEventType? pending_scroll_type;
+
+        // Upstream raises Scroll after the view has moved, with the old and new positions: first
+        // displayed row for a vertical scroll, the pixel offset for a horizontal one
+        // (DataGridView.Methods.cs, OnScroll (ScrollEventType, int, int, ScrollOrientation)).
+        private void RaiseGridScroll (int oldValue, int newValue, ScrollOrientation orientation)
+        {
+            var gesture = pending_scroll_type;
+            pending_scroll_type = null;
+
+            if (oldValue == newValue)
+                return;
+
+            var small = orientation == ScrollOrientation.VerticalScroll ? 1 : hscrollbar.SmallChange;
+            var type = gesture ?? (Math.Abs (newValue - oldValue) <= small
+                ? (newValue > oldValue ? ScrollEventType.SmallIncrement : ScrollEventType.SmallDecrement)
+                : (newValue > oldValue ? ScrollEventType.LargeIncrement : ScrollEventType.LargeDecrement));
+
+            // A horizontal position is reported in the logical pixels HorizontalScrollingOffset answers in
+            // (RC-8); the bar and the geometry work in device pixels.
+            if (orientation == ScrollOrientation.HorizontalScroll) {
+                oldValue = DeviceToLogicalUnits (oldValue);
+                newValue = DeviceToLogicalUnits (newValue);
+            }
+
+            OnScroll (new ScrollEventArgs (type, oldValue, newValue, orientation));
+        }
+
+        /// <summary>Scrolls the DataGridView so that the specified cell is visible.</summary>
+        /// <remarks>
+        /// It only repainted, so "scroll to the row just added" through this or through
+        /// <see cref="CurrentCell"/> left the row off screen (DGV-34). A row index of -1 scrolls only
+        /// horizontally and a column index of -1 only vertically; frozen and right-pinned columns
+        /// never scroll.
+        /// </remarks>
+        public void ScrollIntoView (int columnIndex, int rowIndex)
+        {
+            EnsureScrollBarsAtCurrentScale ();
+
+            if (rowIndex >= 0 && rowIndex < RowCountWithNewRow)
+                EnsureRowVisible (rowIndex);
+
+            if (columnIndex >= 0 && columnIndex < Columns.Count)
+                EnsureColumnVisible (columnIndex);
+        }
+
+        // The horizontal half of ScrollIntoView: the smallest scroll that brings the column's whole
+        // width into the scrolling band, or its left edge when it is wider than the band.
+        private void EnsureColumnVisible (int columnIndex)
+        {
+            var column = Columns[columnIndex];
+
+            if (!column.Visible || column.Frozen || column.PinnedRight || !hscrollbar.Visible)
+                return;
+
+            var left = 0;
+
+            foreach (var i in DisplayOrder) {
+                if (i == columnIndex)
+                    break;
+
+                var other = Columns[i];
+
+                if (other.Visible && !other.Frozen && !other.PinnedRight)
+                    left += LogicalToDeviceUnits (other.Width);
+            }
+
+            var width = LogicalToDeviceUnits (column.Width);
+            var band = ScrollingBandWidth ();
+
+            if (left < horizontal_scroll_offset)
+                HorizontalScrollingOffsetDevice = left;
+            else if (left + width > horizontal_scroll_offset + band)
+                HorizontalScrollingOffsetDevice = Math.Min (left, left + width - band);
+        }
+
+        // The device width of the region the scrolling columns move through -- what UpdateScrollBars
+        // calls scrollable_available.
+        private int ScrollingBandWidth ()
+        {
+            var client = GetContentArea ();
+            var band = client.Width - (row_headers_visible ? ScaledRowHeadersWidth : 0)
+                       - FrozenColumnsWidth - RightPinnedColumnsWidth;
+            return Math.Max (0, band);
+        }
+
+        /// <summary>Scrolls the DataGridView to ensure the specified cell is visible.</summary>
+        public void EnsureVisible (int rowIndex, int columnIndex) => ScrollIntoView (columnIndex, rowIndex);
+
+        /// <summary>Returns the number of cells that have the specified state.</summary>
+        public int GetCellCount (DataGridViewElementStates includeFilter)
+        {
+            if (includeFilter == DataGridViewElementStates.Selected)
+                return SelectedCells.Count;
+            return Rows.Count * Columns.Count;
+        }
+
+        /// <summary>Invalidates a specific row, forcing it to repaint.</summary>
+        public void InvalidateRow (int rowIndex) => Invalidate ();
+
+        /// <summary>Invalidates a specific column, forcing it to repaint.</summary>
+        public void InvalidateColumn (int columnIndex) => Invalidate ();
+
+        /// <summary>Notifies the DataGridView that the current cell value has changed. Stub in Majorsilence.Forms.</summary>
+
+        /// <summary>Updates the value displayed in the specified cell. Invalidates the cell in Majorsilence.Forms.</summary>
+        public void UpdateCellValue (int columnIndex, int rowIndex) => Invalidate ();
+
+        /// <summary>Puts the cell's stored value back into the editing control, discarding what was typed.</summary>
+        /// <remarks>Real as of W6 mechanisms. The editor is reseeded from the cell exactly as it was
+        /// when the edit began, its text is selected again and the cell is clean afterwards -- so a
+        /// handler that decides a half-typed value is not wanted can revert it without leaving edit
+        /// mode. Nothing happens when no cell is being edited.</remarks>
+        public void RefreshEdit ()
+        {
+            if (edit_control is null || editing_row_index < 0 || editing_row_index >= RowCountWithNewRow)
+                return;
+
+            var row = Rows[editing_row_index];
+
+            if (editing_column_index < 0 || editing_column_index >= row.Cells.Count)
+                return;
+
+            var cell = row.Cells[editing_column_index];
+
+            // The reseed must not read as the user typing: TextChanged is what marks the cell dirty.
+            edit_control.TextChanged -= EditTextBox_TextChanged;
+
+            try {
+                switch (edit_control) {
+                case DataGridViewComboBoxEditingControl combo:
+                    if (combo.DataSource is not null)
+                        combo.SelectedValue = cell.Value;
+                    else
+                        combo.SelectedItem = cell.Value;
+
+                    combo.EditingControlValueChanged = false;
+                    break;
+
+                case DataGridViewTextBoxEditingControl text:
+                    text.Text = cell.Value?.ToString () ?? string.Empty;
+                    text.EditingControlValueChanged = false;
+                    break;
+
+                default:
+                    edit_control.Text = cell.Value?.ToString () ?? string.Empty;
+                    break;
+                }
+            } finally {
+                edit_control.TextChanged += EditTextBox_TextChanged;
+            }
+
+            PrepareEditorForEdit (edit_control, selectAll: true);
+            SetCurrentCellDirty (false);
+        }
+
+        /// <inheritdoc/>
+        public override ControlStyle Style { get; } = new ControlStyle (DefaultStyle);
+
+        /// <summary>
+        /// Gets the total width needed to display all columns.
+        /// </summary>
+        internal int TotalColumnsWidth {
+            get {
+                var total = 0;
+
+                foreach (var col in Columns)
+                    if (col.Visible)
+                        total += LogicalToDeviceUnits (col.Width);
+
+                return total;
+            }
+        }
+
+        /// <summary>
+        /// Updates the scrollbars based on the current content.
+        /// </summary>
+        // ScrollBars says which bars the grid is ALLOWED to show; the arithmetic below says which are
+        // NEEDED. It was stored and read by nothing, so a grid told to scroll vertically only still
+        // grew a horizontal bar -- the fourth member of this family to be found dead, after
+        // TextBox (TXT-26), RichTextBox (TXT-29) and ListBox's twin.
+        // Test seams: both bars are private, and whether they are SHOWN is the whole question
+        // ScrollBars decides.
+        internal bool VerticalScrollBarVisible => vscrollbar.Visible;
+
+        internal bool HorizontalScrollBarVisible => hscrollbar.Visible;
+
+        private bool WantsVerticalScrollBar => ScrollBars is ScrollBars.Vertical or ScrollBars.Both;
+
+        private bool WantsHorizontalScrollBar => ScrollBars is ScrollBars.Horizontal or ScrollBars.Both;
+
+        // The horizontal bar's range is in DEVICE pixels, so it is stale once the grid's scale changes --
+        // a grid filled before its form is shown on a 2x display had a range half the content's width,
+        // and the last columns could not be scrolled to (found by ScrollIntoView, DGV-34). Nothing
+        // announces a scale change here (Control.DpiChangedAfterParent is not raised), so the scale the
+        // bars were computed at is remembered and checked before they are relied on.
+        private const int ScaleProbe = 1000;
+        private int scroll_bars_scale;
+
+        private void EnsureScrollBarsAtCurrentScale ()
+        {
+            if (scroll_bars_scale != LogicalToDeviceUnits (ScaleProbe))
+                UpdateScrollBars ();
+        }
+
+        private void UpdateScrollBars ()
+        {
+            scroll_bars_scale = LogicalToDeviceUnits (ScaleProbe);
+
+            // Fill columns take whatever width is left, so they are sized before anything measures the
+            // column total (DGV-18).
+            ApplyFillColumnWidths ();
+
+            var client = GetContentArea ();
+            var header_offset = RowsTopOffset;
+            var content_height = client.Height - header_offset;
+
+            // Count how many rows fit in the content area using their actual heights
+            var visible_rows = 0;
+            var rows_height = 0;
+
+            for (var i = 0; i < RowCountWithNewRow; i++) {
+                var rh = RowDeviceHeight (i);   // hidden rows contribute nothing (DGV-20)
+
+                if (rh > 0 && rows_height + rh <= content_height) {
+                    visible_rows++;
+                    rows_height += rh;
+                } else {
+                    break;
+                }
+            }
+
+            // Vertical scrollbar -- over the rows that TAKE SPACE. A hidden row cannot be scrolled to,
+            // so counting it (Rows.Count) let the thumb travel past the last visible row into blank
+            // space (#94).
+            var scrollable_rows = VisibleRowCount ();
+
+            if (scrollable_rows > visible_rows && visible_rows > 0 && WantsVerticalScrollBar) {
+                vscrollbar.Visible = true;
+                // Maximum is the *conceptual last item index* (see ScrollBar.EffectiveMaximum), not the
+                // last valid top_index -- with LargeChange set below to the page size, EffectiveMaximum
+                // works out to scrollable_rows - visible_rows, which is what top_index actually clamps
+                // against. Setting Maximum to that directly left the thumb, which is positioned from
+                // EffectiveMaximum, reaching the end of the track a whole page early.
+                vscrollbar.Maximum = Math.Max (0, scrollable_rows - 1);
+                vscrollbar.LargeChange = Math.Max (0, visible_rows);
+            } else {
+                vscrollbar.Visible = false;
+                vscrollbar.Value = 0;
+                top_index = 0;
+            }
+
+            // Horizontal scrollbar. Pinned columns (left + right) are always visible, so only the
+            // scrollable columns drive it, across the band they scroll through. That band was the
+            // client width less the vertical bar -- which GetContentArea had already taken off, so it
+            // came off twice -- and NOT less the row headers, so with row headers showing the bar
+            // stopped short and the last column could never be scrolled fully into view (found by
+            // ScrollIntoView, DGV-34). Re-read after the vertical bar's visibility is settled above.
+            var pinned_width = FrozenColumnsWidth + RightPinnedColumnsWidth;
+            var scrollable_total = TotalColumnsWidth - pinned_width;
+            var scrollable_available = ScrollingBandWidth ();
+
+            if (scrollable_total > scrollable_available && scrollable_available > 0 && WantsHorizontalScrollBar) {
+                hscrollbar.Visible = true;
+                // Maximum is the *conceptual total extent minus one* (see ScrollBar.EffectiveMaximum),
+                // not the last valid scroll offset -- with LargeChange set below to the page size,
+                // EffectiveMaximum works out to scrollable_total - scrollable_available, which is what
+                // horizontal_scroll_offset actually needs. Setting Maximum to that directly left the
+                // thumb, which is positioned from EffectiveMaximum, reaching the end of the track a
+                // whole page early.
+                hscrollbar.Maximum = Math.Max (0, scrollable_total - 1);
+                hscrollbar.LargeChange = Math.Max (0, scrollable_available);
+            } else {
+                hscrollbar.Visible = false;
+                hscrollbar.Value = 0;
+                horizontal_scroll_offset = 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the number of columns. Setting it before binding declares an unbound grid's
+        /// columns (WinForms pattern): grows by appending plain columns, or shrinks by removing from
+        /// the end.
+        /// </summary>
+        public int ColumnCount {
+            get => Columns.Count;
+            set {
+                while (Columns.Count < value)
+                    Columns.Add (string.Empty);
+                while (Columns.Count > value)
+                    Columns.RemoveAt (Columns.Count - 1);
+            }
+        }
+
+        /// <summary>Gets or sets which scroll bars are displayed. Stub in Majorsilence.Forms.</summary>
+        public ScrollBars ScrollBars {
+            get => scroll_bars;
+            set {
+                if (scroll_bars == value)
+                    return;
+
+                scroll_bars = value;
+
+                // Takes effect immediately: a property whose only job is to show or hide a bar has to
+                // recompute them, or the change waits for whatever unrelated event lays out next.
+                UpdateScrollBars ();
+                Invalidate ();
+            }
+        }
+
+        private ScrollBars scroll_bars = ScrollBars.Both;
+
+        /// <summary>Gets or sets the horizontal scrolling offset in pixels.</summary>
+        /// <remarks>
+        /// In logical pixels, like every public size and offset (RC-8). It answered the grid's device
+        /// offset, so at a display scale of 2 it read double what upstream's does for the same scroll, and an
+        /// assigned value scrolled half as far. The grid's own geometry uses
+        /// <see cref="HorizontalScrollingOffsetDevice"/>.
+        /// </remarks>
+        public int HorizontalScrollingOffset {
+            get => DeviceToLogicalUnits (horizontal_scroll_offset);
+            set => HorizontalScrollingOffsetDevice = LogicalToDeviceUnits (Math.Max (0, value));
+        }
+
+        // The offset in DEVICE pixels, which the column geometry, the horizontal bar and ScrollIntoView all
+        // work in.
+        internal int HorizontalScrollingOffsetDevice {
+            get => horizontal_scroll_offset;
+            set {
+                // RC-6 again, and the second twin of this exact kind after ListBox's
+                // ScrollAlwaysVisible: the grid already had a live horizontal offset
+                // (`horizontal_scroll_offset`, exposed internally as HorizontalScrollOffset) and this
+                // WinForms-named property stored a second one that nothing read. Migrated code sets the
+                // name that did nothing -- reading it back gave whatever had been assigned while the
+                // grid scrolled independently.
+                var clamped = Math.Max (0, value);
+
+                if (horizontal_scroll_offset == clamped)
+                    return;
+
+                // Through the scrollbar when it is showing, so the thumb and the offset cannot
+                // disagree; its ValueChanged writes the field, repaints and raises Scroll -- which is
+                // why the field is not written first here: the event needs the old offset.
+                if (hscrollbar.Visible) {
+                    hscrollbar.Value = Math.Min (clamped, hscrollbar.EffectiveMaximum);
+                } else {
+                    var old_offset = horizontal_scroll_offset;
+                    horizontal_scroll_offset = clamped;
+                    Invalidate ();
+                    RaiseGridScroll (old_offset, clamped, ScrollOrientation.HorizontalScroll);
+                }
+            }
+        }
+
+        /// <summary>Gets or sets the first column index that is displayed.</summary>
+        public int FirstDisplayedScrollingColumnIndex {
+            get {
+                // The first scrollable column whose right edge is past the scroll offset -- what the
+                // user sees at the left of the scrolling region. Stored and read by nothing before, so
+                // it answered whatever had last been assigned, or 0 on a grid nobody had assigned it on.
+                // In DISPLAY order, as the band is drawn: a column moved by DisplayIndex scrolls where
+                // it is shown, not where it is stored.
+                var x = 0;
+
+                foreach (var i in DisplayOrder) {
+                    if (!Columns[i].Visible || Columns[i].Frozen || Columns[i].PinnedRight)
+                        continue;
+
+                    x += LogicalToDeviceUnits (Columns[i].Width);
+
+                    if (x > horizontal_scroll_offset)
+                        return i;
+                }
+
+                return -1;
+            }
+            set {
+                // Scrolls so that column sits at the left edge, which is what assigning it means.
+                if (value < 0 || value >= Columns.Count)
+                    return;
+
+                var x = 0;
+
+                foreach (var i in DisplayOrder) {
+                    if (i == value)
+                        break;
+
+                    if (!Columns[i].Visible || Columns[i].Frozen || Columns[i].PinnedRight)
+                        continue;
+
+                    x += LogicalToDeviceUnits (Columns[i].Width);
+                }
+
+                HorizontalScrollingOffsetDevice = x;
+            }
+        }
+
+        /// <summary>Gets or sets whether the grid is in virtual mode.</summary>
+        /// <remarks>
+        /// Read as of W6 mechanisms: an UNBOUND grid in virtual mode keeps no cell values -- reads raise
+        /// <see cref="CellValueNeeded"/>, writes raise <see cref="CellValuePushed"/>, row heights go through
+        /// <see cref="RowHeightInfoNeeded"/> / <see cref="RowHeightInfoPushed"/>, and a cancelled edit raises
+        /// <see cref="CancelRowEdit"/>. It also enables the <c>*ContextMenuStripNeeded</c> and
+        /// <c>*ErrorTextNeeded</c> events, as it does upstream. Rows are still added through
+        /// <see cref="Rows"/>; <c>RowCount</c>-driven row creation is the same collection.
+        /// </remarks>
+        public bool VirtualMode {
+            get => virtual_mode;
+            set {
+                if (virtual_mode == value)
+                    return;
+
+                virtual_mode = value;
+                Invalidate ();
+            }
+        }
+
+        private bool virtual_mode;
+
+        /// <summary>Gets or sets whether the selection highlight is hidden when the control loses focus.</summary>
+        /// <remarks>
+        /// Not an upstream <c>DataGridView</c> member -- upstream has it on <c>ListView</c>,
+        /// <c>TreeView</c> and <c>TextBoxBase</c> only, so there is no upstream default to match. It is
+        /// in this layer's surface, named exactly like three siblings that now work, so it behaves the
+        /// way an application reading that name would expect rather than silently doing nothing.
+        /// Default <c>false</c> -- keep the highlight -- which is the less surprising of the two for a
+        /// member upstream does not define.
+        /// </remarks>
+        public bool HideSelection { get; set; }
+
+        /// <summary>Whether a selected cell should be drawn selected right now.</summary>
+        internal bool ShowsSelection => Focused || !HideSelection;
+
+        /// <summary>Gets or sets the number of rows in the grid. Setting adds/removes rows to reach the count.</summary>
+        public int RowCount {
+            get => Rows.Count;
+            set {
+                while (Rows.Count < value) Rows.Add ();   // Rows.Add builds from RowTemplate
+                while (Rows.Count > value && Rows.Count > 0) Rows.RemoveAt (Rows.Count - 1);
+            }
+        }
+
+        /// <summary>Gets the control used to edit the current cell, or null if not in edit mode. Stub in Majorsilence.Forms.</summary>
+
+        /// <summary>Gets the panel that contains editing controls. Stub in Majorsilence.Forms.</summary>
+        public Panel? EditingPanel => null;
+
+        /// <summary>
+        /// Returns the number of rows displayed, starting at <see cref="FirstDisplayedScrollingRowIndex"/>.
+        /// </summary>
+        /// <param name="includePartialRow">Whether a row cut off at the bottom edge counts.</param>
+        /// <remarks>
+        /// It counted from row 0 whatever the scroll position and ignored its parameter, so a grid
+        /// scrolled to taller rows reported the count of the rows at the top (DGV-34). Upstream counts the
+        /// displayed rows from the first displayed one (<c>DataGridView.Methods.cs</c>, DisplayedRowCount).
+        /// </remarks>
+        public int DisplayedRowCount (bool includePartialRow)
+        {
+            var available = GetContentArea ().Height - RowsTopOffset;
+            var count = 0;
+            var h = 0;
+
+            for (var i = Math.Max (0, top_index); i < RowCountWithNewRow; i++) {
+                var rh = RowDeviceHeight (i);
+
+                // A hidden row is not displayed and does not consume space, so it neither counts nor
+                // ends the walk (DGV-20).
+                if (rh == 0)
+                    continue;
+
+                if (h + rh > available) {
+                    if (includePartialRow && h < available)
+                        count++;
+
+                    break;
+                }
+
+                count++;
+                h += rh;
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Ensures the specified row is visible by scrolling if necessary.
+        /// </summary>
+        private void EnsureRowVisible (int index)
+        {
+            if (index < 0 || index >= RowCountWithNewRow || RowDeviceHeight (index) == 0)
+                return;
+
+            if (index < top_index) {
+                FirstDisplayedScrollingRowIndex = index;
+                return;
+            }
+
+            // Fully visible already: the rows from the top down to and including this one fit.
+            var available = GetContentArea ().Height - RowsTopOffset;
+            var used = 0;
+
+            for (var i = top_index; i <= index; i++)
+                used += RowDeviceHeight (i);
+
+            if (used <= available)
+                return;
+
+            // The highest top row that still shows this one whole -- walking up from the row itself,
+            // so rows of different heights land it on the bottom edge rather than a fixed count away.
+            var top = index;
+            used = RowDeviceHeight (index);
+
+            while (top > 0 && used + RowDeviceHeight (top - 1) <= available) {
+                top--;
+                used += RowDeviceHeight (top);
+            }
+
+            FirstDisplayedScrollingRowIndex = top;
+        }
+
+        // Moves the selection to the next cell, wrapping to the next row.
+        private void NavigateToNextCell ()
+        {
+            if (Columns.Count == 0 || Rows.Count == 0)
+                return;
+
+            var position = DisplayPositionOf (selected_column_index);
+
+            if (position >= 0 && position < Columns.Count - 1) {
+                SelectedColumnIndex = DisplayOrder[position + 1];
+            } else if (selected_row_index < RowCountWithNewRow - 1) {
+                SelectedColumnIndex = 0;
+                SelectedRowIndex = selected_row_index + 1;
+                EnsureRowVisible (selected_row_index);
+            }
+        }
+
+        // Moves the selection to the previous cell, wrapping to the previous row.
+        private void NavigateToPreviousCell ()
+        {
+            if (Columns.Count == 0 || Rows.Count == 0)
+                return;
+
+            var position = DisplayPositionOf (selected_column_index);
+
+            if (position > 0) {
+                SelectedColumnIndex = DisplayOrder[position - 1];
+            } else if (selected_row_index > 0) {
+                SelectedColumnIndex = DisplayOrder[Columns.Count - 1];
+                SelectedRowIndex = selected_row_index - 1;
+                EnsureRowVisible (selected_row_index);
+            }
+        }
+
+    }
+
+    /// <summary>
+    /// Provides data for a cancelable cell event. Mirrors System.Windows.Forms
+    /// DataGridViewCellCancelEventArgs (the args of CellBeginEdit/RowValidating).
+    /// </summary>
+    public class DataGridViewCellCancelEventArgs : System.ComponentModel.CancelEventArgs
+    {
+        /// <summary>Initializes a new instance for the specified cell.</summary>
+        public DataGridViewCellCancelEventArgs (int columnIndex, int rowIndex)
+        {
+            ColumnIndex = columnIndex;
+            RowIndex = rowIndex;
+        }
+
+        /// <summary>Gets the column index of the cell.</summary>
+        public int ColumnIndex { get; }
+
+        /// <summary>Gets the row index of the cell.</summary>
+        public int RowIndex { get; }
+    }
+
+    /// <summary>
+    /// Provides data for cell editing events. Superseded by
+    /// <see cref="DataGridViewCellCancelEventArgs"/> for CellBeginEdit (WinForms parity); kept for
+    /// source compatibility.
+    /// </summary>
+    public class DataGridViewCellEditEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Initializes a new instance of the DataGridViewCellEditEventArgs class.
+        /// </summary>
+        public DataGridViewCellEditEventArgs (int rowIndex, int columnIndex)
+        {
+            RowIndex = rowIndex;
+            ColumnIndex = columnIndex;
+        }
+
+        /// <summary>
+        /// Gets or sets whether the editing operation should be canceled.
+        /// </summary>
+        public bool Cancel { get; set; }
+
+        /// <summary>
+        /// Gets the column index of the cell.
+        /// </summary>
+        public int ColumnIndex { get; }
+
+        /// <summary>
+        /// Gets the row index of the cell.
+        /// </summary>
+        public int RowIndex { get; }
+    }
+}

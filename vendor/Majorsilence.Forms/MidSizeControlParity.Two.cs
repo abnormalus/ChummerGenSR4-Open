@@ -1,0 +1,469 @@
+using System;
+using System.Drawing;
+using System.Linq;
+
+namespace Majorsilence.Forms
+{
+    // RichTextBox, TreeView, MaskedTextBox and AccessibleObject parity
+    // (docs/winforms-gap-plan.md).
+    //
+    // AccessibleObject is the one with real reach. It is the object every control hands to a screen
+    // reader, and it was missing the whole navigation and state surface -- State, Value, Navigate,
+    // HitTest, DoDefaultAction. State in particular is computed from the owning control rather than
+    // returned as None, so an assistive client is told what it is actually looking at.
+    //
+    // RichTextBox's undo and redo members are the honest exception: there is no undo stack in this
+    // layer, so CanRedo is false and the action names are empty rather than describing an edit that
+    // could not be reversed.
+
+    public partial class AccessibleObject
+    {
+        /// <summary>Gets or sets the object's value as text.</summary>
+        public virtual string? Value { get; set; }
+
+        /// <summary>Gets the action performed when the object is activated.</summary>
+        public virtual string? DefaultAction => null;
+
+        /// <summary>Gets the object's help text.</summary>
+        public virtual string? Help => null;
+
+        /// <summary>Gets the keyboard shortcut that activates the object.</summary>
+        public virtual string? KeyboardShortcut => null;
+
+        /// <summary>Gets the object's current state.</summary>
+        public virtual AccessibleStates State => AccessibleStates.None;
+
+        /// <summary>Performs the object's default action.</summary>
+        public virtual void DoDefaultAction () { }
+
+        /// <summary>Returns the child object with the keyboard focus, or null.</summary>
+        public virtual AccessibleObject? GetFocused () => null;
+
+        /// <summary>Returns the selected child object, or null.</summary>
+        public virtual AccessibleObject? GetSelected () => null;
+
+        /// <summary>Returns the object at the given screen point, or null.</summary>
+        public virtual AccessibleObject? HitTest (int x, int y)
+            => Bounds.Contains (x, y) ? this : null;
+
+        /// <summary>Returns the object in the given direction from this one, or null.</summary>
+        public virtual AccessibleObject? Navigate (AccessibleNavigation navdir) => null;
+
+        /// <summary>Selects this object.</summary>
+        public virtual void Select (AccessibleSelection flags) { }
+
+        /// <summary>Gets the help topic for this object.</summary>
+        /// <remarks>Returns -1 with an empty file name, which is how WinForms reports "no help file";
+        /// there is no help subsystem here to name one.</remarks>
+        public virtual int GetHelpTopic (out string? fileName)
+        {
+            fileName = null;
+            return -1;
+        }
+
+        // The control or tool strip item this object describes, when it describes one: what a live
+        // region change reads the text and LiveSetting of. Set by the owner's AccessibilityObject getter
+        // (and the ToolStripItem/Control accessible object constructors), so a subclass returned from
+        // CreateAccessibilityInstance has it too.
+        internal object? LiveOwner { get; set; }
+
+        /// <summary>Asks the accessibility client to announce the given text.</summary>
+        /// <remarks>Delivered on the browser target, where the accessibility DOM next to the canvas speaks
+        /// it through an ARIA live region: <see cref="AutomationNotificationProcessing.ImportantAll"/> and
+        /// <see cref="AutomationNotificationProcessing.ImportantMostRecent"/> assertively, the rest
+        /// politely, and the "most recent" kinds replacing a not-yet-spoken notification from the same
+        /// object. Everywhere else it returns false and nothing is announced: UI Automation notifications
+        /// need a platform automation provider, which the other backends do not expose, and false is how
+        /// upstream reports that the notification was not delivered, so a caller that checks behaves
+        /// correctly.</remarks>
+        public bool RaiseAutomationNotification (AutomationNotificationKind notificationKind,
+            AutomationNotificationProcessing notificationProcessing, string? notificationText)
+            => Automation.LiveAnnouncer.Notify (LiveOwner, notificationProcessing, notificationText);
+
+        /// <summary>Tells the accessibility client that the owner's text, a live region, changed.</summary>
+        /// <remarks>For a <see cref="Label"/> or <see cref="ToolStripStatusLabel"/> whose <c>LiveSetting</c>
+        /// is not <see cref="AutomationLiveSetting.Off"/>. A label's change goes to every
+        /// <see cref="Automation.AutomationObserver"/> of its window that listens -- the Windows UI Automation
+        /// bridge raises UIA's LiveRegionChanged from it -- and on the browser target its text is announced
+        /// through the accessibility DOM's live region, assertively for
+        /// <see cref="AutomationLiveSetting.Assertive"/>. A label raises this itself when its text changes,
+        /// as upstream's <c>Label.OnTextChanged</c> does; calling it again after setting the text, as code
+        /// written for .NET Framework does, does not announce twice. True when something took the change;
+        /// false otherwise, as upstream returns with no automation client listening.</remarks>
+        public virtual bool RaiseLiveRegionChanged () => Automation.LiveAnnouncer.LiveRegionChanged (LiveOwner);
+    }
+
+    /// <summary>The kind of change a UI Automation notification describes.</summary>
+    public enum AutomationNotificationKind
+    {
+        /// <summary>An item was added.</summary>
+        ItemAdded = 0,
+        /// <summary>An item was removed.</summary>
+        ItemRemoved = 1,
+        /// <summary>An action completed.</summary>
+        ActionCompleted = 2,
+        /// <summary>An action was aborted.</summary>
+        ActionAborted = 3,
+        /// <summary>Some other change.</summary>
+        Other = 4,
+    }
+
+    /// <summary>How a UI Automation notification should be delivered.</summary>
+    public enum AutomationNotificationProcessing
+    {
+        /// <summary>Deliver as soon as possible, dropping any pending notification.</summary>
+        ImportantAll = 0,
+        /// <summary>Deliver the most recent notification only.</summary>
+        ImportantMostRecent = 1,
+        /// <summary>Deliver all notifications in order.</summary>
+        All = 2,
+        /// <summary>Deliver the most recent notification.</summary>
+        MostRecent = 3,
+        /// <summary>Deliver only when nothing else is pending.</summary>
+        CurrentThenMostRecent = 4,
+    }
+
+    public partial class TreeView
+    {
+        private BorderStyle border_style = BorderStyle.Fixed3D;
+
+        /// <summary>Gets or sets the border drawn around the control.</summary>
+        public BorderStyle BorderStyle {
+            get => border_style;
+            set {
+                if (border_style == value)
+                    return;
+
+                border_style = value;
+                ApplyBorderStyle (value);
+            }
+        }
+
+        /// <summary>Gets or sets the colour of the lines joining nodes.</summary>
+        /// <remarks><see cref="Color.Empty"/> -- the default -- means the theme picks the colour.</remarks>
+        public Color LineColor { get; set; } = Color.Empty;
+
+        /// <summary>Gets or sets the image list key for a node's default image.</summary>
+        public string ImageKey { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the image list key for a selected node's image.</summary>
+        public string SelectedImageKey { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets whether the control shows scroll bars when it needs them.</summary>
+        /// <remarks>
+        /// Read by <c>UpdateVerticalScrollBar</c>. It was stored and consumed by nothing, so a tree told
+        /// not to scroll grew a bar anyway -- the fifth control found with a scrollbar-policy property
+        /// sitting beside scrollbar logic that never consults it, after <c>TextBox</c> (<c>TXT-26</c>),
+        /// <c>RichTextBox</c> (<c>TXT-29</c>), <c>ListBox</c>'s twin and <c>DataGridView</c>
+        /// (<c>DGV-40</c>).
+        /// </remarks>
+        public bool Scrollable {
+            get => scrollable;
+            set {
+                if (scrollable == value)
+                    return;
+
+                scrollable = value;
+
+                // LayoutItems, not PerformLayout: the bar's visibility is decided inside the tree's own
+                // item layout, which a container-level pass does not reach.
+                LayoutItems ();
+                Invalidate ();
+            }
+        }
+
+        private bool scrollable = true;
+
+        /// <summary>Gets or sets whether a node's ToolTipText is shown on hover.</summary>
+        public bool ShowNodeToolTips { get; set; }
+
+        /// <summary>Gets or sets whether nodes are kept in alphabetical order.</summary>
+        public bool Sorted {
+            get => sorted;
+            set {
+                if (sorted == value)
+                    return;
+
+                sorted = value;
+
+                // Sorts on assignment, as upstream does -- the designer serialises `Sorted = true` and
+                // expected the nodes already added to reorder (LST-11).
+                if (sorted)
+                    Sort ();
+            }
+        }
+
+        private bool sorted;
+
+        /// <summary>Gets or sets whether the control lays out right to left when RightToLeft is set.</summary>
+        public virtual bool RightToLeftLayout {
+            get => right_to_left_layout;
+            set {
+                if (right_to_left_layout == value)
+                    return;
+
+                right_to_left_layout = value;
+                RightToLeftLayoutChanged?.Invoke (this, EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool right_to_left_layout;
+
+        /// <summary>Raised when <see cref="RightToLeftLayout"/> changes.</summary>
+        public event EventHandler? RightToLeftLayoutChanged;
+
+        /// <summary>Gets how many nodes fit in the control's height.</summary>
+        public int VisibleCount {
+            get {
+                var itemHeight = Math.Max (1, ItemHeight);
+                return Math.Max (0, DeviceClientRectangle.Height / itemHeight);
+            }
+        }
+
+        /// <summary>Returns what part of the control is at the given point.</summary>
+        public TreeViewHitTestInfo HitTest (int x, int y) => HitTest (new Point (x, y));
+
+        /// <inheritdoc cref="HitTest(int,int)"/>
+        public TreeViewHitTestInfo HitTest (Point pt)
+        {
+            // W6.3: `pt` is logical, as MouseEventArgs is -- and this method used to test it against
+            // THREE different spaces. ClientRectangle is in device pixels (so the bounds check passed
+            // for points well outside the control on a scaled display), GetNodeAt takes logical, and
+            // the node Bounds the indent comes from are device. The last of those was the one a user
+            // saw: the expander indent measured twice its real width at scale 2, so clicks on a node's
+            // LABEL came back as PlusMinus and the standard "did they hit the expander?" test broke.
+            // Converted once here; everything below this line is logical.
+            if (!DeviceToLogicalUnits (DeviceClientRectangle).Contains (pt))
+                return new TreeViewHitTestInfo (null, TreeViewHitTestLocations.None);
+
+            // GetNodeAt returns the library's TreeNode; TreeNode is the WinForms-named subclass
+            // that the string-based Nodes.Add overloads produce, so a tree built the WinForms way
+            // reports its node and one built through TreeNode reports the location only.
+            if (GetNodeAt (pt) is not { } item)
+                return new TreeViewHitTestInfo (null, TreeViewHitTestLocations.AboveClientArea);
+
+            return new TreeViewHitTestInfo (item, LocateWithinRow (item, LogicalToDeviceUnits (pt.X)));
+        }
+
+        // LAY-39: which part of a node's row an x falls on, read from the regions the renderer paints
+        // (device pixels, like the node's Bounds). This keyed off item.Bounds.Left, and a laid-out node's
+        // bounds span the whole row from x ~= 1 whatever its depth, so nothing ever came back PlusMinus and
+        // "did the user click the expander?" was unanswerable. Upstream asks the native control
+        // (TVM_HITTEST), whose regions run in the same order: indent, button, state image, image, label.
+        private TreeViewHitTestLocations LocateWithinRow (TreeNode item, int x)
+        {
+            if (Renderers.RenderManager.GetRenderer<Renderers.TreeViewRenderer> () is not { } renderer)
+                return TreeViewHitTestLocations.Label;
+
+            if (x >= renderer.TextBoundsFor (this, item).Left)
+                return TreeViewHitTestLocations.Label;
+
+            var image = renderer.ImageBoundsFor (this, item);
+
+            if (!image.IsEmpty && x >= image.Left)
+                return TreeViewHitTestLocations.Image;
+
+            var glyph = renderer.GetGlyphBounds (this, item);
+            var glyph_start = glyph.IsEmpty ? renderer.IndentStartFor (this, item) : glyph.Left;
+            var check_start = glyph.IsEmpty ? glyph_start : glyph.Right;
+
+            // With CheckBoxes the box is the state image, as it is upstream.
+            if (CheckBoxes && x >= check_start && x < check_start + ScaledCheckWidth)
+                return TreeViewHitTestLocations.StateImage;
+
+            // A leaf has no button, so its glyph column is indent, as TVHT_ONITEMINDENT reports it.
+            if (!glyph.IsEmpty && x >= glyph.Left && x < glyph.Right && renderer.ShowsGlyphFor (this, item))
+                return TreeViewHitTestLocations.PlusMinus;
+
+            return TreeViewHitTestLocations.Indent;
+        }
+    }
+
+    /// <summary>Describes what is at a particular point in a <see cref="TreeView"/>.</summary>
+    public class TreeViewHitTestInfo
+    {
+        /// <summary>Initializes a new instance of the <see cref="TreeViewHitTestInfo"/> class.</summary>
+        public TreeViewHitTestInfo (TreeNode? hitNode, TreeViewHitTestLocations hitLocation)
+        {
+            Node = hitNode;
+            Location = hitLocation;
+        }
+
+        /// <summary>Gets the node at the tested point, or null.</summary>
+        public TreeNode? Node { get; }
+
+        /// <summary>Gets what part of the control the point was over.</summary>
+        public TreeViewHitTestLocations Location { get; }
+    }
+
+    public partial class RichTextBox
+    {
+        /// <summary>Gets or sets whether a double-click selects a whole word.</summary>
+        public bool AutoWordSelection { get; set; }
+
+        /// <summary>Gets or sets whether the control's own keyboard shortcuts are enabled.</summary>
+        public bool RichTextShortcutsEnabled { get; set; } = true;
+
+        /// <summary>Gets or sets whether the selection margin is shown.</summary>
+        public bool ShowSelectionMargin { get; set; }
+
+        /// <summary>Gets or sets the position of the right margin, in pixels; zero for none.</summary>
+        /// <remarks>
+        /// The wrapping width, whatever the control's own width is. It was stored and read by nothing,
+        /// so a rich text box told to wrap at 200px wrapped at whatever width it happened to be.
+        /// Upstream rejects a negative value outright; this one stored it.
+        /// </remarks>
+        public int RightMargin {
+            get => right_margin;
+            set {
+                if (value < 0)
+                    throw new System.ArgumentOutOfRangeException (nameof (RightMargin), value, "RightMargin cannot be negative.");
+
+                if (right_margin == value)
+                    return;
+
+                right_margin = value;
+
+                // Re-wrap now rather than at the next resize, which may never come.
+                document.Width = WrapWidth;
+                Invalidate ();
+            }
+        }
+
+        private int right_margin;
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Zero means "wrap to the control", which is upstream's meaning and the default; any other
+        /// value is the wrapping width in pixels.
+        /// </remarks>
+        internal override int WrapWidth
+            => (right_margin > 0 ? right_margin : base.WrapWidth) - ScaledSelectionMargin;
+
+        /// <summary>Gets or sets the input-method options for the control.</summary>
+        public RichTextBoxLanguageOptions LanguageOption { get; set; }
+            = RichTextBoxLanguageOptions.AutoFont | RichTextBoxLanguageOptions.DualFont;
+
+        /// <summary>Gets or sets the tab stops of the selected paragraphs.</summary>
+        public int[] SelectionTabs { get; set; } = [];
+
+        /// <summary>Gets or sets the selection as RTF.</summary>
+        /// <remarks>Reads and writes plain text: this control stores text, not a rich-text document,
+        /// so an RTF round trip would lose the markup it appeared to accept.</remarks>
+        public string SelectedRtf {
+            get => SelectedText;
+            set => SelectedText = value ?? string.Empty;
+        }
+
+        /// <summary>Gets what kind of content the selection holds.</summary>
+        public RichTextBoxSelectionTypes SelectionType
+            => SelectionLength == 0 ? RichTextBoxSelectionTypes.Empty : RichTextBoxSelectionTypes.Text;
+
+        /// <summary>Gets whether the clipboard holds data this control could paste.</summary>
+        public bool CanPaste (DataFormats.Format clipFormat)
+        {
+            Guard.ThrowIfNull (clipFormat);
+            return !string.IsNullOrEmpty (Clipboard.GetText ());
+        }
+
+        /// <summary>Gets whether there is an edit <see cref="Redo"/> would reapply.</summary>
+        /// <remarks>
+        /// Real as of W6 mechanisms. The document keeps the single-level undo buffer a Win32 edit
+        /// control keeps, which <c>Undo</c> toggles: undo, then undo again to redo. So anything that
+        /// can be undone can equally be redone, and this answers the same question <c>CanUndo</c>
+        /// does. Deviation from upstream's rich edit, which keeps a multi-level stack and can tell the
+        /// two directions apart.
+        /// </remarks>
+        public bool CanRedo => CanUndo;
+
+        /// <summary>Gets the name of the action <see cref="Redo"/> would reapply.</summary>
+        /// <remarks>Real as of W6 mechanisms: the single-level buffer knows there is an edit to
+        /// restore but not what kind it was, so this is "Undo" whenever there is one -- the name Win32
+        /// gives a toggling buffer -- and empty when there is nothing.</remarks>
+        public string RedoActionName => CanRedo ? "Undo" : string.Empty;
+
+        /// <summary>Gets the name of the action <c>Undo</c> would reverse. See <see cref="RedoActionName"/>.</summary>
+        public string UndoActionName => CanUndo ? "Undo" : string.Empty;
+
+        /// <summary>Reapplies the last undone edit.</summary>
+        /// <remarks>See <see cref="CanRedo"/>: the buffer toggles, so a redo is a second undo. It used
+        /// to do nothing at all.</remarks>
+        public void Redo ()
+        {
+            if (CanRedo)
+                Undo ();
+        }
+
+        // Neither notification has a source: the input-method and protected-range hooks are part of
+        // the native rich edit control that this one does not wrap.
+#pragma warning disable CS0067
+        /// <summary>Raised when the input method changes. Not raised by this layer.</summary>
+        public event EventHandler? ImeChange;
+
+#pragma warning restore CS0067
+    }
+
+    public partial class MaskedTextBox
+    {
+        /// <summary>Gets or sets whether the prompt character is accepted as input.</summary>
+        public bool AllowPromptAsInput { get; set; } = true;
+
+        /// <summary>Gets or sets the culture used to format and parse the value.</summary>
+        public IFormatProvider? FormatProvider { get; set; }
+
+        // Notifies on change; the event was declared and raised by nothing (W6.1 sweep).
+        private InsertKeyMode insert_key_mode = InsertKeyMode.Default;
+
+        /// <summary>Gets or sets whether typing inserts or overwrites.</summary>
+        public InsertKeyMode InsertKeyMode {
+            get => insert_key_mode;
+            set {
+                if (insert_key_mode == value)
+                    return;
+
+                var was_overwrite = IsOverwriteMode;
+                insert_key_mode = value;
+
+                if (IsOverwriteMode != was_overwrite)
+                    IsOverwriteModeChanged?.Invoke (this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Gets whether typing currently overwrites.</summary>
+        /// <remarks>Default follows the keyboard's Insert state, which this layer does not track, so
+        /// it resolves to insert -- the state a text box starts in.</remarks>
+        public bool IsOverwriteMode => InsertKeyMode == InsertKeyMode.Overwrite;
+
+        /// <summary>Gets or sets whether input stops at the first character the mask rejects.</summary>
+        public bool RejectInputOnFirstFailure { get; set; }
+
+        /// <summary>Gets or sets whether typing the prompt character clears that position.</summary>
+        public bool ResetOnPrompt { get; set; } = true;
+
+        /// <summary>Gets or sets whether typing a space clears that position.</summary>
+        public bool ResetOnSpace { get; set; } = true;
+
+        /// <summary>Gets or sets whether typing a literal moves past it rather than rejecting it.</summary>
+        public bool SkipLiterals { get; set; } = true;
+
+        /// <summary>Returns the text converted to <c>ValidatingType</c>, or null when it does not convert.</summary>
+        /// <remarks>Upstream's <c>ValidateText</c> is <c>PerformTypeValidation (null)</c>: the same
+        /// incomplete-mask gate and parse as validation on leaving the field, and it raises
+        /// <see cref="TypeValidationCompleted"/> too. A value that does not convert is reported as null
+        /// rather than thrown, because the caller's next move is a validation message either way.</remarks>
+        public object? ValidateText () => PerformTypeValidation (null);
+
+        // IsOverwriteMode describes state this layer does not change after construction.
+#pragma warning disable CS0067
+        /// <summary>Raised when <see cref="IsOverwriteMode"/> changes. Not raised by this layer yet.</summary>
+        public event EventHandler? IsOverwriteModeChanged;
+#pragma warning restore CS0067
+
+        /// <summary>Raised when <see cref="Mask"/> changes.</summary>
+        public event EventHandler? MaskChanged;
+
+        /// <summary>Raises the <see cref="MaskChanged"/> event.</summary>
+        protected virtual void OnMaskChanged (EventArgs e) => MaskChanged?.Invoke (this, e);
+    }
+}

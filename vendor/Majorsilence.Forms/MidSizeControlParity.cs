@@ -1,0 +1,850 @@
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+
+namespace Majorsilence.Forms
+{
+    // MonthCalendar, PropertyGrid, WebBrowser and PrintPreviewDialog parity
+    // (docs/winforms-gap-plan.md).
+    //
+    // MonthCalendar's is the substantial half: the three bolded-date sets are distinct (a date bolded
+    // annually recurs every year, monthly every month, and a plain bolded date only on that day), and
+    // HitTest and GetDisplayRange are computed from the same geometry the renderer lays the control
+    // out with, so they agree with what the user sees. That last claim was aspirational until W5.20c
+    // (SMP-42/SMP-43) -- the renderer laid out nothing but a centred string, and HitTest returned
+    // SelectionStart for every point in the body. The geometry now lives in MonthCalendarGrid.cs and
+    // all three read it.
+    //
+    // WebBrowser's is mostly the hosting surface of an embedded IE control -- print preview dialogs,
+    // scripting objects, encryption level. The backends host a modern web view through a narrow seam
+    // that offers none of it, and each member says so rather than looking capable.
+
+    public partial class MonthCalendar
+    {
+        private readonly List<DateTime> annually_bolded = [];
+        private readonly List<DateTime> monthly_bolded = [];
+        private readonly List<DateTime> bolded = [];
+
+        /// <summary>Gets or sets how many months a scroll-back or scroll-forward moves.</summary>
+        /// <remarks>Zero means "one screen", which is what WinForms uses as the default.</remarks>
+        public int ScrollChange { get; set; }
+
+        /// <summary>Gets the size one month needs at the current font, in pixels.</summary>
+        /// <remarks>As upstream's, which asks the native control (<c>MCM_GETMINREQRECT</c>): a title,
+        /// a day-of-week header and six weeks wide enough for every day column and the title, plus the
+        /// "Today:" strip while <see cref="ShowToday"/> is set. The control is sized from it, times
+        /// <see cref="CalendarDimensions"/> plus the gaps between the months (SMP-46). It used to be the
+        /// control's size divided by the dimensions, which made it an answer about the bounds rather
+        /// than about a month.</remarks>
+        public Size SingleMonthSize => MeasureSingleMonth ();
+
+        /// <summary>Gets or sets whether the control lays out right to left when RightToLeft is set.</summary>
+        public virtual bool RightToLeftLayout {
+            get => right_to_left_layout;
+            set {
+                if (right_to_left_layout == value)
+                    return;
+
+                right_to_left_layout = value;
+                RightToLeftLayoutChanged?.Invoke (this, EventArgs.Empty);
+                Invalidate ();
+            }
+        }
+
+        private bool right_to_left_layout;
+
+        /// <summary>Raised when <see cref="RightToLeftLayout"/> changes.</summary>
+        public event EventHandler? RightToLeftLayoutChanged;
+
+        /// <summary>Sets how many months are shown, as columns by rows.</summary>
+        public void SetCalendarDimensions (int x, int y)
+        {
+            Guard.ThrowIfNegativeOrZero (x);
+            Guard.ThrowIfNegativeOrZero (y);
+
+            // WinForms caps the total at 12 months by shrinking the larger dimension first, so a
+            // caller asking for 5x5 gets something drawable rather than 25 months.
+            while (x * y > 12) {
+                if (x > y)
+                    x--;
+                else
+                    y--;
+            }
+
+            // Upstream resizes the control to fit the months (AdjustSize), rather than dividing the
+            // area it already has between them.
+            if (calendar_dimensions.Width != x || calendar_dimensions.Height != y) {
+                calendar_dimensions = new Size (x, y);
+                AdjustSize ();
+            }
+        }
+
+        /// <summary>Adds a date that is drawn bold every year on that month and day.</summary>
+        public void AddAnnuallyBoldedDate (DateTime date) => Add (annually_bolded, date);
+
+        /// <summary>Adds a date that is drawn bold every month on that day.</summary>
+        public void AddMonthlyBoldedDate (DateTime date) => Add (monthly_bolded, date);
+
+        /// <summary>Adds a date that is drawn bold on that day only.</summary>
+        public void AddBoldedDate (DateTime date) => Add (bolded, date);
+
+        /// <summary>Removes an annually bolded date.</summary>
+        public void RemoveAnnuallyBoldedDate (DateTime date)
+            => annually_bolded.RemoveAll (d => d.Month == date.Month && d.Day == date.Day);
+
+        /// <summary>Removes a monthly bolded date.</summary>
+        public void RemoveMonthlyBoldedDate (DateTime date) => monthly_bolded.RemoveAll (d => d.Day == date.Day);
+
+        /// <summary>Removes a bolded date.</summary>
+        public void RemoveBoldedDate (DateTime date) => bolded.RemoveAll (d => d.Date == date.Date);
+
+        /// <summary>Removes every annually bolded date.</summary>
+        public void RemoveAllAnnuallyBoldedDates () => annually_bolded.Clear ();
+
+        /// <summary>Removes every monthly bolded date.</summary>
+        public void RemoveAllMonthlyBoldedDates () => monthly_bolded.Clear ();
+
+        /// <summary>Removes every bolded date.</summary>
+        public void RemoveAllBoldedDates () => bolded.Clear ();
+
+        /// <summary>Repaints the control so pending bolded-date changes take effect.</summary>
+        /// <remarks>WinForms batches Add/Remove calls and only sends them to the native control here,
+        /// so applications call it after a run of edits. The lists are live here and are what the
+        /// array properties read, so all this has left to do is repaint. It used to copy the lists
+        /// over the array properties, erasing an array the application had assigned (SMP-44).</remarks>
+        public void UpdateBoldedDates () => Invalidate ();
+
+        /// <summary>Returns whether the given date is drawn bold, by any of the three rules.</summary>
+        public bool IsBoldedDate (DateTime date)
+            => bolded.Any (d => d.Date == date.Date)
+                || monthly_bolded.Any (d => d.Day == date.Day)
+                || annually_bolded.Any (d => d.Month == date.Month && d.Day == date.Day);
+
+        /// <summary>Returns the range of dates the control is showing.</summary>
+        /// <param name="visible">
+        /// True for only the days of the displayed months; false to include the leading and trailing
+        /// days of adjacent months that fill out the first and last weeks.
+        /// </param>
+        public SelectionRange GetDisplayRange (bool visible)
+        {
+            // DisplayMonth, not SelectionStart's month: once the user clicks the prev/next arrows the
+            // two differ, and the range has to report what is on screen (SMP-42). They are the same
+            // until something scrolls the view, which is why every existing caller sees no change.
+            var first = DisplayMonth;
+            var last = first.AddMonths (MonthsShown).AddDays (-1);
+
+            if (visible)
+                return new SelectionRange (first, last);
+
+            // Back up to the first day of the week the month starts in, and forward to the last day
+            // of the week it ends in -- the greyed-out days the control still draws.
+            var weekStart = (int)FirstDayOfWeekAsDayOfWeek;
+            var startOffset = ((int)first.DayOfWeek - weekStart + 7) % 7;
+            var endOffset = 6 - (((int)last.DayOfWeek - weekStart + 7) % 7);
+
+            return new SelectionRange (first.AddDays (-startOffset), last.AddDays (endOffset));
+        }
+
+        /// <summary>Returns what part of the control is at the given point.</summary>
+        public HitTestInfo HitTest (int x, int y) => HitTest (new Point (x, y));
+
+        /// <inheritdoc cref="HitTest(int,int)"/>
+        /// <remarks>
+        /// <paramref name="point"/> is in the logical units a <c>MouseEventArgs</c> carries, while the
+        /// geometry it is tested against is in device pixels, so it is converted first -- the same
+        /// boundary <c>ListBox.GetIndexAtLocation</c> documents. Before W5.20c (finding SMP-43) every
+        /// point in the body returned <c>SelectionStart</c>, whatever day was under the cursor, so a
+        /// per-day context menu always acted on the already-selected date.
+        /// </remarks>
+        public HitTestInfo HitTest (Point point)
+        {
+            var device = new Point (LogicalToDeviceUnits (point.X), LogicalToDeviceUnits (point.Y));
+
+            if (!DeviceClientRectangle.Contains (device))
+                return new HitTestInfo (point, HitArea.Nowhere, DateTime.MinValue);
+
+            // The arrows belong to the control, not to one month: the previous arrow is on the first
+            // month and the next arrow on the last month of the top row (SMP-46).
+            var arrows = Geometry;
+
+            if (arrows.PrevButton.Contains (device))
+                return new HitTestInfo (point, HitArea.PrevMonthButton, DateTime.MinValue);
+            if (arrows.NextButton.Contains (device))
+                return new HitTestInfo (point, HitArea.NextMonthButton, DateTime.MinValue);
+
+            if (arrows.TodayBand.Contains (device))
+                return new HitTestInfo (point, HitArea.TodayLink, TodayDate);
+
+            for (var index = 0; index < MonthsShown; index++) {
+                var geometry = GetMonthGeometry (index);
+
+                if (geometry.Block.Contains (device))
+                    return HitTestMonth (point, device, geometry);
+            }
+
+            // Inside the control but on none of the bands: the few pixels integer division leaves at
+            // the right and bottom edges of the grid.
+            return new HitTestInfo (point, HitArea.CalendarBackground, DateTime.MinValue);
+        }
+
+        // One month's block: its title, day header, week numbers and day cells.
+        private HitTestInfo HitTestMonth (Point point, Point device, MonthCalendarGeometry geometry)
+        {
+            if (geometry.Title.Contains (device))
+                return new HitTestInfo (point, TitleAreaAt (device.X, geometry), DateTime.MinValue);
+
+            if (geometry.DayHeader.Contains (device)) {
+                var column = Math.Min ((device.X - geometry.DayHeader.Left) / geometry.CellWidth, 6);
+
+                return new HitTestInfo (point, HitArea.DayOfWeek, GetDateAt (geometry, 0, column));
+            }
+
+            if (geometry.WeekNumberColumn.Contains (device)) {
+                var week = Math.Min ((device.Y - geometry.WeekNumberColumn.Top) / geometry.CellHeight, 5);
+
+                return new HitTestInfo (point, HitArea.WeekNumbers, GetDateAt (geometry, week, 0));
+            }
+
+            if (geometry.Grid.Contains (device)) {
+                var column = (device.X - geometry.Grid.Left) / geometry.CellWidth;
+                var week = (device.Y - geometry.Grid.Top) / geometry.CellHeight;
+                var date = GetDateAt (geometry, week, column);
+                var displayed = geometry.Month;
+
+                // An adjacent month's day between two months on screen is not drawn, so there is
+                // nothing there to click (SMP-46).
+                if (!IsDrawn (geometry, date))
+                    return new HitTestInfo (point, HitArea.CalendarBackground, DateTime.MinValue);
+
+                // The leading and trailing days belong to the neighbouring months and say so, because
+                // clicking one both selects that date and pages the view -- callers need to tell them
+                // apart from a day of the month on screen.
+                var area = date.Year == displayed.Year && date.Month == displayed.Month
+                    ? HitArea.Date
+                    : date < displayed ? HitArea.PrevMonthDate : HitArea.NextMonthDate;
+
+                return new HitTestInfo (point, area, date);
+            }
+
+            return new HitTestInfo (point, HitArea.CalendarBackground, DateTime.MinValue);
+        }
+
+        // The title caption: the renderer draws exactly this string, centred in exactly this area, so
+        // the month and year runs HitTest finds are where the user sees them.
+        internal string TitleCaption => TitleCaptionOf (DisplayMonth);
+
+        internal static string TitleCaptionOf (DateTime month)
+            => month.ToString ("MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
+
+        // Inset by the arrow width on both sides on every month, arrows or not, so every month's
+        // caption is centred the same way (SMP-46).
+        internal static Rectangle TitleTextArea (MonthCalendarGeometry geometry)
+            => new Rectangle (geometry.Title.Left + geometry.ArrowWidth, geometry.Title.Top,
+                              Math.Max (0, geometry.Title.Width - (2 * geometry.ArrowWidth)),
+                              geometry.Title.Height);
+
+        // SMP-43's remainder: the native control answers MCHT_TITLEMONTH over the month name,
+        // MCHT_TITLEYEAR over the year and MCHT_TITLEBK over the rest of the band. Every title point
+        // used to be TitleMonth. The runs are measured with the font and size the renderer draws with,
+        // in device pixels like the geometry.
+        private HitArea TitleAreaAt (int deviceX, MonthCalendarGeometry geometry)
+        {
+            var area = TitleTextArea (geometry);
+            var font = GetEffectiveFont ();
+            var size = LogicalToDeviceUnits (GetEffectiveFontSize ());
+            var caption = TitleCaptionOf (geometry.Month);
+            var year = geometry.Month.ToString ("yyyy", System.Globalization.CultureInfo.CurrentCulture);
+            var month = geometry.Month.ToString ("MMMM", System.Globalization.CultureInfo.CurrentCulture);
+
+            var caption_width = TextMeasurer.MeasureText (caption, font, size).Width;
+            var left = area.Left + (area.Width - caption_width) / 2f;
+            var right = left + caption_width;
+
+            // The year is measured back from the caption's right edge rather than forward over
+            // "month + space", because a measurer may trim the trailing space.
+            var month_right = left + TextMeasurer.MeasureText (month, font, size).Width;
+            var year_left = right - TextMeasurer.MeasureText (year, font, size).Width;
+
+            if (deviceX >= left && deviceX < month_right)
+                return HitArea.TitleMonth;
+
+            if (deviceX >= year_left && deviceX < right)
+                return HitArea.TitleYear;
+
+            return HitArea.TitleBackground;
+        }
+
+        // WinForms' Day enum starts at Monday = 0 while DayOfWeek starts at Sunday = 0, so the two
+        // cannot be compared directly -- doing so put the padded range's boundaries one day out.
+        internal DayOfWeek FirstDayOfWeekAsDayOfWeek
+            => FirstDayOfWeek == Day.Default ? DayOfWeek.Sunday : (DayOfWeek)(((int)FirstDayOfWeek + 1) % 7);
+
+        private static void Add (List<DateTime> target, DateTime date)
+        {
+            if (!target.Contains (date.Date))
+                target.Add (date.Date);
+        }
+
+        /// <summary>Identifies the part of a <see cref="MonthCalendar"/> a point falls on.</summary>
+        public enum HitArea
+        {
+            /// <summary>The point is not on anything meaningful.</summary>
+            Nowhere = 0,
+            /// <summary>The point is on a date.</summary>
+            Date = 1,
+            /// <summary>The point is on a week number.</summary>
+            WeekNumbers = 2,
+            /// <summary>The point is on the title's background.</summary>
+            TitleBackground = 3,
+            /// <summary>The point is on the month shown in the title.</summary>
+            TitleMonth = 4,
+            /// <summary>The point is on the year shown in the title.</summary>
+            TitleYear = 5,
+            /// <summary>The point is on the next-month arrow.</summary>
+            NextMonthButton = 6,
+            /// <summary>The point is on the previous-month arrow.</summary>
+            PrevMonthButton = 7,
+            /// <summary>The point is on a day of the previous month.</summary>
+            PrevMonthDate = 8,
+            /// <summary>The point is on a day of the next month.</summary>
+            NextMonthDate = 9,
+            /// <summary>The point is on the day-of-week header.</summary>
+            DayOfWeek = 10,
+            /// <summary>The point is on the "today" link.</summary>
+            TodayLink = 11,
+            /// <summary>The point is on the calendar's background.</summary>
+            CalendarBackground = 12,
+        }
+
+        /// <summary>Describes what a <see cref="MonthCalendar.HitTest(Point)"/> found.</summary>
+        public sealed class HitTestInfo
+        {
+            internal HitTestInfo (Point point, HitArea hitArea, DateTime time)
+            {
+                Point = point;
+                HitArea = hitArea;
+                Time = time;
+            }
+
+            /// <summary>Gets the point that was tested.</summary>
+            public Point Point { get; }
+
+            /// <summary>Gets the part of the control the point fell on.</summary>
+            public HitArea HitArea { get; }
+
+            /// <summary>Gets the date at that point, or <see cref="DateTime.MinValue"/> when there is none.</summary>
+            public DateTime Time { get; }
+        }
+    }
+
+    public partial class PropertyGrid
+    {
+        /// <summary>Gets or sets the attributes a property must carry to be listed.</summary>
+        /// <remarks>Real as of W6 mechanisms: a property is shown only when it carries every attribute
+        /// in the collection, an attribute at its default value matching a property that does not
+        /// declare it, which is how upstream filters.</remarks>
+        public AttributeCollection? BrowsableAttributes {
+            get => browsable_attributes;
+            set {
+                if (ReferenceEquals (browsable_attributes, value))
+                    return;
+
+                browsable_attributes = value;
+                Refresh ();
+            }
+        }
+
+        private AttributeCollection? browsable_attributes;
+
+        /// <summary>Gets or sets whether visual-style glyphs are used for the expand indicators.</summary>
+        public bool CanShowVisualStyleGlyphs { get; set; } = true;
+
+        /// <summary>Gets or sets whether the toolbar uses large buttons.</summary>
+        /// <remarks>Read as of W6 mechanisms: it sets the toolbar's image scaling size and its height.</remarks>
+        public bool LargeButtons {
+            get => large_buttons;
+            set {
+                if (large_buttons == value)
+                    return;
+
+                large_buttons = value;
+                ApplyToolbarState ();
+                Invalidate ();
+            }
+        }
+
+        private bool large_buttons;
+
+        /// <summary>Gets or sets whether text is drawn through the compatible text renderer.</summary>
+        public bool UseCompatibleTextRendering { get; set; }
+
+        /// <summary>Gets or sets the colour of category headings.</summary>
+        public Color CategoryForeColor { get; set; } = SystemColors.ControlText;
+
+        /// <summary>Gets or sets the colour of the line under a category heading.</summary>
+        public Color CategorySplitterColor { get; set; } = SystemColors.Control;
+
+        /// <summary>Gets or sets the colour of a property that cannot be edited.</summary>
+        public Color DisabledItemForeColor { get; set; } = SystemColors.GrayText;
+
+        /// <summary>Gets or sets the colour of the help pane's border.</summary>
+        public Color HelpBorderColor { get; set; } = SystemColors.ControlDark;
+
+        /// <summary>Gets or sets the colour of the grid's border.</summary>
+        public Color ViewBorderColor { get; set; } = SystemColors.ControlDark;
+
+        /// <summary>Gets or sets the background colour of the selected row while the grid has focus.</summary>
+        public Color SelectedItemWithFocusBackColor { get; set; } = SystemColors.Highlight;
+
+        /// <summary>Gets or sets the text colour of the selected row while the grid has focus.</summary>
+        public Color SelectedItemWithFocusForeColor { get; set; } = SystemColors.HighlightText;
+
+        /// <summary>Gets or sets the background colour of the commands pane.</summary>
+        public Color CommandsBackColor { get; set; } = SystemColors.Control;
+
+        /// <summary>Gets or sets the text colour of the commands pane.</summary>
+        public Color CommandsForeColor { get; set; } = SystemColors.ControlText;
+
+        /// <summary>Gets or sets the border colour of the commands pane.</summary>
+        public Color CommandsBorderColor { get; set; } = SystemColors.ControlDark;
+
+        /// <summary>Gets or sets the colour of a link in the commands pane.</summary>
+        public Color CommandsLinkColor { get; set; } = SystemColors.HotTrack;
+
+        /// <summary>Gets or sets the colour of a link being clicked in the commands pane.</summary>
+        public Color CommandsActiveLinkColor { get; set; } = SystemColors.HotTrack;
+
+        /// <summary>Gets or sets the colour of a disabled link in the commands pane.</summary>
+        public Color CommandsDisabledLinkColor { get; set; } = SystemColors.GrayText;
+
+        /// <summary>Gets where a context menu opens when raised from the keyboard.</summary>
+        public Point ContextMenuDefaultLocation => new Point (Width / 2, Height / 2);
+
+        /// <summary>Gets the property tabs available on this grid.</summary>
+        public PropertyTabCollection PropertyTabs => property_tabs ??= new PropertyTabCollection ();
+
+        private PropertyTabCollection? property_tabs;
+
+
+
+        /// <summary>Resets the selected property to its default value.</summary>
+        /// <summary>Puts the selected property back to its default value.</summary>
+        /// <remarks>
+        /// Real as of W6 mechanisms, now that the grid has an item tree to select in and a path that
+        /// writes values: the property's own <c>ResetValue</c> is called when it can be reset, the row
+        /// picks up the new value, and the change is announced through <c>PropertyValueChanged</c> as
+        /// an edit would be. A property that cannot be reset, or no selection, does nothing.
+        /// </remarks>
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage ("Trimming", "IL2026", Justification = "PropertyGrid resets through TypeDescriptor at runtime; trimming is not supported for this control.")]
+        public void ResetSelectedProperty ()
+        {
+            if (SelectedGridItem is not { PropertyDescriptor: { } property } item || SelectedObject is not { } target)
+                return;
+
+            if (!property.CanResetValue (target))
+                return;
+
+            var old = item.Value;
+
+            // Every selected object, as a committed edit does (SMP-59).
+            foreach (var each in SelectedObjects ?? [])
+                if (CounterpartOf (each, property) is { } counterpart && counterpart.CanResetValue (each))
+                    counterpart.ResetValue (each);
+
+            item.Value = property.GetValue (target);
+
+            OnPropertyValueChanged (new PropertyValueChangedEventArgs (item, old!));
+            Invalidate ();
+        }
+
+        /// <summary>Raised when the sort order changes.</summary>
+        public event EventHandler? PropertySortChanged;
+
+        /// <summary>Raised when the selected property tab changes.</summary>
+#pragma warning disable CS0067
+        public event PropertyTabChangedEventHandler? PropertyTabChanged;
+#pragma warning restore CS0067
+
+        /// <summary>Raises the <see cref="PropertySortChanged"/> event.</summary>
+        protected virtual void OnPropertySortChanged (EventArgs e) => PropertySortChanged?.Invoke (this, e);
+
+        /// <summary>The property tabs shown by a <see cref="PropertyGrid"/>.</summary>
+        public class PropertyTabCollection : IReadOnlyList<PropertyTab>
+        {
+            private readonly List<PropertyTab> tabs = [];
+
+            /// <summary>Gets the number of tabs.</summary>
+            public int Count => tabs.Count;
+
+            /// <summary>Gets the tab at the given index.</summary>
+            public PropertyTab this[int index] => tabs[index];
+
+            /// <summary>Adds a tab.</summary>
+            [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode ("The tab type is constructed by reflection, as it is upstream.")]
+            public void AddTabType (Type propertyTabType) => AddTabType (propertyTabType, PropertyTabScope.Global);
+
+            /// <inheritdoc cref="AddTabType(Type)"/>
+            [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode ("The tab type is constructed by reflection, as it is upstream.")]
+            public void AddTabType (Type propertyTabType, PropertyTabScope tabScope)
+            {
+                Guard.ThrowIfNull (propertyTabType);
+
+                if (Activator.CreateInstance (propertyTabType) is PropertyTab tab)
+                    tabs.Add (tab);
+            }
+
+            /// <summary>Removes every tab of the given scope.</summary>
+            public void Clear (PropertyTabScope tabScope) => tabs.Clear ();
+
+            /// <summary>Removes the tab of the given type.</summary>
+            public void RemoveTabType (Type propertyTabType)
+                => tabs.RemoveAll (t => t.GetType () == propertyTabType);
+
+            /// <inheritdoc/>
+            public IEnumerator<PropertyTab> GetEnumerator () => tabs.GetEnumerator ();
+
+            IEnumerator IEnumerable.GetEnumerator () => GetEnumerator ();
+        }
+    }
+
+    /// <summary>A tab of properties shown by a <see cref="PropertyGrid"/>.</summary>
+    /// <remarks>WinForms declares this in <c>System.Windows.Forms.Design</c>, an assembly this layer
+    /// does not have; it is reimplemented here for the same reason the drawing types are.</remarks>
+    public abstract class PropertyTab
+    {
+        /// <summary>Gets the tab's display name.</summary>
+        public abstract string TabName { get; }
+
+        /// <summary>Gets the tab's bitmap, or null.</summary>
+        public virtual Majorsilence.Forms.Drawing.Bitmap? Bitmap => null;
+
+        /// <summary>Gets the properties this tab shows for the given component.</summary>
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode ("The component's properties are discovered by reflection, as they are upstream.")]
+        public virtual PropertyDescriptorCollection GetProperties (object component)
+            => TypeDescriptor.GetProperties (component);
+    }
+
+    // PropertyTabScope used to be redeclared here. It is a real cross-platform BCL type
+    // (System.ComponentModel.PropertyTabScope, alongside PropertyTabAttribute which carries it), so the
+    // copy was not filling a gap -- it was competing with the original. WinForms' own
+    // PropertyGrid.RefreshTabs takes the BCL enum, so a caller holding one from the attribute it read it
+    // off could not pass it here. RefreshTabs and PropertyTabCollection now take the BCL type.
+
+    public partial class WebBrowser
+    {
+        /// <summary>Gets or sets whether the control may navigate.</summary>
+        public bool AllowNavigation { get; set; } = true;
+
+        /// <summary>Gets or sets whether files dropped on the control are opened.</summary>
+        public bool AllowWebBrowserDrop { get; set; } = true;
+
+        /// <summary>Gets or sets whether the control works from the local cache only.</summary>
+        public bool IsOffline { get; set; }
+
+        /// <summary>Gets whether a navigation is in progress.</summary>
+        public bool IsBusy => ReadyState is WebBrowserReadyState.Loading or WebBrowserReadyState.Interactive;
+
+        /// <summary>Gets the type of the loaded document.</summary>
+        public string DocumentType => "HTML Document";
+
+        /// <summary>Gets the status text the page has set.</summary>
+        public virtual string StatusText => string.Empty;
+
+        /// <summary>Gets the version of the underlying browser engine.</summary>
+        /// <remarks>The backends host their platform's web view, which does not report a version
+        /// through this seam; zero is reported rather than a number invented to look plausible.</remarks>
+        public Version Version => new Version (0, 0);
+
+        /// <summary>Gets the encryption level of the loaded page.</summary>
+        /// <remarks>Unknown: the hosting seam does not surface certificate information, and reporting
+        /// anything else would be a security claim this layer cannot back.</remarks>
+        public WebBrowserEncryptionLevel EncryptionLevel => WebBrowserEncryptionLevel.Unknown;
+
+        /// <summary>Gets or sets the object exposed to the page's script as <c>window.external</c>.</summary>
+        /// <remarks>Stored, not injected: the backends' web views have no scripting bridge here, so
+        /// a page calling <c>window.external</c> finds nothing.</remarks>
+        public object? ObjectForScripting { get; set; }
+
+        /// <summary>Gets or sets the document as a stream.</summary>
+        /// <remarks>Reading returns null and writing is ignored. Loading from a stream needs a content
+        /// seam the backends do not offer, and silently discarding a caller's document while looking
+        /// successful would be worse than saying so.</remarks>
+        public Stream? DocumentStream { get; set; }
+
+        /// <summary>Gets the loaded document's object model.</summary>
+        /// <remarks>Always null. The DOM types (<c>HtmlDocument</c> and friends) are documented
+        /// non-goals -- see docs/winforms-gap-plan.md -- so there is nothing to return.</remarks>
+        public object? Document => null;
+
+        /// <summary>Navigates to the configured search page.</summary>
+        public void GoSearch () { }
+
+        /// <summary>Shows the page setup dialog for the loaded page.</summary>
+        public void ShowPageSetupDialog () { }
+
+        /// <summary>Shows the print preview dialog for the loaded page.</summary>
+        public void ShowPrintPreviewDialog () { }
+
+        /// <summary>Shows the properties dialog for the loaded page.</summary>
+        public void ShowPropertiesDialog () { }
+
+        /// <summary>Shows the save-as dialog for the loaded page.</summary>
+        public void ShowSaveAsDialog () { }
+
+        // The browser-host notifications. The seam the backends expose reports navigation only, so
+        // these are declared and raisable but not raised.
+#pragma warning disable CS0067
+        /// <summary>Raised when the page's encryption level changes. Not raised by this layer yet.</summary>
+        public event EventHandler? EncryptionLevelChanged;
+
+        /// <summary>Raised when a file download starts. Not raised by this layer yet.</summary>
+        public event EventHandler? FileDownload;
+
+        /// <summary>Raised when the page asks for a new window. Not raised by this layer yet.</summary>
+        public event CancelEventHandler? NewWindow;
+
+        /// <summary>Raised as a page loads. Not raised by this layer yet.</summary>
+        public event WebBrowserProgressChangedEventHandler? ProgressChanged;
+#pragma warning restore CS0067
+    }
+
+    public partial class PrintPreviewDialog
+    {
+        /// <summary>Gets the control that renders the preview.</summary>
+        public PrintPreviewControl PrintPreviewControl => print_preview_control ??= new PrintPreviewControl ();
+
+        private PrintPreviewControl? print_preview_control;
+
+        // AccessibleRole is NOT redeclared here. WindowBase supplies it now, and this dialog only ever
+        // wanted a different default (Client rather than Default, as WinForms reports for it), which the
+        // constructor sets -- shadowing the inherited property to change a default would leave two
+        // properties where callers expect one.
+        /// <summary>Initializes a new instance.</summary>
+        public PrintPreviewDialog ()
+        {
+            AccessibleRole = AccessibleRole.Client;
+            ImeMode = ImeMode.Inherit;
+        }
+
+        /// <summary>Gets or sets whether the dialog shows the wait cursor.</summary>
+        /// <remarks>`new` for the same reason as the shadowed events below: WinForms redeclares this on
+        /// the dialog (to hide it from the designer) and forwards to the base, as this does.</remarks>
+        public new bool UseWaitCursor {
+            get => base.UseWaitCursor;
+            set => base.UseWaitCursor = value;
+        }
+
+        /// <summary>Gets the data bindings for the dialog.</summary>
+        /// <remarks>`new` deliberately: these bind the hosted <see cref="PrintPreviewControl"/>, which is
+        /// what a caller binding this dialog means, and not the window's own properties that
+        /// <see cref="WindowBase.DataBindings"/> covers.</remarks>
+        public new ControlBindingsCollection DataBindings => data_bindings ??= new ControlBindingsCollection (PrintPreviewControl);
+
+        private ControlBindingsCollection? data_bindings;
+
+        /// <summary>Gets the padding between the dialog's docked edges and its contents.</summary>
+        public ScrollableControl.DockPaddingEdges DockPadding { get; } = new ScrollableControl.DockPaddingEdges (0, 0, 0, 0);
+
+        // WinForms redeclares these on this dialog purely to hide them from the designer; they are
+        // never raised there either, because the dialog is not meant to be re-styled. The ones that now
+        // shadow a WindowBase member say `new` for that reason, exactly as WinForms does -- hiding is the
+        // intent here, not an accident.
+        //
+        // Ones that existed only because the window side LACKED the member are deleted rather than
+        // shadowed as that gap closes: an inert stub in front of a working forward is worse than nothing.
+        // ContextMenuStripChanged, ImeModeChanged, ImeMode and AccessibleRole went that way.
+        // WinForms redeclares each of these with `new` and forwards to the base -- the redeclaration is
+        // a designer-visibility trick, not a different event. Until W6.1 the redeclarations here were
+        // plain fields that nothing raised, so subscribing on the dialog silently heard nothing while
+        // the same subscription on any other Form worked (LST-28's shape, on a window).
+        /// <summary>Forwards to the inherited <c>BackColorChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? BackColorChanged {
+            add => base.BackColorChanged += value;
+            remove => base.BackColorChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>BackgroundImageChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? BackgroundImageChanged {
+            add => base.BackgroundImageChanged += value;
+            remove => base.BackgroundImageChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>BackgroundImageLayoutChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? BackgroundImageLayoutChanged {
+            add => base.BackgroundImageLayoutChanged += value;
+            remove => base.BackgroundImageLayoutChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>CausesValidationChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? CausesValidationChanged {
+            add => base.CausesValidationChanged += value;
+            remove => base.CausesValidationChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>CursorChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? CursorChanged {
+            add => base.CursorChanged += value;
+            remove => base.CursorChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>ForeColorChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? ForeColorChanged {
+            add => base.ForeColorChanged += value;
+            remove => base.ForeColorChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>PaddingChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? PaddingChanged {
+            add => base.PaddingChanged += value;
+            remove => base.PaddingChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>RightToLeftChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? RightToLeftChanged {
+            add => base.RightToLeftChanged += value;
+            remove => base.RightToLeftChanged -= value;
+        }
+
+        /// <summary>Forwards to the inherited <c>TextChanged</c>; redeclared for designer parity, as WinForms does.</summary>
+        public new event EventHandler? TextChanged {
+            add => base.TextChanged += value;
+            remove => base.TextChanged -= value;
+        }
+
+        /// <summary>Raised when <see cref="WindowBase.Dock"/> changes.</summary>
+        public event EventHandler? DockChanged;
+
+        internal override void OnDockChangedCore () => DockChanged?.Invoke (this, EventArgs.Empty);
+
+        // VisibleChanged was a stub here too; it now comes from WindowBase, which actually raises it.
+    }
+
+    public partial class ScrollableControl
+    {
+        /// <summary>The padding between a container's docked edges and its contents.</summary>
+        /// <remarks>
+        /// A view of the owner's <see cref="Control.Padding"/>, as upstream's is
+        /// (Scrolling/ScrollableControl.DockPaddingEdgesConverter.cs): designer code from older Visual Studio
+        /// versions writes <c>panel1.DockPadding.All = 5</c>, and that has to inset the docked children.
+        /// This was a detached bag of four integers nothing read, so the children sat flush against the
+        /// edge (LAY-31). A copy made through <see cref="ICloneable"/> is detached and keeps its own values.
+        /// </remarks>
+        public class DockPaddingEdges : ICloneable
+        {
+            private readonly ScrollableControl? owner;
+            private int left;
+            private int right;
+            private int top;
+            private int bottom;
+
+            internal DockPaddingEdges (ScrollableControl owner)
+            {
+                this.owner = owner;
+            }
+
+            internal DockPaddingEdges (int left, int right, int top, int bottom)
+            {
+                this.left = left;
+                this.right = right;
+                this.top = top;
+                this.bottom = bottom;
+            }
+
+            /// <summary>Gets or sets the padding on every edge at once; 0 when the edges differ.</summary>
+            public int All {
+                get {
+                    if (owner is null)
+                        return left == right && top == bottom && left == top ? left : 0;
+
+                    // Padding answers -1 when its edges disagree. Upstream remaps that to 0 for
+                    // compatibility, unless every edge really is -1.
+                    var padding = owner.Padding;
+
+                    if (padding.All == -1 && (padding.Left != -1 || padding.Top != -1 || padding.Right != -1 || padding.Bottom != -1))
+                        return 0;
+
+                    return padding.All;
+                }
+                set {
+                    if (owner is null)
+                        left = top = right = bottom = value;
+                    else
+                        owner.Padding = new Padding (value);
+                }
+            }
+
+            /// <summary>Gets or sets the padding on the left edge.</summary>
+            public int Left {
+                get => owner is null ? left : owner.Padding.Left;
+                set {
+                    if (owner is null) {
+                        left = value;
+                    } else {
+                        var padding = owner.Padding;
+                        padding.Left = value;
+                        owner.Padding = padding;
+                    }
+                }
+            }
+
+            /// <summary>Gets or sets the padding on the top edge.</summary>
+            public int Top {
+                get => owner is null ? top : owner.Padding.Top;
+                set {
+                    if (owner is null) {
+                        top = value;
+                    } else {
+                        var padding = owner.Padding;
+                        padding.Top = value;
+                        owner.Padding = padding;
+                    }
+                }
+            }
+
+            /// <summary>Gets or sets the padding on the right edge.</summary>
+            public int Right {
+                get => owner is null ? right : owner.Padding.Right;
+                set {
+                    if (owner is null) {
+                        right = value;
+                    } else {
+                        var padding = owner.Padding;
+                        padding.Right = value;
+                        owner.Padding = padding;
+                    }
+                }
+            }
+
+            /// <summary>Gets or sets the padding on the bottom edge.</summary>
+            public int Bottom {
+                get => owner is null ? bottom : owner.Padding.Bottom;
+                set {
+                    if (owner is null) {
+                        bottom = value;
+                    } else {
+                        var padding = owner.Padding;
+                        padding.Bottom = value;
+                        owner.Padding = padding;
+                    }
+                }
+            }
+
+            /// <inheritdoc/>
+            public override bool Equals (object? obj)
+                => obj is DockPaddingEdges edges
+                    && Left == edges.Left && Top == edges.Top && Right == edges.Right && Bottom == edges.Bottom;
+
+            /// <inheritdoc/>
+            public override int GetHashCode () => HashCode.Combine (Left, Top, Right, Bottom);
+
+            /// <inheritdoc/>
+            public override string ToString () => $"{{Left={Left},Top={Top},Right={Right},Bottom={Bottom}}}";
+
+            object ICloneable.Clone () => new DockPaddingEdges (Left, Right, Top, Bottom);
+        }
+    }
+}
