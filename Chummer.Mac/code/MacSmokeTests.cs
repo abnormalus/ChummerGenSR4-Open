@@ -424,9 +424,12 @@ namespace Chummer
                     screenForm.Controls.Add(anchor);
                     screenForm.Show();
                     var local = new System.Drawing.Point(13, 7);
-                    var expected = nativeBackend.PointToScreen(new System.Drawing.Point(anchor.Left + local.X, anchor.Top + local.Y));
+                    var clientOffset = new System.Drawing.Point(anchor.Left + local.X, anchor.Top + local.Y);
+                    // Windows custom chrome insets the form client container; native Mac chrome does not.
+                    clientOffset.Offset(anchor.Parent.Location);
+                    var expected = nativeBackend.PointToScreen(clientOffset);
                     Check(anchor.PointToScreen(local) == expected,
-                        "Retina screen placement uses desktop points rather than framebuffer pixels");
+                        "screen placement includes client chrome and uses native desktop units");
                     var screenBounds = (System.Drawing.Rectangle)typeof(Form).BaseType.GetProperty("ScreenBounds",
                         BindingFlags.NonPublic | BindingFlags.Instance).GetValue(screenForm);
                     Check(screenBounds.Width == nativeBackend.ClientSize.Width,
