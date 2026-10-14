@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chummer Sourcebook</title><link rel="stylesheet" href="legacy/web/pdf_viewer.css"><link rel="stylesheet" href="reader.css"></head>
+<body><header aria-label="PDF controls">
+<button id="previous" aria-label="Previous page">‹</button><label>Page <input id="page" type="number" min="1" value="1"></label><span id="pages">/ —</span><button id="next" aria-label="Next page">›</button>
+<button id="zoomOut" aria-label="Zoom out">−</button><select id="zoom" aria-label="Zoom"><option value="page-width">Page width</option><option value="page-fit">Fit page</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select><button id="zoomIn" aria-label="Zoom in">+</button>
+<label>Find <input id="search" type="search" placeholder="Search this book"></label><button id="findPrevious" aria-label="Previous match">↑</button><button id="findNext" aria-label="Next match">↓</button><span id="matches" role="status"></span>
+</header><div id="status" role="status">Opening book…</div><div id="container"><div id="viewer" class="pdfViewer"></div></div>
+<dialog id="passwordDialog"><form id="passwordForm"><label id="passwordLabel" for="password">This PDF needs a password.</label><input id="password" type="password" autocomplete="off"><button type="submit">Open</button><button id="cancelPassword" type="button">Cancel</button></form></dialog>
+<script type="module" src="reader.mjs"></script></body></html>

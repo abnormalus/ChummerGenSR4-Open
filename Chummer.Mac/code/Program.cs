@@ -37,6 +37,14 @@ namespace Chummer
                 {
                     using var main = new frmMain();
                     using var watchdog = AppDiagnostics.StartWatchdog();
+                    // Optional standalone PDF opening also provides a reproducible reader check
+                    // without changing the user's sourcebook preferences.
+                    if (args.Length >= 2 && args[0] == "--pdf")
+                    {
+                        int page = args.Length >= 3 && int.TryParse(args[2], out int requested) ? Math.Max(1, requested) : 1;
+                        main.Shown += (_, _) => SourcebookReader.OpenDocument(
+                            new SourcebookInfo { Code = "PDF", Path = args[1] }, page, main);
+                    }
                     Application.Run(main);
                 }
                 else

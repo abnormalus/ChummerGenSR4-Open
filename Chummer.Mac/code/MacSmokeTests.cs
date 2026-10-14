@@ -124,6 +124,42 @@ namespace Chummer
                     MetatypeMeasurements.Guidance("Ork").Contains("78–210") &&
                     MetatypeMeasurements.Guidance("Unknown").Contains("No suggested"),
                     "all standard metatypes have guidance and unsupported types avoid invented ranges");
+                var pdfSource = new SourcebookInfo { Code = "PDFTEST", Path = "local-book.pdf", Offset = 3 };
+                GlobalOptions.Instance.SourcebookInfo.Add(pdfSource);
+                Check(SourcebookReader.TryResolve("PDFTEST 12", null, out var resolvedBook, out int resolvedPage) &&
+                    resolvedBook == pdfSource && resolvedPage == 15 && !SourcebookReader.TryResolve("PDFTEST nope", null, out _, out _) &&
+                    !SourcebookReader.TryResolve("PDFTEST 0", null, out _, out _),
+                    "PDF references resolve the linked book and offset and reject invalid pages");
+                GlobalOptions.Instance.SourcebookInfo.Remove(pdfSource);
+                Check(PdfLocalServer.TryRange("bytes=2-5", 10, out long rangeStart, out long rangeEnd) && rangeStart == 2 && rangeEnd == 5 &&
+                    PdfLocalServer.TryRange("bytes=-4", 10, out rangeStart, out rangeEnd) && rangeStart == 6 && rangeEnd == 9 &&
+                    !PdfLocalServer.TryRange("bytes=20-30", 10, out _, out _), "PDF streaming supports valid byte ranges");
+                string localPdf = Path.Combine(output, "reader-test.pdf");
+                File.WriteAllText(localPdf, "%PDF-1.4\nlocal test data");
+                Uri stoppedPdfServer;
+                using (var pdfServer = new PdfLocalServer(localPdf))
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    var viewerResponse = client.GetAsync(pdfServer.ViewerUri(12)).GetAwaiter().GetResult();
+                    Check(viewerResponse.IsSuccessStatusCode && viewerResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult().Contains("reader.mjs"),
+                        "local PDF server serves the bundled reader");
+                    var rangeRequest = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, new Uri(pdfServer.BaseUri, "document.pdf"));
+                    rangeRequest.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 7);
+                    var rangeResponse = client.SendAsync(rangeRequest).GetAwaiter().GetResult();
+                    Check((int)rangeResponse.StatusCode == 206 && rangeResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult() == "%PDF-1.4",
+                        "local PDF server streams exact requested bytes");
+                    Check((int)client.GetAsync(new Uri(pdfServer.BaseUri, "../document.pdf")).GetAwaiter().GetResult().StatusCode == 404 &&
+                        (int)client.GetAsync(new Uri(pdfServer.BaseUri, "%2E%2E%2Fcode%2FProgram.cs")).GetAwaiter().GetResult().StatusCode == 404,
+                        "local PDF server refuses wrong tokens and asset traversal");
+                    stoppedPdfServer = pdfServer.BaseUri;
+                }
+                using (var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(2) })
+                {
+                    bool stopped = false;
+                    try { client.GetAsync(stoppedPdfServer).GetAwaiter().GetResult(); }
+                    catch (System.Net.Http.HttpRequestException) { stopped = true; }
+                    Check(stopped, "closing the reader releases its local listener");
+                }
                 var choiceCharacter = new Character();
                 choiceCharacter.Options.Books.Clear();
                 choiceCharacter.Options.Books.Add("SR4");

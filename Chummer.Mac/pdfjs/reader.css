@@ -1,0 +1,11 @@
+:root { color-scheme: light dark; font: 14px system-ui, sans-serif; }
+body { margin: 0; background: #777; }
+header { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px; background: Canvas; color: CanvasText; }
+button, input, select { font: inherit; padding: 5px 8px; border: 1px solid #888; border-radius: 4px; }
+button { cursor: pointer; min-width: 30px; }
+#page { width: 65px; } #search { width: 180px; }
+#status { padding: 8px 12px; background: Canvas; color: CanvasText; }
+#status:empty { display: none; }
+#container { position: absolute; inset: 110px 0 0; overflow: auto; }
+#passwordForm { display: grid; gap: 12px; }
+.pdfViewer .page { margin: 10px auto; }

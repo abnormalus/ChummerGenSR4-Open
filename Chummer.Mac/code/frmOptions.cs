@@ -177,6 +177,10 @@ namespace Chummer
 			chkPrintToFileFirst.Checked = blnPrintToFileFirst;
 
 			txtPDFAppPath.Text = GlobalOptions.Instance.PDFAppPath;
+            lblPDFAppPath.Visible = txtPDFAppPath.Visible = cmdPDFAppPath.Visible = false;
+            lblPDFArgumentStyle.Visible = cboPDFArgumentStyle.Visible = false;
+            tabGlobal.Controls.Add(new Label { Name = "nativePdfInformation", Left = 6, Top = 250,
+                Width = 440, Height = 48, Text = LanguageManager.Instance.GetString("Label_Options_NativePdf") });
 
 			// Populate the Language List.
 			string strPath = Path.Combine(Application.StartupPath, "lang");

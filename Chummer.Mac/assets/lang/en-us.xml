@@ -6672,5 +6672,11 @@ Only one attribute may be at its Maximum value during character creation.</text>
 Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>Label_MeasurementRangesUnavailable</key><text>No suggested measurement ranges available for this metatype. Enter height and weight freely.</text></string>
 <string><key>Label_TypicalAgeRange</key><text>Typically {0} years</text></string>
+<string><key>Label_Options_NativePdf</key><text>PDFs open in Chummer’s built-in reader. Select a sourcebook below to link your local PDF and set its page offset.</text></string>
+<string><key>Message_PdfInvalidReference</key><text>This source reference does not contain a valid book and page number.</text></string>
+<string><key>Message_PdfNotLinked</key><text>Link your local PDF for this sourcebook in Chummer Settings, under the sourcebook PDF locations.</text></string>
+<string><key>Message_PdfMissing</key><text>The linked PDF could not be found. Update its location in Chummer Settings.</text></string>
+<string><key>Message_PdfUnavailable</key><text>The built-in PDF reader could not start. On Windows, check that the Microsoft Edge WebView2 runtime is installed.</text></string>
+<string><key>Message_PdfOpenFailed</key><text>Chummer could not open this PDF. Check its location and try again; diagnostic logs contain additional details.</text></string>
 </strings>
 </chummer>
