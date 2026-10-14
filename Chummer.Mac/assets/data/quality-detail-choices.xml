@@ -79,4 +79,58 @@
     <choice name="Sacred Symbols" rarity="Uncommon" />
     <choice name="Moonlight" rarity="Common" />
   </choices>
+  <choices quality="Records on File">
+    <choice name="Ares Macrotechnology" type="AAA Corporation" region="Global" status="Active" />
+    <choice name="Aztechnology" type="AAA Corporation" region="Aztlan / Global" status="Active" />
+    <choice name="Cross Applied Technologies" type="AAA Corporation" region="Québec / Global" status="Active" />
+    <choice name="Mitsuhama Computer Technologies" type="AAA Corporation" region="Japan / Global" status="Active" />
+    <choice name="Novatech" type="AAA Corporation" region="UCAS / Global" status="Active" />
+    <choice name="Renraku Computer Systems" type="AAA Corporation" region="Japan / Global" status="Active" />
+    <choice name="Saeder-Krupp" type="AAA Corporation" region="Germany / Global" status="Active" />
+    <choice name="Shiawase Corporation" type="AAA Corporation" region="Japan / Global" status="Active" />
+    <choice name="Wuxing Incorporated" type="AAA Corporation" region="Hong Kong / Global" status="Active" />
+    <choice name="Yamatetsu Corporation" type="AAA Corporation" region="Russia / Global" status="Active" />
+    <choice name="Fuchi Industrial Electronics" type="Legacy Corporation" region="Japan / Global" status="Dissolved July 2060; legacy files" />
+    <choice name="Lone Star Security Services" type="Corporation" region="UCAS" status="Active" />
+    <choice name="Knight Errant Security Services" type="Corporation" region="UCAS" status="Active" />
+    <choice name="DocWagon" type="Corporation" region="UCAS / Global" status="Active" />
+    <choice name="Federated Boeing" type="Corporation" region="UCAS / Pacific Rim" status="Active" />
+    <choice name="Gaeatronics" type="Corporation" region="Pacific Northwest" status="Active" />
+    <choice name="Telestrian Industries" type="Corporation" region="Tír Tairngire" status="Active" />
+    <choice name="Transys Neuronet" type="Corporation" region="United Kingdom" status="Active" />
+    <choice name="United Canadian and American States (UCAS)" type="Nation" region="North America" status="Active" />
+    <choice name="Confederation of American States (CAS)" type="Nation" region="North America" status="Active" />
+    <choice name="Aztlan" type="Nation" region="North America" status="Active" />
+    <choice name="California Free State" type="Nation" region="North America" status="Active" />
+    <choice name="Republic of Québec" type="Nation" region="North America" status="Active" />
+    <choice name="Tír Tairngire" type="Nation" region="North America" status="Active" />
+    <choice name="Sioux Nation" type="Nation" region="North America" status="Active" />
+    <choice name="Salish-Shidhe Council" type="Nation" region="North America" status="Active" />
+    <choice name="Pueblo Corporate Council" type="Nation" region="North America" status="Active" />
+    <choice name="Athabaskan Council" type="Nation" region="North America" status="Active" />
+    <choice name="Algonkian-Manitou Council" type="Nation" region="North America" status="Active" />
+    <choice name="Tsimshian Nation" type="Nation" region="North America" status="Active" />
+    <choice name="Trans-polar Aleut Nation" type="Nation" region="North America" status="Active" />
+    <choice name="Kingdom of Hawaiʻi" type="Nation" region="Pacific" status="Active" />
+    <choice name="Caribbean League" type="Nation" region="Caribbean" status="Active" />
+    <choice name="Denver Front Range Free Zone" type="Special Jurisdiction" region="North America" status="Active" />
+    <choice name="Tír na nÓg" type="Nation" region="Europe" status="Active" />
+    <choice name="United Kingdom" type="Nation" region="Europe" status="Active" />
+    <choice name="Allied German States" type="Nation" region="Europe" status="Active" />
+    <choice name="France" type="Nation" region="Europe" status="Active" />
+    <choice name="Italian Confederation" type="Nation" region="Europe" status="Active" />
+    <choice name="United Netherlands" type="Nation" region="Europe" status="Active" />
+    <choice name="Scandinavian Union" type="Nation" region="Europe" status="Active" />
+    <choice name="Russia" type="Nation" region="Europe / Asia" status="Active" />
+    <choice name="Japanese Imperial State" type="Nation" region="Asia" status="Active" />
+    <choice name="Indian Union" type="Nation" region="Asia" status="Active" />
+    <choice name="Hong Kong Free Enterprise Zone" type="Special Jurisdiction" region="Asia" status="Active" />
+    <choice name="Canton Confederation" type="Nation" region="Asia" status="Active" />
+    <choice name="Arabian Caliphate" type="Nation" region="Middle East" status="Active" />
+    <choice name="Amazonia" type="Nation" region="South America" status="Active" />
+    <choice name="Argentina" type="Nation" region="South America" status="Active" />
+    <choice name="Azanian Confederation" type="Nation" region="Africa" status="Active" />
+    <choice name="Egypt" type="Nation" region="Africa" status="Active" />
+    <choice name="Australian Republic" type="Nation" region="Oceania" status="Active" />
+  </choices>
 </detailChoices>

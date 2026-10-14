@@ -146,6 +146,30 @@ namespace Chummer
                         "blank searchable detail retains the shared placeholder behavior");
                 }
 
+                var recordsChoices = DetailChoices.ForQuality(choiceCharacter, "Records on File");
+                Check(recordsChoices.Length == 52 && recordsChoices.Any(item => item.Name == "Republic of Québec") &&
+                    recordsChoices.Any(item => item.Name == "Fuchi Industrial Electronics"),
+                    "Records on File includes all supplied organizations, Unicode names and legacy records");
+                using (var recordsPrompt = new frmSelectText { AutoAcceptPrefilled = false })
+                {
+                    recordsPrompt.ConfigureChoices(choiceCharacter, "Records on File");
+                    recordsPrompt.Show();
+                    var combo = Field<ComboBox>(recordsPrompt, "detailChoices");
+                    combo.Text = "ares";
+                    Check(combo.Items.Count == 1, "Records on File search narrows the supplied suggestions");
+                    combo.SelectedIndex = 0;
+                    Field<Button>(recordsPrompt, "cmdOK").PerformClick();
+                    Check(recordsPrompt.SelectedValue == "Ares Macrotechnology", "Records on File stores the organization name as the existing detail");
+                }
+                using (var customRecords = new frmSelectText { AutoAcceptPrefilled = false })
+                {
+                    customRecords.ConfigureChoices(choiceCharacter, "Records on File");
+                    customRecords.Show();
+                    Field<ComboBox>(customRecords, "detailChoices").Text = "My custom records holder";
+                    Field<Button>(customRecords, "cmdOK").PerformClick();
+                    Check(customRecords.SelectedValue == "My custom records holder", "Records on File accepts custom entries beyond the supplied list");
+                }
+
                 var commonAllergies = DetailChoices.ForQuality(choiceCharacter, "Allergy (Common, Mild)");
                 var uncommonAllergies = DetailChoices.ForQuality(choiceCharacter, "Allergy (Uncommon, Severe)");
                 Check(commonAllergies.Length == 18 && uncommonAllergies.Length == 32 &&

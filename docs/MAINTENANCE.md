@@ -40,3 +40,5 @@ Each diagnostic line now includes a process ID and random session ID, allowing m
 ## Recoverable commands
 
 AppErrors subscribes to the toolkit's UI ThreadException boundary. Pointer/timer handlers and shared menu commands (including native-menu invocations) report managed command exceptions without terminating the application. The notice advises reviewing the character before saving: arbitrary commands are not transactional, so recovery does not imply rollback. Failures outside these event boundaries still use the fatal main-loop path. Cyberware selection explicitly rejects missing parent/rules entries and non-OK picker results. Plugin pickers curate subsystem categories and cancel with an informational notice when the enabled sources offer no compatible candidates.
+
+Records on File uses the shared detail picker with 52 organization suggestions from `Shadowrun_2060_Records_on_File_Options.csv`. Organization names remain the stored detail; type, region, and 2060 status are retained as suggestion metadata. Legacy organizations stay available for historical records, and custom entries remain allowed.
