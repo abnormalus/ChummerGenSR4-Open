@@ -173,6 +173,9 @@ namespace Majorsilence.Forms
         {
             base.OnTextChanged (e);
             AdjustSize ();
+            // Labels draw transparently. A same-size replacement also needs the
+            // parent background repainted to erase the previous glyphs.
+            Parent?.Invalidate ();
 
             // Upstream Label.OnTextChanged raises the live-region change itself, so a screen reader
             // announces a status label's new text. Upstream skips it until the accessible object exists,

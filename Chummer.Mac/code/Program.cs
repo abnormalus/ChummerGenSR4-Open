@@ -45,6 +45,36 @@ namespace Chummer
                         main.Shown += (_, _) => SourcebookReader.OpenDocument(
                             new SourcebookInfo { Code = "PDF", Path = args[1] }, page, main);
                     }
+                    // Open an existing character directly in the output preview for support/reproduction.
+                    if (args.Length >= 2 && args[0] == "--print-preview")
+                    {
+                        main.Shown += (_, _) => {
+                            try {
+                                var character = new Character { FileName = args[1] };
+                                if (!character.Load()) throw new System.IO.InvalidDataException("Character could not be loaded.");
+                                character.Print(false);
+                            }
+                            catch (Exception error) {
+                                AppDiagnostics.Record("character-preview-open-failed", error);
+                                AppErrors.Notify(main, "Unable to open the character print preview.", "Character output");
+                            }
+                        };
+                    }
+                    // Native PDF export can also be reproduced without a printer or preference changes.
+                    if (args.Length >= 3 && args[0] == "--export-pdf")
+                    {
+                        main.Shown += async (_, _) => {
+                            try {
+                                var character = new Character { FileName = args[1] };
+                                if (!character.Load()) throw new System.IO.InvalidDataException("Character could not be loaded.");
+                                character.Print(false);
+                                await character.PrintWindow.ExportPdfAsync(args[2]);
+                                AppDiagnostics.Record("character-pdf-command-completed");
+                            }
+                            catch (Exception error) { AppDiagnostics.Record("character-pdf-command-failed", error); Environment.ExitCode = 1; }
+                            finally { Application.Exit(); }
+                        };
+                    }
                     Application.Run(main);
                 }
                 else

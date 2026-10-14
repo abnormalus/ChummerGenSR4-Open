@@ -15,7 +15,7 @@ namespace Majorsilence.Forms.Backends
     /// navigation event args expose <c>Request</c> (a <see cref="Uri"/>) rather than <c>Url</c>, which
     /// this handle adapts into the core <see cref="WebViewNavigationCompletedEventArgs"/> shape.
     /// </summary>
-    internal sealed class AvaloniaWebViewHandle : IWebViewHandle
+    internal sealed class AvaloniaWebViewHandle : IWebViewHandle, IWebViewPrintHandle
     {
         private readonly Avalonia.Controls.NativeWebView _webView;
         private bool _disposed;
@@ -58,6 +58,30 @@ namespace Majorsilence.Forms.Backends
                 return await _webView.InvokeScript (script).ConfigureAwait (false);
 
             return await Dispatcher.UIThread.InvokeAsync (() => _webView.InvokeScript (script)).ConfigureAwait (false);
+        }
+
+        public void ShowPrintUI() => Dispatcher.UIThread.Invoke(() => _webView.ShowPrintUI());
+
+        public async Task ShowPrintUIAsync()
+        {
+            if (OperatingSystem.IsMacOS())
+            {
+                if (Dispatcher.UIThread.CheckAccess()) await MacWebViewPrinting.ShowPrintUIAsync(_webView.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+                else await Dispatcher.UIThread.InvokeAsync(() => MacWebViewPrinting.ShowPrintUIAsync(_webView.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero));
+            }
+            else ShowPrintUI();
+        }
+
+        public async Task<System.IO.Stream> PrintToPdfStreamAsync()
+        {
+            if (OperatingSystem.IsMacOS())
+            {
+                if (Dispatcher.UIThread.CheckAccess()) return await MacWebViewPrinting.ExportPdfAsync(_webView.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+                return await Dispatcher.UIThread.InvokeAsync(() => MacWebViewPrinting.ExportPdfAsync(_webView.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero));
+            }
+            if (Dispatcher.UIThread.CheckAccess())
+                return await _webView.PrintToPdfStreamAsync().ConfigureAwait(false);
+            return await Dispatcher.UIThread.InvokeAsync(() => _webView.PrintToPdfStreamAsync()).ConfigureAwait(false);
         }
 
         /// <inheritdoc/>

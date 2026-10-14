@@ -1,5 +1,13 @@
 namespace Majorsilence.Forms.Backends
 {
+    /// <summary>Optional native print capability; unavailable backends keep HTML export usable.</summary>
+    public interface IWebViewPrintHandle
+    {
+        void ShowPrintUI();
+        Task ShowPrintUIAsync();
+        Task<System.IO.Stream> PrintToPdfStreamAsync();
+    }
+
     /// <summary>
     /// Optional capability implemented by a platform backend that can create a native web-rendering
     /// control (a real browser engine — WebView2 on Windows, WKWebView on macOS, WebKitGTK/WPE WebKit on

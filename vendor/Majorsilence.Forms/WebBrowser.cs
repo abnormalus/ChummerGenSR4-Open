@@ -178,11 +178,20 @@ namespace Majorsilence.Forms
         /// <summary>Stops the current navigation. Stub in Majorsilence.Forms.</summary>
         public void Stop () { }
 
-        /// <summary>Prints the current document. Stub in Majorsilence.Forms.</summary>
-        public void Print () { }
+        /// <summary>Opens the native print dialog for the current document.</summary>
+        public void Print () => ShowPrintDialog();
 
-        /// <summary>Prints the current document with a dialog. Stub in Majorsilence.Forms.</summary>
-        public void ShowPrintDialog () { }
+        /// <summary>Reports whether the backend supports native printing.</summary>
+        public bool CanPrint => _host.WebViewHandle is IWebViewPrintHandle;
+
+        public void ShowPrintDialog () => PrintHandle.ShowPrintUI();
+
+        public Task ShowPrintDialogAsync() => PrintHandle.ShowPrintUIAsync();
+
+        public Task<System.IO.Stream> PrintToPdfStreamAsync() => PrintHandle.PrintToPdfStreamAsync();
+
+        private IWebViewPrintHandle PrintHandle => _host.WebViewHandle as IWebViewPrintHandle
+            ?? throw new PlatformNotSupportedException("Native printing requires an available browser engine.");
 
         /// <summary>
         /// Invokes a script function. Always returns <c>null</c> — intentionally left stubbed even

@@ -886,6 +886,20 @@ namespace Chummer
 
 		// Sourcebook list.
 		private readonly List<string> _lstBooks = new List<string>();
+        private static readonly List<WeakReference<CharacterOptions>> LiveOptions = new List<WeakReference<CharacterOptions>>();
+        private void PublishSourceChanges()
+        {
+            lock (LiveOptions)
+            {
+                for (int index = LiveOptions.Count - 1; index >= 0; --index)
+                {
+                    if (!LiveOptions[index].TryGetTarget(out var options)) { LiveOptions.RemoveAt(index); continue; }
+                    if (ReferenceEquals(options, this) || options._strFileName != _strFileName) continue;
+                    options._lstBooks.Clear(); options._lstBooks.AddRange(_lstBooks);
+                    options._strBookXPath = string.Empty;
+                }
+            }
+        }
 
 		#region Initialization, Save, and Load Methods
 		public CharacterOptions()
@@ -911,6 +925,7 @@ namespace Chummer
 
 			// Load the book information.
 			_objBookDoc = XmlManager.Instance.Load("books.xml");
+            lock (LiveOptions) LiveOptions.Add(new WeakReference<CharacterOptions>(this));
 		}
 
 		/// <summary>
@@ -1210,6 +1225,7 @@ namespace Chummer
 			objWriter.WriteEndDocument();
 			objWriter.Close();
 			objStream.Close();
+            PublishSourceChanges();
 		}
 
 		/// <summary>
@@ -2158,8 +2174,6 @@ namespace Chummer
 		/// </summary>
 		public string BookXPath()
 		{
-			if (_strBookXPath != "")
-				return _strBookXPath;
 
 			string strPath = "";
 
@@ -2168,7 +2182,7 @@ namespace Chummer
 				if (strBook != "")
 					strPath += "source = \"" + strBook + "\" or ";
 			}
-			strPath = strPath.Substring(0, strPath.Length - 4);
+			strPath = strPath.Length > 0 ? strPath.Substring(0, strPath.Length - 4) : "false()";
 
 			_strBookXPath = strPath;
 			

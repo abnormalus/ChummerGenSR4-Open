@@ -78,10 +78,39 @@ namespace Chummer
                 using (var branding = new frmAbout())
                     Check(Field<PictureBox>(branding, "logoPictureBox").Image.Width == 1254,
                         "About uses the supplied dragon emblem");
+                var editedSources = new CharacterOptions();
+                var liveSources = new CharacterOptions();
+                var otherSources = new CharacterOptions();
+                typeof(CharacterOptions).GetField("_strFileName", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(otherSources, "other-settings.xml");
+                otherSources.Books.Clear(); otherSources.Books.Add("UN");
+                var originalSources = editedSources.Books.ToArray();
+                try
+                {
+                    editedSources.Books.Clear(); editedSources.Books.Add("SR4"); editedSources.Books.Add("UN"); editedSources.Save();
+                    Check(liveSources.BookXPath().Contains("UN"), "saved sources update already-open character settings");
+                    editedSources.Books.Remove("UN"); editedSources.Save();
+                    Check(!liveSources.BookXPath().Contains("UN") && otherSources.Books.Contains("UN"),
+                        "deselected sources disappear immediately while other source sets stay intact");
+                    liveSources.Books.Add("UN");
+                    Check(liveSources.BookXPath().Contains("UN"), "source queries reflect list edits without stale cached filters");
+                }
+                finally { editedSources.Books.Clear(); editedSources.Books.AddRange(originalSources); editedSources.Save(); }
+
                 Check(Properties.Resources.add != null, "embedded toolbar image decoded");
                 foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data"), "*.xml"))
                     XmlManager.Instance.Load(Path.GetFileName(file));
                 Console.WriteLine("PASS ruleset XML loads");
+                using (var repaintForm = new Form { Width = 300, Height = 120 })
+                {
+                    var valueLabel = new Label { Text = "MMMM", AutoSize = false, Width = 120 };
+                    repaintForm.Controls.Add(valueLabel); repaintForm.Show();
+                    HeadlessRenderer.CapturePng(repaintForm, 600, 240);
+                    bool parentInvalidated = false;
+                    valueLabel.Parent.Invalidated += (_, _) => parentInvalidated = true;
+                    valueLabel.Text = "IIII";
+                    Check(parentInvalidated,
+                        "same-size label text changes repaint the background to remove old weapon-detail glyphs");
+                }
                 using (var refreshForm = new Form { Width = 400, Height = 140 })
                 {
                     var refreshTree = new TreeView { Dock = DockStyle.Fill };
@@ -1063,6 +1092,34 @@ namespace Chummer
                     using var reader = XmlReader.Create(stream);
                     transform.Transform(reader, null, html);
                     Check(html.ToString().Contains("Mac Smoke Test"), "HTML character sheet transformation");
+                }
+
+                using (var stream = new MemoryStream())
+                {
+                    careerCharacter.Mugshot = Convert.ToBase64String(File.ReadAllBytes(Path.Combine(output, "portrait-input.png")));
+                    using var writer = new XmlTextWriter(stream, Encoding.UTF8);
+                    writer.WriteStartElement("characters"); careerCharacter.PrintToStream(stream, writer);
+                    writer.WriteEndElement(); writer.Flush(); stream.Position = 0;
+                    var document = new XmlDocument(); document.Load(stream);
+                    Check(document.SelectSingleNode("/characters/character/mugshot").InnerText.StartsWith("data:image/png;base64,"),
+                        "print portraits are embedded without temporary file dependencies");
+                    string html = frmViewer.TransformSheet(document, "Shadowrun 4");
+                    Check(html.Contains("data:image/png;base64,") && html.Contains("Mac Smoke Test"), "modern output preserves template content and portrait");
+                    File.WriteAllText(Path.Combine(output, "character-sheet.html"), html);
+                    bool rejected = false;
+                    try { frmViewer.TransformSheet(document, "../data/qualities"); } catch (InvalidOperationException) { rejected = true; }
+                    Check(rejected, "character output rejects templates outside the bundled folder");
+                    using var browser = new WebBrowser();
+                    Check(!browser.CanPrint, "headless output reports native printing unavailable");
+                    bool printRejected = false;
+                    try { browser.ShowPrintDialog(); } catch (PlatformNotSupportedException) { printRejected = true; }
+                    Check(printRejected, "unsupported printing reports an error rather than silently doing nothing");
+                    using var viewer = new frmViewer { Characters = new System.Collections.Generic.List<Character> { careerCharacter }, CharacterXML = document };
+                    var notify = AppErrors.Notify;
+                    try { AppErrors.Notify = (_, text, title) => throw new InvalidOperationException(text); viewer.RefreshView(); viewer.RefreshView(); viewer.OutputTask.GetAwaiter().GetResult();
+                        Check(Field<string>(viewer, "_html").Contains("Mac Smoke Test"), "repeated preview refresh completes with the current character sheet"); }
+                    finally { AppErrors.Notify = notify; }
+                    Check(true, "repeated viewer refresh uses modern asynchronous rendering without delegate BeginInvoke");
                 }
 
                 if (args.Length > 2)

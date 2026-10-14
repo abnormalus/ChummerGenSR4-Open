@@ -1612,21 +1612,15 @@ namespace Chummer
 			else
 				objWriter.WriteElementString("name", LanguageManager.Instance.GetString("String_UnnamedCharacter"));
 
-			// Since IE is retarded and can't handle base64 images before IE9, we need to dump the image to a temporary directory and re-write the information.
-			// If you give it an extension of jpg, gif, or png, it expects the file to be in that format and won't render the image unless it was originally that type.
-			// But if you give it the extension img, it will render whatever you give it (which doesn't make any damn sense, but that's IE for you).
-			string strMugshotPath = "";
-			if (_strMugshot != "")
-			{
-				if (!Directory.Exists(MacPaths.MugshotsDirectory))
-					Directory.CreateDirectory(MacPaths.MugshotsDirectory);
-				byte[] bytImage = Convert.FromBase64String(_strMugshot);
-				MemoryStream objImageStream = new MemoryStream(bytImage, 0, bytImage.Length);
-				objImageStream.Write(bytImage, 0, bytImage.Length);
-				Image imgMugshot = Image.FromStream(objImageStream, true);
-				imgMugshot.Save(MacPaths.MugshotsDirectory + Path.DirectorySeparatorChar + guiImage.ToString() + ".img");
-				strMugshotPath = "file://" + (MacPaths.MugshotsDirectory + Path.DirectorySeparatorChar + guiImage.ToString() + ".img").Replace(Path.DirectorySeparatorChar, '/');
-			}
+            // Embed a normalized PNG so preview, HTML export and PDF share the same portrait.
+            string strMugshotPath = "";
+            if (!string.IsNullOrEmpty(_strMugshot))
+            {
+                using var pixels = PortraitImage.Decode(Convert.FromBase64String(_strMugshot));
+                using var image = SkiaSharp.SKImage.FromBitmap(pixels);
+                using var png = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+                strMugshotPath = "data:image/png;base64," + Convert.ToBase64String(png.ToArray());
+            }
 			// <mugshot />
 			objWriter.WriteElementString("mugshot", strMugshotPath);
 			// <mugshotbase64 />
@@ -2236,37 +2230,14 @@ namespace Chummer
 		/// <param name="blnDialog">Whether or not the window should be shown as a dialogue window.</param>
 		public void Print(bool blnDialog = true)
 		{
-			// Write the Character information to a MemoryStream so we don't need to create any files.
-			MemoryStream objStream = new MemoryStream();
-			XmlTextWriter objWriter = new XmlTextWriter(objStream, Encoding.UTF8);
-
-			// Being the document.
-			objWriter.WriteStartDocument();
-
-			// </characters>
-			objWriter.WriteStartElement("characters");
-
-			PrintToStream(objStream, objWriter);
-
-			// </characters>
-			objWriter.WriteEndElement();
-
-			// Finish the document and flush the Writer and Stream.
-			objWriter.WriteEndDocument();
-			objWriter.Flush();
-			objStream.Flush();
-
-			// Read the stream.
-			StreamReader objReader = new StreamReader(objStream);
-			objStream.Position = 0;
-			XmlDocument objCharacterXML = new XmlDocument();
-
-			// Put the stream into an XmlDocument and send it off to the Viewer.
-			string strXML = objReader.ReadToEnd();
-			objCharacterXML.LoadXml(strXML);
-
-			objWriter.Close();
-			objStream.Close();
+            using var objStream = new MemoryStream();
+            using var objWriter = new XmlTextWriter(objStream, Encoding.UTF8);
+            objWriter.WriteStartDocument();
+            objWriter.WriteStartElement("characters");
+            PrintToStream(objStream, objWriter);
+            objWriter.WriteEndElement(); objWriter.WriteEndDocument(); objWriter.Flush();
+            objStream.Position = 0;
+            var objCharacterXML = new XmlDocument(); objCharacterXML.Load(objStream);
 
 			// If a reference to the Viewer window does not yet exist for this character, open a new Viewer window and set the reference to it.
 			// If a Viewer window already exists for this character, use it instead.
@@ -2279,9 +2250,9 @@ namespace Chummer
 				frmViewCharacter.CharacterXML = objCharacterXML;
 				_frmPrintView = frmViewCharacter;
 				if (blnDialog)
-					frmViewCharacter.ShowDialog();
+					_ = frmViewCharacter.ShowDialogAsync(GlobalOptions.Instance.MainForm);
 				else
-					frmViewCharacter.Show();
+					frmViewCharacter.Show(GlobalOptions.Instance.MainForm);
 			}
 			else
 			{
