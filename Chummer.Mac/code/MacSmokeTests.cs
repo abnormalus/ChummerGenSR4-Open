@@ -201,6 +201,30 @@ namespace Chummer
                     Check(PersonNames.FirstNameFits(Field<TextBox>(namePrompt, "txtValue").Text.Split(' ')[0], "Female"), "SIN dice button uses the character gender and leaves an editable name");
                     Capture(namePrompt, output, "sin-name-prompt");
                 }
+                var stackCharacter = new Character();
+                var stackGear = new Gear(stackCharacter) { Name = "Configured gear", Cost = "100", Quantity = 1 };
+                var stackAddon = new Gear(stackCharacter) { Name = "Add-in", Cost = "25", Quantity = 2, Parent = stackGear };
+                var nestedAddon = new Gear(stackCharacter) { Name = "Nested add-in", Cost = "10", Quantity = 1, Parent = stackAddon };
+                stackAddon.Children.Add(nestedAddon);
+                stackGear.Children.Add(stackAddon);
+                stackCharacter.Gear.Add(stackGear);
+                int unitCost = stackGear.TotalCost;
+                Check(GearStacks.Apply(stackCharacter, stackGear, 3, false) && stackGear.TotalCost == unitCost * 3 &&
+                    stackGear.Children[0] == stackAddon && stackAddon.Children[0] == nestedAddon && stackAddon.Quantity == 2,
+                    "gear stacks retain nested add-ins per unit and multiply their full cost without doubling child quantities");
+                var stackXmlText = new StringWriter();
+                using (var writer = new XmlTextWriter(stackXmlText)) stackGear.Save(writer);
+                var stackXml = new XmlDocument(); stackXml.LoadXml(stackXmlText.ToString());
+                var stackReload = new Gear(stackCharacter); stackReload.Load(stackXml.DocumentElement);
+                Check(stackReload.Quantity == 3 && stackReload.Children.Count == 1 && stackReload.Children[0].Children.Count == 1 &&
+                    stackReload.TotalCost == stackGear.TotalCost, "configured gear stacks round trip with every nested add-in");
+                stackGear.Quantity = 1; stackCharacter.Nuyen = 2000;
+                GearStacks.Apply(stackCharacter, stackGear, 3, true);
+                Check(stackCharacter.Nuyen == 2000 - unitCost * 2 && stackCharacter.ExpenseEntries.Count == 1 &&
+                    stackCharacter.ExpenseEntries[0].Undo != null, "career stacks charge additional configured units and retain expense undo");
+                stackCharacter.Nuyen = 0;
+                try { GearStacks.Apply(stackCharacter, stackGear, 4, true); throw new Exception("expected insufficient funds"); }
+                catch (InvalidOperationException) { Check(stackGear.Quantity == 3 && stackCharacter.ExpenseEntries.Count == 1, "unaffordable stacks preserve quantity and ledger"); }
                 var aliasPrefs = new StreetNamePreferences();
                 var namesA = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);
                 var namesB = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);

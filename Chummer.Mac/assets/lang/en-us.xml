@@ -6722,5 +6722,12 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>PdfCollection_Select</key><text>Select all sourced books</text></string>
 <string><key>PersonNames_Roll</key><text>Randomize name using Character Info gender</text></string>
 <string><key>PersonNames_Failed</key><text>A random name could not be generated. You can enter a name manually.</text></string>
+<string><key>GearStack_Command</key><text>Create stack…</text></string>
+<string><key>GearStack_Title</key><text>Create gear stack</text></string>
+<string><key>GearStack_Prompt</key><text>Total quantity, including the original. Every unit keeps all nested add-ins.</text></string>
+<string><key>GearStack_CareerPrompt</key><text>Total quantity, including the original. Added units and add-ins are charged to Nuyen.</text></string>
+<string><key>GearStack_NotEnoughNuyen</key><text>There is not enough Nuyen for the additional units and their add-ins.</text></string>
+<string><key>GearStack_Capacity</key><text>The stack would exceed the parent item’s capacity.</text></string>
+<string><key>GearStack_Failed</key><text>The stack could not be created. The previous quantity was kept.</text></string>
 </strings>
 </chummer>

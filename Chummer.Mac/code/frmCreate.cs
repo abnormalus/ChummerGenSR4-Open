@@ -64,6 +64,8 @@ namespace Chummer
                 id => _objFunctions.FindQuality(id, _objCharacter.Qualities), null, detailChanged, cmsQuality);
             PromptDetails.Attach(this, _objCharacter, treGear, null,
                 id => _objFunctions.FindGear(id, _objCharacter.Gear), detailChanged, cmsGear, cmsGearPlugin);
+            GearStacks.Attach(this, _objCharacter, treGear, id => _objFunctions.FindGear(id, _objCharacter.Gear),
+                () => { RefreshSelectedGear(); detailChanged(); }, false, cmsGear, cmsGearPlugin);
 
 			// Add EventHandlers for the MAG and RES enabled events and tab enabled events.
 			_objCharacter.MAGEnabledChanged += objCharacter_MAGEnabledChanged;

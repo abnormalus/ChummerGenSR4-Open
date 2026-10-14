@@ -79,6 +79,8 @@ namespace Chummer
                 id => _objFunctions.FindQuality(id, _objCharacter.Qualities), null, detailChanged, cmsQuality);
             PromptDetails.Attach(this, _objCharacter, treGear, null,
                 id => _objFunctions.FindGear(id, _objCharacter.Gear), detailChanged, cmsGear, cmsGearPlugin);
+            GearStacks.Attach(this, _objCharacter, treGear, id => _objFunctions.FindGear(id, _objCharacter.Gear),
+                () => { RefreshSelectedGear(); detailChanged(); }, true, cmsGear, cmsGearPlugin);
 			_tsCredstickDeposit = new ToolStripMenuItem("Deposit Nuyen") { Tag = "Menu_CredstickDeposit" };
 			_tsCredstickWithdraw = new ToolStripMenuItem("Withdraw Nuyen") { Tag = "Menu_CredstickWithdraw" };
 			_tsCredstickDeposit.Click += tsCredstickDeposit_Click;
