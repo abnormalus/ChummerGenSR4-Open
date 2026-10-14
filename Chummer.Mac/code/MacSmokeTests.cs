@@ -32,6 +32,23 @@ namespace Chummer
             File.WriteAllBytes(Path.Combine(output, name + ".png"), HeadlessRenderer.CapturePng(form, 1200, 850));
             Console.WriteLine("PASS render " + name);
         }
+        private static void CheckInventoryUndoView(Form form, Character character)
+        {
+            var history = Field<InventoryUndo>(form, "_inventoryUndo");
+            history.Observe();
+            var gear = character.Gear.First();
+            int quantity = gear.Quantity;
+            gear.Quantity++;
+            history.Observe();
+            var tree = Field<TreeView>(form, "treGear");
+            var command = tree.ContextMenuStrip.Items.OfType<ToolStripMenuItem>().Single(i => i.Name == "undoInventoryChange");
+            Check(command.Enabled, "inventory Undo command enables after an item change");
+            var notify = AppErrors.Notify;
+            try { AppErrors.Notify = (_, text, title) => throw new InvalidOperationException(text); command.PerformClick(); }
+            finally { AppErrors.Notify = notify; }
+            Check(character.Gear.First().Quantity == quantity && tree.Nodes[0].Nodes.Count > 0,
+                "inventory undo rebuilds " + form.GetType().Name + " item views");
+        }
         public static int Run(string[] args)
         {
             if (args.Length < 2) { Console.Error.WriteLine("Usage: --smoke-test OUTPUT [FIXTURE]"); return 2; }
@@ -225,6 +242,38 @@ namespace Chummer
                 stackCharacter.Nuyen = 0;
                 try { GearStacks.Apply(stackCharacter, stackGear, 4, true); throw new Exception("expected insufficient funds"); }
                 catch (InvalidOperationException) { Check(stackGear.Quantity == 3 && stackCharacter.ExpenseEntries.Count == 1, "unaffordable stacks preserve quantity and ledger"); }
+                var undoCharacter = new Character();
+                var undoGear = new Gear(undoCharacter) { Name = "Configured item", Category = "General", Cost = "100", Quantity = 1 };
+                var undoAddon = new Gear(undoCharacter) { Name = "Add-in", Category = "General", Cost = "25", Quantity = 1, Parent = undoGear };
+                undoGear.Children.Add(undoAddon); undoCharacter.Gear.Add(undoGear);
+                undoCharacter.Gear.Add(null);
+                var recoveredHistory = new InventoryUndo(undoCharacter);
+                undoCharacter.Gear.Remove(null); recoveredHistory.Observe();
+                Check(recoveredHistory.Count == 0, "inventory history recovers from an invalid initial item without crashing the editor");
+                var inventoryHistory = new InventoryUndo(undoCharacter);
+                inventoryHistory.Observe();
+                Check(inventoryHistory.Count == 0, "inventory history ignores unchanged refreshes");
+                for (int quantity = 2; quantity <= 7; quantity++) { undoGear.Quantity = quantity; inventoryHistory.Observe(); }
+                Check(inventoryHistory.Count == 5, "inventory undo retains the five most recent changes");
+                undoCharacter.Alias = "Keep unrelated edit"; undoCharacter.Nuyen = 123;
+                inventoryHistory.Observe();
+                for (int quantity = 6; quantity >= 2; quantity--) { Check(inventoryHistory.Undo() && undoCharacter.Gear[0].Quantity == quantity, "inventory undo restores quantity " + quantity); }
+                Check(!inventoryHistory.Undo() && undoCharacter.Alias == "Keep unrelated edit" && undoCharacter.Nuyen == 123,
+                    "exhausted inventory history preserves unrelated edits and rewards");
+                var deletionHistory = new InventoryUndo(undoCharacter);
+                string restoredId = undoCharacter.Gear[0].InternalId;
+                undoCharacter.Gear.Clear(); deletionHistory.Observe(); deletionHistory.Undo();
+                Check(undoCharacter.Gear.Single().InternalId == restoredId && undoCharacter.Gear[0].Children.Count == 1 &&
+                    undoCharacter.Gear[0].Children[0].Parent == undoCharacter.Gear[0], "inventory deletion undo restores IDs and parented add-ins");
+                undoCharacter.Nuyen = 2000;
+                var purchaseHistory = new InventoryUndo(undoCharacter);
+                GearStacks.Apply(undoCharacter, undoCharacter.Gear[0], 4, true); purchaseHistory.Observe();
+                var unrelatedReward = new ExpenseLogEntry(); unrelatedReward.Create(50, "Reward", ExpenseType.Nuyen, DateTime.Now);
+                undoCharacter.ExpenseEntries.Add(unrelatedReward); undoCharacter.Nuyen += 50; purchaseHistory.Observe();
+                purchaseHistory.Undo();
+                Check(undoCharacter.Gear[0].Quantity == 2 && undoCharacter.Nuyen == 2050 &&
+                    undoCharacter.ExpenseEntries.Count == 1 && undoCharacter.ExpenseEntries[0] == unrelatedReward,
+                    "inventory undo reverses its purchase and ledger while preserving a later reward");
                 var aliasPrefs = new StreetNamePreferences();
                 var namesA = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);
                 var namesB = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);
@@ -879,6 +928,7 @@ namespace Chummer
                 {
                     creation.MdiParent = main;
                     creation.Show();
+                    CheckInventoryUndoView(creation, character);
                     var aliasButton = Field<TextBox>(creation, "txtAlias").Parent.Controls.Cast<Control>().OfType<SplitButton>()
                         .Single(button => button.Name == "cmdRandomizeAlias");
                     var aliasField = Field<TextBox>(creation, "txtAlias");
@@ -986,6 +1036,7 @@ namespace Chummer
                 {
                     Check(!Field<TreeView>(career, "treQualities").ShowLines, "career quality list does not draw connector lines");
                     Capture(career, output, "career");
+                    CheckInventoryUndoView(career, careerCharacter);
                     Check(Field<ComboBox>(career, "txtHair").Text == "Crimson" &&
                         Field<ComboBox>(career, "txtEyes").Text == "Custom iridescent",
                         "career color controls load existing selected and custom colors");
@@ -1031,6 +1082,12 @@ namespace Chummer
                         fixture.FileName = Path.Combine(output, "fixture-copy.chum");
                         fixture.Save();
                         var original = XDocument.Load(fixture.FileName);
+                        var fixtureHistory = new InventoryUndo(fixture);
+                        fixture.Gear.Add(new Gear(fixture) { Name = "Undo probe", Category = "General", Cost = "0", Quantity = 1 });
+                        fixtureHistory.Observe(); fixtureHistory.Undo(); fixture.Save();
+                        if (!XNode.DeepEquals(original, XDocument.Load(fixture.FileName)))
+                            throw new InvalidOperationException("Inventory undo changed fixture state: " + file);
+
                         var copy = new Character { FileName = fixture.FileName };
                         if (!copy.Load() || copy.Name != name || copy.Weapons.Count != weapons || copy.Gear.Count != gear
                             || copy.Skills.Count != skills) throw new InvalidOperationException("Fixture contents changed: " + file);

@@ -40,6 +40,7 @@ namespace Chummer
 		private bool _blnSkipUpdate = false;
 		private bool _blnLoading = false;
 		private bool _blnIsDirty = false;
+        private InventoryUndo _inventoryUndo;
 		private bool _blnSkipToolStripRevert = false;
 		private bool _blnReapplyImprovements = false;
 		private bool _blnAutomaticDataUpdate = false;
@@ -69,6 +70,7 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
+            Load += (_, _) => InitializeInventoryUndo();
             treQualities.ShowLines = false;
             splitMain.Dock = DockStyle.Fill;
             tabCharacterTabs.Dock = DockStyle.Fill;
@@ -22593,6 +22595,8 @@ namespace Chummer
 			}
 			RefreshImprovements();
 			UpdateReputation();
+
+            if (!_blnLoading) _inventoryUndo?.QueueObserve();
 		}
 
 		/// <summary>
@@ -23533,6 +23537,7 @@ namespace Chummer
 		/// </summary>
 		private void UpdateWindowTitle(bool blnCanSkip = true)
 		{
+            if (!_blnLoading) _inventoryUndo?.QueueObserve();
 			if (this.Text.EndsWith("*") && blnCanSkip)
 				return;
 

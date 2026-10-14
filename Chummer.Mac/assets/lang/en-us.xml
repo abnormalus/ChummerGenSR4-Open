@@ -6729,5 +6729,7 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>GearStack_NotEnoughNuyen</key><text>There is not enough Nuyen for the additional units and their add-ins.</text></string>
 <string><key>GearStack_Capacity</key><text>The stack would exceed the parent item’s capacity.</text></string>
 <string><key>GearStack_Failed</key><text>The stack could not be created. The previous quantity was kept.</text></string>
+<string><key>InventoryUndo_Command</key><text>Undo inventory change</text></string>
+<string><key>InventoryUndo_Failed</key><text>The inventory change could not be undone. The current inventory was kept.</text></string>
 </strings>
 </chummer>
