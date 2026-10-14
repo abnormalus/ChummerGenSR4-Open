@@ -55,6 +55,11 @@ namespace Chummer
                 AppDiagnostics.Record("rotation-test");
                 Check(File.Exists(AppDiagnostics.LogPath + ".1") && new FileInfo(AppDiagnostics.LogPath).Length < 4096,
                     "diagnostic logs rotate before growing without bound");
+                Check(Form.ApplicationIconOverride != null && Form.ApplicationIconOverride.ToBitmap().Width > 0,
+                    "shared dragon application icon decodes");
+                using (var branding = new frmAbout())
+                    Check(Field<PictureBox>(branding, "logoPictureBox").Image.Width == 1254,
+                        "About uses the supplied dragon emblem");
                 Check(Properties.Resources.add != null, "embedded toolbar image decoded");
                 foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data"), "*.xml"))
                     XmlManager.Instance.Load(Path.GetFileName(file));

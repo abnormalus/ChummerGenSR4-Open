@@ -10,6 +10,41 @@ namespace Chummer
     internal static class AppDiagnostics
     {
         private static readonly object Gate = new object();
+        private static readonly string Session = Guid.NewGuid().ToString("N");
+        private static long lastUiResponse = Environment.TickCount64;
+        private static int openFormCount;
+        private static string modalType;
+        internal static void CaptureUiState()
+        {
+            openFormCount = Majorsilence.Forms.Application.OpenForms.Count;
+            modalType = Majorsilence.Forms.Application.OpenForms.Cast<Majorsilence.Forms.Form>().LastOrDefault(form => form.Modal)?.GetType().Name;
+        }
+        internal static IDisposable StartWatchdog()
+        {
+            long lastTick = Environment.TickCount64;
+            int queued = 0;
+            bool stalled = false;
+            CaptureUiState();
+            System.Threading.Interlocked.Exchange(ref lastUiResponse, lastTick);
+            return new System.Threading.Timer(_ =>
+            {
+                long now = Environment.TickCount64;
+                // A long gap in the worker timer indicates sleep/suspension, not an observed UI hang.
+                if (now - lastTick > 15000)
+                    System.Threading.Interlocked.Exchange(ref lastUiResponse, now);
+                lastTick = now;
+                long delay = now - System.Threading.Interlocked.Read(ref lastUiResponse);
+                if (delay >= 15000 && !stalled) { stalled = true; Record("ui-unresponsive"); }
+                else if (delay < 15000 && stalled) { stalled = false; Record("ui-responsive-again"); }
+                if (System.Threading.Interlocked.CompareExchange(ref queued, 1, 0) != 0) return;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    CaptureUiState();
+                    System.Threading.Interlocked.Exchange(ref lastUiResponse, Environment.TickCount64);
+                    System.Threading.Interlocked.Exchange(ref queued, 0);
+                });
+            }, null, 2000, 2000);
+        }
         internal static string CurrentAction { get; private set; } = "startup";
         internal static string DirectoryPath => Path.Combine(MacPaths.UserDirectory, "logs");
         internal static string LogPath => Path.Combine(DirectoryPath, "diagnostics.jsonl");
@@ -49,6 +84,8 @@ namespace Chummer
                     }).ToArray();
                     File.AppendAllText(LogPath, JsonSerializer.Serialize(new {
                         utc = DateTimeOffset.UtcNow, kind, action = CurrentAction,
+                        session = Session, processId = Environment.ProcessId, openFormCount, modalType,
+                        uiResponseAgeMs = Math.Max(0, Environment.TickCount64 - System.Threading.Interlocked.Read(ref lastUiResponse)),
                         version = typeof(Program).Assembly.GetName().Version?.ToString(),
                         build = typeof(Program).Module.ModuleVersionId.ToString(),
                         runtime = Environment.Version.ToString(), platform = Environment.OSVersion.Platform.ToString(),

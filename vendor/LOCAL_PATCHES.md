@@ -34,3 +34,5 @@ TreeView now supports horizontal scrolling for expanded text, with translated no
 DesktopMenus projects shared menu items into native Mac menus, preserving default system app-menu entries while replacing About/Settings/Quit in place. Avalonia bootstrap accepts the application name before native setup. An opt-in Command-key mapping keeps shared text-editing shortcuts functional on Mac. MenuItem.CommandStarting reports command invocation before user handlers for privacy-conscious diagnostics.
 
 ComboBox exposes DropDownOpening before popup measurement. Searchable providers use it to restore the complete category list for browsing; typing opens filtered suggestions without taking input focus. Switching between these modes recreates the popup with the appropriate activation behavior while retaining its list control.
+
+Form.ApplicationIconOverride is an opt-in shared branding icon. Chummer sets it before constructing forms, including dialogs, and it replaces designer-provided legacy icons without changing other consumers' defaults.

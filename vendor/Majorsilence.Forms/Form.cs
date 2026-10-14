@@ -56,6 +56,7 @@ namespace Majorsilence.Forms
             // last would have let it claim the whole window before the caption had taken its strip.
             client_area = adapter.Controls.AddImplicitControl (new FormClientArea (this));
             TitleBar = adapter.Controls.AddImplicitControl (new FormTitleBar ());
+            if (ApplicationIconOverride != null) Icon = ApplicationIconOverride;
 
             Resizeable = true;
             Backend.SetSystemDecorations (false);
@@ -768,6 +769,8 @@ namespace Majorsilence.Forms
         /// <summary>Gets the next control in tab order.</summary>
         public Control? GetNextControl (Control? start, bool forward = true) => adapter.GetNextControl (start, forward);
 
+        /// <summary>Optional shared branding icon that overrides legacy form icons.</summary>
+        public static Majorsilence.Forms.Drawing.Icon? ApplicationIconOverride { get; set; }
         private Majorsilence.Forms.Drawing.Icon? _formIcon;
 
         /// <summary>
@@ -777,6 +780,7 @@ namespace Majorsilence.Forms
         public Majorsilence.Forms.Drawing.Icon? Icon {
             get => _formIcon;
             set {
+                value = ApplicationIconOverride ?? value;
                 _formIcon = value;
                 if (value is null)
                     Image = null;

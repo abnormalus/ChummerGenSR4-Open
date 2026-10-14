@@ -5,6 +5,7 @@
     <AssemblyName>ChummerMac</AssemblyName>
     <RootNamespace>Chummer</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ApplicationIcon>branding/chummer.ico</ApplicationIcon>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
@@ -25,6 +26,7 @@
     <Content Include="assets/sheets/**" Link="sheets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="assets/settings/**" Link="settings/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../changelog.txt" Link="changelog.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="branding/**" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="icons/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

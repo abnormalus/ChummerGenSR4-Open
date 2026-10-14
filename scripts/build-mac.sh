@@ -17,6 +17,7 @@ fi
 mkdir -p "$chummer_app/Contents/MacOS" "$chummer_app/Contents/Resources"
 cp -R "$chummer_output/publish/." "$chummer_app/Contents/MacOS/"
 cp "$chummer_root/packaging/mac/Info.plist" "$chummer_app/Contents/Info.plist"
+cp "$chummer_root/packaging/mac/Chummer.icns" "$chummer_app/Contents/Resources/Chummer.icns"
 chmod +x "$chummer_app/Contents/MacOS/ChummerMac"
 if [[ "$(uname -s)" == "Darwin" ]]; then
     /usr/bin/codesign --force --deep --sign - \

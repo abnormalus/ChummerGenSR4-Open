@@ -30,3 +30,9 @@ Keep vendor/LOCAL_PATCHES.md updated when changing the vendored toolkit. Each be
 ## Localization and native menus
 
 Menu labels come from the existing language keys. New commands have English keys so other language packs fall back safely and can translate them later. Mac gestures use Command while the command implementation stays shared with Windows Control shortcuts. Mac About/Settings/Quit use the observed application-menu object, preserving system Services/Hide entries. Quit uses the shared application close sequence, including unsaved-character prompts. Window commands and menu enabled states refresh from the current source tree.
+
+## Branding and hang traces
+
+`Chummer.Mac/branding/chummer.png` is the supplied dragon emblem. The ICO supplies shared form branding and the Windows executable icon; packaging/mac/Chummer.icns supplies Finder/Dock branding. About loads the same PNG. Action icons retain their functional meaning.
+
+Each diagnostic line now includes a process ID and random session ID, allowing multiple builds/processes to be distinguished. Quit logs start, completion/cancellation, and failures. Character close logs unsaved-prompt opening/answer and save progress. A background watchdog posts bounded UI probes every two seconds and records a single unresponsive event after 15 seconds without a UI reply, followed by recovery when detected. Worker timer gaps caused by sleep are excluded. Cached open-form count and modal form type contain no character names or document paths. The watchdog identifies a stall and last command; it cannot reconstruct a killed process's call stack or guarantee logging if the whole process or filesystem is stalled.

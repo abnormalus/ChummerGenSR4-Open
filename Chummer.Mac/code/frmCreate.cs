@@ -1272,17 +1272,23 @@ namespace Chummer
 
 		private void frmCreate_FormClosing(object sender, FormClosingEventArgs e)
 		{
+            AppDiagnostics.CaptureUiState();
+            AppDiagnostics.Record("character-closing");
 			// If there are unsaved changes to the character, as the user if they would like to save their changes.
 			if (_blnIsDirty)
 			{
 				string strCharacterName = _objCharacter.Alias;
 				if (_objCharacter.Alias.Trim() == string.Empty)
 					strCharacterName = LanguageManager.Instance.GetString("String_UnnamedCharacter");
+                AppDiagnostics.Record("close-unsaved-prompt-opening");
 				DialogResult objResult = MessageBox.Show(LanguageManager.Instance.GetString("Message_UnsavedChanges").Replace("{0}", strCharacterName), LanguageManager.Instance.GetString("MessageTitle_UnsavedChanges"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                AppDiagnostics.Record("close-unsaved-prompt-answer-" + objResult.ToString());
 				if (objResult == DialogResult.Yes)
 				{
 					// Attempt to save the Character. If the user cancels the Save As dialogue that may open, cancel the closing event so that changes are not lost.
+                    AppDiagnostics.Record("close-save-start");
 					bool blnResult = SaveCharacter();
+                    AppDiagnostics.Record(blnResult ? "close-save-completed" : "close-save-cancelled-or-failed");
 					if (!blnResult)
 						e.Cancel = true;
 				}

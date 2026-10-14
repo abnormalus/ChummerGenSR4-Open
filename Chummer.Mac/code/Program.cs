@@ -17,6 +17,8 @@ namespace Chummer
         static void Main(string[] args)
         {
             DesktopMenus.ApplicationName = "Chummer";
+            Form.ApplicationIconOverride = new Majorsilence.Forms.Drawing.Icon(
+                System.IO.Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico"));
             Form.CenterModalDialogsOnRootOwner = true;
             if (args.Length > 0 && args[0] == "--smoke-test")
             {
@@ -31,7 +33,11 @@ namespace Chummer
                 Application.SetCompatibleTextRenderingDefault(false);
                 LanguageManager.Instance.Load(GlobalOptions.Instance.Language, null);
                 if (LanguageManager.Instance.Loaded)
-                    Application.Run(new frmMain());
+                {
+                    using var main = new frmMain();
+                    using var watchdog = AppDiagnostics.StartWatchdog();
+                    Application.Run(main);
+                }
                 else
                     Application.Exit();
             }

@@ -5,6 +5,7 @@
   <key>CFBundleName</key><string>Chummer SR4</string>
   <key>CFBundleDisplayName</key><string>Chummer SR4</string>
   <key>CFBundleExecutable</key><string>ChummerMac</string>
+  <key>CFBundleIconFile</key><string>Chummer.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.501</string>
   <key>CFBundleVersion</key><string>1</string>

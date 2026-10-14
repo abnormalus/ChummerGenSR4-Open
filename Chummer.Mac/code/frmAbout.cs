@@ -11,6 +11,8 @@ namespace Chummer
 		public frmAbout()
 		{
 			InitializeComponent();
+            logoPictureBox.Image = Majorsilence.Forms.Drawing.Image.FromFile(System.IO.Path.Combine(AppContext.BaseDirectory, "branding", "chummer.png"));
+            logoPictureBox.SizeMode = Majorsilence.Forms.PictureBoxSizeMode.Zoom;
 			this.Text = String.Format("About {0}", AssemblyTitle);
 			this.labelProductName.Text = AssemblyProduct;
 			this.labelVersion.Text = String.Format("Version {0}", AssemblyVersion);
