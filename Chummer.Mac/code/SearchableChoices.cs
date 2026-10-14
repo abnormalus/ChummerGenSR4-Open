@@ -10,8 +10,7 @@ namespace Chummer
     {
         internal bool IsFiltering { get; private set; }
         private ComboBox combo;
-        private Func<IEnumerable<object>> available;
-        private Func<object, string> name;
+        private Func<string, IEnumerable<object>> available;
         private bool openingFiltered;
         internal void Refresh(string query = "")
         {
@@ -22,8 +21,7 @@ namespace Chummer
                 string text = combo.Text;
                 int caret = combo.SelectionStart;
                 combo.Items.Clear();
-                combo.Items.AddRange(available().Where(item => name(item).IndexOf(query,
-                    StringComparison.OrdinalIgnoreCase) >= 0).ToArray());
+                combo.Items.AddRange(available(query).ToArray());
                 combo.Text = text;
                 combo.SelectionStart = caret;
                 combo.SelectionLength = 0;
@@ -37,7 +35,12 @@ namespace Chummer
         }
         internal static SearchableChoices Attach(ComboBox combo, Func<IEnumerable<object>> available, Func<object, string> name)
         {
-            var behavior = new SearchableChoices { combo = combo, available = available, name = name };
+            return AttachFiltered(combo, query => available().Where(item => name(item).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
+        }
+        // Query-aware providers can retain selectable group rows around matching items.
+        internal static SearchableChoices AttachFiltered(ComboBox combo, Func<string, IEnumerable<object>> available)
+        {
+            var behavior = new SearchableChoices { combo = combo, available = available };
             bool editing = false;
             combo.KeepInputFocusOnDropDown = true;
             combo.DropDownOpening += (_, _) =>

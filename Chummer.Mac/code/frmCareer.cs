@@ -31,6 +31,7 @@ namespace Chummer
 	{
 		// Set the default culture to en-US so we work with decimals correctly.
 		private Character _objCharacter;
+        private SearchableChoices hairChoices, eyeChoices, skinChoices;
 		private MainController _objController;
 
 		private CharacterOptions _objOptions;
@@ -102,6 +103,9 @@ namespace Chummer
 			GlobalOptions.Instance.MRUChanged += PopulateMRU;
 
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
+            hairChoices = AppearanceColors.Attach(txtHair);
+            eyeChoices = AppearanceColors.Attach(txtEyes);
+            skinChoices = AppearanceColors.Attach(txtSkin);
             CharacterPortraits.Attach(this, _objCharacter, picMugshot, cmdAddMugshot, cmdDeleteMugshot,
                 () => { _blnIsDirty = true; UpdateWindowTitle(); });
 
@@ -20726,6 +20730,7 @@ namespace Chummer
 
 		private void txtEyes_TextChanged(object sender, EventArgs e)
 		{
+            if (eyeChoices?.IsFiltering == true) return;
 			_objCharacter.Eyes = txtEyes.Text;
 			_blnIsDirty = true;
 			UpdateWindowTitle();
@@ -20733,6 +20738,7 @@ namespace Chummer
 
 		private void txtHair_TextChanged(object sender, EventArgs e)
 		{
+            if (hairChoices?.IsFiltering == true) return;
 			_objCharacter.Hair = txtHair.Text;
 			_blnIsDirty = true;
 			UpdateWindowTitle();
@@ -20754,6 +20760,7 @@ namespace Chummer
 
 		private void txtSkin_TextChanged(object sender, EventArgs e)
 		{
+            if (skinChoices?.IsFiltering == true) return;
 			_objCharacter.Skin = txtSkin.Text;
 			_blnIsDirty = true;
 			UpdateWindowTitle();

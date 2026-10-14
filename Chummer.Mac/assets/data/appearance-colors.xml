@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='utf-8'?>
+<colors>
+  <family name="Red">
+    <color name="Blood Red" />
+    <color name="Burgundy" />
+    <color name="Crimson" />
+    <color name="Maroon" />
+    <color name="Ruby" />
+    <color name="Scarlet" />
+    <color name="Vermilion" />
+  </family>
+  <family name="Orange">
+    <color name="Amber" />
+    <color name="Burnt Orange" />
+    <color name="Copper" />
+    <color name="Rust" />
+    <color name="Tangerine" />
+  </family>
+  <family name="Yellow">
+    <color name="Canary" />
+    <color name="Gold" />
+    <color name="Lemon" />
+    <color name="Mustard" />
+    <color name="Saffron" />
+  </family>
+  <family name="Green">
+    <color name="Chartreuse" />
+    <color name="Emerald" />
+    <color name="Forest Green" />
+    <color name="Jade" />
+    <color name="Lime" />
+    <color name="Mint" />
+    <color name="Olive" />
+  </family>
+  <family name="Blue">
+    <color name="Azure" />
+    <color name="Cerulean" />
+    <color name="Cobalt" />
+    <color name="Midnight Blue" />
+    <color name="Navy" />
+    <color name="Sapphire" />
+    <color name="Sky Blue" />
+  </family>
+  <family name="Purple">
+    <color name="Amethyst" />
+    <color name="Indigo" />
+    <color name="Lavender" />
+    <color name="Plum" />
+    <color name="Royal Purple" />
+    <color name="Violet" />
+  </family>
+  <family name="Pink">
+    <color name="Coral" />
+    <color name="Fuchsia" />
+    <color name="Magenta" />
+    <color name="Rose" />
+  </family>
+  <family name="Brown">
+    <color name="Chocolate" />
+    <color name="Sienna" />
+    <color name="Tan" />
+    <color name="Umber" />
+  </family>
+  <family name="White">
+    <color name="Bone" />
+    <color name="Ivory" />
+    <color name="Pearl" />
+    <color name="Snow" />
+  </family>
+  <family name="Black">
+    <color name="Charcoal" />
+    <color name="Ebony" />
+    <color name="Jet" />
+    <color name="Onyx" />
+  </family>
+  <family name="Gray">
+    <color name="Ash" />
+    <color name="Gunmetal" />
+    <color name="Silver" />
+    <color name="Slate" />
+    <color name="Steel" />
+  </family>
+</colors>

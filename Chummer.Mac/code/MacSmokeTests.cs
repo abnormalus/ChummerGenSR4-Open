@@ -94,6 +94,26 @@ namespace Chummer
                     Check(editPrompt.SelectedValue == "Later detail", "shared prompt accepts edited detail");
                 }
 
+                var colorRows = AppearanceColors.Filter("").Cast<AppearanceColor>().ToArray();
+                Check(colorRows.Count(row => row.IsFamily) == 11 && colorRows.Length == 69,
+                    "appearance palette contains every supplied color and selectable family");
+                Check(colorRows.Take(8).Select(row => row.Name).SequenceEqual(new[] {
+                    "Red", "Blood Red", "Burgundy", "Crimson", "Maroon", "Ruby", "Scarlet", "Vermilion" }),
+                    "color families precede alphabetized shades");
+                Check(AppearanceColors.Filter("CRIM").Cast<AppearanceColor>().Select(row => row.Name)
+                    .SequenceEqual(new[] { "Red", "Crimson" }) && AppearanceColors.Filter("Blue").Count() == 8,
+                    "color search keeps family context and matches family or shade without case sensitivity");
+                using (var colorCombo = new ComboBox())
+                {
+                    var colorSearch = AppearanceColors.Attach(colorCombo);
+                    colorCombo.Text = "Custom iridescent";
+                    colorSearch.Refresh();
+                    Check(colorCombo.Text == "Custom iridescent", "refresh preserves custom color text");
+                    colorCombo.SelectedIndex = 0;
+                    Check(colorCombo.Text == "Red", "family rows select their plain color name");
+                    colorCombo.SelectedIndex = 3;
+                    Check(colorCombo.Text == "Crimson", "shade selection omits visual indentation");
+                }
                 var choiceCharacter = new Character();
                 choiceCharacter.Options.Books.Clear();
                 choiceCharacter.Options.Books.Add("SR4");
@@ -705,6 +725,13 @@ namespace Chummer
                 {
                     creation.MdiParent = main;
                     creation.Show();
+                    var hairColor = Field<ComboBox>(creation, "txtHair");
+                    hairColor.SelectedIndex = 3;
+                    Field<ComboBox>(creation, "txtEyes").Text = "Custom iridescent";
+                    Field<ComboBox>(creation, "txtSkin").SelectedIndex = 0;
+                    Field<SearchableChoices>(creation, "hairChoices").Refresh("crim");
+                    Check(character.Hair == "Crimson" && character.Eyes == "Custom iridescent" && character.Skin == "Red",
+                        "creation color controls update the model and filtering preserves chosen colors");
                     var originalPluginNotice = AppErrors.Notify;
                     try
                     {
@@ -760,6 +787,8 @@ namespace Chummer
                 character.Save();
                 var loaded = new Character { FileName = character.FileName };
                 Check(loaded.Load(), "new character reloads");
+                Check(loaded.Hair == "Crimson" && loaded.Eyes == "Custom iridescent" && loaded.Skin == "Red",
+                    "selected and custom appearance colors survive the existing character format");
                 Check(loaded.Qualities.Any(item => item.InternalId == detailQuality.InternalId && item.Extra == "Hack on the Fly" &&
                     PromptDetails.CanEdit(item)), "edited quality detail survives save/load and remains editable");
                 Check(loaded.Gear.Any(item => item.Name == "Fake SIN" && item.Extra == PromptDetails.Placeholder) &&
@@ -788,6 +817,11 @@ namespace Chummer
                 {
                     Check(!Field<TreeView>(career, "treQualities").ShowLines, "career quality list does not draw connector lines");
                     Capture(career, output, "career");
+                    Check(Field<ComboBox>(career, "txtHair").Text == "Crimson" &&
+                        Field<ComboBox>(career, "txtEyes").Text == "Custom iridescent",
+                        "career color controls load existing selected and custom colors");
+                    Field<ComboBox>(career, "txtSkin").Text = "Pearl";
+                    Check(careerCharacter.Skin == "Pearl", "career color editing updates the character");
                     Field<TabControl>(career, "tabCharacterTabs").SelectedTab = Field<TabPage>(career, "tabKarma");
                     File.WriteAllBytes(Path.Combine(output, "career-ledger.png"), HeadlessRenderer.CapturePng(career, 1200, 850));
                     var chart = Field<HistoryChart>(career, "chtKarma");
