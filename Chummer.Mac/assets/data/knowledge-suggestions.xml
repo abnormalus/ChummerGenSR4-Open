@@ -1,0 +1,152 @@
+<knowledgeSuggestions>
+  <skill name="Seattle Gangs" category="Street" />
+  <skill name="Seattle Organized Crime" category="Street" />
+  <skill name="Smuggling Routes" category="Street" />
+  <skill name="Black Market Cyberware" category="Street" />
+  <skill name="Street Drug Trade" category="Street" />
+  <skill name="Shadowrunner Hangouts" category="Street" />
+  <skill name="Fixers and Johnsons" category="Street" />
+  <skill name="Corporate Security Procedures" category="Professional" />
+  <skill name="Lone Star Operations" category="Street" />
+  <skill name="Seattle Underground" category="Street" />
+  <skill name="Yakuza Organizations" category="Street" />
+  <skill name="Mafia Families" category="Street" />
+  <skill name="Triad Organizations" category="Street" />
+  <skill name="Tír Tairngire Politics" category="Academic" />
+  <skill name="UCAS Politics" category="Academic" />
+  <skill name="Corporate Politics" category="Professional" />
+  <skill name="Megacorporate History" category="Academic" />
+  <skill name="Corporate Espionage" category="Professional" />
+  <skill name="Corporate Law" category="Academic" />
+  <skill name="Extraterritoriality Law" category="Academic" />
+  <skill name="Cyberware Manufacturers" category="Professional" />
+  <skill name="Bioware Technology" category="Academic" />
+  <skill name="Matrix Architecture" category="Academic" />
+  <skill name="Decking Techniques" category="Professional" />
+  <skill name="Matrix Security Systems" category="Professional" />
+  <skill name="Artificial Intelligence Research" category="Academic" />
+  <skill name="Magical Theory" category="Academic" />
+  <skill name="Hermetic Traditions" category="Academic" />
+  <skill name="Shamanic Traditions" category="Academic" />
+  <skill name="Magical Threats" category="Academic" />
+  <skill name="Paranormal Critters" category="Academic" />
+  <skill name="Awakened Botany" category="Academic" />
+  <skill name="Metaplanar Theory" category="Academic" />
+  <skill name="Spirit Classification" category="Academic" />
+  <skill name="Astral Phenomena" category="Academic" />
+  <skill name="Ancient Magical Cultures" category="Academic" />
+  <skill name="Metahuman Biology" category="Academic" />
+  <skill name="VITAS Epidemics" category="Academic" />
+  <skill name="HMHVV Research" category="Academic" />
+  <skill name="Military Tactics" category="Professional" />
+  <skill name="Military Hardware" category="Professional" />
+  <skill name="Weapons Manufacturers" category="Professional" />
+  <skill name="Security Equipment" category="Professional" />
+  <skill name="Urban Survival Techniques" category="Professional" />
+  <skill name="Vehicle Identification" category="Professional" />
+  <skill name="Combat Biker Leagues" category="Interest" />
+  <skill name="Urban Brawl Teams" category="Interest" />
+  <skill name="Trideo Entertainment" category="Interest" />
+  <skill name="Sixth World Music" category="Interest" />
+  <skill name="Conspiracy Theories" category="Interest" />
+  <skill name="Combat Biking" category="Interest" />
+  <skill name="Combat Biker Teams" category="Interest" />
+  <skill name="Urban Brawl Rules" category="Interest" />
+  <skill name="Urban Brawl Players" category="Interest" />
+  <skill name="Professional Football" category="Interest" />
+  <skill name="Professional Basketball" category="Interest" />
+  <skill name="Professional Baseball" category="Interest" />
+  <skill name="Hockey" category="Interest" />
+  <skill name="Martial Arts Competitions" category="Interest" />
+  <skill name="Boxing" category="Interest" />
+  <skill name="Mixed Martial Arts" category="Interest" />
+  <skill name="Auto Racing" category="Interest" />
+  <skill name="Motorcycle Racing" category="Interest" />
+  <skill name="Drone Racing" category="Interest" />
+  <skill name="Extreme Sports" category="Interest" />
+  <skill name="Skateboarding" category="Interest" />
+  <skill name="Mountain Climbing" category="Interest" />
+  <skill name="Recreational Fishing" category="Interest" />
+  <skill name="Hunting" category="Interest" />
+  <skill name="Sports Betting" category="Interest" />
+  <skill name="Video Gaming" category="Interest" />
+  <skill name="Arcade Games" category="Interest" />
+  <skill name="Virtual Reality Games" category="Interest" />
+  <skill name="Simsense Entertainment" category="Interest" />
+  <skill name="Simsense Celebrities" category="Interest" />
+  <skill name="Trideo Movies" category="Interest" />
+  <skill name="Trideo Series" category="Interest" />
+  <skill name="Trideo Celebrities" category="Interest" />
+  <skill name="Animated Trideo" category="Interest" />
+  <skill name="Comic Books" category="Interest" />
+  <skill name="Roleplaying Games" category="Interest" />
+  <skill name="Tabletop Wargaming" category="Interest" />
+  <skill name="Collectible Card Games" category="Interest" />
+  <skill name="Board Games" category="Interest" />
+  <skill name="Gambling Games" category="Interest" />
+  <skill name="Casino Games" category="Interest" />
+  <skill name="Video Game Development" category="Professional" />
+  <skill name="Game Console Hardware" category="Interest" />
+  <skill name="Arcade Machine Repair" category="Professional" />
+  <skill name="Classic Video Games" category="Interest" />
+  <skill name="Rock Music" category="Interest" />
+  <skill name="Goblin Rock" category="Interest" />
+  <skill name="Synthpop" category="Interest" />
+  <skill name="Electronic Dance Music" category="Interest" />
+  <skill name="Classical Music" category="Interest" />
+  <skill name="Jazz" category="Interest" />
+  <skill name="Underground Music" category="Street" />
+  <skill name="Seattle Music Scene" category="Interest" />
+  <skill name="Music Production" category="Professional" />
+  <skill name="Musical Instruments" category="Interest" />
+  <skill name="Celebrity Gossip" category="Interest" />
+  <skill name="Fashion Trends" category="Interest" />
+  <skill name="Street Fashion" category="Street" />
+  <skill name="Tattoo Culture" category="Interest" />
+  <skill name="Body Modification Culture" category="Interest" />
+  <skill name="Fine Art" category="Interest" />
+  <skill name="Street Art and Graffiti" category="Street" />
+  <skill name="Photography" category="Interest" />
+  <skill name="Dance Styles" category="Interest" />
+  <skill name="Theater" category="Interest" />
+  <skill name="Cooking" category="Interest" />
+  <skill name="Baking" category="Interest" />
+  <skill name="Brewing" category="Interest" />
+  <skill name="Coffee Culture" category="Interest" />
+  <skill name="Restaurants" category="Interest" />
+  <skill name="Bartending" category="Professional" />
+  <skill name="Gardening" category="Interest" />
+  <skill name="Houseplants" category="Interest" />
+  <skill name="Pet Care" category="Interest" />
+  <skill name="Animal Breeds" category="Interest" />
+  <skill name="Automotive Maintenance" category="Professional" />
+  <skill name="Motorcycle Maintenance" category="Professional" />
+  <skill name="Vehicle Customization" category="Interest" />
+  <skill name="Home Electronics" category="Interest" />
+  <skill name="Consumer Electronics" category="Interest" />
+  <skill name="Computer Hardware" category="Academic" />
+  <skill name="Home Decorating" category="Interest" />
+  <skill name="Woodworking" category="Interest" />
+  <skill name="Model Building" category="Interest" />
+  <skill name="Collectible Miniatures" category="Interest" />
+  <skill name="Seattle Restaurants" category="Interest" />
+  <skill name="Seattle Nightlife" category="Street" />
+  <skill name="Local Festivals" category="Interest" />
+  <skill name="Tourist Attractions" category="Interest" />
+  <skill name="Public Transportation" category="Professional" />
+  <skill name="Urban Geography" category="Academic" />
+  <skill name="Local History" category="Academic" />
+  <skill name="Metahuman Customs" category="Academic" />
+  <skill name="Popular Literature" category="Interest" />
+  <skill name="Science Fiction" category="Interest" />
+  <skill name="Fantasy Literature" category="Interest" />
+  <skill name="Comic Book Characters" category="Interest" />
+  <skill name="Advertising" category="Professional" />
+  <skill name="Consumer Products" category="Interest" />
+  <skill name="Retail Operations" category="Professional" />
+  <skill name="Hospitality Industry" category="Professional" />
+  <skill name="Fashion Design" category="Professional" />
+  <skill name="Journalism" category="Professional" />
+  <skill name="Educational Systems" category="Academic" />
+  <skill name="Local Politics" category="Academic" />
+</knowledgeSuggestions>

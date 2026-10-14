@@ -8,7 +8,9 @@ The shared desktop application currently lives in Chummer.Mac. It can be publish
 - DesktopMenus projects the existing menu command tree into native Mac menus. The original handlers remain authoritative; Windows retains in-window menus.
 - MenuItem.CommandStarting provides one pre-handler observation point for both menu and toolbar commands. Diagnostics record fixed command IDs, never captions or character data.
 - CharacterFileDialogs owns native file-picker behavior and invokes the existing serializer.
-- PromptDetails owns normalization/editing. DetailChoices supplies data and filters enabled sources; the searchable control remains reusable.
+- PromptDetails owns normalization/editing. DetailChoices supplies quality suggestions and filters enabled sources; SearchableChoices supplies reusable editable combo filtering for quality details and knowledge names.
+- `quality-detail-choices.xml` includes the supplied allergy recommendations, filtered by the quality's Common/Uncommon rarity. Severity does not change the list. Custom details remain allowed.
+- `knowledge-suggestions.xml` supplements the existing ruleset skills with the supplied `knowledge skills.csv` and `interests.csv` entries. The CSV category `Interests` maps to the existing `Interest` category. Suggestions are optional names, not new rules or source attributions; selecting one sets its category. Keep these suggestions separate from `skills.xml` so ruleset updates preserve them.
 - Keep extracting rules from window handlers when changing those areas, rather than rewriting the rules engine during unrelated UI fixes.
 
 ## Diagnostics

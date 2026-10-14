@@ -141,6 +141,42 @@ namespace Chummer
                         "blank searchable detail retains the shared placeholder behavior");
                 }
 
+                var commonAllergies = DetailChoices.ForQuality(choiceCharacter, "Allergy (Common, Mild)");
+                var uncommonAllergies = DetailChoices.ForQuality(choiceCharacter, "Allergy (Uncommon, Severe)");
+                Check(commonAllergies.Length == 18 && uncommonAllergies.Length == 32 &&
+                    commonAllergies.Any(item => item.Name == "Pollen") && uncommonAllergies.Any(item => item.Name == "Silver"),
+                    "allergy suggestions use the supplied recommended rarity across severity levels");
+                using (var allergyPrompt = new frmSelectText { AutoAcceptPrefilled = false })
+                {
+                    allergyPrompt.ConfigureChoices(choiceCharacter, "Allergy (Common, Mild)");
+                    allergyPrompt.Show();
+                    var combo = Field<ComboBox>(allergyPrompt, "detailChoices");
+                    combo.Text = "poll";
+                    Check(combo.Items.Count == 2, "allergy search narrows suggestions by contained text");
+                    combo.Text = "Custom allergen";
+                    Field<Button>(allergyPrompt, "cmdOK").PerformClick();
+                    Check(allergyPrompt.SelectedValue == "Custom allergen", "allergy picker retains custom details");
+                }
+                using (var knowledgeControl = new SkillControl())
+                {
+                    var knowledge = new Skill(choiceCharacter) { SkillCategory = "Academic", Attribute = "LOG" };
+                    knowledgeControl.SkillObject = knowledge;
+                    knowledgeControl.RatingChanged += _ => { };
+                    knowledgeControl.KnowledgeSkill = true;
+                    var combo = Field<ComboBox>(knowledgeControl, "cboSkillName");
+                    Check(KnowledgeSuggestions.Names.Length == 150 && combo.Items.Cast<object>().Any(item => item.ToString() == "Combat Biking"),
+                        "both supplied knowledge lists supplement existing skills");
+                    combo.Text = "biking";
+                    Check(combo.Items.Count == 1 && knowledge.Name == "biking", "knowledge search narrows without losing typed text");
+                    combo.SelectedIndex = 0;
+                    Check(knowledge.Name == "Combat Biking" && knowledge.SkillCategory == "Interest",
+                        "selecting a knowledge suggestion sets its name and matching category");
+                    combo.Text = "My custom knowledge";
+                    Check(knowledge.Name == "My custom knowledge", "custom knowledge skill names remain supported");
+                    combo.Text = "";
+                    Check(combo.Items.Count > 150, "clearing knowledge search restores existing and supplied suggestions");
+                }
+
                 using (var screenForm = new Form { Width = 600, Height = 200 })
                 {
                     var backendField = typeof(Form).BaseType.GetField("Backend", BindingFlags.NonPublic | BindingFlags.Instance);

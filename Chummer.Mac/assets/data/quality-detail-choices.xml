@@ -1,30 +1,82 @@
 <detailChoices>
-<choices quality="Codeslinger">
-  <choice name="Analyze Icon/Node" source="SR4" book="SR4A" review="false" />
-  <choice name="Capture Wireless Signal" source="SR4" book="SR4A" review="false" />
-  <choice name="Control Device" source="SR4" book="SR4A" review="true" />
-  <choice name="Crash Node" source="SR4" book="SR4A" review="false" />
-  <choice name="Crash Program" source="SR4" book="SR4A" review="false" />
-  <choice name="Data Search" source="SR4" book="SR4A" review="false" />
-  <choice name="Detect Hidden Node" source="SR4" book="SR4A" review="false" />
-  <choice name="Disarm Data Bomb" source="SR4" book="SR4A" review="false" />
-  <choice name="Edit" source="SR4" book="SR4A" review="false" />
-  <choice name="Hack on the Fly" source="SR4" book="SR4A" review="false" />
-  <choice name="Initiate Cryptanalysis" source="SR4" book="SR4A" review="false" />
-  <choice name="Intercept Traffic" source="SR4" book="SR4A" review="false" />
-  <choice name="Jam Signals" source="SR4" book="SR4A" review="true" />
-  <choice name="Matrix Attack" source="SR4" book="SR4A" review="false" />
-  <choice name="Probing the Target" source="SR4" book="SR4A" review="false" />
-  <choice name="Redirect Trace" source="SR4" book="SR4A" review="false" />
-  <choice name="Repair Icon" source="SR4" book="SR4A" review="false" />
-  <choice name="Set Data Bomb" source="SR4" book="SR4A" review="false" />
-  <choice name="Spoof Command" source="SR4" book="SR4A" review="false" />
-  <choice name="Trace User" source="SR4" book="SR4A" review="false" />
-  <choice name="Corrupt Data" source="UN" book="Unwired" review="false" />
-  <choice name="Disarm Program" source="UN" book="Unwired" review="false" />
-  <choice name="Disinfect" source="UN" book="Unwired" review="false" />
-  <choice name="Matrix Full Defense" source="SR4" book="SR4A" review="true" />
-  <choice name="Observe in Detail" source="SR4" book="SR4A" review="true" />
-  <choice name="Detect Wireless Nodes" source="SR4" book="SR4A" review="true" />
-</choices>
+  <choices quality="Codeslinger">
+    <choice name="Analyze Icon/Node" source="SR4" book="SR4A" review="false" />
+    <choice name="Capture Wireless Signal" source="SR4" book="SR4A" review="false" />
+    <choice name="Control Device" source="SR4" book="SR4A" review="true" />
+    <choice name="Crash Node" source="SR4" book="SR4A" review="false" />
+    <choice name="Crash Program" source="SR4" book="SR4A" review="false" />
+    <choice name="Data Search" source="SR4" book="SR4A" review="false" />
+    <choice name="Detect Hidden Node" source="SR4" book="SR4A" review="false" />
+    <choice name="Disarm Data Bomb" source="SR4" book="SR4A" review="false" />
+    <choice name="Edit" source="SR4" book="SR4A" review="false" />
+    <choice name="Hack on the Fly" source="SR4" book="SR4A" review="false" />
+    <choice name="Initiate Cryptanalysis" source="SR4" book="SR4A" review="false" />
+    <choice name="Intercept Traffic" source="SR4" book="SR4A" review="false" />
+    <choice name="Jam Signals" source="SR4" book="SR4A" review="true" />
+    <choice name="Matrix Attack" source="SR4" book="SR4A" review="false" />
+    <choice name="Probing the Target" source="SR4" book="SR4A" review="false" />
+    <choice name="Redirect Trace" source="SR4" book="SR4A" review="false" />
+    <choice name="Repair Icon" source="SR4" book="SR4A" review="false" />
+    <choice name="Set Data Bomb" source="SR4" book="SR4A" review="false" />
+    <choice name="Spoof Command" source="SR4" book="SR4A" review="false" />
+    <choice name="Trace User" source="SR4" book="SR4A" review="false" />
+    <choice name="Corrupt Data" source="UN" book="Unwired" review="false" />
+    <choice name="Disarm Program" source="UN" book="Unwired" review="false" />
+    <choice name="Disinfect" source="UN" book="Unwired" review="false" />
+    <choice name="Matrix Full Defense" source="SR4" book="SR4A" review="true" />
+    <choice name="Observe in Detail" source="SR4" book="SR4A" review="true" />
+    <choice name="Detect Wireless Nodes" source="SR4" book="SR4A" review="true" />
+  </choices>
+  <choices quality="Allergy">
+    <choice name="Sunlight" rarity="Common" />
+    <choice name="Silver" rarity="Uncommon" />
+    <choice name="Gold" rarity="Uncommon" />
+    <choice name="Iron" rarity="Common" />
+    <choice name="Copper" rarity="Common" />
+    <choice name="Nickel" rarity="Common" />
+    <choice name="Plastic" rarity="Common" />
+    <choice name="Latex" rarity="Common" />
+    <choice name="Pollen" rarity="Common" />
+    <choice name="Mold Spores" rarity="Common" />
+    <choice name="Insect Venom" rarity="Common" />
+    <choice name="Shellfish" rarity="Uncommon" />
+    <choice name="Soy" rarity="Common" />
+    <choice name="Synthetic Fragrances" rarity="Common" />
+    <choice name="Industrial Pollutants" rarity="Common" />
+    <choice name="Orichalcum" rarity="Uncommon" />
+    <choice name="Radical Reagents" rarity="Uncommon" />
+    <choice name="Awakened Plant Pollen" rarity="Uncommon" />
+    <choice name="FAB III" rarity="Uncommon" />
+    <choice name="Awakened Animal Dander" rarity="Uncommon" />
+    <choice name="Dragon Blood" rarity="Uncommon" />
+    <choice name="Ghoul Bodily Fluids" rarity="Uncommon" />
+    <choice name="Insect Spirit Secretions" rarity="Uncommon" />
+    <choice name="Toxic Algae" rarity="Uncommon" />
+    <choice name="Background-Count Contaminated Materials" rarity="Uncommon" />
+    <choice name="Alchemical Preparations" rarity="Uncommon" />
+    <choice name="Magical Incense" rarity="Uncommon" />
+    <choice name="Awakened Fungal Spores" rarity="Uncommon" />
+    <choice name="Dragon Scales" rarity="Uncommon" />
+    <choice name="Specific Magical Reagents" rarity="Uncommon" />
+    <choice name="Cold-Wrought Iron" rarity="Uncommon" />
+    <choice name="Holy Water" rarity="Uncommon" />
+    <choice name="Consecrated Salt" rarity="Uncommon" />
+    <choice name="Garlic" rarity="Common" />
+    <choice name="Wolfsbane" rarity="Uncommon" />
+    <choice name="Rowan Wood" rarity="Uncommon" />
+    <choice name="Hawthorn Wood" rarity="Uncommon" />
+    <choice name="Mistletoe" rarity="Uncommon" />
+    <choice name="Running Water" rarity="Common" />
+    <choice name="Oak Wood" rarity="Common" />
+    <choice name="Yew Wood" rarity="Uncommon" />
+    <choice name="Cedar Wood" rarity="Common" />
+    <choice name="Jade" rarity="Uncommon" />
+    <choice name="Obsidian" rarity="Uncommon" />
+    <choice name="Sacred Ash" rarity="Uncommon" />
+    <choice name="Bells" rarity="Common" />
+    <choice name="Frankincense" rarity="Uncommon" />
+    <choice name="Graveyard Earth" rarity="Uncommon" />
+    <choice name="Sacred Symbols" rarity="Uncommon" />
+    <choice name="Moonlight" rarity="Common" />
+  </choices>
 </detailChoices>

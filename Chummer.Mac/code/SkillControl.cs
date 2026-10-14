@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using Majorsilence.Forms;
 using System.Xml;
+using System.Linq;
 using SystemColors = Majorsilence.Forms.SystemColors;
 
 
@@ -72,6 +73,7 @@ namespace Chummer
     public partial class SkillControl : UserControl
     {
 		private Skill _objSkill;
+        private SearchableChoices knowledgeSearch;
 
         // RatingChanged Event.
         public event RatingChangedHandler RatingChanged;
@@ -264,15 +266,19 @@ namespace Chummer
 
 		private void cboSkillName_SelectedIndexChanged(object sender, EventArgs e)
 		{
+            if (knowledgeSearch?.IsFiltering == true || cboSkillName.SelectedIndex < 0) return;
 			_objSkill.Name = cboSkillName.Text;
+            string suggestedCategory = KnowledgeSuggestions.Category(cboSkillName.Text);
+            if (!_blnSkipRefresh && suggestedCategory != null)
+                cboKnowledgeSkillCategory.SelectedValue = suggestedCategory;
 
 			XmlDocument objXmlDocument = new XmlDocument();
 			objXmlDocument = XmlManager.Instance.Load("skills.xml");
 
 			// When the selected Knowledge Skill is changed, check the Skill file and build the pre-defined list of its Specializations (if any).
-			XmlNode objXmlSkill = objXmlDocument.SelectSingleNode("/chummer/knowledgeskills/skill[name = \"" + cboSkillName.Text + "\"]");
-			if (objXmlSkill == null)
-				objXmlSkill = objXmlDocument.SelectSingleNode("/chummer/knowledgeskills/skill[translate = \"" + cboSkillName.Text + "\"]");
+            XmlNode objXmlSkill = objXmlDocument.SelectNodes("/chummer/knowledgeskills/skill").Cast<XmlNode>()
+                .FirstOrDefault(item => item["name"]?.InnerText == cboSkillName.Text ||
+                    item["translate"]?.InnerText == cboSkillName.Text);
 			if (objXmlSkill != null)
 			{
 				if (!_blnSkipRefresh)
@@ -291,7 +297,8 @@ namespace Chummer
 
 		private void cboSkillName_TextChanged(object sender, EventArgs e)
 		{
-			_objSkill.Name = cboSkillName.Text;
+            if (knowledgeSearch?.IsFiltering != true)
+                _objSkill.Name = cboSkillName.Text;
 		}
 
 		private void cmdImproveSkill_Click(object sender, EventArgs e)
@@ -499,6 +506,11 @@ namespace Chummer
 						else
 							cboSkillName.Items.Add(objXmlSkill["name"].InnerText);
 					}
+                    foreach (string name in KnowledgeSuggestions.Names)
+                        if (!cboSkillName.Items.Cast<object>().Any(item => string.Equals(item.ToString(), name, StringComparison.OrdinalIgnoreCase)))
+                            cboSkillName.Items.Add(name);
+                    if (knowledgeSearch == null)
+                        knowledgeSearch = SearchableChoices.Attach(cboSkillName, cboSkillName.Items.Cast<object>(), item => item.ToString());
 					_blnSkipRefresh = false;
 
 					if (_objSkill.SkillCategory != "")

@@ -11,8 +11,6 @@ namespace Chummer
     {
         private string _strReturnValue = "";
         private ComboBox detailChoices;
-        private bool filtering;
-        private bool editingChoices;
         public void ConfigureChoices(Character character, string qualityName)
         {
             var choices = DetailChoices.ForQuality(character, qualityName);
@@ -45,28 +43,7 @@ namespace Chummer
             };
             detailChoices.Items.AddRange(choices.Cast<object>().ToArray());
             detailChoices.Text = txtValue.Text;
-            detailChoices.TextUpdate += (_, _) => editingChoices = true;
-            detailChoices.TextChanged += (_, _) =>
-            {
-                if (filtering || (detailChoices.SelectedItem is DetailChoice current && detailChoices.Text == current.ToString())) return;
-                filtering = true;
-                try
-                {
-                    string query = detailChoices.Text;
-                    int caret = detailChoices.SelectionStart;
-                    bool showList = editingChoices || detailChoices.DroppedDown;
-                    editingChoices = false;
-                    detailChoices.DroppedDown = false;
-                    detailChoices.Items.Clear();
-                    detailChoices.Items.AddRange(choices.Where(item => item.Name.IndexOf(query,
-                        StringComparison.OrdinalIgnoreCase) >= 0).Cast<object>().ToArray());
-                    detailChoices.Text = query;
-                    detailChoices.SelectionStart = caret;
-                    detailChoices.SelectionLength = 0;
-                    if (showList) detailChoices.DroppedDown = detailChoices.Items.Count > 0;
-                }
-                finally { filtering = false; }
-            };
+            SearchableChoices.Attach(detailChoices, choices.Cast<object>(), item => ((DetailChoice)item).Name);
             txtValue.Visible = false;
             Controls.Add(detailChoices);
         }

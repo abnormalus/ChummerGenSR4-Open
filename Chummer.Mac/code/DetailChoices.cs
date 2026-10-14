@@ -25,9 +25,12 @@ namespace Chummer
         internal static DetailChoice[] ForQuality(Character character, string qualityName)
         {
             if (character == null || string.IsNullOrEmpty(qualityName)) return null;
-            var group = Data.Value.Root.Elements("choices").FirstOrDefault(item => (string)item.Attribute("quality") == qualityName);
+            bool allergy = qualityName.StartsWith("Allergy (", StringComparison.Ordinal);
+            var group = Data.Value.Root.Elements("choices").FirstOrDefault(item =>
+                (string)item.Attribute("quality") == (allergy ? "Allergy" : qualityName));
             if (group == null) return null;
             return group.Elements("choice")
+                .Where(item => !allergy || qualityName.StartsWith("Allergy (" + (string)item.Attribute("rarity") + ",", StringComparison.Ordinal))
                 .Where(item => string.IsNullOrEmpty((string)item.Attribute("source")) ||
                     character.Options.BookEnabled((string)item.Attribute("source")))
                 .Select(item => new DetailChoice { Name = (string)item.Attribute("name"),
