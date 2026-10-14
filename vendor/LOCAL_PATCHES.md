@@ -32,3 +32,5 @@ ListBox item insertion no longer shifts provisional focus zero past the last ite
 TreeView now supports horizontal scrolling for expanded text, with translated node bounds, trackpad X gestures, and scrollbar placement within the viewport. StatusStrip AutoSize items measure current rendered text. TreeView exposes its existing pre-render node-formatting hook as an event so Chummer can retain review colors from model data.
 
 DesktopMenus projects shared menu items into native Mac menus, preserving default system app-menu entries while replacing About/Settings/Quit in place. Avalonia bootstrap accepts the application name before native setup. An opt-in Command-key mapping keeps shared text-editing shortcuts functional on Mac. MenuItem.CommandStarting reports command invocation before user handlers for privacy-conscious diagnostics.
+
+ComboBox exposes DropDownOpening before popup measurement. Searchable providers use it to restore the complete category list for browsing; typing opens filtered suggestions without taking input focus. Switching between these modes recreates the popup with the appropriate activation behavior while retaining its list control.

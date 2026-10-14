@@ -157,24 +157,58 @@ namespace Chummer
                     Field<Button>(allergyPrompt, "cmdOK").PerformClick();
                     Check(allergyPrompt.SelectedValue == "Custom allergen", "allergy picker retains custom details");
                 }
+                using (var knowledgeHost = new Form { Width = 900, Height = 160 })
                 using (var knowledgeControl = new SkillControl())
                 {
                     var knowledge = new Skill(choiceCharacter) { SkillCategory = "Academic", Attribute = "LOG" };
                     knowledgeControl.SkillObject = knowledge;
                     knowledgeControl.RatingChanged += _ => { };
                     knowledgeControl.KnowledgeSkill = true;
+                    knowledgeHost.Controls.Add(knowledgeControl);
+                    knowledgeHost.Show();
+                    var category = Field<ComboBox>(knowledgeControl, "cboKnowledgeSkillCategory");
+                    category.SelectedValue = "Interest";
                     var combo = Field<ComboBox>(knowledgeControl, "cboSkillName");
                     Check(KnowledgeSuggestions.Names.Length == 150 && combo.Items.Cast<object>().Any(item => item.ToString() == "Combat Biking"),
                         "both supplied knowledge lists supplement existing skills");
+                    Check(category.Left < combo.Left && !combo.Items.Cast<object>().Any(item => item.ToString() == "Seattle Gangs"),
+                        "knowledge type precedes the name and curates its suggestions");
+                    int fullCount = combo.Items.Count;
                     combo.Text = "biking";
                     Check(combo.Items.Count == 1 && knowledge.Name == "biking", "knowledge search narrows without losing typed text");
                     combo.SelectedIndex = 0;
                     Check(knowledge.Name == "Combat Biking" && knowledge.SkillCategory == "Interest",
-                        "selecting a knowledge suggestion sets its name and matching category");
+                        "selecting a knowledge suggestion preserves the chosen type");
+                    combo.Text = "biking";
+                    combo.DroppedDown = true;
+                    Check(combo.Items.Count == fullCount && combo.Text == "biking", "opening dropdown restores the full type list while retaining text");
+                    var browsingPopup = (PopupWindow)typeof(ComboBox).GetField("popup", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(combo);
+                    Check((bool)typeof(PopupWindow).GetProperty("ShowsActivated", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(browsingPopup),
+                        "knowledge browsing popup takes focus for mouse selection");
+                    HeadlessRenderer.CapturePng(browsingPopup, 720, 500);
+                    var popupWindowType = typeof(Form).BaseType;
+                    int choiceX = (int)(20 * browsingPopup.Scaling);
+                    int choiceY = (int)(8 * browsingPopup.Scaling);
+                    popupWindowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Invoke(browsingPopup, new object[] { MouseButtons.Left, choiceX, choiceY, Keys.None });
+                    popupWindowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Invoke(browsingPopup, new object[] { MouseButtons.Left, choiceX, choiceY, Keys.None });
+                    Check(combo.SelectedIndex == 0 && knowledge.Name == combo.Items[0].ToString(),
+                        "mouse selection from knowledge dropdown updates the skill name");
+                    var nameInput = (TextBox)typeof(ComboBox).GetField("edit", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(combo);
+                    nameInput.Text = "biking";
+                    Check(combo.Items.Count == 1 && combo.DroppedDown, "typing after browsing switches back to narrowed suggestions");
+                    combo.DroppedDown = false;
+                    category.SelectedValue = "Street";
+                    Check(combo.Items.Cast<object>().Any(item => item.ToString() == "Seattle Gangs") &&
+                        !combo.Items.Cast<object>().Any(item => item.ToString() == "Combat Biking"),
+                        "changing knowledge type refreshes the full matching list");
+                    Check(knowledgeControl.Controls.Find("addKnowledgeSpecialty", false).Length == 1,
+                        "knowledge skills offer an explicit specialty button");
                     combo.Text = "My custom knowledge";
                     Check(knowledge.Name == "My custom knowledge", "custom knowledge skill names remain supported");
                     combo.Text = "";
-                    Check(combo.Items.Count > 150, "clearing knowledge search restores existing and supplied suggestions");
+                    Check(combo.Items.Count > 12, "clearing knowledge search restores the full selected type list");
                 }
 
                 using (var screenForm = new Form { Width = 600, Height = 200 })

@@ -10,7 +10,7 @@ The shared desktop application currently lives in Chummer.Mac. It can be publish
 - CharacterFileDialogs owns native file-picker behavior and invokes the existing serializer.
 - PromptDetails owns normalization/editing. DetailChoices supplies quality suggestions and filters enabled sources; SearchableChoices supplies reusable editable combo filtering for quality details and knowledge names.
 - `quality-detail-choices.xml` includes the supplied allergy recommendations, filtered by the quality's Common/Uncommon rarity. Severity does not change the list. Custom details remain allowed.
-- `knowledge-suggestions.xml` supplements the existing ruleset skills with the supplied `knowledge skills.csv` and `interests.csv` entries. The CSV category `Interests` maps to the existing `Interest` category. Suggestions are optional names, not new rules or source attributions; selecting one sets its category. Keep these suggestions separate from `skills.xml` so ruleset updates preserve them.
+- `knowledge-suggestions.xml` supplements the existing ruleset skills with the supplied `knowledge skills.csv` and `interests.csv` entries. The CSV category `Interests` maps to the existing `Interest` category. Suggestions are optional names, not new rules or source attributions; the category is chosen first and curates the available names. The arrow restores the full category list, while typing filters it. Add Specialty uses the shared free-text prompt and the existing career Karma flow. Keep these suggestions separate from `skills.xml` so ruleset updates preserve them.
 - Keep extracting rules from window handlers when changing those areas, rather than rewriting the rules engine during unrelated UI fixes.
 
 ## Diagnostics

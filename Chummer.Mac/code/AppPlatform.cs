@@ -9,12 +9,12 @@ namespace Chummer
     internal static class AppPlatform
     {
         internal static bool UsesNativeMenus => System.OperatingSystem.IsMacOS();
-        internal static void ConfigureMenus(Form owner, MenuStrip menus, MenuItem preferences, MenuItem about, MenuItem quit)
+        internal static void ConfigureMenus(Form owner, MenuStrip menus, MenuItem preferences, MenuItem about, MenuItem quit, Action openPreferences)
         {
             if (UsesNativeMenus)
             {
                 var macPreferences = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_MacPreferences")) { Name = "preferences" };
-                macPreferences.Click += (_, _) => preferences.PerformClick();
+                macPreferences.Click += (_, _) => openPreferences();
                 var macQuit = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_MacQuit")) { Name = "quitApplication" };
                 macQuit.Click += (_, _) => Application.Exit();
                 try { DesktopMenus.Install(owner, menus, macPreferences, about, macQuit); AppDiagnostics.Record("native-menu-installed");

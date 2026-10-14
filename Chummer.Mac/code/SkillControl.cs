@@ -74,6 +74,8 @@ namespace Chummer
     {
 		private Skill _objSkill;
         private SearchableChoices knowledgeSearch;
+        private readonly Dictionary<string, string> knowledgeCategories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private Button addKnowledgeSpecialty;
 
         // RatingChanged Event.
         public event RatingChangedHandler RatingChanged;
@@ -186,6 +188,7 @@ namespace Chummer
 
 			RefreshControl();
 			_blnSkipRefresh = false;
+            if (KnowledgeSkill) LayoutKnowledgeInputs();
         }
 
         private void nudSkill_ValueChanged(object sender, EventArgs e)
@@ -255,7 +258,9 @@ namespace Chummer
 		{
 			// Raise the RatingChanged Event when the user has changed the Knowledge Skill's Category.
 			// The entire SkillControl is passed as an argument so the handling event can evaluate its contents.
+            if (cboKnowledgeSkillCategory.SelectedValue == null) return;
 			SkillCategory = cboKnowledgeSkillCategory.SelectedValue.ToString();
+            if (!_blnSkipRefresh) knowledgeSearch?.Refresh();
 			RatingChanged(this);
 		}
 
@@ -268,9 +273,6 @@ namespace Chummer
 		{
             if (knowledgeSearch?.IsFiltering == true || cboSkillName.SelectedIndex < 0) return;
 			_objSkill.Name = cboSkillName.Text;
-            string suggestedCategory = KnowledgeSuggestions.Category(cboSkillName.Text);
-            if (!_blnSkipRefresh && suggestedCategory != null)
-                cboKnowledgeSkillCategory.SelectedValue = suggestedCategory;
 
 			XmlDocument objXmlDocument = new XmlDocument();
 			objXmlDocument = XmlManager.Instance.Load("skills.xml");
@@ -281,8 +283,7 @@ namespace Chummer
                     item["translate"]?.InnerText == cboSkillName.Text);
 			if (objXmlSkill != null)
 			{
-				if (!_blnSkipRefresh)
-					cboKnowledgeSkillCategory.SelectedValue = objXmlSkill["category"].InnerText;
+                // The type chosen first remains authoritative; suggestions are curated by that type.
 				cboSpec.Items.Clear();
 				foreach (XmlNode objXmlSpecialization in objXmlSkill.SelectNodes("specs/spec"))
 				{
@@ -455,6 +456,49 @@ namespace Chummer
         /// <summary>
         /// Is the Skill a Knowledge Skill?
         /// </summary>
+        private void LayoutKnowledgeInputs()
+        {
+            cboKnowledgeSkillCategory.Left = 3;
+            cboKnowledgeSkillCategory.Width = 140;
+            cboKnowledgeSkillCategory.TabIndex = 0;
+            cboSkillName.Left = 149;
+            cboSkillName.Width = 196;
+            cboSkillName.DropDownWidth = 360;
+            cboSkillName.MaxDropDownItems = 10;
+            cboSkillName.TabIndex = 1;
+            nudSkill.Left = lblSkillRating.Left = 351;
+            lblModifiedRating.Left = 397;
+            cmdImproveSkill.Left = 421;
+            cmdRoll.Left = 451;
+            cmdChangeSpec.Visible = false;
+            if (addKnowledgeSpecialty == null)
+            {
+                addKnowledgeSpecialty = new Button { Name = "addKnowledgeSpecialty", Left = 481, Top = 0,
+                    Width = 125, Height = 23, TabIndex = 3,
+                    Text = LanguageManager.Instance.GetString("Button_AddSpecialty") };
+                addKnowledgeSpecialty.Click += (_, _) =>
+                {
+                    using var prompt = new frmSelectText { AutoAcceptPrefilled = false,
+                        SelectedValue = cboSpec.Text,
+                        Description = LanguageManager.Instance.GetString("Label_KnowledgeSpecialty") };
+                    _strOldSpec = cboSpec.Text;
+                    if (prompt.ShowDialog(FindForm()) != DialogResult.OK) return;
+                    cboSpec.Text = prompt.SelectedValue;
+                    if (_objSkill.CharacterObject.Created && cboSpec.Text != _strOldSpec)
+                        SpecializationLeave?.Invoke(this);
+                };
+                Controls.Add(addKnowledgeSpecialty);
+            }
+            cboSpec.Left = 612;
+            cboSpec.Width = 140;
+            cboSpec.TabIndex = 4;
+            // Existing specialties stay editable in creation and use the usual Karma flow in career.
+            cboSpec.Enabled = !_objSkill.CharacterObject.Created;
+            cmdDelete.Left = 758;
+            cmdDelete.TabIndex = 5;
+            Width = 833;
+        }
+
         public bool KnowledgeSkill
         {
             get
@@ -495,28 +539,24 @@ namespace Chummer
 					if (cboKnowledgeSkillCategory.Text == "")
 						cboKnowledgeSkillCategory.SelectedIndex = 0;
 
-					// Populate the list of Knowledge Skills.
-					objXmlSkillList = objXmlDocument.SelectNodes("/chummer/knowledgeskills/skill");
-
-					cboSkillName.Items.Clear();
-					foreach (XmlNode objXmlSkill in objXmlSkillList)
-					{
-						if (objXmlSkill["translate"] != null)
-							cboSkillName.Items.Add(objXmlSkill["translate"].InnerText);
-						else
-							cboSkillName.Items.Add(objXmlSkill["name"].InnerText);
-					}
+                    knowledgeCategories.Clear();
+                    foreach (XmlNode skill in objXmlDocument.SelectNodes("/chummer/knowledgeskills/skill"))
+                        knowledgeCategories[skill["translate"]?.InnerText ?? skill["name"].InnerText] = skill["category"].InnerText;
                     foreach (string name in KnowledgeSuggestions.Names)
-                        if (!cboSkillName.Items.Cast<object>().Any(item => string.Equals(item.ToString(), name, StringComparison.OrdinalIgnoreCase)))
-                            cboSkillName.Items.Add(name);
+                        if (!knowledgeCategories.ContainsKey(name)) knowledgeCategories[name] = KnowledgeSuggestions.Category(name);
                     if (knowledgeSearch == null)
-                        knowledgeSearch = SearchableChoices.Attach(cboSkillName, cboSkillName.Items.Cast<object>(), item => item.ToString());
+                        knowledgeSearch = SearchableChoices.Attach(cboSkillName,
+                            () => knowledgeCategories.Where(item => item.Value == _objSkill.SkillCategory)
+                                .OrderBy(item => item.Key).Select(item => (object)item.Key), item => item.ToString());
+
 					_blnSkipRefresh = false;
 
 					if (_objSkill.SkillCategory != "")
 						cboKnowledgeSkillCategory.SelectedValue = _objSkill.SkillCategory;
 					else
 						_objSkill.Attribute = "LOG";
+                    knowledgeSearch.Refresh();
+                    LayoutKnowledgeInputs();
                 }
                 else
                 {

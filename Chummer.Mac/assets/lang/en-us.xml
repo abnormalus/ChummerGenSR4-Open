@@ -6647,5 +6647,7 @@ Only one attribute may be at its Maximum value during character creation.</text>
 		<string><key>MessageTitle_CredstickTransfer</key><text>Credstick Transfer</text></string>
 		<string><key>Message_SpareClipAmmoMismatch</key><text>{0} is not compatible with {1}. The ammunition was not added.</text></string>
 		<string><key>MessageTitle_SpareClipAmmoMismatch</key><text>Incompatible Ammunition</text></string>
-	</strings>
+	<string><key>Button_AddSpecialty</key><text>Add Specialty</text></string>
+        <string><key>Label_KnowledgeSpecialty</key><text>Specialty:</text></string>
+    </strings>
 </chummer>

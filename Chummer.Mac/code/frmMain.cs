@@ -140,7 +140,7 @@ namespace Chummer
 			{
 			}
             AppPlatform.ConfigureMenus(this, menuStrip, optionsToolStripMenuItem,
-                aboutToolStripMenuItem, exitToolStripMenuItem);
+                aboutToolStripMenuItem, exitToolStripMenuItem, () => optionsToolStripMenuItem_Click(this, EventArgs.Empty));
 		}
 
 		private void ExitToolsStripMenuItem_Click(object sender, EventArgs e)

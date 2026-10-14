@@ -11,6 +11,7 @@ namespace Majorsilence.Forms
     public partial class ComboBox : ListControl
     {
         private PopupWindow? popup;
+        private bool popupKeepsInputFocus;
         private readonly PopupList popup_listbox;
         private readonly ComboBoxEdit edit;
         private bool suppress_popup_close;
@@ -246,6 +247,9 @@ namespace Majorsilence.Forms
         /// Raised when the drop down portion of the ComboBox is opened.
         /// </summary>
         public event EventHandler? DropDownOpened;
+
+        /// <summary>Raised before measuring or displaying the dropdown, so providers can refresh its choices.</summary>
+        public event EventHandler? DropDownOpening;
 
         /// <summary>Raised when the user commits a selection from the drop-down (not on programmatic changes).</summary>
         public event EventHandler? SelectionChangeCommitted;
@@ -610,12 +614,19 @@ namespace Majorsilence.Forms
                     if (FindWindow () is not WindowBase window)
                         throw new InvalidOperationException ("Cannot drop down a ComboBox that is not parented to a window");
 
+                    DropDownOpening?.Invoke (this, EventArgs.Empty);
                     if (TryShowNativePicker ())
                         return;
 
                     // The suggestions and the drop-down are never open together (LST-07).
                     CloseSuggestions ();
 
+                    if (popup != null && popupKeepsInputFocus != KeepInputFocusOnDropDown) {
+                        popup.Controls.Remove (popup_listbox);
+                        popup.Dispose ();
+                        popup = null;
+                    }
+                    popupKeepsInputFocus = KeepInputFocusOnDropDown;
                     popup ??= new PopupWindow (window, activates: !KeepInputFocusOnDropDown) { AccessibleOwner = this };
 
                     popup.Controls.Add (popup_listbox);
