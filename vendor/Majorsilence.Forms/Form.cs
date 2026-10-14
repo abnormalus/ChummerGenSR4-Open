@@ -69,16 +69,11 @@ namespace Majorsilence.Forms
 
             // The native-close (Closing) hook is delivered via WindowBase.OnBackendClosing → OnClosing.
 
-            // Windows/Linux draw fully custom chrome. macOS uses the NATIVE title bar (traffic lights,
-            // rounded corners, shadow). A form that wants to paint into the title bar opts in with
-            // ExtendsContentIntoTitleBar = true (Avalonia 12 full-size content view) — see RadTabbedForm.
-            // MF_FORCE_CUSTOM_CHROME=1 makes a macOS process take the Windows/Linux branch. macOS is the
-            // ONLY platform that uses system decorations, and CI runs the test suite on Windows only --
-            // so anything touching the caption (client-area geometry, hit-testing near the top of a
-            // form, tab order through the caption buttons) passes vacuously on a developer's Mac and
-            // fails in CI. This has cost two round trips already. Same shape as the backend's
-            // MF_HEADLESS_SCALE, and inert unless the variable is set.
-            if (OperatingSystemCompat.IsMacOS ()
+            // Native Windows decorations preserve OS Snap and caption behavior. macOS keeps its
+            // native traffic lights, rounded corners and shadow; Linux uses custom chrome.
+            // Forms may opt into extended native title-bar content (see RadTabbedForm).
+            // The explicit override retains coverage of custom-caption geometry and hit testing.
+            if ((OperatingSystemCompat.IsMacOS () || OperatingSystemCompat.IsWindows ())
                 && Environment.GetEnvironmentVariable ("MF_FORCE_CUSTOM_CHROME") != "1")
                 UseSystemDecorations = true;
 

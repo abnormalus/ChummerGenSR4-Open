@@ -271,6 +271,9 @@ namespace Chummer
                 }
 
                 var recordsChoices = DetailChoices.ForQuality(choiceCharacter, "Records on File");
+                Check(DetailChoices.ForQuality(choiceCharacter, "SINner (Standard)").Select(c => c.Name).SequenceEqual(recordsChoices.Select(c => c.Name)) &&
+                    DetailChoices.ForQuality(choiceCharacter, "SINner (Criminal)").Select(c => c.Name).SequenceEqual(recordsChoices.Select(c => c.Name)),
+                    "both SINner variants share Records on File choices");
                 Check(recordsChoices.Length == 52 && recordsChoices.Any(item => item.Name == "Republic of Québec") &&
                     recordsChoices.Any(item => item.Name == "Fuchi Industrial Electronics"),
                     "Records on File includes all supplied organizations, Unicode names and legacy records");
