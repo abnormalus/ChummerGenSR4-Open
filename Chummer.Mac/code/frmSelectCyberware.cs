@@ -31,6 +31,7 @@ namespace Chummer
 
 		private string _strSetGrade = "";
 		private bool _blnShowOnlySubsystems = false;
+        internal bool PluginSelection { get; set; }
 		private string _strSubsystems = "";
 		private int _intMaximumCapacity = -1;
 		private bool _blnLockGrade = false;
@@ -97,6 +98,8 @@ namespace Chummer
 				if (objXmlCategory.Attributes["show"] != null)
 					blnAddItem = _blnAllowModularPlugins;
 
+                if (PluginSelection && _blnShowOnlySubsystems)
+                    blnAddItem &= _strSubsystems.Split(',').Any(category => category.Trim() == objXmlCategory.InnerText);
 				if (blnAddItem)
 				{
 					ListItem objItem = new ListItem();
@@ -113,6 +116,18 @@ namespace Chummer
 					_lstCategory.Add(objItem);
 				}
 			}
+            if (PluginSelection)
+            {
+                var candidates = _objXmlDocument.SelectNodes("/chummer/" + _strNode + "s/" + _strNode + "[(" + _objCharacter.Options.BookXPath() + ")]").Cast<XmlNode>();
+                bool available = candidates.Any(item => _lstCategory.Any(category => category.Value == item["category"]?.InnerText) &&
+                    (!_blnShowOnlySubsystems || (item["capacity"]?.InnerText.Contains("[") ?? false)));
+                if (!available)
+                {
+                    AppErrors.Inform(Owner ?? this, "Message_NoCompatibleCyberwareAddins");
+                    DialogResult = DialogResult.Cancel;
+                    return;
+                }
+            }
 			cboCategory.ValueMember = "Value";
 			cboCategory.DisplayMember = "Name";
 			cboCategory.DataSource = _lstCategory;

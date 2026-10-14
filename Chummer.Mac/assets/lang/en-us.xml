@@ -6649,5 +6649,8 @@ Only one attribute may be at its Maximum value during character creation.</text>
 		<string><key>MessageTitle_SpareClipAmmoMismatch</key><text>Incompatible Ammunition</text></string>
 	<string><key>Button_AddSpecialty</key><text>Add Specialty</text></string>
         <string><key>Label_KnowledgeSpecialty</key><text>Specialty:</text></string>
+    <string><key>Message_NoCompatibleCyberwareAddins</key><text>No compatible add-ins are available for this cyberware with the currently enabled sourcebooks.</text></string>
+    <string><key>Message_CyberwareSelectionUnavailable</key><text>The selected cyberware could not be found. Select the parent cyberware again before adding an add-in.</text></string>
+    <string><key>Message_CommandFailed</key><text>The action could not be completed. Chummer will remain open. Review your character before saving; details have been recorded in Diagnostic Logs.</text></string>
     </strings>
 </chummer>

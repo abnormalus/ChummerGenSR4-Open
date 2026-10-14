@@ -309,7 +309,8 @@ namespace Majorsilence.Forms
         protected virtual void OnClick (EventArgs e)
         {
             CommandStarting?.Invoke(this);
-            Click?.Invoke (this, e);
+            try { Click?.Invoke (this, e); }
+            catch (Exception error) when (Application.RaiseThreadException (error)) { }
         }
 
         // The Control that owns this menu item. Internal rather than private because

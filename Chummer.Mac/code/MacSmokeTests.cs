@@ -259,6 +259,36 @@ namespace Chummer
                     finally { Application.UiScale = savedScale; }
                 }
 
+                var originalNotice = AppErrors.Notify;
+                int errorNotices = 0;
+                try
+                {
+                    AppErrors.Notify = (_, _, _) => errorNotices++;
+                    Application.ThreadException += AppErrors.OnThreadException;
+                    using var recoveryHost = new Form { Width = 300, Height = 120 };
+                    recoveryHost.Show();
+                    var failedCommand = new ToolStripMenuItem("Test command");
+                    failedCommand.Click += (_, _) => throw new NullReferenceException("test command");
+                    failedCommand.PerformClick();
+                    Check(errorNotices == 1 && Application.OpenForms.Contains(recoveryHost),
+                        "null-reference command errors show a recoverable notice without closing the app");
+                    int followingClicks = 0;
+                    var followingCommand = new ToolStripMenuItem("Next command");
+                    followingCommand.Click += (_, _) => followingClicks++;
+                    followingCommand.PerformClick();
+                    Check(followingClicks == 1, "commands still run after a recoverable failure");
+                    using var emptyPlugins = new frmSelectCyberware(choiceCharacter) {
+                        PluginSelection = true, ShowOnlySubsystems = true, Subsystems = "No matching category" };
+                    emptyPlugins.Show();
+                    Check(emptyPlugins.DialogResult == DialogResult.Cancel && errorNotices == 2,
+                        "no compatible add-ins produces a notice and cancels the picker safely");
+                }
+                finally
+                {
+                    Application.ThreadException -= AppErrors.OnThreadException;
+                    AppErrors.Notify = originalNotice;
+                }
+
                 using (var screenForm = new Form { Width = 600, Height = 200 })
                 {
                     var backendField = typeof(Form).BaseType.GetField("Backend", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -620,6 +650,25 @@ namespace Chummer
                 {
                     creation.MdiParent = main;
                     creation.Show();
+                    var originalPluginNotice = AppErrors.Notify;
+                    try
+                    {
+                        int missingNotices = 0;
+                        AppErrors.Notify = (_, _, _) => missingNotices++;
+                        var cyberTree = Field<TreeView>(creation, "treCyberware");
+                        typeof(frmCreate).GetField("_blnSkipRefresh", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(creation, true);
+                        var staleNode = new TreeNode("Stale selected cyberware") { Tag = Guid.NewGuid().ToString() };
+                        cyberTree.Nodes[0].Nodes.Add(staleNode);
+                        cyberTree.SelectedNode = staleNode;
+                        bool added = (bool)typeof(frmCreate).GetMethod("PickCyberware", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(creation, new object[] { Improvement.ImprovementSource.Cyberware });
+                        Check(!added && missingNotices == 1, "missing selected cyberware cancels plugin addition without a null-reference crash");
+                        staleNode.Remove();
+                        cyberTree.SelectedNode = cyberTree.Nodes[0];
+                        typeof(frmCreate).GetField("_blnSkipRefresh", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(creation, false);
+                    }
+                    finally { AppErrors.Notify = originalPluginNotice; }
+
                     Check(!Field<TreeView>(creation, "treQualities").ShowLines, "creation quality list does not draw connector lines");
                     Field<NumericUpDown>(creation, "nudBOD").Value = 4;
                     Check(character.BOD.Value == 4, "creation spinner updates rule model");

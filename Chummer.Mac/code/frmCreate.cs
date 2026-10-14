@@ -18019,15 +18019,17 @@ namespace Chummer
 			if (objSource == Improvement.ImprovementSource.Bioware)
 				intNode = 1;
 
-			// Attempt to locate the selected piece of Cyberware.
-			try
-			{
-				if (treCyberware.SelectedNode.Level > 0)
-					objSelectedCyberware = _objFunctions.FindCyberware(treCyberware.SelectedNode.Tag.ToString(), _objCharacter.Cyberware);
-			}
-			catch
-			{
-			}
+            // A selected tree entry may no longer have a corresponding model object.
+            // Do not substitute an empty cyberware object or dereference a missing lookup.
+            if (treCyberware.SelectedNode?.Level > 0)
+                objSelectedCyberware = treCyberware.SelectedNode.Tag == null ? null :
+                    _objFunctions.FindCyberware(treCyberware.SelectedNode.Tag.ToString(), _objCharacter.Cyberware);
+
+            if (objSelectedCyberware == null)
+            {
+                AppErrors.Inform(this, "Message_CyberwareSelectionUnavailable");
+                return false;
+            }
 
 			frmSelectCyberware frmPickCyberware = new frmSelectCyberware(_objCharacter);
 			double dblMultiplier = 1;
@@ -18113,10 +18115,12 @@ namespace Chummer
 
 			frmPickCyberware.AllowModularPlugins = objSelectedCyberware.AllowModularPlugins;
 
+            frmPickCyberware.PluginSelection = treCyberware.SelectedNode?.Level > 0;
+
 			frmPickCyberware.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickCyberware.DialogResult == DialogResult.Cancel)
+			if (frmPickCyberware.DialogResult != DialogResult.OK)
 				return false;
 
 			// Open the Cyberware XML file and locate the selected piece.
@@ -18131,6 +18135,12 @@ namespace Chummer
 				objXmlCyberware = objXmlDocument.SelectSingleNode("/chummer/biowares/bioware[name = \"" + frmPickCyberware.SelectedCyberware + "\"]");
 			else
 				objXmlCyberware = objXmlDocument.SelectSingleNode("/chummer/cyberwares/cyberware[name = \"" + frmPickCyberware.SelectedCyberware + "\"]");
+
+            if (objXmlCyberware == null)
+            {
+                AppErrors.Inform(this, "Message_CyberwareSelectionUnavailable");
+                return false;
+            }
 
 			// Create the Cyberware object.
 			Cyberware objCyberware = new Cyberware(_objCharacter);

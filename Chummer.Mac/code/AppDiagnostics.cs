@@ -50,6 +50,7 @@ namespace Chummer
         internal static string LogPath => Path.Combine(DirectoryPath, "diagnostics.jsonl");
         internal static void Initialize()
         {
+            Majorsilence.Forms.Application.ThreadException += AppErrors.OnThreadException;
             Majorsilence.Forms.MenuItem.CommandStarting += item => Action(
                 item is Majorsilence.Forms.ToolStripItem command && !string.IsNullOrEmpty(command.Name)
                     ? "menu." + command.Name : "menu.command");

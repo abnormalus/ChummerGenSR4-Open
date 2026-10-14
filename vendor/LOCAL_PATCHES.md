@@ -40,3 +40,5 @@ Form.ApplicationIconOverride is an opt-in shared branding icon. Chummer sets it 
 PopupWindow.Show(Control, x, y) maps through Control.PointToScreen, respecting an MDI document's visible host and native screen scale. ListBox has opt-in cumulative prefix selection (1.2-second idle reset, mouse/focus/navigation reset). Chummer enables it for all lists so successive m/a/g keys search for mag instead of separate initials.
 
 AutoSize Label changes invalidate the parent background when resizing, clearing pixels outside the new bounds when a displayed value gets shorter (cyberware Capacity/Cost).
+
+MenuItem routes command-handler exceptions through the existing Application.ThreadException boundary when subscribed, including native menu commands; consumers without a handler retain exception propagation.
