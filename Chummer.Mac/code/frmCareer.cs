@@ -104,6 +104,7 @@ namespace Chummer
 
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
             MetatypeMeasurements.Attach(_objCharacter, tabCharacterInfo, lblMetatype, lblDescription);
+            AliasRandomizer.Attach(this, _objCharacter, txtAlias, lblMetatypeLabel);
             hairChoices = AppearanceColors.Attach(txtHair);
             eyeChoices = AppearanceColors.Attach(txtEyes);
             skinChoices = AppearanceColors.Attach(txtSkin, skin: true);

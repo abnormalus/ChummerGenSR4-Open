@@ -6678,5 +6678,34 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>Message_PdfMissing</key><text>The linked PDF could not be found. Update its location in Chummer Settings.</text></string>
 <string><key>Message_PdfUnavailable</key><text>The built-in PDF reader could not start. On Windows, check that the Microsoft Edge WebView2 runtime is installed.</text></string>
 <string><key>Message_PdfOpenFailed</key><text>Chummer could not open this PDF. Check its location and try again; diagnostic logs contain additional details.</text></string>
+<string><key>Alias_Randomize</key><text>Randomize</text></string>
+<string><key>Alias_WithCulture</key><text>Randomize with Culture</text></string>
+<string><key>Alias_GenerateFive</key><text>Generate 5 suggestions</text></string>
+<string><key>Alias_Undo</key><text>Undo last randomize</text></string>
+<string><key>Alias_Title</key><text>Street name suggestions</text></string>
+<string><key>Alias_Instructions</key><text>Offline suggestions for 2060. Culture and home region are separate choices; neither is inferred from metatype or appearance. Choose a suggestion or edit it before applying.</text></string>
+<string><key>Alias_Mode</key><text>Mode</text></string>
+<string><key>Alias_Region</key><text>Home region</text></string>
+<string><key>Alias_Primary</key><text>Primary cultural influence</text></string>
+<string><key>Alias_Secondary</key><text>Secondary cultural influence</text></string>
+<string><key>Alias_Strength</key><text>Cultural influence</text></string>
+<string><key>Alias_Tone</key><text>Tone</text></string>
+<string><key>Alias_Length</key><text>Length</text></string>
+<string><key>Alias_Theme</key><text>Theme</text></string>
+<string><key>Alias_Origin</key><text>Naming origin</text></string>
+<string><key>Alias_Locked</key><text>Locked word or component</text></string>
+<string><key>Alias_Position</key><text>Keep component at</text></string>
+<string><key>Alias_Used</key><text>Campaign names to avoid</text></string>
+<string><key>Alias_None</key><text>None</text></string>
+<string><key>Alias_Optional</key><text>Optional</text></string>
+<string><key>Alias_UsedHint</key><text>Separate names with commas or new lines</text></string>
+<string><key>Alias_Editable</key><text>Editable street name</text></string>
+<string><key>Alias_NoResults</key><text>No compatible suggestions are available. Relax the filters or add reviewed terms to the selected dictionary; manual names remain available.</text></string>
+<string><key>Alias_FewerResults</key><text>This combination has fewer than five compatible suggestions.</text></string>
+<string><key>Alias_OriginSuggestion</key><text>Suggested naming origin (not character canon):</text></string>
+<string><key>Alias_DuplicateWarning</key><text>Already used in this campaign</text></string>
+<string><key>Alias_Use</key><text>Use alias</text></string>
+<string><key>Alias_Error</key><text>The street-name generator could not complete. Check the editable dictionary configuration and diagnostic logs; your current alias has been preserved.</text></string>
+<string><key>Alias_Advanced</key><text>More naming options</text></string>
 </strings>
 </chummer>

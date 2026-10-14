@@ -1,0 +1,21 @@
+# Street-name suggestions
+
+The Common tab's **Randomize** split button sits beside Alias in creation and career modes. Its main action chooses an offline, character-aware suggestion. The arrow offers **Randomize with Culture**, **Generate 5 suggestions**, and **Undo last randomize**. Manual aliases remain editable. Undo restores the previous value unless the alias has since been edited manually.
+
+The culture dialog keeps home region, primary culture, secondary culture, and strength separate. It shows five candidates with an editable selection; Cancel leaves the character unchanged. **More naming options** exposes Random/Character-Aware mode, tone, length, theme, suggested naming origin, a retained first/last component, and a campaign used-name list. Campaign conflicts are soft warnings. Naming origins are suggestions, not newly invented character history. Choices are retained for the current character window's session; cultural settings are not added to `.chum` files.
+
+Character awareness weights active skills/groups, qualities, equipment types/names, physical traits/metatype, and unrelated variety separately. Cultural percentages remain meaningful after candidate deduplication, and metatype is only a small influence. No ethnicity, religion, or culture is inferred from appearance or metatype. Candidate generation is bounded, seeded for tests, era-filtered to 2060, normalized for punctuation/space/case duplicates, and scored using editorial metadata and thematic affinity. Compounds use approved exceptions rather than arbitrary word fusion.
+
+## Editable data
+
+The initial dictionary is `Chummer.Mac/assets/data/street-names/config.json`: 222 shared word entries and 291 curated complete handles, plus pattern/origin weights, role pairs, exclusions, culture/region tags, and skill/group/equipment signal maps. These are implementation defaults, not official Shadowrun rules. The curated count is in the specification's recommended range; the thematic word list is a starter pool, smaller than its suggested eventual 620 entries.
+
+For local customization, copy the entire JSON to the user data directory's `data/street-names/config.json` (beside other custom XML data). That file overrides the bundled generator configuration. Property names are case-insensitive. Keep schemaVersion 1, unique word/culture IDs, positive finite entry weights, supported role pairs, and valid culture references. `ReviewStatus` must be `approved` and `Sensitivity` `ordinary` before an entry is sampled. Each entry may belong to several themes/cultures without duplicating its word ID. `EraStart`/`EraEnd` restrict dates; missing end means no expiration. Keep pronunciation and cultural context/source notes with the entry.
+
+The starter reviewed culture vocabulary includes ordinary Scots words with references from [Dictionaries of the Scots Language](https://dsl.ac.uk/) and public Irish folklore creature names with [Fingal County Council](https://www.fingal.ie/puca) and [Ireland.ie](https://api.ireland.ie/en/halloween/spirits-of-samhain/) references. These sources establish vocabulary/context; they do not constitute community endorsement of every nickname combination. Pacific Northwest, Seattle, and the distinct Tír overlays are original English nickname imagery, not translations or canonical elven naming rules.
+
+Scottish Gaelic, Irish language, Welsh, Japanese, Norse, Lakota, Dakota, Nakota, and Coast Salish profiles are clearly marked **dictionary pending**. They contain no invented or unreviewed terms. Exclusive mode with no compatible reviewed vocabulary produces a useful empty-state notice rather than pulling from unrelated cultures. Expand these specific dictionaries with appropriate review; there is no catch-all pan-Indigenous mythology pool.
+
+## Verification
+
+Smoke checks cover seeded results, normalized duplicates, technical character influence, statistical Strong/None culture behavior, separate Tír overlays, insufficient Exclusive cultures, era filtering, split-button placement, editable alias/model updates, Undo, and existing save compatibility. The engine and UI are shared by Mac and Windows; generation needs no network or external API. Diagnostics record action IDs and error types without generated aliases or culture preferences.

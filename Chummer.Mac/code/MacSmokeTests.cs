@@ -173,6 +173,39 @@ namespace Chummer
                     AppearanceColors.Filter("", skin: true).Cast<AppearanceColor>().Any(row => row.Name == "Warm Ivory") &&
                     !AppearanceColors.Filter("").Cast<AppearanceColor>().Any(row => row.Name == "Warm Ivory"),
                     "skin search keeps family context while hair and eye palettes remain independent");
+                var aliasPrefs = new StreetNamePreferences();
+                var namesA = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);
+                var namesB = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);
+                Check(namesA.Count == 5 && namesA.Select(n => n.Name).SequenceEqual(namesB.Select(n => n.Name)) &&
+                    namesA.Select(n => StreetNameEngine.Canonical(n.Name)).Distinct().Count() == 5,
+                    "street names are seeded, varied, and normalized-unique within a batch");
+                Check(StreetNameEngine.Canonical("Ghost-Wire") == StreetNameEngine.Canonical("ghost wire"),
+                    "street names canonicalize case, spaces, and punctuation");
+                var aliasEngine = StreetNameEngine.Load(42);
+                var awareCharacter = new Character { Metatype = "Troll", RESEnabled = true };
+                var influence = aliasEngine.Themes(awareCharacter, aliasPrefs);
+                Check(influence["matrix"] > influence["personality"] && Math.Abs(influence.Values.Sum() - 1) < .001,
+                    "character traits weight technical aliases without letting metatype dominate");
+                var culturePrefs = new StreetNamePreferences { Primary = "scots", Strength = "Strong" };
+                int influenced = 0, neutral = 0;
+                var strongEngine = StreetNameEngine.Load(77);
+                var neutralEngine = StreetNameEngine.Load(77);
+                for (int run = 0; run < 60; run++)
+                {
+                    influenced += strongEngine.Suggest(awareCharacter, culturePrefs).Count(n => n.Cultures.Contains("scots"));
+                    neutral += neutralEngine.Suggest(awareCharacter, new StreetNamePreferences { Primary = "scots", Strength = "None" }).Count(n => n.Cultures.Contains("scots"));
+                }
+                Check(influenced > 80 && neutral == 0, "explicit Strong culture shifts suggestions while None excludes cultural sources");
+                Check(aliasEngine.Suggest(null, new StreetNamePreferences { Primary = "lakota", Strength = "Exclusive" }).Count == 0,
+                    "unreviewed Exclusive cultural pools fail gracefully without unrelated cultural fallback");
+                var firstTir = aliasEngine.Suggest(null, new StreetNamePreferences { Primary = "tir_tairngire", Strength = "Exclusive" });
+                var secondTir = aliasEngine.Suggest(null, new StreetNamePreferences { Primary = "tir_na_nog", Strength = "Exclusive" });
+                Check(firstTir.Count > 0 && secondTir.Count > 0 && !firstTir.Select(n => n.Name).Intersect(secondTir.Select(n => n.Name)).Any(),
+                    "the two Tir cultural overlays remain distinct");
+                aliasEngine.Config.Words.Add(new StreetNameEntry { Id = "future-test", Text = "Anachronism", Themes = new[] { "matrix" },
+                    Roles = new[] { "standalone" }, EraStart = 2064, ReviewStatus = "approved" });
+                Check(Enumerable.Range(0, 20).SelectMany(_ => aliasEngine.Suggest(null, aliasPrefs)).All(n => !n.Name.Contains("Anachronism")),
+                    "2060 alias generation rejects later-era dictionary entries");
                 var choiceCharacter = new Character();
                 choiceCharacter.Options.Books.Clear();
                 choiceCharacter.Options.Books.Add("SR4");
@@ -791,6 +824,21 @@ namespace Chummer
                 {
                     creation.MdiParent = main;
                     creation.Show();
+                    var aliasButton = Field<TextBox>(creation, "txtAlias").Parent.Controls.Cast<Control>().OfType<SplitButton>()
+                        .Single(button => button.Name == "cmdRandomizeAlias");
+                    var aliasField = Field<TextBox>(creation, "txtAlias");
+                    string aliasBefore = aliasField.Text;
+                    Check(aliasButton.Left > aliasField.Left && aliasButton.Left >= aliasField.Right &&
+                        aliasButton.Right < Field<Label>(creation, "lblMetatypeLabel").Left,
+                        "Randomize split button fits beside Alias before the metatype label");
+                    aliasButton.PerformClick();
+                    Check(aliasField.Text.Length > 0 && character.Alias == aliasField.Text,
+                        "character-aware randomization updates editable alias and character model");
+                    var undoAlias = aliasButton.SplitMenuStrip.Items.Cast<MenuItem>().Last();
+                    undoAlias.PerformClick();
+                    Check(aliasField.Text == aliasBefore && character.Alias == aliasBefore,
+                        "undo restores the previous alias without changing character format");
+
                     var hairColor = Field<ComboBox>(creation, "txtHair");
                     hairColor.SelectedIndex = 3;
                     Field<ComboBox>(creation, "txtEyes").Text = "Custom iridescent";
