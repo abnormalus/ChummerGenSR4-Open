@@ -35,18 +35,39 @@ namespace Chummer
 
         internal static void Attach(Character character, TabPage page, Label metatypeLabel, Label descriptionLabel)
         {
-            // Reserve a guidance row below the editable measurements. Existing responsive
-            // description layout uses the shifted label position to size its text areas.
-            int top = descriptionLabel.Top;
-            foreach (Control control in page.Controls.Cast<Control>().ToArray())
-                if (control.Top >= top) control.Top += 40;
-            var guidance = new Label { Name = "measurementGuidance", AutoSize = false,
-                Left = descriptionLabel.Left, Top = top, Height = 36,
-                Width = Math.Max(200, page.ClientSize.Width - descriptionLabel.Left - 8),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-            void Update() => guidance.Text = Guidance(character.Metatype);
+            int descriptionTop = descriptionLabel.Top;
+            var fields = page.Controls.Cast<Control>().ToArray();
+            foreach (var control in fields)
+            {
+                if (control.Top >= descriptionTop) control.Top += 64;
+                else if (control.Top >= 30) control.Top += 22;
+            }
+            var height = fields.Single(control => control.Name == "txtHeight");
+            var weight = fields.Single(control => control.Name == "txtWeight");
+            var age = fields.Single(control => control.Name == "txtAge");
+            Label Hint(Control field, string name, int rows)
+            {
+                var label = new Label { Name = name, AutoSize = false, Height = rows * 16,
+                    Font = new Majorsilence.Forms.Drawing.Font(field.Font.FamilyName, 8),
+                    Left = field.Left, Top = field.Bottom + 2, Width = field.Width };
+                void Position() { label.Left = field.Left; label.Top = field.Bottom + 2; label.Width = field.Width; }
+                field.LocationChanged += (_, _) => Position();
+                field.SizeChanged += (_, _) => Position();
+                page.Controls.Add(label);
+                return label;
+            }
+            var heightHint = Hint(height, "heightGuidance", 2);
+            var weightHint = Hint(weight, "weightGuidance", 1);
+            var ageHint = Hint(age, "ageGuidance", 1);
+            void Update()
+            {
+                bool known = ranges.TryGetValue(character.Metatype ?? "", out var range);
+                heightHint.Text = known ? $"{range.MinHeight}–{range.MaxHeight} cm\n{Feet(range.MinHeight)}–{Feet(range.MaxHeight)}" : "";
+                weightHint.Text = known ? $"{range.MinWeight}–{range.MaxWeight} kg" : "";
+                string years = character.Metatype == "Ork" ? "15–25" : character.Metatype == "Troll" ? "18–30" : "20–40";
+                ageHint.Text = known ? string.Format(LanguageManager.Instance.GetString("Label_TypicalAgeRange"), years) : "";
+            }
             metatypeLabel.TextChanged += (_, _) => Update();
-            page.Controls.Add(guidance);
             Update();
         }
     }
