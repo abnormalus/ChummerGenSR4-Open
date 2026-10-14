@@ -30,6 +30,7 @@
     <Content Include="icons/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
     <PackageReference Include="System.CodeDom" Version="10.0.0" />
   </ItemGroup>
 </Project>

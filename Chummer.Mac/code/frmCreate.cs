@@ -79,6 +79,9 @@ namespace Chummer
 			GlobalOptions.Instance.MRUChanged += PopulateMRU;
 
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
+            CharacterPortraits.Attach(this, _objCharacter, picMugshot, cmdAddMugshot, cmdDeleteMugshot,
+                () => { _blnIsDirty = true; UpdateWindowTitle(); });
+
 
 			// Update the text in the Menus so they can be merged with frmMain properly.
 			foreach (ToolStripMenuItem objItem in mnuCreateMenu.Items.OfType<ToolStripMenuItem>())
@@ -7344,29 +7347,11 @@ namespace Chummer
 			UpdateWindowTitle();
 		}
 
-		private void cmdAddMugshot_Click(object sender, EventArgs e)
-		{
-			// Prompt the user to select an image to associate with this character.
-			OpenFileDialog openFileDialog = new OpenFileDialog();
-			openFileDialog.Filter = "All Files (*.*)|*.*";
-
-			if (openFileDialog.ShowDialog(this) == DialogResult.OK)
-			{
-				MemoryStream objStream = new MemoryStream();
-				// Convert the image to a string usinb Base64.
-				Image imgMugshot = new Bitmap(openFileDialog.FileName);
-				imgMugshot.Save(objStream, imgMugshot.RawFormat);
-				string strResult = Convert.ToBase64String(objStream.ToArray());
-
-				_objCharacter.Mugshot = strResult;
-				picMugshot.Image = imgMugshot;
-
-				objStream.Close();
-
-				_blnIsDirty = true;
-				UpdateWindowTitle();
-			}
-		}
+		private async void cmdAddMugshot_Click(object sender, EventArgs e)
+        {
+            await CharacterPortraits.AddAsync(this, _objCharacter, picMugshot,
+                () => { _blnIsDirty = true; UpdateWindowTitle(); });
+        }
 
 		private void cmdDeleteMugshot_Click(object sender, EventArgs e)
 		{

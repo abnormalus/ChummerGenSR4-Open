@@ -170,6 +170,37 @@ namespace Chummer
                     Check(customRecords.SelectedValue == "My custom records holder", "Records on File accepts custom entries beyond the supplied list");
                 }
 
+                using (var portraitPixels = new SkiaSharp.SKBitmap(200, 100))
+                {
+                    using (var canvas = new SkiaSharp.SKCanvas(portraitPixels))
+                    using (var paint = new SkiaSharp.SKPaint { Color = SkiaSharp.SKColors.Blue })
+                    {
+                        canvas.Clear(SkiaSharp.SKColors.Red);
+                        canvas.DrawRect(new SkiaSharp.SKRect(100, 0, 200, 100), paint);
+                    }
+                    var fullPortrait = PortraitImage.Export(portraitPixels, new SkiaSharp.SKRect(0, 0, 200, 100), 100);
+                    File.WriteAllBytes(Path.Combine(output, "portrait-input.png"), fullPortrait);
+                    using var full = PortraitImage.Decode(fullPortrait);
+                    Check(full.Width == 200 && full.Height == 100, "portrait accepts arbitrary image dimensions without the legacy fixed size");
+                    var croppedPortrait = PortraitImage.Export(portraitPixels, new SkiaSharp.SKRect(100, 0, 200, 100), 50);
+                    using var cropped = PortraitImage.Decode(croppedPortrait);
+                    Check(cropped.Width == 50 && cropped.Height == 50 && cropped.GetPixel(25, 25).Blue > 200,
+                        "portrait crop preserves the selected region and applies output scaling");
+                    var clamped = PortraitImage.ClampCrop(new SkiaSharp.SKRect(250, 120, -20, -10), 200, 100);
+                    Check(clamped.Left == 0 && clamped.Top == 0 && clamped.Right == 200 && clamped.Bottom == 100,
+                        "portrait crop handles reversed drags and clamps to image boundaries");
+                    var portraitCharacter = new Character { Mugshot = Convert.ToBase64String(croppedPortrait),
+                        FileName = Path.Combine(output, "portrait-roundtrip.chum") };
+                    portraitCharacter.Save();
+                    var portraitReload = new Character { FileName = portraitCharacter.FileName };
+                    Check(portraitReload.Load() && portraitReload.Mugshot == portraitCharacter.Mugshot,
+                        "edited portrait round-trips in the existing embedded character-image field");
+                    bool invalidPortraitRejected = false;
+                    try { using var invalidPortrait = PortraitImage.Decode(new byte[] { 1, 2, 3 }); }
+                    catch (InvalidDataException) { invalidPortraitRejected = true; }
+                    Check(invalidPortraitRejected, "invalid portrait bytes are rejected before applying character changes");
+                }
+
                 var commonAllergies = DetailChoices.ForQuality(choiceCharacter, "Allergy (Common, Mild)");
                 var uncommonAllergies = DetailChoices.ForQuality(choiceCharacter, "Allergy (Uncommon, Severe)");
                 Check(commonAllergies.Length == 18 && uncommonAllergies.Length == 32 &&

@@ -3446,7 +3446,7 @@ Only one attribute may be at its Maximum value during character creation.</text>
 		</string>
 		<string>
 			<key>Label_Mugshot</key>
-			<text>Mugshot:        (210px X 310px)</text>
+			<text>Portrait:</text>
 		</string>
 		<string>
 			<key>Checkbox_Created</key>
@@ -6652,5 +6652,21 @@ Only one attribute may be at its Maximum value during character creation.</text>
     <string><key>Message_NoCompatibleCyberwareAddins</key><text>No compatible add-ins are available for this cyberware with the currently enabled sourcebooks.</text></string>
     <string><key>Message_CyberwareSelectionUnavailable</key><text>The selected cyberware could not be found. Select the parent cyberware again before adding an add-in.</text></string>
     <string><key>Message_CommandFailed</key><text>The action could not be completed. Chummer will remain open. Review your character before saving; details have been recorded in Diagnostic Logs.</text></string>
+    <string><key>Portrait_Title</key><text>Edit Character Portrait</text></string>
+    <string><key>Portrait_Instructions</key><text>Drag to select the area to keep. Use Move Image and Zoom to inspect it; Output Scale controls the saved size.</text></string>
+    <string><key>Portrait_Crop</key><text>Crop Area</text></string>
+    <string><key>Portrait_Move</key><text>Move Image</text></string>
+    <string><key>Portrait_Portrait</key><text>Portrait Crop</text></string>
+    <string><key>Portrait_Square</key><text>Square Crop</text></string>
+    <string><key>Portrait_Full</key><text>Full Image</text></string>
+    <string><key>Portrait_Zoom</key><text>Zoom</text></string>
+    <string><key>Portrait_Scale</key><text>Output Scale</text></string>
+    <string><key>Portrait_Cancel</key><text>Cancel</text></string>
+    <string><key>Portrait_Apply</key><text>Use Portrait</text></string>
+    <string><key>Portrait_Add</key><text>Add…</text></string>
+    <string><key>Portrait_Edit</key><text>Edit…</text></string>
+    <string><key>Portrait_Remove</key><text>Remove</text></string>
+    <string><key>Portrait_Choose</key><text>Choose Character Portrait</text></string>
+    <string><key>Portrait_Error</key><text>This image could not be opened or edited. Try a PNG or JPEG image. Your previous portrait has been kept.</text></string>
     </strings>
 </chummer>

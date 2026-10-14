@@ -8846,7 +8846,7 @@ namespace Chummer
             this.lblMugshot.Size = new System.Drawing.Size(152, 13);
             this.lblMugshot.TabIndex = 21;
             this.lblMugshot.Tag = "Label_Mugshot";
-            this.lblMugshot.Text = "Mugshot:        (210px X 310px)";
+            this.lblMugshot.Text = "Portrait:";
             // 
             // txtConcept
             // 
