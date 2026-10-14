@@ -142,9 +142,8 @@ namespace Majorsilence.Forms
         /// <summary>Show the PopupWindow at the specified coordinates relative to the provided Control.</summary>
         public void Show (Control control, int x, int y)
         {
-            var pos = control.GetPositionInForm ();
-
-            Show (parent_form.PointToScreen (new System.Drawing.Point (pos.X + x, pos.Y + y)));
+            // Map through the visible control, including its MDI host and native screen scale.
+            Show (control.PointToScreen (new System.Drawing.Point (x, y)));
         }
 
         // A popup that shows without activating: a tool tip, or a combo box's suggestion list, which must

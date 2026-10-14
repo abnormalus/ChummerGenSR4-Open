@@ -14,6 +14,14 @@ namespace Majorsilence.Forms
     public partial class ListBox : ListControl
     {
         private int item_height = -1;
+        private string typedPrefix = string.Empty;
+        private long lastPrefixKey;
+
+        /// <summary>Default for accumulating typed letters in newly created lists.</summary>
+        public static bool DefaultIncrementalSearch { get; set; }
+
+        /// <summary>Whether typing selects by a complete prefix, resetting after 1.2 seconds idle.</summary>
+        public bool IncrementalSearch { get; set; } = DefaultIncrementalSearch;
         private SelectionMode selection_mode = SelectionMode.One;
         private bool scrollbar_always_visible;
         private int top_index;
@@ -444,6 +452,8 @@ namespace Majorsilence.Forms
         protected override void OnKeyDown (KeyEventArgs e)
         {
             base.OnKeyDown (e);
+            if (!char.IsLetterOrDigit((char)e.KeyCode) && e.KeyCode != Keys.Space)
+                typedPrefix = string.Empty;
 
             if (!e.Handled)
                 ChangeSelection (() => KeyDownCore (e));
@@ -587,8 +597,18 @@ namespace Majorsilence.Forms
                     }
                 }
 
-                if (char.IsLetterOrDigit ((char)e.KeyCode)) {
-                    var index = FindString (((char)e.KeyCode).ToString (), SelectedIndex);
+                if (char.IsLetterOrDigit ((char)e.KeyCode) ||
+                    (IncrementalSearch && e.KeyCode == Keys.Space && typedPrefix.Length > 0)) {
+                    var query = ((char)e.KeyCode).ToString ();
+                    if (IncrementalSearch && (e.Modifiers & (Keys.Control | Keys.Alt)) == 0) {
+                        long now = Environment.TickCount64;
+                        typedPrefix = now - lastPrefixKey < 1200 ? typedPrefix + query : query;
+                        lastPrefixKey = now;
+                        query = typedPrefix;
+                    }
+                    // Search from the first item for a cumulative prefix, rather than
+                    // skipping the current match on every newly typed character.
+                    var index = FindString (query, IncrementalSearch ? -1 : SelectedIndex);
 
                     if (index >= 0) {
                         SelectedIndex = index;
@@ -669,8 +689,16 @@ namespace Majorsilence.Forms
         private int selection_anchor = -1;
 
         /// <inheritdoc/>
+        protected override void OnLostFocus (EventArgs e)
+        {
+            typedPrefix = string.Empty;
+            base.OnLostFocus (e);
+        }
+
+        /// <inheritdoc/>
         protected override void OnMouseDown (MouseEventArgs e)
         {
+            typedPrefix = string.Empty;
             base.OnMouseDown (e);
 
             if (!SelectItemOnMouseUp)

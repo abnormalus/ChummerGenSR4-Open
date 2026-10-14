@@ -17,6 +17,7 @@ namespace Chummer
         static void Main(string[] args)
         {
             DesktopMenus.ApplicationName = "Chummer";
+            ListBox.DefaultIncrementalSearch = true;
             Form.ApplicationIconOverride = new Majorsilence.Forms.Drawing.Icon(
                 System.IO.Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico"));
             Form.CenterModalDialogsOnRootOwner = true;

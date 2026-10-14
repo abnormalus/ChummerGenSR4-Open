@@ -216,6 +216,23 @@ namespace Chummer
                     Check(combo.Items.Count > 12, "clearing knowledge search restores the full selected type list");
                 }
 
+                using (var prefixList = new ListBox())
+                {
+                    prefixList.Items.AddRange(new object[] { "Alchemy", "Gamma", "Machinery", "Magician", "Magical Theory" });
+                    prefixList.SelectedIndex = 0;
+                    var keyDown = typeof(Control).GetMethod("RaiseKeyDown", BindingFlags.NonPublic | BindingFlags.Instance);
+                    foreach (Keys letter in new[] { Keys.M, Keys.A, Keys.G })
+                        keyDown.Invoke(prefixList, new object[] { new KeyEventArgs(letter) });
+                    Check(prefixList.SelectedIndex == 3, "typing mag on a list selects the first complete prefix match");
+                    keyDown.Invoke(prefixList, new object[] { new KeyEventArgs(Keys.Down) });
+                    Check(prefixList.SelectedIndex == 4, "arrow navigation still works after a typed prefix");
+                    keyDown.Invoke(prefixList, new object[] { new KeyEventArgs(Keys.A) });
+                    Check(prefixList.SelectedIndex == 0, "arrow navigation starts a fresh subsequent prefix");
+                    typeof(ListBox).GetField("lastPrefixKey", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(prefixList, 0L);
+                    keyDown.Invoke(prefixList, new object[] { new KeyEventArgs(Keys.G) });
+                    Check(prefixList.SelectedIndex == 1, "idle timeout starts a fresh list prefix");
+                }
+
                 using (var screenForm = new Form { Width = 600, Height = 200 })
                 {
                     var backendField = typeof(Form).BaseType.GetField("Backend", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -437,6 +454,18 @@ namespace Chummer
                         windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
                             .Invoke(mdiParent, new object[] { MouseButtons.Left, primaryX, primaryY, Keys.None });
                         Check(primaryClicks == 1, "inventory primary Add fires once at scale " + scale + " in " + state);
+                        var tradition = new ComboBox { Left = 100, Top = 90, Width = 140, Height = 24,
+                            DropDownStyle = ComboBoxStyle.DropDownList };
+                        tradition.Items.AddRange(new object[] { "Aboriginal", "Hermetic", "Shamanic" });
+                        mdiChild.Controls.Add(tradition);
+                        HeadlessRenderer.CapturePng(mdiParent, 1000, 600);
+                        tradition.DroppedDown = true;
+                        var traditionPopup = (PopupWindow)typeof(ComboBox).GetField("popup", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(tradition);
+                        var popupBackend = (Majorsilence.Forms.Backends.IWindowBackend)windowType
+                            .GetField("Backend", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(traditionPopup);
+                        Check(popupBackend.Location == tradition.PointToScreen(new System.Drawing.Point(1, tradition.Height)),
+                            "hosted Tradition dropdown stays beneath its control at scale " + scale + " in " + state);
+                        tradition.DroppedDown = false;
                         var detailTree = new TreeView { Left = 140, Top = 70, Width = 110, Height = 70 };
                         using var nodeMenu = new ContextMenuStrip();
                         nodeMenu.Items.Add("Edit Detail");

@@ -36,3 +36,5 @@ DesktopMenus projects shared menu items into native Mac menus, preserving defaul
 ComboBox exposes DropDownOpening before popup measurement. Searchable providers use it to restore the complete category list for browsing; typing opens filtered suggestions without taking input focus. Switching between these modes recreates the popup with the appropriate activation behavior while retaining its list control.
 
 Form.ApplicationIconOverride is an opt-in shared branding icon. Chummer sets it before constructing forms, including dialogs, and it replaces designer-provided legacy icons without changing other consumers' defaults.
+
+PopupWindow.Show(Control, x, y) maps through Control.PointToScreen, respecting an MDI document's visible host and native screen scale. ListBox has opt-in cumulative prefix selection (1.2-second idle reset, mouse/focus/navigation reset). Chummer enables it for all lists so successive m/a/g keys search for mag instead of separate initials.
