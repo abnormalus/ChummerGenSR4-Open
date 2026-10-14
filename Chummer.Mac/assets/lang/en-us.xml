@@ -6668,5 +6668,8 @@ Only one attribute may be at its Maximum value during character creation.</text>
     <string><key>Portrait_Remove</key><text>Remove</text></string>
     <string><key>Portrait_Choose</key><text>Choose Character Portrait</text></string>
     <string><key>Portrait_Error</key><text>This image could not be opened or edited. Try a PNG or JPEG image. Your previous portrait has been kept.</text></string>
-    </strings>
+    <string><key>Label_MeasurementRanges</key><text>Suggested adult ranges: Height {0}–{1} cm (about {2}–{3}); Weight {4}–{5} kg.
+Guidance only; manual values may fall outside these ranges.</text></string>
+<string><key>Label_MeasurementRangesUnavailable</key><text>No suggested measurement ranges available for this metatype. Enter height and weight freely.</text></string>
+</strings>
 </chummer>

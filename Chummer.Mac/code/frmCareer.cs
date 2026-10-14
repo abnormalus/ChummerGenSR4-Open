@@ -103,6 +103,7 @@ namespace Chummer
 			GlobalOptions.Instance.MRUChanged += PopulateMRU;
 
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
+            MetatypeMeasurements.Attach(_objCharacter, tabCharacterInfo, lblMetatype, lblDescription);
             hairChoices = AppearanceColors.Attach(txtHair);
             eyeChoices = AppearanceColors.Attach(txtEyes);
             skinChoices = AppearanceColors.Attach(txtSkin);

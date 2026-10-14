@@ -114,6 +114,16 @@ namespace Chummer
                     colorCombo.SelectedIndex = 3;
                     Check(colorCombo.Text == "Crimson", "shade selection omits visual indentation");
                 }
+                Check(MetatypeMeasurements.Guidance("Troll").Contains("210–290") &&
+                    MetatypeMeasurements.Guidance("Troll").Contains("180–480") &&
+                    MetatypeMeasurements.Guidance("Troll").Contains("6′11″–9′6″"),
+                    "Troll measurement guidance uses supplied ranges and rounded imperial heights");
+                Check(MetatypeMeasurements.Guidance("Dwarf").Contains("35–85") &&
+                    MetatypeMeasurements.Guidance("Elf").Contains("48–120") &&
+                    MetatypeMeasurements.Guidance("Human").Contains("43–145") &&
+                    MetatypeMeasurements.Guidance("Ork").Contains("78–210") &&
+                    MetatypeMeasurements.Guidance("Unknown").Contains("No suggested"),
+                    "all standard metatypes have guidance and unsupported types avoid invented ranges");
                 var choiceCharacter = new Character();
                 choiceCharacter.Options.Books.Clear();
                 choiceCharacter.Options.Books.Add("SR4");
