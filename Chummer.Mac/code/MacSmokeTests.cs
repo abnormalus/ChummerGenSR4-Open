@@ -807,6 +807,21 @@ namespace Chummer
                     }
                     Console.WriteLine("PASS upstream fixture round trips: " + count);
                 }
+                using (var quitGuard = new Form { Width = 300, Height = 140 })
+                {
+                    bool allowQuit = false;
+                    int closeChecks = 0;
+                    quitGuard.FormClosing += (_, args) => { closeChecks++; args.Cancel = !allowQuit; };
+                    quitGuard.Show();
+                    AppPlatform.QuitApplication();
+                    Check(Application.OpenForms.Contains(quitGuard) && !AppPlatform.CanTerminateAfterQuit,
+                        "cancelled Quit preserves the open window and prevents process termination");
+                    allowQuit = true;
+                    AppPlatform.QuitApplication();
+                    Check(closeChecks == 2, "each Quit attempt checks closing once without repeated prompts");
+                    Check(Application.OpenForms.Count == 0 && AppPlatform.CanTerminateAfterQuit,
+                        "approved Quit closes all forms before enabling final process termination");
+                }
                 Console.WriteLine("SMOKE TESTS PASSED");
                 return 0;
             }

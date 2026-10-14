@@ -42,3 +42,5 @@ PopupWindow.Show(Control, x, y) maps through Control.PointToScreen, respecting a
 AutoSize Label changes invalidate the parent background when resizing, clearing pixels outside the new bounds when a displayed value gets shorter (cyberware Capacity/Cost).
 
 MenuItem routes command-handler exceptions through the existing Application.ThreadException boundary when subscribed, including native menu commands; consumers without a handler retain exception propagation.
+
+Application.Exit closes only still-open forms after one successful FormClosing approval pass, without raising closing handlers twice. It does not cancel the loop if a form remains open.

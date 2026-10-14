@@ -967,6 +967,7 @@ namespace Majorsilence.Forms
         // tray on UserClosing, actually exit on ApplicationExitCall" pattern reads this to tell the two
         // apart, and would have hidden the window instead of exiting.
         internal CloseReason PendingCloseReason { get; set; } = CloseReason.UserClosing;
+        internal bool ExitCloseApproved { get; set; }
 
 
         /// <summary>Raises the Closing event.</summary>
@@ -977,6 +978,7 @@ namespace Majorsilence.Forms
         /// </remarks>
         protected virtual void OnClosing (CancelEventArgs e)
         {
+            if (ExitCloseApproved) return;
             Closing?.Invoke (this, e);
 
             var form_closing_args = new FormClosingEventArgs (PendingCloseReason, e.Cancel);

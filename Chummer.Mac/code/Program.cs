@@ -50,6 +50,13 @@ namespace Chummer
                     "Chummer", MessageBoxButtons.OK, MessageBoxIcon.Error); } catch { }
             }
             finally { AppDiagnostics.Record("session-end"); }
+            // The loop has returned and using scopes have disposed the main window and watchdog.
+            // Explicit Quit must also end any surviving platform/native worker threads.
+            if (AppPlatform.CanTerminateAfterQuit)
+            {
+                AppDiagnostics.Record("process-exit");
+                Environment.Exit(Environment.ExitCode);
+            }
         }
     }
 }

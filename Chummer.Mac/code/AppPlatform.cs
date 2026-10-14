@@ -18,18 +18,7 @@ namespace Chummer
                 var macPreferences = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_MacPreferences")) { Name = "preferences" };
                 macPreferences.Click += (_, _) => openPreferences();
                 var macQuit = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_MacQuit")) { Name = "quitApplication" };
-                macQuit.Click += (_, _) =>
-                {
-                    AppDiagnostics.CaptureUiState();
-                    AppDiagnostics.Record("quit-start");
-                    try
-                    {
-                        Application.Exit();
-                        AppDiagnostics.CaptureUiState();
-                        AppDiagnostics.Record(Application.OpenForms.Count == 0 ? "quit-completed" : "quit-cancelled-or-incomplete");
-                    }
-                    catch (Exception error) { AppDiagnostics.Record("quit-failed", error); throw; }
-                };
+                macQuit.Click += (_, _) => QuitApplication();
                 try { DesktopMenus.Install(owner, menus, macPreferences, about, macQuit); AppDiagnostics.Record("native-menu-installed");
                     // Remove Windows-only placements from the source tree projected into native menus.
                     preferences.Visible = false; quit.Visible = false;
@@ -37,6 +26,21 @@ namespace Chummer
                 catch (Exception error) { AppDiagnostics.Record("native-menu-fallback", error); }
             }
         }
+        internal static bool QuitApproved { get; private set; }
+        internal static void QuitApplication()
+        {
+            AppDiagnostics.CaptureUiState();
+            AppDiagnostics.Record("quit-start");
+            try
+            {
+                Application.Exit();
+                AppDiagnostics.CaptureUiState();
+                QuitApproved = Application.OpenForms.Count == 0;
+                AppDiagnostics.Record(QuitApproved ? "quit-completed" : "quit-cancelled-or-incomplete");
+            }
+            catch (Exception error) { QuitApproved = false; AppDiagnostics.Record("quit-failed", error); throw; }
+        }
+        internal static bool CanTerminateAfterQuit => QuitApproved && Application.OpenForms.Count == 0;
         internal static void OpenLogs(Form owner)
         {
             try

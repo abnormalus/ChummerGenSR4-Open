@@ -224,8 +224,24 @@ namespace Majorsilence.Forms
                 }
             }
 
-            foreach (var form in OpenForms.Cast<Form> ().ToArray ())
-                form.Close ();
+            var approvedForms = OpenForms.Cast<Form> ().ToArray ();
+            foreach (var form in approvedForms)
+                form.ExitCloseApproved = true;
+            try {
+                foreach (var form in approvedForms)
+                    if (OpenForms.Contains (form)) form.Close ();
+            } finally {
+                foreach (var form in approvedForms)
+                    form.ExitCloseApproved = false;
+            }
+
+            // Never stop the loop while a form remains open after an unsuccessful close.
+            if (OpenForms.Count > 0) {
+                is_exiting = false;
+                foreach (var form in OpenForms.Cast<Form> ().ToArray ())
+                    form.PendingCloseReason = CloseReason.UserClosing;
+                return;
+            }
 
             OnExit?.Invoke (null, EventArgs.Empty);
             ApplicationExit?.Invoke (null, EventArgs.Empty);

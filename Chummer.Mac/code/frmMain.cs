@@ -145,7 +145,7 @@ namespace Chummer
 
 		private void ExitToolsStripMenuItem_Click(object sender, EventArgs e)
 		{
-			this.Close();
+			AppPlatform.QuitApplication();
 		}
 
 		private void CloseAllToolStripMenuItem_Click(object sender, EventArgs e)
