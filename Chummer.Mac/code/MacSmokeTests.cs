@@ -163,6 +163,16 @@ namespace Chummer
                     { stopped = true; }
                     Check(stopped, "closing the reader releases its local listener");
                 }
+                var skinRows = AppearanceColors.Filter("", skin: true).Cast<AppearanceColor>().ToArray();
+                Check(skinRows.Count(row => row.IsFamily) == 12 && skinRows.Count(row => row.Name == "Fair") == 1 &&
+                    skinRows.Take(7).Select(row => row.Name).SequenceEqual(new[] {
+                        "Fair", "Alabaster", "Chalk White", "Ivory", "Pale", "Porcelain", "Snow White" }),
+                    "skin palette groups the supplied shades alphabetically without duplicate family rows");
+                Check(AppearanceColors.Filter("espresso", skin: true).Cast<AppearanceColor>().Select(row => row.Name)
+                    .SequenceEqual(new[] { "Deep", "Espresso" }) &&
+                    AppearanceColors.Filter("", skin: true).Cast<AppearanceColor>().Any(row => row.Name == "Warm Ivory") &&
+                    !AppearanceColors.Filter("").Cast<AppearanceColor>().Any(row => row.Name == "Warm Ivory"),
+                    "skin search keeps family context while hair and eye palettes remain independent");
                 var choiceCharacter = new Character();
                 choiceCharacter.Options.Books.Clear();
                 choiceCharacter.Options.Books.Add("SR4");
@@ -786,7 +796,7 @@ namespace Chummer
                     Field<ComboBox>(creation, "txtEyes").Text = "Custom iridescent";
                     Field<ComboBox>(creation, "txtSkin").SelectedIndex = 0;
                     Field<SearchableChoices>(creation, "hairChoices").Refresh("crim");
-                    Check(character.Hair == "Crimson" && character.Eyes == "Custom iridescent" && character.Skin == "Red",
+                    Check(character.Hair == "Crimson" && character.Eyes == "Custom iridescent" && character.Skin == "Fair",
                         "creation color controls update the model and filtering preserves chosen colors");
                     var originalPluginNotice = AppErrors.Notify;
                     try
@@ -843,7 +853,7 @@ namespace Chummer
                 character.Save();
                 var loaded = new Character { FileName = character.FileName };
                 Check(loaded.Load(), "new character reloads");
-                Check(loaded.Hair == "Crimson" && loaded.Eyes == "Custom iridescent" && loaded.Skin == "Red",
+                Check(loaded.Hair == "Crimson" && loaded.Eyes == "Custom iridescent" && loaded.Skin == "Fair",
                     "selected and custom appearance colors survive the existing character format");
                 Check(loaded.Qualities.Any(item => item.InternalId == detailQuality.InternalId && item.Extra == "Hack on the Fly" &&
                     PromptDetails.CanEdit(item)), "edited quality detail survives save/load and remains editable");

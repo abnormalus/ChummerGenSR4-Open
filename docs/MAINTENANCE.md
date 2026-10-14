@@ -51,7 +51,7 @@ CharacterPortraits provides shared import/edit behavior for creation and career 
 
 ### Grouped appearance colors
 
-Hair, eyes, and skin use `AppearanceColors` with the editable `SearchableChoices` behavior in creation and career modes. The palette lives in `Chummer.Mac/assets/data/appearance-colors.xml`; family order follows the data, with shades sorted alphabetically. Families are selectable values. Searches match shade names or families and retain the family row above matching shades. Owner drawing supplies indentation and bold family rows; stored character fields contain plain names or custom text. `SearchableChoices.AttachFiltered` accepts a query-aware provider for other grouped lists without knowing their domain. Model handlers ignore intermediate list-refresh events, preserving character values while filtering.
+Hair, eyes, and skin use `AppearanceColors` with the editable `SearchableChoices` behavior in creation and career modes. Hair and eyes use `Chummer.Mac/assets/data/appearance-colors.xml`; skin uses its independent `skin-colors.xml` palette with the same rendering and filtering behavior. The `skin` argument selects that palette. For both palettes, family order follows the data, with shades sorted alphabetically. Families are selectable values. Searches match shade names or families and retain the family row above matching shades. Owner drawing supplies indentation and bold family rows; stored character fields contain plain names or custom text. `SearchableChoices.AttachFiltered` accepts a query-aware provider for other grouped lists without knowing their domain. Model handlers ignore intermediate list-refresh events, preserving character values while filtering.
 
 ### Sourcebook PDF reader
 

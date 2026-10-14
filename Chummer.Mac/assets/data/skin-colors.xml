@@ -1,0 +1,96 @@
+<?xml version='1.0' encoding='utf-8'?>
+<colors>
+  <family name="Fair">
+    <color name="Alabaster" />
+    <color name="Chalk White" />
+    <color name="Ivory" />
+    <color name="Pale" />
+    <color name="Porcelain" />
+    <color name="Snow White" />
+  </family>
+  <family name="Light">
+    <color name="Cream" />
+    <color name="Light Beige" />
+    <color name="Peach" />
+    <color name="Pinkish" />
+    <color name="Rosy" />
+    <color name="Warm Ivory" />
+  </family>
+  <family name="Medium">
+    <color name="Beige" />
+    <color name="Golden Beige" />
+    <color name="Honey" />
+    <color name="Neutral Tan" />
+    <color name="Sand" />
+    <color name="Warm Beige" />
+    <color name="Wheat" />
+  </family>
+  <family name="Olive">
+    <color name="Ash Olive" />
+    <color name="Bronze" />
+    <color name="Dark Olive" />
+    <color name="Golden Olive" />
+    <color name="Light Olive" />
+  </family>
+  <family name="Tan">
+    <color name="Amber" />
+    <color name="Burnished Gold" />
+    <color name="Caramel" />
+    <color name="Copper" />
+    <color name="Golden Tan" />
+  </family>
+  <family name="Brown">
+    <color name="Chestnut" />
+    <color name="Cocoa" />
+    <color name="Dark Brown" />
+    <color name="Light Brown" />
+    <color name="Mahogany" />
+    <color name="Medium Brown" />
+    <color name="Sienna" />
+    <color name="Umber" />
+  </family>
+  <family name="Deep">
+    <color name="Black" />
+    <color name="Deep Chocolate" />
+    <color name="Ebony" />
+    <color name="Espresso" />
+    <color name="Midnight Brown" />
+    <color name="Onyx" />
+  </family>
+  <family name="Red">
+    <color name="Brick Red" />
+    <color name="Burgundy" />
+    <color name="Crimson" />
+    <color name="Rust Red" />
+    <color name="Scarlet" />
+    <color name="Terracotta" />
+  </family>
+  <family name="Green">
+    <color name="Emerald" />
+    <color name="Forest Green" />
+    <color name="Jade" />
+    <color name="Mint Green" />
+    <color name="Moss Green" />
+    <color name="Olive Green" />
+  </family>
+  <family name="Blue">
+    <color name="Azure" />
+    <color name="Cobalt" />
+    <color name="Midnight Blue" />
+    <color name="Sky Blue" />
+    <color name="Slate Blue" />
+  </family>
+  <family name="Purple">
+    <color name="Amethyst" />
+    <color name="Lavender" />
+    <color name="Lilac" />
+    <color name="Plum" />
+    <color name="Violet" />
+  </family>
+  <family name="Unusual">
+    <color name="Ash Gray" />
+    <color name="Obsidian" />
+    <color name="Pearlescent" />
+    <color name="Silver" />
+  </family>
+</colors>

@@ -83,7 +83,7 @@ namespace Chummer
             MetatypeMeasurements.Attach(_objCharacter, tabCharacterInfo, lblMetatype, lblDescription);
             hairChoices = AppearanceColors.Attach(txtHair);
             eyeChoices = AppearanceColors.Attach(txtEyes);
-            skinChoices = AppearanceColors.Attach(txtSkin);
+            skinChoices = AppearanceColors.Attach(txtSkin, skin: true);
             CharacterPortraits.Attach(this, _objCharacter, picMugshot, cmdAddMugshot, cmdDeleteMugshot,
                 () => { _blnIsDirty = true; UpdateWindowTitle(); });
 

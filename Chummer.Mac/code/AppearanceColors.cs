@@ -18,15 +18,17 @@ namespace Chummer
     internal static class AppearanceColors
     {
         // Family order follows the supplied palette; shades sort within each family.
-        private static readonly AppearanceColor[] palette = XDocument.Load(Path.Combine(AppContext.BaseDirectory,
-            "data", "appearance-colors.xml")).Root.Elements("family").SelectMany(family =>
+        private static readonly AppearanceColor[] palette = LoadPalette("appearance-colors.xml");
+        private static readonly AppearanceColor[] skinPalette = LoadPalette("skin-colors.xml");
+        private static AppearanceColor[] LoadPalette(string file) => XDocument.Load(Path.Combine(AppContext.BaseDirectory,
+            "data", file)).Root.Elements("family").SelectMany(family =>
             new[] { new AppearanceColor { Name = (string)family.Attribute("name"), Family = (string)family.Attribute("name") } }
             .Concat(family.Elements("color").OrderBy(color => (string)color.Attribute("name"), StringComparer.OrdinalIgnoreCase)
                 .Select(color => new AppearanceColor { Name = (string)color.Attribute("name"), Family = (string)family.Attribute("name") }))).ToArray();
 
-        internal static IEnumerable<object> Filter(string query)
+        internal static IEnumerable<object> Filter(string query, bool skin = false)
         {
-            foreach (var group in palette.GroupBy(color => color.Family))
+            foreach (var group in (skin ? skinPalette : palette).GroupBy(color => color.Family))
             {
                 var matches = group.Where(color => color.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     color.Family.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
@@ -36,7 +38,7 @@ namespace Chummer
             }
         }
 
-        internal static SearchableChoices Attach(ComboBox combo)
+        internal static SearchableChoices Attach(ComboBox combo, bool skin = false)
         {
             combo.DropDownStyle = ComboBoxStyle.DropDown;
             combo.Sorted = false;
@@ -59,7 +61,7 @@ namespace Chummer
                 e.Graphics.DrawString(color.Name, font, brush, bounds, format);
                 e.DrawFocusRectangle();
             };
-            var behavior = SearchableChoices.AttachFiltered(combo, Filter);
+            var behavior = SearchableChoices.AttachFiltered(combo, query => Filter(query, skin));
             behavior.Refresh();
             return behavior;
         }
