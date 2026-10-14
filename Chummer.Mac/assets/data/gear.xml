@@ -2278,7 +2278,7 @@
 			<avail>(Rating * 3)F</avail>
 			<cost>Rating * 1000</cost>
 			<bonus>
-				<selecttext />
+				<selecttext generator="person-name" />
 			</bonus>
 			<source>SR4</source>
 			<page>332</page>

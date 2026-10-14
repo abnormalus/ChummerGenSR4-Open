@@ -185,6 +185,22 @@ namespace Chummer
                     AppearanceColors.Filter("", skin: true).Cast<AppearanceColor>().Any(row => row.Name == "Warm Ivory") &&
                     !AppearanceColors.Filter("").Cast<AppearanceColor>().Any(row => row.Name == "Warm Ivory"),
                     "skin search keeps family context while hair and eye palettes remain independent");
+                Check(PersonNames.Generate("Female", new Random(42)) == PersonNames.Generate("Female", new Random(42)), "person names reproduce with a fixed seed");
+                foreach (string gender in new[] { "Male", "Female", "Nonbinary", "", "custom gender" })
+                {
+                    var randomNames = new Random(37);
+                    Check(Enumerable.Range(0, 100).Select(_ => PersonNames.Generate(gender, randomNames)).All(name =>
+                        name.Contains(" ") && PersonNames.FirstNameFits(name.Split(' ')[0], gender)), "SIN names use the appropriate first-name pool for " + gender);
+                }
+                using (var namePrompt = new frmSelectText { AutoAcceptPrefilled = false, SelectedValue = "Manual name" })
+                {
+                    var namedCharacter = new Character { Sex = "Female" };
+                    namePrompt.ConfigureNameGenerator(namedCharacter);
+                    Check(Field<TextBox>(namePrompt, "txtValue").Text == "Manual name", "opening the SIN generator preserves manual input");
+                    namePrompt.Controls.Cast<Control>().OfType<Button>().Single(b => b.Name == "cmdRandomPersonName").PerformClick();
+                    Check(PersonNames.FirstNameFits(Field<TextBox>(namePrompt, "txtValue").Text.Split(' ')[0], "Female"), "SIN dice button uses the character gender and leaves an editable name");
+                    Capture(namePrompt, output, "sin-name-prompt");
+                }
                 var aliasPrefs = new StreetNamePreferences();
                 var namesA = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);
                 var namesB = StreetNameEngine.Load(1234).Suggest(null, aliasPrefs);

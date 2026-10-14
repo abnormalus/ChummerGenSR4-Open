@@ -80,6 +80,7 @@ namespace Chummer
                 using var dialog = new frmSelectText { AutoAcceptPrefilled = false, Text = "Edit Detail",
                     Description = "Detail for " + name + ":", SelectedValue = previous };
                 dialog.ConfigureChoices(character, quality?.Name);
+                if (gear?.Name == "Fake SIN") dialog.ConfigureNameGenerator(character);
                 if (dialog.ShowDialog(owner) != DialogResult.OK) return;
                 if (dialog.SelectedValue == previous) return;
                 if (quality != null) Apply(character, quality, dialog.SelectedValue);

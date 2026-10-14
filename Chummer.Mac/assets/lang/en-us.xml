@@ -6720,5 +6720,7 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>PdfCollection_Deselect</key><text>Deselect unlinked books</text></string>
 <string><key>PdfCollection_Clear</key><text>Clear PDF links</text></string>
 <string><key>PdfCollection_Select</key><text>Select all sourced books</text></string>
+<string><key>PersonNames_Roll</key><text>Randomize name using Character Info gender</text></string>
+<string><key>PersonNames_Failed</key><text>A random name could not be generated. You can enter a name manually.</text></string>
 </strings>
 </chummer>

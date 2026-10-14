@@ -47,6 +47,20 @@ namespace Chummer
             txtValue.Visible = false;
             Controls.Add(detailChoices);
         }
+        internal void ConfigureNameGenerator(Character character)
+        {
+            if (Controls.Cast<Control>().Any(c => c.Name == "cmdRandomPersonName")) return;
+            // Optional and explicit: never generate on opening, loading, cancelling or accepting.
+            var dice = new Button { Name = "cmdRandomPersonName", Text = "", Image = PersonNames.DiceIcon, Left = txtValue.Right - 28,
+                Top = txtValue.Top - 1, Width = 28, Height = 24, TabIndex = 2 };
+            txtValue.Width -= 34;
+            Controls.Add(dice);
+            new ToolTip().SetToolTip(dice, LanguageManager.Instance.GetString("PersonNames_Roll"));
+            dice.Click += (_, _) => {
+                try { txtValue.Text = PersonNames.Generate(character?.Sex); txtValue.Focus(); AppDiagnostics.Record("name.randomize"); }
+                catch (Exception error) { AppDiagnostics.Record("name.randomize-failed", error); AppErrors.Inform(this, "PersonNames_Failed"); }
+            };
+        }
         private string DetailText => detailChoices?.SelectedItem is DetailChoice selected && detailChoices.Text == selected.ToString() ? selected.Name : detailChoices?.Text ?? txtValue.Text;
 
 		#region Control Events
