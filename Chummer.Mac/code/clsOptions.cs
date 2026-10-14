@@ -35,7 +35,7 @@ namespace Chummer
 	{
 		string _strCode = "";
 		string _strPath = "";
-		int _intOffset = 0;
+		int _intOffset = 2;
 
 		#region Properties
 		public string Code
@@ -279,7 +279,8 @@ namespace Chummer
 				try
 				{
 					SourcebookInfo objSource = new SourcebookInfo();
-					string strTemp = CheckAndGetRegistryKey("Software\\Chummer", objXmlBook["code"].InnerText);
+					string strTemp = CheckAndGetRegistryKey("Software\\Chummer\\Sourcebook", objXmlBook["code"].InnerText)
+                        ?? CheckAndGetRegistryKey("Software\\Chummer", objXmlBook["code"].InnerText);
 					if (strTemp == null)
 						continue;
 					string[] strParts = strTemp.Split('|');

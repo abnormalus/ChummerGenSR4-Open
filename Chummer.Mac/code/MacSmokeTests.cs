@@ -135,6 +135,18 @@ namespace Chummer
                 Check(PdfLocalServer.TryRange("bytes=2-5", 10, out long rangeStart, out long rangeEnd) && rangeStart == 2 && rangeEnd == 5 &&
                     PdfLocalServer.TryRange("bytes=-4", 10, out rangeStart, out rangeEnd) && rangeStart == 6 && rangeEnd == 9 &&
                     !PdfLocalServer.TryRange("bytes=20-30", 10, out _, out _), "PDF streaming supports valid byte ranges");
+                var collectionFiles = new[] { "/books/Shadowrun - Arsenal.pdf", "/books/SR4 - Unwired.PDF", "/books/Arsenal French Content.pdf" };
+                Check(PdfCollectionMatcher.Candidates(collectionFiles, "AR", "Arsenal").SequenceEqual(new[] { collectionFiles[2], collectionFiles[0] }), "PDF matching returns equally strong title matches in stable alphabetical order");
+                Check(PdfCollectionMatcher.Candidates(collectionFiles, "UW", "Unwired").Single() == collectionFiles[1] &&
+                    PdfCollectionMatcher.Candidates(collectionFiles, "AR", "Arsenal French Content").Single() == collectionFiles[2] &&
+                    PdfCollectionMatcher.Candidates(collectionFiles, "SR", "Unknown").Length == 0,
+                    "PDF wildcard matching handles prefixes, full titles and bounded source codes");
+                Check(new SourcebookInfo().Offset == 2, "new sourcebook links default to page offset 2");
+                string collectionRoot = Path.Combine(output, "collection");
+                Directory.CreateDirectory(Path.Combine(collectionRoot, "nested"));
+                File.WriteAllText(Path.Combine(collectionRoot, "nested", "Unwired.PDF"), "test");
+                File.WriteAllText(Path.Combine(collectionRoot, "ignore.txt"), "test");
+                Check(PdfCollectionMatcher.Scan(collectionRoot).Length == 1, "PDF collection scanning includes subfolders and uppercase PDF extensions only");
                 string localPdf = Path.Combine(output, "reader-test.pdf");
                 File.WriteAllText(localPdf, "%PDF-1.4\nlocal test data");
                 Uri stoppedPdfServer;

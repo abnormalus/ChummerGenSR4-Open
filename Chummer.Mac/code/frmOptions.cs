@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Majorsilence.Forms;
 using System.Xml;
+using System.Threading.Tasks;
 
 
 
@@ -18,6 +19,10 @@ namespace Chummer
 		private readonly List<ListItem> _lstStickNShockWeaponCategories = new List<ListItem>();
 		private readonly HashSet<string> _setStickNShockExcludedWeaponCategories = new HashSet<string>();
 		private bool _blnSkipRefresh = false;
+        private TextBox txtPdfBaseFolder;
+        private Button cmdPdfAutoMatch;
+        private TextBox txtPdfMatchReport;
+        private bool pdfMatching;
 
 		#region Form Events
 		public frmOptions()
@@ -181,6 +186,7 @@ namespace Chummer
             lblPDFArgumentStyle.Visible = cboPDFArgumentStyle.Visible = false;
             tabGlobal.Controls.Add(new Label { Name = "nativePdfInformation", Left = 6, Top = 250,
                 Width = 440, Height = 48, Text = LanguageManager.Instance.GetString("Label_Options_NativePdf") });
+            ConfigurePdfSources();
 
 			// Populate the Language List.
 			string strPath = Path.Combine(Application.StartupPath, "lang");
@@ -636,6 +642,97 @@ namespace Chummer
 			nudKarmaWeaponFocus.Value = 3;
 		}
 
+        private void ConfigurePdfSources()
+        {
+            string L(string key) => LanguageManager.Instance.GetString(key);
+            var sources = new TabPage { Name = "tabSources", Text = L("PdfCollection_Sources") };
+            tabControl2.Controls.Add(sources);
+            sources.Controls.Add(new Label { Left = 8, Top = 12, Width = 420, Height = 20, Text = L("PdfCollection_Base") });
+            txtPdfBaseFolder = new TextBox { Name = "txtPdfBaseFolder", Left = 8, Top = 36, Width = 380,
+                Text = SettingsStore.CurrentUser.CreateSubKey("Software\\Chummer").GetValue("pdfbasefolder")?.ToString() ?? "" };
+            sources.Controls.Add(txtPdfBaseFolder);
+            var browse = new Button { Left = 396, Top = 34, Width = 100, Text = L("PdfCollection_Browse") };
+            sources.Controls.Add(browse);
+            browse.Click += async (_, _) => {
+                using var picker = new FolderBrowserDialog { Description = L("PdfCollection_Base"), SelectedPath = txtPdfBaseFolder.Text };
+                if (await picker.ShowDialogAsync(this) == DialogResult.OK) txtPdfBaseFolder.Text = picker.SelectedPath;
+            };
+            cmdPdfAutoMatch = new Button { Name = "cmdPdfAutoMatch", Left = 8, Top = 72, Width = 150, Text = L("PdfCollection_Match") };
+            sources.Controls.Add(cmdPdfAutoMatch);
+            cmdPdfAutoMatch.Click += async (_, _) => await AutoMatchPdfs();
+            var deselect = new Button { Name = "cmdPdfDeselectUnlinked", Left = 164, Top = 72, Width = 190, Text = L("PdfCollection_Deselect") };
+            var clear = new Button { Name = "cmdPdfClearLinks", Left = 360, Top = 72, Width = 145, Text = L("PdfCollection_Clear") };
+            sources.Controls.Add(deselect);
+            sources.Controls.Add(clear);
+            var select = new Button { Name = "cmdPdfSelectSourced", Left = 8, Top = 106, Width = 210, Text = L("PdfCollection_Select") };
+            sources.Controls.Add(select);
+            select.Click += (_, _) => {
+                if (pdfMatching) return;
+                foreach (TreeNode node in treSourcebook.Nodes)
+                    if (GlobalOptions.Instance.SourcebookInfo.Any(b => b.Code == node.Tag.ToString() && File.Exists(b.Path))) node.Checked = true;
+                AppDiagnostics.Record("pdf.select-sourced");
+            };
+            deselect.Click += (_, _) => {
+                if (pdfMatching) return;
+                foreach (TreeNode node in treSourcebook.Nodes)
+                    if (!GlobalOptions.Instance.SourcebookInfo.Any(b => b.Code == node.Tag.ToString() && File.Exists(b.Path))) node.Checked = false;
+                AppDiagnostics.Record("pdf.deselect-unlinked");
+            };
+            clear.Click += (_, _) => {
+                if (pdfMatching) return;
+                foreach (var link in GlobalOptions.Instance.SourcebookInfo) link.Path = "";
+                if (treSourcebook.SelectedNode != null) treSourcebook_AfterSelect(this, null);
+                AppDiagnostics.Record("pdf.clear-links");
+            };
+            sources.Controls.Add(new Label { Left = 8, Top = 140, Width = 490, Height = 76, Text = L("PdfCollection_Help") });
+            var controls = new Control[] { lblPDFLocation, txtPDFLocation, cmdPDFLocation, lblPDFOffset, nudPDFOffset, cmdPDFTest };
+            foreach (var control in controls) { tabGlobal.Controls.Remove(control); sources.Controls.Add(control); control.Top -= 101; }
+            txtPdfMatchReport = new TextBox { Name = "txtPdfMatchReport", Left = 8, Top = 312, Width = 490, Height = 188,
+                Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+            sources.Controls.Add(txtPdfMatchReport);
+            txtPDFLocation.Width = 300;
+            cmdPDFLocation.Left = txtPDFLocation.Right + 6;
+        }
+
+        private async Task AutoMatchPdfs()
+        {
+            if (pdfMatching) return;
+            string folder = txtPdfBaseFolder.Text.Trim();
+            if (!Directory.Exists(folder)) { AppErrors.Inform(this, "PdfCollection_InvalidFolder"); return; }
+            pdfMatching = true;
+            cmdPdfAutoMatch.Enabled = false;
+            cmdOK.Enabled = false;
+            try
+            {
+                var files = await Task.Run(() => PdfCollectionMatcher.Scan(folder));
+                if (IsDisposed) return;
+                var books = XmlManager.Instance.Load("books.xml").SelectNodes("/chummer/books/book");
+                int matched = 0, preserved = 0;
+                var unresolved = new List<string>();
+                foreach (XmlNode book in books)
+                {
+                    string code = book["code"].InnerText, name = book["name"].InnerText;
+                    var link = GlobalOptions.Instance.SourcebookInfo.FirstOrDefault(b => b.Code == code);
+                    if (link != null && File.Exists(link.Path)) { preserved++; continue; }
+                    var candidates = PdfCollectionMatcher.Candidates(files, code, name, book["translate"]?.InnerText);
+                    if (candidates.Length == 0) { unresolved.Add(name + " — " + LanguageManager.Instance.GetString("PdfCollection_NoMatch")); continue; }
+                    if (candidates.Length > 1) unresolved.Add(name + " — " + LanguageManager.Instance.GetString("PdfCollection_Ambiguous"));
+                    if (link == null) { link = new SourcebookInfo { Code = code }; GlobalOptions.Instance.SourcebookInfo.Add(link); }
+                    link.Path = candidates[0];
+                    matched++;
+                }
+                if (treSourcebook.SelectedNode != null) treSourcebook_AfterSelect(this, null);
+                string result = string.Format(LanguageManager.Instance.GetString("PdfCollection_Result"), matched, preserved, unresolved.Count);
+                txtPdfMatchReport.Text = result + "\r\n\r\n" + string.Join("\r\n", unresolved);
+                // Keep the report readable; individual unmatched books can still be linked manually.
+                if (unresolved.Count > 0) result += "\n\n" + string.Join("\n", unresolved.Take(12)) + (unresolved.Count > 12 ? "\n…" : "");
+                AppErrors.Notify(this, result, "Chummer");
+                AppDiagnostics.Record("pdf.collection-match-complete");
+            }
+            catch (Exception error) { AppDiagnostics.Record("pdf.collection-match-failed", error); AppErrors.Inform(this, "PdfCollection_Failed"); }
+            finally { pdfMatching = false; if (!IsDisposed) { cmdPdfAutoMatch.Enabled = true; cmdOK.Enabled = true; } }
+        }
+
 		private void cmdPDFAppPath_Click(object sender, EventArgs e)
 		{
 			// Prompt the user to select a save file to associate with this Contact.
@@ -650,6 +747,7 @@ namespace Chummer
 		{
 			// Prompt the user to select a save file to associate with this Contact.
 			OpenFileDialog openFileDialog = new OpenFileDialog();
+			openFileDialog.InitialDirectory = txtPdfBaseFolder.Text;
 			openFileDialog.Filter = "PDF Files (*.pdf)|*.pdf|All Files (*.*)|*.*";
 
 			if (openFileDialog.ShowDialog(this) == DialogResult.OK)
@@ -688,7 +786,7 @@ namespace Chummer
 
 			_blnSkipRefresh = true;
 			txtPDFLocation.Text = "";
-			nudPDFOffset.Value = 0;
+			nudPDFOffset.Value = 2;
 			_blnSkipRefresh = false;
 
 			// Find the selected item in the Sourcebook List.
@@ -1749,6 +1847,8 @@ namespace Chummer
 			objRegistry.SetValue("printtofilefirst", chkPrintToFileFirst.Checked.ToString());
 
 			objRegistry.SetValue("pdfapppath", txtPDFAppPath.Text);
+
+			objRegistry.SetValue("pdfbasefolder", txtPdfBaseFolder.Text.Trim());
 
 			// Save the SourcebookInfo.
 			SettingsRegistryKey objSourceRegistry = SettingsStore.CurrentUser.CreateSubKey("Software\\Chummer\\Sourcebook");

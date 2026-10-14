@@ -6672,7 +6672,7 @@ Only one attribute may be at its Maximum value during character creation.</text>
 Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>Label_MeasurementRangesUnavailable</key><text>No suggested measurement ranges available for this metatype. Enter height and weight freely.</text></string>
 <string><key>Label_TypicalAgeRange</key><text>Typically {0} years</text></string>
-<string><key>Label_Options_NativePdf</key><text>PDFs open in Chummer’s built-in reader. Select a sourcebook below to link your local PDF and set its page offset.</text></string>
+<string><key>Label_Options_NativePdf</key><text>PDFs open in Chummer’s built-in reader. Use the Sources tab to link your PDF collection and set page offsets.</text></string>
 <string><key>Message_PdfInvalidReference</key><text>This source reference does not contain a valid book and page number.</text></string>
 <string><key>Message_PdfNotLinked</key><text>Link your local PDF for this sourcebook in Chummer Settings, under the sourcebook PDF locations.</text></string>
 <string><key>Message_PdfMissing</key><text>The linked PDF could not be found. Update its location in Chummer Settings.</text></string>
@@ -6707,5 +6707,18 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>Alias_Use</key><text>Use alias</text></string>
 <string><key>Alias_Error</key><text>The street-name generator could not complete. Check the editable dictionary configuration and diagnostic logs; your current alias has been preserved.</text></string>
 <string><key>Alias_Advanced</key><text>More naming options</text></string>
+<string><key>PdfCollection_Sources</key><text>Sources</text></string>
+<string><key>PdfCollection_Base</key><text>PDF base folder:</text></string>
+<string><key>PdfCollection_Browse</key><text>Browse…</text></string>
+<string><key>PdfCollection_Match</key><text>Auto-match PDFs</text></string>
+<string><key>PdfCollection_Help</key><text>Searches this folder and its subfolders for PDF filenames matching sourcebook titles or codes. Existing valid links and saved offsets are kept. Multiple equally good matches use the first file alphabetically and are reported for review. New links use a page offset of 2. Save preferences to keep changes. The core rulebook remains enabled.</text></string>
+<string><key>PdfCollection_InvalidFolder</key><text>Choose an existing PDF base folder first.</text></string>
+<string><key>PdfCollection_NoMatch</key><text>no match</text></string>
+<string><key>PdfCollection_Ambiguous</key><text>multiple matches; first file linked — review recommended</text></string>
+<string><key>PdfCollection_Result</key><text>Linked {0} books. Kept {1} existing links. {2} books need review (missing or multiple matches).</text></string>
+<string><key>PdfCollection_Failed</key><text>The PDF collection could not be searched. Check the folder and access permissions, then try again.</text></string>
+<string><key>PdfCollection_Deselect</key><text>Deselect unlinked books</text></string>
+<string><key>PdfCollection_Clear</key><text>Clear PDF links</text></string>
+<string><key>PdfCollection_Select</key><text>Select all sourced books</text></string>
 </strings>
 </chummer>
