@@ -320,6 +320,48 @@ namespace Chummer
                         windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
                             .Invoke(mdiParent, new object[] { MouseButtons.Left, x, y, Keys.None });
                         Check(clicks == 1, "outer window routes hosted press and captured release at scale " + scale + " in " + state);
+                        using var inventoryMenu = new ContextMenuStrip();
+                        var customItem = inventoryMenu.Items.Add("Custom Lifestyle");
+                        int customClicks = 0;
+                        customItem.Click += (_, _) => customClicks++;
+                        var splitButton = new SplitButton { Left = 30, Top = 10, Width = 160, Height = 30,
+                            AutoSize = false, Text = "Add Lifestyle", SplitMenuStrip = inventoryMenu };
+                        int primaryClicks = 0;
+                        splitButton.Click += (_, _) => primaryClicks++;
+                        mdiChild.Controls.Add(splitButton);
+                        HeadlessRenderer.CapturePng(mdiParent, 1000, 600);
+                        var arrow = (System.Drawing.Rectangle)typeof(SplitButton)
+                            .GetField("dropDownRectangle", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(splitButton);
+                        var arrowCenter = mdiParent.PointToClient(splitButton.PointToScreen(new System.Drawing.Point(
+                            arrow.Left + arrow.Width / 2, arrow.Top + arrow.Height / 2)));
+                        int arrowX = (int)Math.Round(arrowCenter.X * mdiParent.Scaling);
+                        int arrowY = (int)Math.Round(arrowCenter.Y * mdiParent.Scaling);
+                        windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Left, arrowX, arrowY, Keys.None });
+                        windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Left, arrowX, arrowY, Keys.None });
+                        Check(primaryClicks == 0, "inventory arrow does not fire primary Add at scale " + scale + " in " + state);
+                        var inventoryPopup = (PopupWindow)typeof(MenuDropDown)
+                            .GetField("popup", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(inventoryMenu);
+                        Check(inventoryPopup != null && inventoryPopup.Visible,
+                            "inventory arrow opens menu at scale " + scale + " in " + state);
+                        HeadlessRenderer.CapturePng(inventoryPopup, 600, 100);
+                        int itemX = (int)((customItem.Bounds.Left + customItem.Bounds.Width / 2) * inventoryPopup.Scaling);
+                        int itemY = (int)((customItem.Bounds.Top + customItem.Bounds.Height / 2) * inventoryPopup.Scaling);
+                        windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(inventoryPopup, new object[] { MouseButtons.Left, itemX, itemY, Keys.None });
+                        windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(inventoryPopup, new object[] { MouseButtons.Left, itemX, itemY, Keys.None });
+                        Check(customClicks == 1, "inventory submenu selection fires once at scale " + scale + " in " + state);
+                        inventoryMenu.Hide();
+                        var primaryCenter = mdiParent.PointToClient(splitButton.PointToScreen(new System.Drawing.Point(30, 15)));
+                        int primaryX = (int)Math.Round(primaryCenter.X * mdiParent.Scaling);
+                        int primaryY = (int)Math.Round(primaryCenter.Y * mdiParent.Scaling);
+                        windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Left, primaryX, primaryY, Keys.None });
+                        windowType.GetMethod("HandlePointerReleased", BindingFlags.NonPublic | BindingFlags.Instance)
+                            .Invoke(mdiParent, new object[] { MouseButtons.Left, primaryX, primaryY, Keys.None });
+                        Check(primaryClicks == 1, "inventory primary Add fires once at scale " + scale + " in " + state);
                         var detailTree = new TreeView { Left = 140, Top = 70, Width = 110, Height = 70 };
                         using var nodeMenu = new ContextMenuStrip();
                         nodeMenu.Items.Add("Edit Detail");

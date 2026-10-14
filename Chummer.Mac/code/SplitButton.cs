@@ -117,6 +117,10 @@ public class SplitButton : Button
             if (value != showSplit)
             {
                 showSplit = value;
+                // Split mode raises its primary click in OnMouseUp after checking the
+                // arrow area. The standard release path would fire it again, including
+                // on an arrow click, opening an Add dialog over the dropdown.
+                SetStyle(ControlStyles.StandardClick, !value);
                 Invalidate();
 
                 if (Parent != null)
