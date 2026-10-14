@@ -69,6 +69,7 @@ namespace Chummer
             }
             void Edit()
             {
+                AppDiagnostics.Action("detail.edit");
                 string id = tree.SelectedNode?.Tag?.ToString();
                 if (id == null) return;
                 var quality = findQuality?.Invoke(id);

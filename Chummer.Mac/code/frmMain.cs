@@ -15,6 +15,7 @@ namespace Chummer
 		private frmDiceRoller _frmRoller;
         private ToolStripMenuItem _mnuSaveCharacter;
         private ToolStripMenuItem _mnuSaveCharacterAs;
+        private ToolStripMenuItem _mnuCloseCharacter;
 
 		#region Control Events
 		public frmMain()
@@ -22,6 +23,8 @@ namespace Chummer
 			InitializeComponent();
             _mnuSaveCharacter = new ToolStripMenuItem { Name = "nativeSaveCharacter", Text = "&Save", Tag = "Menu_FileSave", Enabled = false };
             _mnuSaveCharacterAs = new ToolStripMenuItem { Name = "nativeSaveCharacterAs", Text = "Save &As…", Tag = "Menu_FileSaveAs", Enabled = false };
+            _mnuSaveCharacter.ShortcutKeys = Keys.Control | Keys.S;
+            _mnuSaveCharacterAs.ShortcutKeys = Keys.Control | Keys.Shift | Keys.S;
             _mnuSaveCharacter.Image = Properties.Resources.disk;
             _mnuSaveCharacterAs.Image = Properties.Resources.disk;
             _mnuSaveCharacter.Click += (_, _) =>
@@ -36,11 +39,16 @@ namespace Chummer
             };
             fileMenu.DropDownItems.Insert(3, _mnuSaveCharacter);
             fileMenu.DropDownItems.Insert(4, _mnuSaveCharacterAs);
+            _mnuCloseCharacter = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_CloseCharacter")) {
+                Name = "closeCharacter", Enabled = false, ShortcutKeys = Keys.Control | Keys.W };
+            _mnuCloseCharacter.Click += (_, _) => ActiveMdiChild?.Close();
+            fileMenu.DropDownItems.Insert(5, _mnuCloseCharacter);
             MdiChildActivate += (_, _) =>
             {
                 bool hasCharacter = ActiveMdiChild is frmCreate || ActiveMdiChild is frmCareer;
                 _mnuSaveCharacter.Enabled = hasCharacter;
                 _mnuSaveCharacterAs.Enabled = hasCharacter;
+                _mnuCloseCharacter.Enabled = hasCharacter;
             };
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 
@@ -107,6 +115,11 @@ namespace Chummer
 				}
 			}
 
+            var logsCommand = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_OpenDiagnosticLogs")) { Name = "openDiagnosticLogs", Tag = "Menu_OpenDiagnosticLogs" };
+            logsCommand.Click += (_, _) => AppPlatform.OpenLogs(this);
+            helpMenu.DropDownItems.Add(logsCommand);
+
+
 			// Attempt to cache the XML files that are used the most.
 			try
 			{
@@ -126,6 +139,8 @@ namespace Chummer
 			catch
 			{
 			}
+            AppPlatform.ConfigureMenus(this, menuStrip, optionsToolStripMenuItem,
+                aboutToolStripMenuItem, exitToolStripMenuItem);
 		}
 
 		private void ExitToolsStripMenuItem_Click(object sender, EventArgs e)
@@ -544,6 +559,7 @@ namespace Chummer
 		/// <param name="blnClearFileName">Whether or not the name of the save file should be cleared.</param>
 		public void LoadCharacter(string strFileName, bool blnIncludeInMRU = true, string strNewName = "", bool blnClearFileName = false)
 		{
+			AppDiagnostics.Action("character.open");
 			if (File.Exists(strFileName) && string.Equals(Path.GetExtension(strFileName), ".chum", StringComparison.OrdinalIgnoreCase))
 			{
 				bool blnLoaded = false;
@@ -552,7 +568,10 @@ namespace Chummer
 				blnLoaded = objCharacter.Load();
 
 				if (!blnLoaded)
-					return;
+                {
+                    AppDiagnostics.Record("character.open-failed");
+                    return;
+                }
 
 				// If a new name is given, set the character's name to match (used in cloning).
 				if (strNewName != "")

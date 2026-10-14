@@ -137,6 +137,8 @@ internal static class AvaloniaKeyInterop
         if ((mods & KeyModifiers.Control) != 0) key |= Keys.Control;
         if ((mods & KeyModifiers.Shift) != 0)   key |= Keys.Shift;
 
+        if (DesktopMenus.CommandShortcutsEnabled && (mods & KeyModifiers.Meta) != 0)
+            key |= Keys.Control;
         return key;
     }
 

@@ -45,6 +45,16 @@ namespace Chummer
                 GlobalOptions.Instance.AutomaticUpdate = false;
                 LanguageManager.Instance.Load("en-us", null);
                 Check(LanguageManager.Instance.Loaded, "English language loaded");
+                AppDiagnostics.Action("diagnostics.privacy-test");
+                AppDiagnostics.Record("simulated-error", new System.IO.IOException("private-character-name /private/character.chum"));
+                string diagnosticText = File.ReadAllText(AppDiagnostics.LogPath);
+                Check(diagnosticText.Contains("IOException") && diagnosticText.Contains("diagnostics.privacy-test") &&
+                    !diagnosticText.Contains("private-character-name") && !diagnosticText.Contains("character.chum"),
+                    "diagnostics retain error types and action IDs without exception messages or character paths");
+                File.WriteAllText(AppDiagnostics.LogPath, new string('x', 2 * 1024 * 1024 + 1));
+                AppDiagnostics.Record("rotation-test");
+                Check(File.Exists(AppDiagnostics.LogPath + ".1") && new FileInfo(AppDiagnostics.LogPath).Length < 4096,
+                    "diagnostic logs rotate before growing without bound");
                 Check(Properties.Resources.add != null, "embedded toolbar image decoded");
                 foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data"), "*.xml"))
                     XmlManager.Instance.Load(Path.GetFileName(file));

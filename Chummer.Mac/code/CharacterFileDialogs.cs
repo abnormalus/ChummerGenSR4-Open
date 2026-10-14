@@ -79,6 +79,7 @@ namespace Chummer
             string previousPath = character.FileName;
             try
             {
+                AppDiagnostics.Action("character.save");
                 character.FileName = path;
                 character.Save();
                 RememberDirectory(path);
@@ -94,7 +95,10 @@ namespace Chummer
         }
 
         internal static void ShowError(Form owner, string title, Exception error)
-            => MessageBox.Show(owner, error.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        {
+            AppDiagnostics.Record("file-operation-failed", error);
+            MessageBox.Show(owner, error.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
 
         private static void RememberDirectory(string path)
         {

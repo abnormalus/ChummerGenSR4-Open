@@ -632,6 +632,13 @@
 			<key>Menu_Main_About</key>
 			<text>&amp;About...</text>
 		</string>
+        <string>
+            <key>Menu_OpenDiagnosticLogs</key>
+            <text>Open Diagnostic Logs</text>
+        </string>
+        <string><key>Menu_MacPreferences</key><text>Preferences…</text></string>
+        <string><key>Menu_MacQuit</key><text>Quit Chummer</text></string>
+        <string><key>Menu_CloseCharacter</key><text>Close Character</text></string>
 		<!-- Create/Career Window -->
 		<string>
 			<key>Menu_Special</key>

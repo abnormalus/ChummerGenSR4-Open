@@ -1,0 +1,33 @@
+name: Desktop compatibility
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build shared desktop application
+        run: dotnet build Chummer.Mac.sln -c Release --disable-build-servers -p:UsedAvaloniaProducts=
+      - name: Verify character compatibility and UI regressions
+        run: dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
+      - name: Publish platform build
+        shell: pwsh
+        run: |
+          $rid = if ($IsMacOS) { 'osx-arm64' } else { 'win-x64' }
+          dotnet publish Chummer.Mac/Chummer.Mac.csproj -c Release -r $rid --self-contained true -p:UsedAvaloniaProducts= -o artifacts/publish
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: desktop-${{ matrix.os }}
+          path: artifacts

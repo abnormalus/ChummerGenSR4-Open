@@ -304,8 +304,11 @@ namespace Majorsilence.Forms
         /// WinForms declares ToolStripItem.OnClick with this signature, and ported menu items override it
         /// to intercept their own clicks -- so it has to be the one that actually raises Click.
         /// </remarks>
+        /// <summary>Reports a shared menu/toolbar command before its handlers run.</summary>
+        public static event Action<MenuItem>? CommandStarting;
         protected virtual void OnClick (EventArgs e)
         {
+            CommandStarting?.Invoke(this);
             Click?.Invoke (this, e);
         }
 

@@ -92,5 +92,8 @@ internal static class AvaloniaBootstrap
     }
 #endif
 
-    private sealed class MinimalApp : Avalonia.Application { }
+    private sealed class MinimalApp : Avalonia.Application
+    {
+        public MinimalApp() { if (DesktopMenus.ApplicationName is { } name) Name = name; }
+    }
 }
