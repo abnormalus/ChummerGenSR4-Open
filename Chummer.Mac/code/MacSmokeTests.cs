@@ -512,8 +512,10 @@ namespace Chummer
                             .GetMethod("GetIncrementArea", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(spinner, null);
                         Check(increment.Left == 82 && increment.Width == 18,
                             "spinner arrow strip keeps logical bounds at scale " + scale);
-                        int x = (int)((spinner.Left + increment.Left + increment.Width / 2) * scale);
-                        int y = (int)((spinner.Top + increment.Top + increment.Height / 2) * scale);
+                        var spinnerCenter = spinnerForm.PointToClient(spinner.PointToScreen(new System.Drawing.Point(
+                            increment.Left + increment.Width / 2, increment.Top + increment.Height / 2)));
+                        int x = (int)Math.Round(spinnerCenter.X * spinnerForm.Scaling);
+                        int y = (int)Math.Round(spinnerCenter.Y * spinnerForm.Scaling);
                         var windowType = typeof(Form).BaseType;
                         windowType.GetMethod("HandlePointerPressed", BindingFlags.NonPublic | BindingFlags.Instance)
                             .Invoke(spinnerForm, new object[] { MouseButtons.Left, x, y, Keys.None });
@@ -526,8 +528,10 @@ namespace Chummer
                         HeadlessRenderer.CapturePng(spinnerForm, 1200, 240);
                         foreach (MenuItem item in ((Menu)menuBar).Items)
                         {
-                            int hoverX = (int)((menuBar.Left + item.Bounds.Left + item.Bounds.Width / 2) * scale);
-                            int hoverY = (int)((menuBar.Top + item.Bounds.Top + item.Bounds.Height / 2) * scale);
+                            var hoverCenter = spinnerForm.PointToClient(menuBar.PointToScreen(new System.Drawing.Point(
+                                item.Bounds.Left + item.Bounds.Width / 2, item.Bounds.Top + item.Bounds.Height / 2)));
+                            int hoverX = (int)Math.Round(hoverCenter.X * spinnerForm.Scaling);
+                            int hoverY = (int)Math.Round(hoverCenter.Y * spinnerForm.Scaling);
                             windowType.GetMethod("HandlePointerMoved", BindingFlags.NonPublic | BindingFlags.Instance)
                                 .Invoke(spinnerForm, new object[] { MouseButtons.None, hoverX, hoverY, Keys.None });
                             Check(item.Hovered, "top menu hover aligns with " + item.Text + " at scale " + scale);
