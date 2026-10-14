@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
+      - name: Verify release archival safeguards
+        run: python scripts/tests/test_archive_nightly.py
       - name: Build shared desktop application
         run: dotnet build Chummer.Mac.sln -c Release --disable-build-servers -p:UsedAvaloniaProducts=
       - name: Check characters and UI behavior

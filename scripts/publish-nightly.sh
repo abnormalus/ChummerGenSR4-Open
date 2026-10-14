@@ -25,7 +25,15 @@ EOF_NOTES
 if ! gh release view Nightly --repo "$chummer_repo" >/dev/null 2>&1; then
     gh release create Nightly --repo "$chummer_repo" --target "$chummer_sha" --draft --prerelease --title Nightly --notes-file "$chummer_notes"
 fi
+python3 "$(dirname "$0")/archive-nightly.py" "$chummer_assets"
 gh release upload Nightly "$chummer_assets"/* --repo "$chummer_repo" --clobber
 # Only the moving nightly tag is updated; versioned release tags stay immutable.
 gh api --method PATCH "repos/$chummer_repo/git/refs/tags/Nightly" -f sha="$chummer_sha" -F force=true >/dev/null
 gh release edit Nightly --repo "$chummer_repo" --draft=false --prerelease --title Nightly --notes-file "$chummer_notes"
+
+# Remove superseded legacy download names only after their archive is verified and new uploads succeeded.
+while IFS= read -r chummer_old_asset; do
+    if [[ ! -f "$chummer_assets/$chummer_old_asset" ]]; then
+        gh release delete-asset Nightly "$chummer_old_asset" --repo "$chummer_repo" --yes
+    fi
+done < <(gh api "repos/$chummer_repo/releases/tags/Nightly" --jq '.assets[].name')
