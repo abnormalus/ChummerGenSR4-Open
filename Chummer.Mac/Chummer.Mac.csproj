@@ -6,6 +6,7 @@
     <RootNamespace>Chummer</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ApplicationIcon>branding/chummer.ico</ApplicationIcon>
+    <ApplicationManifest>../packaging/windows/app.manifest</ApplicationManifest>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

@@ -36,6 +36,7 @@ namespace Chummer
         {
             if (args.Length < 2) { Console.Error.WriteLine("Usage: --smoke-test OUTPUT [FIXTURE]"); return 2; }
             string output = Path.GetFullPath(args[1]);
+            string fixtureRoot = args.Length > 2 ? Path.GetFullPath(args[2]) : null;
             Directory.CreateDirectory(output);
             MacPaths.TestUserDirectory = Path.Combine(output, "user");
             try
@@ -153,11 +154,13 @@ namespace Chummer
                         "local PDF server refuses wrong tokens and asset traversal");
                     stoppedPdfServer = pdfServer.BaseUri;
                 }
-                using (var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(2) })
+                using (var probe = new System.Net.Sockets.TcpClient())
+                using (var timeout = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5)))
                 {
                     bool stopped = false;
-                    try { client.GetAsync(stoppedPdfServer).GetAwaiter().GetResult(); }
-                    catch (System.Net.Http.HttpRequestException) { stopped = true; }
+                    try { probe.ConnectAsync(System.Net.IPAddress.Loopback, stoppedPdfServer.Port, timeout.Token).AsTask().GetAwaiter().GetResult(); }
+                    catch (System.Net.Sockets.SocketException error) when (error.SocketErrorCode == System.Net.Sockets.SocketError.ConnectionRefused)
+                    { stopped = true; }
                     Check(stopped, "closing the reader releases its local listener");
                 }
                 var choiceCharacter = new Character();
@@ -893,9 +896,9 @@ namespace Chummer
 
                 if (args.Length > 2)
                 {
-                    string[] fixtures = Directory.Exists(args[2])
-                        ? Directory.GetFiles(args[2], "*.chum", SearchOption.AllDirectories)
-                        : new[] { args[2] };
+                    string[] fixtures = Directory.Exists(fixtureRoot)
+                        ? Directory.GetFiles(fixtureRoot, "*.chum", SearchOption.AllDirectories)
+                        : new[] { fixtureRoot };
                     int count = 0;
                     foreach (string file in fixtures)
                     {

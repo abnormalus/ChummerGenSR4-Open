@@ -1,12 +1,17 @@
-name: Desktop compatibility
+name: Nightly desktop builds
 on:
   push:
+    branches: [master]
   pull_request:
+    branches: [master]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  build-and-check:
+  validate:
     strategy:
       fail-fast: false
       matrix:
@@ -19,15 +24,45 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Build shared desktop application
         run: dotnet build Chummer.Mac.sln -c Release --disable-build-servers -p:UsedAvaloniaProducts=
-      - name: Verify character compatibility and UI regressions
+      - name: Check characters and UI behavior
         run: dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
-      - name: Publish platform build
-        shell: pwsh
-        run: |
-          $rid = if ($IsMacOS) { 'osx-arm64' } else { 'win-x64' }
-          dotnet publish Chummer.Mac/Chummer.Mac.csproj -c Release -r $rid --self-contained true -p:UsedAvaloniaProducts= -o artifacts/publish
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: failure()
         with:
-          name: desktop-${{ matrix.os }}
-          path: artifacts
+          name: diagnostics-${{ matrix.os }}
+          path: artifacts/checks
+  package:
+    needs: validate
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install MSI tools
+        run: brew install msitools
+      - name: Package and verify both desktop downloads
+        run: bash scripts/package-nightly.sh artifacts/nightly
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nightly-assets
+          path: artifacts/nightly/assets
+          if-no-files-found: error
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: nightly-assets
+          path: assets
+      - name: Publish Nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: bash scripts/publish-nightly.sh assets
