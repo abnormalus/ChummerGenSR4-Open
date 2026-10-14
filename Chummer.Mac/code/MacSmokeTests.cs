@@ -233,6 +233,32 @@ namespace Chummer
                     Check(prefixList.SelectedIndex == 1, "idle timeout starts a fresh list prefix");
                 }
 
+                foreach (double labelScale in new[] { 1.0, 2.0 })
+                {
+                    double savedScale = Application.UiScale;
+                    try
+                    {
+                        Application.UiScale = labelScale;
+                        using var labelHost = new Form { Width = 300, Height = 120 };
+                        var panel = new Panel { Dock = DockStyle.Fill };
+                        var valueLabel = new Label { Left = 30, Top = 20, AutoSize = true, Text = "1250¥" };
+                        panel.Controls.Add(valueLabel);
+                        labelHost.Controls.Add(panel);
+                        labelHost.Show();
+                        HeadlessRenderer.CapturePng(labelHost, 600, 240);
+                        int oldWidth = valueLabel.Width;
+                        valueLabel.Text = "750¥";
+                        Check(valueLabel.Width < oldWidth && (bool)typeof(Control).GetProperty("NeedsPaint", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(panel),
+                            "shrinking cost redraws the old label background at scale " + labelScale);
+                        valueLabel.Text = "12";
+                        HeadlessRenderer.CapturePng(labelHost, 600, 240);
+                        valueLabel.Text = "8";
+                        Check((bool)typeof(Control).GetProperty("NeedsPaint", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(panel),
+                            "shrinking capacity redraws its old trailing digit at scale " + labelScale);
+                    }
+                    finally { Application.UiScale = savedScale; }
+                }
+
                 using (var screenForm = new Form { Width = 600, Height = 200 })
                 {
                     var backendField = typeof(Form).BaseType.GetField("Backend", BindingFlags.NonPublic | BindingFlags.Instance);

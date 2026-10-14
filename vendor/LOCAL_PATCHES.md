@@ -38,3 +38,5 @@ ComboBox exposes DropDownOpening before popup measurement. Searchable providers 
 Form.ApplicationIconOverride is an opt-in shared branding icon. Chummer sets it before constructing forms, including dialogs, and it replaces designer-provided legacy icons without changing other consumers' defaults.
 
 PopupWindow.Show(Control, x, y) maps through Control.PointToScreen, respecting an MDI document's visible host and native screen scale. ListBox has opt-in cumulative prefix selection (1.2-second idle reset, mouse/focus/navigation reset). Chummer enables it for all lists so successive m/a/g keys search for mag instead of separate initials.
+
+AutoSize Label changes invalidate the parent background when resizing, clearing pixels outside the new bounds when a displayed value gets shorter (cyberware Capacity/Cost).

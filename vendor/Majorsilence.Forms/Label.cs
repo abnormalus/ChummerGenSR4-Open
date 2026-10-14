@@ -147,8 +147,13 @@ namespace Majorsilence.Forms
 
             var preferred = GetPreferredSize (Size.Empty);
 
-            if (preferred != Size && preferred.Width > 0 && preferred.Height > 0)
+            if (preferred != Size && preferred.Width > 0 && preferred.Height > 0) {
                 Size = preferred;
+                // Repaint the parent's background as well as the new text bounds.
+                // A shorter value otherwise leaves the old trailing pixels outside
+                // the resized label (for example Capacity 12 -> 8 or a lower cost).
+                Parent?.Invalidate ();
+            }
         }
 
         /// <inheritdoc/>
