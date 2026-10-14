@@ -51,9 +51,9 @@ def archive(repo, incoming):
             return
         existing = next((r for r in releases if r["tag_name"] == tag), None)
         notes = Path(temporary) / "notes.md"
-        notes.write_text("Archived Nightly downloads, preserved before replacement.\n\n" + (nightly.get("body") or ""))
+        notes.write_text("Archived Nightly downloads, preserved before replacement.\n\nOriginal build source: `" + ref["sha"] + "`. The archive tag identifies the publishing revision; use BUILD.txt and the original release notes for the archived application source.\n\n" + (nightly.get("body") or ""))
         if existing is None:
-            gh("release", "create", tag, "--repo", repo, "--target", ref["sha"], "--draft", "--prerelease", "--title", "Archive — " + stamp, "--notes-file", str(notes))
+            gh("release", "create", tag, "--repo", repo, "--target", os.environ.get("SOURCE_SHA") or api(repo, "git/ref/heads/master")["object"]["sha"], "--draft", "--prerelease", "--title", "Archive — " + stamp, "--notes-file", str(notes))
             uploaded = set()
         else:
             uploaded = {a["name"] for a in existing["assets"]}

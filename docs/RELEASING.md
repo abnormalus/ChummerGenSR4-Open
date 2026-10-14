@@ -28,6 +28,8 @@ Mac builds are ad-hoc signed development previews, not Apple-notarized releases.
 
 ## Archived builds
 
-Before replacing Nightly, the publisher downloads every old asset, creates a separate **Archive — timestamp** prerelease tied to its original source commit, and downloads that archive again to verify all SHA-256 hashes. If archiving fails, publication stops before replacing Nightly. Archive tags are immutable, and retries reuse the same archive instead of duplicating it. Identical republishing does not create another archive.
+Before replacing Nightly, the publisher downloads every old asset, creates a separate **Archive — timestamp** prerelease retaining the original source commit in its notes and BUILD.txt, and downloads that archive again to verify all SHA-256 hashes. If archiving fails, publication stops before replacing Nightly. Archive tags are immutable, and retries reuse the same archive instead of duplicating it. Identical republishing does not create another archive.
 
 The Nightly Assets section contains only the current packages and metadata. Older or legacy filenames are removed from Nightly only after successful archival and upload of the replacement. Find older downloads under **Releases**, in releases titled **Archive — timestamp**. GitHub releases have no custom archive category; separate archive releases provide that organization.
+
+Archive tags identify the publishing revision, which allows creation using the workflow token without broader workflow-edit permissions. The archived app’s actual source revision remains in BUILD.txt and the archive notes.
