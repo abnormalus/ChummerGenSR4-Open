@@ -17,9 +17,15 @@ namespace Majorsilence.Forms
             CommandShortcutsEnabled = true;
             var root = new NativeMenu();
             string Caption(string text) => (text ?? "").Replace("&&", "\u0001").Replace("&", "").Replace("\u0001", "&");
+            // A native menu can outlive a modal transition or queue a click before it.
+            // Respect the actual host window state as well as the logical item state.
+            // Quit remains available so the application can cancel and unwind owned work.
+            bool CanExecute(MenuItem item) => item.Enabled && item.Visible &&
+                (ReferenceEquals(item, quit) || window.IsEnabled);
+            Action refreshApplicationCommands = () => { };
             NativeMenuItem Entry(MenuItem item)
             {
-                var entry = new NativeMenuItem { Header = Caption(item.Text), IsEnabled = item.Enabled, IsVisible = item.Visible };
+                var entry = new NativeMenuItem { Header = Caption(item.Text), IsEnabled = CanExecute(item), IsVisible = item.Visible };
                 if (item is ToolStripMenuItem shortcut && shortcut.ShortcutKeys != Keys.None)
                 {
                     int key = (int)(shortcut.ShortcutKeys & Keys.KeyCode);
@@ -38,7 +44,7 @@ namespace Majorsilence.Forms
                     entry.Menu.NeedsUpdate += (_, _) => { item.PopulateMdiWindowList(); Fill(entry.Menu, item.Items); };
                 }
                 else entry.Click += (_, _) => {
-                    item.PerformClick();
+                    if (CanExecute(item)) item.PerformClick();
                 };
                 if (item.Checked) { entry.ToggleType = MenuItemToggleType.CheckBox; entry.IsChecked = true; }
                 return entry;
@@ -61,7 +67,8 @@ namespace Majorsilence.Forms
                 var systemItems = app.Items.Skip(1).Where(item => item is not NativeMenuItem command ||
                     (command.Gesture?.Key != Key.Q && command.Gesture?.Key != Key.OemComma && command.Header != "Quit")).ToArray();
                 app.Items.Clear();
-                app.Items.Add(Entry(about));
+                var aboutEntry = Entry(about);
+                app.Items.Add(aboutEntry);
                 app.Items.Add(new NativeMenuItemSeparator());
                 var settings = Entry(preferences); settings.Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Meta);
                 app.Items.Add(settings);
@@ -71,6 +78,14 @@ namespace Majorsilence.Forms
                 }
                 if (app.Items.LastOrDefault() is not NativeMenuItemSeparator) app.Items.Add(new NativeMenuItemSeparator());
                 var exit = Entry(quit); exit.Gesture = new KeyGesture(Key.Q, KeyModifiers.Meta); app.Items.Add(exit);
+                refreshApplicationCommands = () => {
+                    aboutEntry.IsEnabled = CanExecute(about);
+                    settings.IsEnabled = CanExecute(preferences);
+                    exit.IsEnabled = CanExecute(quit);
+                };
+                EventHandler<EventArgs> updateApplicationCommands = (_, _) => refreshApplicationCommands();
+                app.NeedsUpdate += updateApplicationCommands;
+                form.FormClosed += (_, _) => app.NeedsUpdate -= updateApplicationCommands;
                 if (NativeMenu.GetMenu(application) == null) NativeMenu.SetMenu(application, app);
             }
             void Refresh()
@@ -85,6 +100,12 @@ namespace Majorsilence.Forms
             }
             Refresh();
             root.NeedsUpdate += (_, _) => Refresh();
+            window.PropertyChanged += (_, change) => {
+                if (change.Property == Avalonia.Input.InputElement.IsEnabledProperty) {
+                    Refresh();
+                    refreshApplicationCommands();
+                }
+            };
             NativeMenu.SetMenu(window, root);
             source.Visible = false;
             // Keep the source command tree for MDI merging and shortcut behavior, without drawing Windows chrome.

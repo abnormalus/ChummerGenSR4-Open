@@ -13,7 +13,7 @@ identity = load("write-build-revision")
 
 class Safeguards(unittest.TestCase):
     def test_obsolete_and_unsupported_calls_fail(self):
-        for code in ("new WebClient();", "new RNGCryptoServiceProvider();", "new BinaryFormatter();", "new PrintDialog();", "refresh.BeginInvoke(null, null);", "Application.DoEvents();"):
+        for code in ("new WebClient();", "new RNGCryptoServiceProvider();", "new BinaryFormatter();", "new PrintDialog();", "new PageSetupDialog();", "browser.InvokeScript(\"test\");", "refresh.BeginInvoke(null, null);", "Application.DoEvents();"):
             with self.subTest(code=code): self.assertTrue(source.source_errors("Chummer.Mac/code/test.cs", code))
     def test_dispatcher_and_documented_comments_stay_valid(self):
         self.assertFalse(source.source_errors("Chummer.Mac/code/test.cs", 'owner.BeginInvoke(new Action(Update)); // new WebClient();\nvar text = "new BinaryFormatter()";'))

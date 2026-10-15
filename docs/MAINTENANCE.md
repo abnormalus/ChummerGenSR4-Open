@@ -15,7 +15,7 @@ The shared desktop application currently lives in Chummer.Mac. It can be publish
 
 ## Diagnostics
 
-Help → Open Diagnostic Logs opens the local log folder. On Mac it is under Library/Application Support/ChummerGenSR4Mac/logs. Logs contain UTC time, command ID, assembly version, unique compiled-module build ID, OS/runtime/architecture, exception types/HRESULTs, and method stacks without source-file paths. Exception messages, character XML, aliases, and character filenames are omitted. No logs are uploaded automatically.
+Help → Open Diagnostic Logs opens the local log folder. On Mac it is under Library/Application Support/ChummerGenSR4Mac/logs. Logs contain UTC time, command ID, assembly version, unique compiled-module build ID, OS/runtime/architecture, exception types/HRESULTs, and method stacks without source-file paths. The specific numeric Avalonia render-timer registration error is recorded when present; arbitrary exception messages, character XML, aliases, and character filenames are omitted. No logs are uploaded automatically.
 
 The active diagnostics.jsonl file rotates at approximately 2 MiB with three retained archives. Disk/permission failures in logging never block app operations. Caught file failures and main-loop failures are recorded; native menu setup failures retain the ordinary menu as a fallback. Diagnostic coverage is intentionally incremental: additional caught errors should explicitly call AppDiagnostics.Record with a fixed category.
 
@@ -70,3 +70,5 @@ Cross-publish the shared project with `dotnet publish Chummer.Mac/Chummer.Mac.cs
 The MSI embeds the full publish output, installs per user into `%LOCALAPPDATA%\Programs\ChummerSR4`, registers a Start menu shortcut and dragon icon, and supports standard Windows uninstall. HKCU component key paths avoid per-user MSI repair ambiguity. .NET is bundled; WebView2 remains a Windows prerequisite for the PDF reader. Character files and the separate roaming user settings directory are outside the install tree. Verify the MSI's x64 summary, shortcut and upgrade tables, then extract its cabinet and compare every file hash to the publish output. Native Windows install/launch/upgrade/uninstall and PDF behavior require a Windows test machine.
 
 Windows executables must embed `packaging/windows/app.manifest` via `ApplicationManifest`. The explicit Windows 10/11 compatibility declaration permits the layered child windows used by Avalonia's native PDF browser host; an unmanifested build can fail in `Win32NativeControlHost.DumbWindow` before the PDF loads. Keep standard-user (`asInvoker`) privileges and per-monitor DPI awareness. Check the published PE's RT_MANIFEST resource, not just the source XML, when diagnosing this failure.
+
+Compatibility capabilities and remaining interaction checks are recorded in `COMPATIBILITY_CONTROLS.md`. Bundled reader integrity and update procedures are in `PDFJS_MAINTENANCE.md`.

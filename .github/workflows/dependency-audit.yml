@@ -16,6 +16,8 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
       - run: python scripts/audit-dependencies.py artifacts/dependency-audit
+      - name: Check bundled PDF.js integrity and upstream metadata
+        run: python scripts/check-pdfjs.py --upstream
       - uses: actions/upload-artifact@v7
         if: always()
         with:

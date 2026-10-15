@@ -44,3 +44,5 @@ AutoSize Label changes invalidate the parent background when resizing, clearing 
 MenuItem routes command-handler exceptions through the existing Application.ThreadException boundary when subscribed, including native menu commands; consumers without a handler retain exception propagation.
 
 Application.Exit closes only still-open forms after one successful FormClosing approval pass, without raising closing handlers twice. It does not cancel the loop if a form remains open.
+
+DesktopMenus checks actual Avalonia host enablement when projecting and executing native commands. Modal owner disabling previously did not flow through MenuItem.Enabled; queued native clicks could still invoke the source command. About/Preferences and document commands disable during modal work and recover afterward; Quit stays available to cancel owned operations. NativeControlChecks drives the real exporter click bridge, including stale selections, on both desktop CI platforms.

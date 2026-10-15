@@ -64,6 +64,12 @@ namespace Chummer
                 LanguageManager.Instance.Load("en-us", null);
                 Check(LanguageManager.Instance.Loaded, "English language loaded");
                 ReleaseUpdateChecks.Run();
+                Check(AppDiagnostics.NativeRenderTimerCode(new InvalidOperationException(
+                    "Avalonia.Native was not able to start the RenderTimer. Native error code is: -666")) == -666 &&
+                    AppDiagnostics.NativeRenderTimerCode(new IOException("private-character-name")) == null &&
+                    AppDiagnostics.NativeRenderTimerCode(new InvalidOperationException(
+                    "Avalonia.Native was not able to start the RenderTimer. Native error code is: /private/character.chum")) == null,
+                    "startup diagnostics extract only the known native rendering error number");
                 AppDiagnostics.Action("diagnostics.privacy-test");
                 AppDiagnostics.Record("simulated-error", new System.IO.IOException("private-character-name /private/character.chum"));
                 string diagnosticText = File.ReadAllText(AppDiagnostics.LogPath);

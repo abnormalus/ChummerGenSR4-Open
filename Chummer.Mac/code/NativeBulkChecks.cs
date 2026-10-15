@@ -43,6 +43,7 @@ internal static class NativeBulkChecks
         try
         {
             Check(SynchronizationContext.Current != null, "Native UI synchronization context is installed");
+            await NativeControlChecks.RunAsync(Check);
             byte[] originalFile = File.ReadAllBytes(path);
             var character = new Character { FileName = path };
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");

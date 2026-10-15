@@ -21,8 +21,8 @@ This is an incremental maintenance policy, not a guarantee that all legacy techn
 
 | Priority | Work | Why it remains |
 |---|---|---|
-| High | Inventory compatibility-layer capabilities used by each screen and add real platform interaction tests. | Successful compilation cannot detect every no-op method. Examples still present include `PrintDialog` (no real dialog), portions of `WebBrowser` such as synchronous script invocation, and legacy toolbar merging. Character output uses the real native browser printing path instead. |
-| High | Establish an explicit PDF.js vendoring/update check. | Bundled `pdfjs-dist` 6.4.299 is recorded in `Chummer.Mac/pdfjs/VERSION.txt`, with source, integrity and license. NuGet auditing and Dependabot do not automatically replace these bundled files. Updates need reader/security review and sourcebook navigation tests. |
+| High | Inventory compatibility-layer capabilities used by each screen and add real platform interaction tests. | Successful compilation cannot detect every no-op method. The first audit records reachable capabilities in `COMPATIBILITY_CONTROLS.md`; native menu modal protection is now tested. `PrintDialog`, `PageSetupDialog`, and synchronous browser scripting are unused stubs guarded against new application calls. Toolbar merging is implemented; screen-switch regression coverage remains useful. |
+| High | Review PDF.js updates when the upstream check reports them. | File hashes now gate Mac/Windows builds. Dependency health also verifies official package metadata and detects a newer release; updates remain deliberate, with reader/security review and native navigation tests. See `PDFJS_MAINTENANCE.md`. |
 | Medium | Separate rules, file serialization and UI; gradually replace compatibility screens with direct Avalonia controls. | Large `frmCreate`/`frmCareer` classes still mix calculations and interface state. Keep 4e stable; no 3e/5e implementation or language rewrite is part of this work. |
 | Medium | Expand nullable reference checking into existing rules/data code. | The legacy application has nullable analysis disabled. New update service/tests enable it locally. Enabling it globally without a staged cleanup would create noise rather than reliable fixes. |
 | Medium | Replace developer-only `frmTest` validation with headless checks; audit synchronous dialogs and mutable global caches. | The current fixture suite proves round-trip compatibility, not every rules calculation or interaction. Async event handlers are valid at UI boundaries, but underlying operations should return Tasks and handle cancellation. |
@@ -56,3 +56,7 @@ Useful primary references:
 - https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages
 - https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
 - https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core
+
+## October 15 follow-up
+
+Native menus now recheck actual window enablement at invocation, including queued clicks, while keeping Quit available for cancellation. Native Mac/Windows CI exercises modal disable/re-enable, stale clicks, preferences and Quit. A local native startup previously failed in Avalonia render-timer registration; a later local run passed. Diagnostics now record the specific upstream numeric rendering code without arbitrary exception messages. No rendering fallback or dependency upgrade was guessed from this intermittent evidence.

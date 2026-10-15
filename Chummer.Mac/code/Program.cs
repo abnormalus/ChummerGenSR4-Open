@@ -38,7 +38,9 @@ namespace Chummer
                 LanguageManager.Instance.Load(GlobalOptions.Instance.Language, null);
                 if (LanguageManager.Instance.Loaded)
                 {
+                    AppDiagnostics.Record("desktop-window-initializing");
                     using var main = new frmMain();
+                    AppDiagnostics.Record("desktop-window-initialized");
                     using var watchdog = AppDiagnostics.StartWatchdog();
                     if (args.Length >= 3 && args[0] == "--check-bulk")
                     {

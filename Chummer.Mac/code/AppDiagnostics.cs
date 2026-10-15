@@ -81,6 +81,7 @@ namespace Chummer
                     }
                     var exceptions = error == null ? null : Flatten(error).Select(item => new {
                         type = item.GetType().FullName, code = item.HResult,
+                        nativeRenderTimerCode = NativeRenderTimerCode(item),
                         stack = new StackTrace(item, false).ToString()
                     }).ToArray();
                     File.AppendAllText(LogPath, JsonSerializer.Serialize(new {
@@ -97,6 +98,16 @@ namespace Chummer
             }
             catch (Exception) { /* Logging must never prevent launching, saving, or closing. */ }
         }
+        // Capture only this known upstream numeric diagnostic, never arbitrary exception messages.
+        internal static int? NativeRenderTimerCode(Exception error)
+        {
+            const string prefix = "Avalonia.Native was not able to start the RenderTimer. Native error code is: ";
+            if (error is InvalidOperationException && error.Message.StartsWith(prefix, StringComparison.Ordinal) &&
+                int.TryParse(error.Message.Substring(prefix.Length), System.Globalization.NumberStyles.AllowLeadingSign,
+                    System.Globalization.CultureInfo.InvariantCulture, out int code)) return code;
+            return null;
+        }
+
         private static System.Collections.Generic.IEnumerable<Exception> Flatten(Exception error)
         {
             yield return error;

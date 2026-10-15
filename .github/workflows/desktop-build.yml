@@ -24,6 +24,10 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Verify release archival safeguards
         run: python scripts/tests/test_archive_nightly.py
+      - name: Verify reviewed PDF.js bundle
+        run: python scripts/check-pdfjs.py
+      - name: Test PDF.js safeguards
+        run: python scripts/tests/test_pdfjs.py
       - name: Check modernization safeguards
         run: python scripts/check-modernization.py
       - name: Test modernization safeguards
@@ -49,7 +53,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Native bulk-operation checks failed: $($process.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'Native bulk-operation report is missing.' }
           $result = Get-Content $report -Raw | ConvertFrom-Json
-          if (-not $result.passed -or $result.checks.Count -lt 12) { throw 'Native bulk-operation checks did not complete.' }
+          if (-not $result.passed -or $result.checks.Count -lt 18) { throw 'Native bulk-operation checks did not complete.' }
       - name: Ensure native Windows browser runtime
         if: runner.os == 'Windows'
         shell: pwsh

@@ -14,6 +14,8 @@ PATTERNS = {
     "unsafe object deserialization": r"\bnew\s+(?:System\.Runtime\.Serialization\.Formatters\.Binary\.)?BinaryFormatter\b",
     "unsupported delegate async invocation": r"\.BeginInvoke\s*\(\s*null\s*,\s*null\s*\)",
     "unsupported print dialog": r"\bnew\s+(?:Majorsilence\.Forms\.)?PrintDialog\s*\(",
+    "unsupported page setup dialog": r"\bnew\s+(?:Majorsilence\.Forms\.)?PageSetupDialog\s*\(",
+    "unsupported synchronous browser scripting": r"\.\s*InvokeScript\s*\(",
     "manual message pumping": r"\bApplication\s*\.\s*DoEvents\s*\(",
 }
 # Retained to recover image byte arrays from legacy resources without deserializing objects.
