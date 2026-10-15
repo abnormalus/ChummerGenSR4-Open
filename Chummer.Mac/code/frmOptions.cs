@@ -23,6 +23,7 @@ namespace Chummer
         private Button cmdPdfAutoMatch;
         private TextBox txtPdfMatchReport;
         private bool pdfMatching;
+        private ComboBox cboSourceSet;
 
 		#region Form Events
 		public frmOptions()
@@ -684,14 +685,67 @@ namespace Chummer
                 if (treSourcebook.SelectedNode != null) treSourcebook_AfterSelect(this, null);
                 AppDiagnostics.Record("pdf.clear-links");
             };
-            sources.Controls.Add(new Label { Left = 8, Top = 140, Width = 490, Height = 76, Text = L("PdfCollection_Help") });
+            sources.Controls.Add(new Label { Left = 8, Top = 200, Width = 490, Height = 76, Text = L("PdfCollection_Help") });
             var controls = new Control[] { lblPDFLocation, txtPDFLocation, cmdPDFLocation, lblPDFOffset, nudPDFOffset, cmdPDFTest };
-            foreach (var control in controls) { tabGlobal.Controls.Remove(control); sources.Controls.Add(control); control.Top -= 101; }
-            txtPdfMatchReport = new TextBox { Name = "txtPdfMatchReport", Left = 8, Top = 312, Width = 490, Height = 188,
+            foreach (var control in controls) { tabGlobal.Controls.Remove(control); sources.Controls.Add(control); control.Top -= 41; }
+            txtPdfMatchReport = new TextBox { Name = "txtPdfMatchReport", Left = 8, Top = 372, Width = 490, Height = 128,
                 Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
             sources.Controls.Add(txtPdfMatchReport);
+            sources.Controls.Add(new Label { Left = 8, Top = 140, Width = 490, Height = 20, Text = L("SourceSets_Label") });
+            cboSourceSet = new ComboBox { Name = "cboSourceSet", Left = 8, Top = 164, Width = 280,
+                DropDownStyle = ComboBoxStyle.DropDown, KeepInputFocusOnDropDown = true };
+            sources.Controls.Add(cboSourceSet);
+            var saveSet = new Button { Name = "cmdSourceSetSave", Left = 294, Top = 162, Width = 100, Text = L("SourceSets_Save") };
+            var loadSet = new Button { Name = "cmdSourceSetLoad", Left = 400, Top = 162, Width = 100, Text = L("SourceSets_Load") };
+            sources.Controls.Add(saveSet);
+            sources.Controls.Add(loadSet);
+            try { RefreshSourceSets(); }
+            catch (Exception error) { SourceSetFailure(error); }
+            saveSet.Click += (_, _) => {
+                if (pdfMatching) return;
+                try
+                {
+                    string name = cboSourceSet.Text.Trim();
+                    if (SourceSets.UserLibrary.Read().ContainsKey(name) && MessageBox.Show(L("SourceSets_Overwrite"),
+                        L("SourceSets_Label"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                    SourceSets.UserLibrary.Save(name, treSourcebook.Nodes.Cast<TreeNode>().Where(n => n.Checked).Select(n => n.Tag.ToString()));
+                    RefreshSourceSets();
+                    cboSourceSet.Text = name;
+                    txtPdfMatchReport.Text = L("SourceSets_Saved");
+                }
+                catch (Exception error) { SourceSetFailure(error); }
+            };
+            loadSet.Click += (_, _) => {
+                if (pdfMatching) return;
+                try
+                {
+                    if (!SourceSets.UserLibrary.Read().TryGetValue(cboSourceSet.Text.Trim(), out var books))
+                    { txtPdfMatchReport.Text = L("SourceSets_NotFound"); return; }
+                    var selected = new HashSet<string>(books, StringComparer.Ordinal);
+                    foreach (TreeNode node in treSourcebook.Nodes)
+                        if (node.Tag.ToString() != "SR4") node.Checked = selected.Contains(node.Tag.ToString());
+                    var known = treSourcebook.Nodes.Cast<TreeNode>().Select(n => n.Tag.ToString()).ToHashSet(StringComparer.Ordinal);
+                    var missing = books.Where(b => !known.Contains(b)).ToArray();
+                    txtPdfMatchReport.Text = L("SourceSets_Loaded") + (missing.Length == 0 ? "" : "\r\n" + L("SourceSets_Missing") + " " + string.Join(", ", missing));
+                }
+                catch (Exception error) { SourceSetFailure(error); }
+            };
             txtPDFLocation.Width = 300;
             cmdPDFLocation.Left = txtPDFLocation.Right + 6;
+        }
+
+        private void RefreshSourceSets()
+        {
+            string name = cboSourceSet.Text;
+            cboSourceSet.Items.Clear();
+            cboSourceSet.Items.AddRange(SourceSets.UserLibrary.Read().Keys.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).Cast<object>().ToArray());
+            cboSourceSet.Text = name;
+        }
+
+        private void SourceSetFailure(Exception error)
+        {
+            AppDiagnostics.Record("sources.set-failed", error);
+            txtPdfMatchReport.Text = LanguageManager.Instance.GetString("SourceSets_Failed");
         }
 
         private async Task AutoMatchPdfs()

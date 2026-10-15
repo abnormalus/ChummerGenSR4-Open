@@ -6731,5 +6731,14 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>GearStack_Failed</key><text>The stack could not be created. The previous quantity was kept.</text></string>
 <string><key>InventoryUndo_Command</key><text>Undo inventory change</text></string>
 <string><key>InventoryUndo_Failed</key><text>The inventory change could not be undone. The current inventory was kept.</text></string>
+<string><key>SourceSets_Label</key><text>Named source sets — type a name to save the checked books</text></string>
+<string><key>SourceSets_Save</key><text>Save set</text></string>
+<string><key>SourceSets_Load</key><text>Load set</text></string>
+<string><key>SourceSets_Overwrite</key><text>Replace the existing source set with the currently checked books?</text></string>
+<string><key>SourceSets_Saved</key><text>Source set saved. Sets are available across preferences profiles and application upgrades.</text></string>
+<string><key>SourceSets_Loaded</key><text>Source set loaded. Save preferences to apply these book selections. PDF links and offsets are unchanged.</text></string>
+<string><key>SourceSets_Missing</key><text>Unavailable book codes skipped:</text></string>
+<string><key>SourceSets_NotFound</key><text>Choose a saved source set to load.</text></string>
+<string><key>SourceSets_Failed</key><text>The source set could not be saved or loaded. Use a name of 1–100 characters. Check the diagnostics log if the problem continues; existing sets are kept.</text></string>
 </strings>
 </chummer>

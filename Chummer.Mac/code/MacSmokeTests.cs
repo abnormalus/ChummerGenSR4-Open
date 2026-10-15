@@ -194,6 +194,47 @@ namespace Chummer
                 File.WriteAllText(Path.Combine(collectionRoot, "nested", "Unwired.PDF"), "test");
                 File.WriteAllText(Path.Combine(collectionRoot, "ignore.txt"), "test");
                 Check(PdfCollectionMatcher.Scan(collectionRoot).Length == 1, "PDF collection scanning includes subfolders and uppercase PDF extensions only");
+                var sourceSetPath = Path.Combine(output, "source-sets-test.json");
+                if (File.Exists(sourceSetPath)) File.Delete(sourceSetPath);
+                var sourceSets = new SourceSets(sourceSetPath);
+                sourceSets.Save(" Campaign / 夜 ", new[] { "UW", "UW", "", "UNKNOWN" });
+                Check(new SourceSets(sourceSetPath).Read()["campaign / 夜"].SequenceEqual(new[] { "SR4", "UNKNOWN", "UW" }),
+                    "source sets persist Unicode names and normalized codes without using names as paths");
+                sourceSets.Save("CAMPAIGN / 夜", new[] { "AR" });
+                Check(sourceSets.Read().Count == 1 && sourceSets.Read()["Campaign / 夜"].SequenceEqual(new[] { "AR", "SR4" }),
+                    "source set replacement is case insensitive and keeps the core rulebook");
+                bool rejectedSourceSet = false;
+                try { sourceSets.Save("  ", new[] { "UW" }); } catch (ArgumentException) { rejectedSourceSet = true; }
+                Check(rejectedSourceSet && sourceSets.Read().Count == 1, "invalid source set names do not change existing sets");
+                File.WriteAllText(sourceSetPath, "invalid");
+                bool preservedSourceSet = false;
+                try { sourceSets.Save("New", new[] { "UW" }); } catch (System.Text.Json.JsonException) { preservedSourceSet = true; }
+                Check(preservedSourceSet && File.ReadAllText(sourceSetPath) == "invalid", "unreadable source libraries are preserved rather than overwritten");
+                SourceSets.UserLibrary.Save("UI test", new[] { "AR", "UNKNOWN" });
+                using (var sourceOptions = new frmOptions())
+                {
+                    sourceOptions.Show();
+                    var tabs = Field<TabControl>(sourceOptions, "tabControl2");
+                    var sourcesTab = tabs.TabPages.Cast<TabPage>().Single(t => t.Name == "tabSources");
+                    tabs.SelectedTab = sourcesTab;
+                    var tree = Field<TreeView>(sourceOptions, "treSourcebook");
+                    var combo = Field<ComboBox>(sourceOptions, "cboSourceSet");
+                    combo.Text = "UI test";
+                    var linkSnapshot = GlobalOptions.Instance.SourcebookInfo.Select(b => (b.Code, b.Path, b.Offset)).ToArray();
+                    ((Button)sourcesTab.Controls.Cast<Control>().Single(c => c.Name == "cmdSourceSetLoad")).PerformClick();
+                    Check(tree.Nodes.Cast<TreeNode>().All(n => n.Checked == (n.Tag.ToString() == "AR" || n.Tag.ToString() == "SR4")),
+                        "loading a source set replaces source selections and retains the required core book");
+                    Check(GlobalOptions.Instance.SourcebookInfo.Select(b => (b.Code, b.Path, b.Offset)).SequenceEqual(linkSnapshot) &&
+                        Field<TextBox>(sourceOptions, "txtPdfMatchReport").Text.Contains("UNKNOWN"),
+                        "source set loading reports unavailable codes and preserves PDF associations and offsets");
+                    Check(tree.Nodes.Cast<TreeNode>().Single(n => n.Tag.ToString() == "AR").Checked,
+                        "loading a named set enables an available supplementary book");
+                    combo.Text = "Saved from UI " + Guid.NewGuid().ToString("N");
+                    ((Button)sourcesTab.Controls.Cast<Control>().Single(c => c.Name == "cmdSourceSetSave")).PerformClick();
+                    Check(SourceSets.UserLibrary.Read()[combo.Text].SequenceEqual(new[] { "AR", "SR4" }),
+                        "saving through Sources records only selected book codes");
+                    File.WriteAllBytes(Path.Combine(output, "source-sets.png"), HeadlessRenderer.CapturePng(sourceOptions, 1200, 1000));
+                }
                 string localPdf = Path.Combine(output, "reader-test.pdf");
                 File.WriteAllText(localPdf, "%PDF-1.4\nlocal test data");
                 Uri stoppedPdfServer;
