@@ -118,7 +118,8 @@ internal sealed class FoundryActorExporter
             var raw = Snapshot(power.Save);
             var item = Add(power, raw, raw, "Power", power.DisplayNameShort);
             var system = (JsonObject)item["system"]!;
-            system["rating"] = Math.Max(1, power.Rating); system["cost"] = power.PointsPerLevel;
+            system["rating"] = (int)Math.Max(1, decimal.Truncate(power.Rating)); system["cost"] = power.PointsPerLevel;
+            if (power.Rating != decimal.Truncate(power.Rating)) Note(item, "Original fractional power rating " + power.Rating.ToString(CultureInfo.InvariantCulture) + " is retained in metadata; Foundry requires a whole-number rating, so its rating/cost must be adjusted manually.");
             system["ratingMode"] = power.LevelsEnabled ? "rated" : "none";
             Note(item, "Power rules and conditional bonuses are not automated. Current attribute/skill bonuses are included in the exported totals; do not add them again.");
         }
@@ -220,7 +221,8 @@ internal sealed class FoundryActorExporter
         string category = skill.SkillCategory.Replace(" Active", "", StringComparison.Ordinal).ToLowerInvariant();
         var system = (JsonObject)item["system"]!;
         system["attribute"] = Attributes.GetValueOrDefault(skill.Attribute, "LOGIC");
-        system["category"] = category == "magical" ? "magic" : category == "interest" ? "hobby" : category;
+        system["category"] = category switch { "magical" => "magic", "interest" => "hobby", "professional" => "academic",
+            "combat" or "physical" or "social" or "technical" or "vehicle" or "matrix" or "magic" or "resonance" or "academic" or "hobby" or "street" or "language" => category, _ => "misc" };
         system["type"] = skill.KnowledgeSkill ? "knowledge" : "active"; system["group"] = skill.SkillGroup;
         system["specialization"] = skill.Specialization; system["label"] = skill.KnowledgeSkill || skill.ExoticSkill ? "" : "sr4.skills." + SkillKey(skill.Name);
         int rating = Integer(Text(printed, "rating"));

@@ -1186,6 +1186,7 @@ namespace Chummer
                         foreach (var target in new[] { FoundryActorExporter.Target.Version16, FoundryActorExporter.Target.Version126 })
                         {
                             var actor = FoundryActorExporter.Export(copy, target);
+                            FoundryExportChecks.ValidateContract(actor);
                             if (actor["type"]?.GetValue<string>() != "character" || actor["items"] is not System.Text.Json.Nodes.JsonArray)
                                 throw new InvalidOperationException("Foundry fixture export failed: " + file);
                         }

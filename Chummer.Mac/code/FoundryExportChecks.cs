@@ -10,6 +10,57 @@ namespace Chummer;
 
 internal static class FoundryExportChecks
 {
+    // Independent constraints from the two upstream data models, not a serialization round-trip test.
+    // Missing optional fields are filled by Foundry; fields we emit must satisfy their actual types.
+    internal static void ValidateContract(JsonObject actor)
+    {
+        void Require(bool condition, string field) { if (!condition) throw new InvalidDataException("Foundry contract mismatch: " + field); }
+        void Number(JsonNode? value, string field, bool integer = true)
+        {
+            Require(value != null && value.GetValueKind() == System.Text.Json.JsonValueKind.Number &&
+                decimal.TryParse(value.ToJsonString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var n) &&
+                (!integer || n == decimal.Truncate(n)), field);
+        }
+        Require(actor["type"]?.GetValue<string>() == "character" && !string.IsNullOrWhiteSpace(actor["name"]?.GetValue<string>()), "actor identity");
+        var stats = actor["system"]!["sheetStats"]!.AsObject();
+        foreach (var pair in stats) Number(pair.Value, "sheetStats." + pair.Key, pair.Key != "ESSENCE");
+        foreach (var pair in actor["system"]!["metaData"]!.AsObject()) Number(pair.Value, "metaData." + pair.Key);
+        var items = actor["items"]!.AsArray().OfType<JsonObject>().ToArray();
+        var ids = items.Select(i => i["_id"]!.GetValue<string>()).ToArray();
+        Require(ids.Distinct().Count() == items.Length && ids.All(id => System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9]{16}$")), "item IDs");
+        var byId = items.ToDictionary(i => i["_id"]!.GetValue<string>());
+        var itemTypes = new HashSet<string>(new[] { "Ranged Weapon", "Melee Weapon", "Implant", "Item", "Gear", "Armor", "Skill", "Spell", "Commlink", "Program", "Quality", "Fetish", "Focus", "Action", "Power", "Vehicle", "Autosoft", "Ammo", "Weapon Mod", "Armor Mod", "Vehicle Mod" });
+        var integers = new HashSet<string>(new[] { "cost", "avail", "quantity", "ballisticarmor", "impactarmor", "ballisticBonus", "impactBonus", "damage", "ap", "rc", "maxAmmo", "currentAmmo", "reach", "dv", "bp", "damageBonus", "apBonus", "rcBonus", "response", "signal", "firewall", "os" });
+        foreach (var item in items)
+        {
+            string type = item["type"]!.GetValue<string>(); Require(itemTypes.Contains(type), "item type " + type);
+            var system = item["system"]!.AsObject();
+            foreach (var pair in system) {
+                if (integers.Contains(pair.Key)) Number(pair.Value, type + "." + pair.Key, type != "Power" || pair.Key != "cost");
+                if (pair.Key == "rating") Number(pair.Value, type + ".rating", type is "Skill" or "Power");
+            }
+            if (type == "Power") Require(system["rating"]!.GetValue<int>() >= 1, "Power rating minimum");
+            if (system["installedModIds"] is JsonArray links) {
+                foreach (var link in links) {
+                    string id = link!.GetValue<string>();
+                    Require(byId.ContainsKey(id), "attachment reference");
+                    Require(byId[id]["type"]!.GetValue<string>() == (type == "Armor" ? "Armor Mod" : "Weapon Mod"), "attachment type");
+                }
+            }
+            string? parent = item["flags"]?["shadowrun4e"]?["chummerExport"]?["parentId"]?.GetValue<string>();
+            Require(parent == null || byId.ContainsKey(parent), "container parent reference");
+            foreach (var effect in item["effects"]!.AsArray()) {
+                Require(effect!["transfer"]!.GetValue<bool>(), "implant effect transfer");
+                foreach (var change in effect["changes"]!.AsArray()) {
+                    Require(change!["type"]!.GetValue<string>() == "add" && int.TryParse(change["value"]!.GetValue<string>(), out _), "effect change type/value");
+                    string key = change["key"]!.GetValue<string>();
+                    Require(FoundryActorExporter.Attributes.Values.Any(attribute => key == "system.sheetStats." + attribute) ||
+                        System.Text.RegularExpressions.Regex.IsMatch(key, "^system[.]modifiers[.]initiative[.](bonuses|passes)[.](physical|astral|matrix)$"), "effect target");
+                }
+            }
+        }
+    }
+
     internal static void Run(string output, Action<bool, string> check)
     {
         var character = new Character { FileName = Path.Combine(output, "career.chum") };
@@ -34,6 +85,7 @@ internal static class FoundryExportChecks
         int reaction = character.REA.TotalValue;
         int passes = FoundryActorExporter.Effective(character.InitiativePasses);
         var actor = FoundryActorExporter.Export(character);
+        ValidateContract(actor);
         JsonObject Find(JsonObject root, string name) => root["items"]!.AsArray().OfType<JsonObject>().Single(i => i["name"]!.GetValue<string>().StartsWith(name, StringComparison.Ordinal));
         var wiredItem = Find(actor, "Wired Reflexes");
         var effects = wiredItem["effects"]!.AsArray();
@@ -103,7 +155,16 @@ internal static class FoundryExportChecks
         var attachment = new WeaponAccessory(character);
         attachment.Create(weaponXml.SelectSingleNode("/chummer/accessories/accessory[name='Smartgun System, Internal']"), new TreeNode(), "Internal");
         attachment.Parent = weapon; weapon.WeaponAccessories.Add(attachment);
+        var fractionalPower = new Power(character) { Name = "Contract fractional power", Rating = 1.5m, PointsPerLevel = .25m, LevelsEnabled = true };
+        character.Powers.Add(fractionalPower);
+        character.Skills.Add(new Skill(character) { Name = "Contract professional knowledge", Attribute = "LOG", KnowledgeSkill = true, SkillCategory = "Professional", Rating = 2 });
         var nested = FoundryActorExporter.Export(character, FoundryActorExporter.Target.Version126);
+        ValidateContract(nested);
+        var powerRecord = Find(nested, "Contract fractional power");
+        check(powerRecord["system"]!["rating"]!.GetValue<int>() == 1 && powerRecord["system"]!["notes"]!.GetValue<string>().Contains("1.5"),
+            "fractional power ratings meet Foundry's integer contract and retain explicit manual notes");
+        check(Find(nested, "Contract professional knowledge")["system"]!["category"]!.GetValue<string>() == "academic",
+            "professional knowledge uses the existing Foundry academic category mapping");
         var eyeRecord = Find(nested, "Cybereyes Basic"); var visionRecord = Find(nested, "Low-Light Vision");
         check(visionRecord["system"]!["essenceActual"]!.GetValue<decimal>() == 0 &&
             visionRecord["flags"]!["shadowrun4e"]!["chummerExport"]!["parentId"]!.GetValue<string>() == eyeRecord["_id"]!.GetValue<string>() &&
