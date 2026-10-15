@@ -58,16 +58,16 @@ namespace Chummer
             var length = Select("Alias_Length", new object[] { "Any", "One Word", "Multiple Words" }, previous.Length);
             var theme = Select("Alias_Theme", new object[] { "Automatic" }.Concat(engine.Config.Words.SelectMany(w => w.Themes).Distinct().OrderBy(x => x).Cast<object>()).ToArray(), previous.Theme);
             var origin = Select("Alias_Origin", new object[] { "Automatic" }.Concat(engine.Config.Origins.Keys.Cast<object>()).ToArray(), previous.Origin);
-            var locked = new TextBox { Text = previous.Locked, Watermark = T("Alias_Optional"), MaxLength = 16 };
+            var locked = new TextBox { Text = previous.Locked, PlaceholderText = T("Alias_Optional"), MaxLength = 16 };
             Field("Alias_Locked", locked);
             var position = Select("Alias_Position", new object[] { "First", "Last" }, previous.LockPosition);
-            var used = new TextBox { Text = previous.UsedNames, Watermark = T("Alias_UsedHint"), AcceptsReturn = true, MinHeight = 48 };
+            var used = new TextBox { Text = previous.UsedNames, PlaceholderText = T("Alias_UsedHint"), AcceptsReturn = true, MinHeight = 48 };
             Field("Alias_Used", used);
             var note = new TextBlock { TextWrapping = TextWrapping.Wrap }; panel.Children.Add(note);
             var regenerate = new Button { Content = T("Alias_GenerateFive") }; panel.Children.Add(regenerate);
             var names = new ListBox { MinHeight = 130, MaxHeight = 170 }; panel.Children.Add(names);
             var hook = new TextBlock { TextWrapping = TextWrapping.Wrap }; panel.Children.Add(hook);
-            var draft = new TextBox { Text = character.Alias, Watermark = T("Alias_Editable"), MaxLength = 80 }; panel.Children.Add(draft);
+            var draft = new TextBox { Text = character.Alias, PlaceholderText = T("Alias_Editable"), MaxLength = 80 }; panel.Children.Add(draft);
             StreetNamePreferences Read() => new StreetNamePreferences {
                 CharacterAware = mode.SelectedItem.ToString() == "Character-Aware",
                 Region = region.SelectedItem.ToString() == "None" ? "" : region.SelectedItem.ToString(),

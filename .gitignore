@@ -58,3 +58,7 @@ artifacts/
 .local-nuget/
 
 .DS_Store
+
+# Local maintenance-tool caches
+__pycache__/
+*.py[cod]

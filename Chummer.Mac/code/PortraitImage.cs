@@ -54,11 +54,12 @@ namespace Chummer
             crop = ClampCrop(crop, source.Width, source.Height);
             var size = OutputSize(crop, percent);
             using var output = new SKBitmap(size.Width, size.Height);
+            using var sourceImage = SKImage.FromBitmap(source);
             using (var canvas = new SKCanvas(output))
-            using (var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.High })
+            using (var paint = new SKPaint { IsAntialias = true })
             {
                 canvas.Clear(SKColors.Transparent);
-                canvas.DrawBitmap(source, crop, new SKRect(0, 0, size.Width, size.Height), paint);
+                canvas.DrawImage(sourceImage, crop, new SKRect(0, 0, size.Width, size.Height), new SKSamplingOptions(SKCubicResampler.Mitchell), paint);
             }
             using var image = SKImage.FromBitmap(output);
             using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);

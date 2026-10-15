@@ -63,6 +63,7 @@ namespace Chummer
                 GlobalOptions.Instance.AutomaticUpdate = false;
                 LanguageManager.Instance.Load("en-us", null);
                 Check(LanguageManager.Instance.Loaded, "English language loaded");
+                ReleaseUpdateChecks.Run();
                 AppDiagnostics.Action("diagnostics.privacy-test");
                 AppDiagnostics.Record("simulated-error", new System.IO.IOException("private-character-name /private/character.chum"));
                 string diagnosticText = File.ReadAllText(AppDiagnostics.LogPath);

@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directories:
+      - /Chummer.Mac
+      - /vendor/Majorsilence.Forms
+      - /vendor/Majorsilence.Forms.Avalonia
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      avalonia:
+        patterns: ["Avalonia*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

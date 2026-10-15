@@ -24,8 +24,14 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Verify release archival safeguards
         run: python scripts/tests/test_archive_nightly.py
+      - name: Check modernization safeguards
+        run: python scripts/check-modernization.py
+      - name: Test modernization safeguards
+        run: python scripts/tests/test_modernization.py
+      - name: Restore reviewed dependency graph
+        run: dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
       - name: Build shared desktop application
-        run: dotnet build Chummer.Mac.sln -c Release --disable-build-servers -p:UsedAvaloniaProducts=
+        run: dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts=
       - name: Check characters and UI behavior
         run: dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
       - uses: actions/upload-artifact@v7
@@ -33,8 +39,10 @@ jobs:
         with:
           name: diagnostics-${{ matrix.os }}
           path: artifacts/checks
+  dependency-audit:
+    uses: ./.github/workflows/dependency-audit.yml
   package:
-    needs: validate
+    needs: [validate, dependency-audit]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: macos-latest
     steps:

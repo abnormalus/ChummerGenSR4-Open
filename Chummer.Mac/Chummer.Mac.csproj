@@ -11,7 +11,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     
-    <NoWarn>$(NoWarn);SYSLIB0014</NoWarn>
+    <!-- The application is warning-clean. Compatibility sources have a separate debt policy. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>10.0</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

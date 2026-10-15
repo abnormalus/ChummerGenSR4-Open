@@ -1,6 +1,8 @@
 ChummerGen
 -------
 
+The current Mac and Windows builds use `Chummer.Mac.sln` on .NET 10. See [desktop setup](README-MAC.md), [release instructions](docs/RELEASING.md), and the [modernization audit and safeguards](docs/MODERNIZATION.md). The original `Chummer/` project is retained for historical reference.
+
 "Chummer is a character generator for Shadowrun 4th Edition.
 Not only can you create your character quickly and easily,
 but you can also use Chummer during your character's shadowrunning career,

@@ -1321,6 +1321,7 @@ namespace Chummer
 					}
 					catch (Exception exception)
 					{
+                        AppDiagnostics.Record("toolbar-close-revert-failed", exception);
 					}
 				}
 
@@ -1444,6 +1445,7 @@ namespace Chummer
 			}
 			catch (Exception ex)
 			{
+                AppDiagnostics.Record("toolbar-activation-merge-failed", ex);
 			}
 			try
 			{
@@ -1452,6 +1454,7 @@ namespace Chummer
 			}
 			catch (Exception ex)
 			{
+                AppDiagnostics.Record("toolbar-activation-merge-failed", ex);
 			}
 		}
 

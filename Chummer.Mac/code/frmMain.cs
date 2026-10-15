@@ -52,28 +52,13 @@ namespace Chummer
             };
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 
-			// If Automatic Updates are enabled, check for updates immediately.
-			if (GlobalOptions.Instance.AutomaticUpdate)
-			{
-				frmUpdate frmAutoUpdate = new frmUpdate();
-				frmAutoUpdate.SilentMode = true;
-				frmAutoUpdate.Visible = false;
-				frmAutoUpdate.ShowDialog(this);
-			}
+            // Defer optional network checks until the main window and dispatcher are ready.
+            Shown += async (_, _) => {
+                if (!GlobalOptions.Instance.AutomaticUpdate) return;
+                await frmUpdate.CheckSilentlyAsync(this);
+            };
 
 			GlobalOptions.Instance.MRUChanged += PopulateMRU;
-
-			// Delete the old executable if it exists (created by the update process).
-			if (File.Exists("Chummer.exe.old"))
-			{
-				try
-				{
-					File.Delete("Chummer.exe.old");
-				}
-				catch
-				{
-				}
-			}
 
 			// Populate the MRU list.
 			PopulateMRU();

@@ -31,9 +31,8 @@ namespace Chummer
 
         public MTRNG()
         {
-            RNGCryptoServiceProvider rngcsp = new RNGCryptoServiceProvider();
             byte[] bytes = new byte[4];
-            rngcsp.GetBytes(bytes);
+            RandomNumberGenerator.Fill(bytes);
             usedSeed = BitConverter.ToUInt32(bytes,0);
             mt[0] = usedSeed & 0xffffffffU;
             for (mti = 1; mti < N; ++mti)
@@ -46,9 +45,8 @@ namespace Chummer
 		{
             if (seed == 0)
             {
-                RNGCryptoServiceProvider rngcsp = new RNGCryptoServiceProvider();
                 byte[] bytes = new byte[4];
-                rngcsp.GetBytes(bytes);
+                RandomNumberGenerator.Fill(bytes);
                 usedSeed = BitConverter.ToUInt32(bytes, 0);
             }
             usedSeed = seed;

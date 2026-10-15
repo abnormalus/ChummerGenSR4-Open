@@ -14,6 +14,7 @@ fi
     -c Release -r osx-arm64 --self-contained true \
     -p:PublishSingleFile=false -p:PublishTrimmed=false -p:UsedAvaloniaProducts= \
     -o "$chummer_output/publish"
+python3 "$chummer_root/scripts/write-build-revision.py" "$chummer_output/publish/source-revision.txt"
 mkdir -p "$chummer_app/Contents/MacOS" "$chummer_app/Contents/Resources"
 cp -R "$chummer_output/publish/." "$chummer_app/Contents/MacOS/"
 cp "$chummer_root/packaging/mac/Info.plist" "$chummer_app/Contents/Info.plist"

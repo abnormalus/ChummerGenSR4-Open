@@ -1,186 +1,76 @@
 using System;
 using System.Diagnostics;
-using System.Net;
-using System.Text;
-using System.Text.Json;
-using System.Linq;
+using System.Threading;
 using Majorsilence.Forms;
-
-
-
-
-
-
 
 namespace Chummer
 {
-	public partial class frmUpdate : Form
-	{
-		private const string GitHubLatestReleaseApiUrl = "https://api.github.com/repos/JonasTrampe/ChummerGenSR4/releases/latest";
+    public partial class frmUpdate : Form
+    {
+        private readonly CancellationTokenSource _request = new CancellationTokenSource();
+        public bool SilentMode { get; set; }
+        private bool _requestDisposed;
+        private ReleaseInfo _cached;
+        internal frmUpdate(ReleaseInfo release) : this() { _cached = release; }
 
-		private bool _blnSilentMode = false;
-		private string _strReleaseHtmlUrl = "";
+        internal static async System.Threading.Tasks.Task CheckSilentlyAsync(Form owner)
+        {
+            using var request = new CancellationTokenSource();
+            FormClosingEventHandler closing = (_, e) => { if (!e.Cancel) request.Cancel(); };
+            owner.FormClosing += closing;
+            try
+            {
+                var release = await ReleaseUpdates.CheckAsync(request.Token);
+                if (release.Newer && !request.IsCancellationRequested && !owner.IsDisposed)
+                {
+                    using var dialog = new frmUpdate(release);
+                    await dialog.ShowDialogAsync(owner);
+                }
+            }
+            catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+            catch (Exception error) { AppDiagnostics.Record("automatic-update-check-failed", error); }
+            finally { owner.FormClosing -= closing; }
+        }
 
-		#region Control Methods
-		public frmUpdate()
-		{
-			InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-		}
+        public frmUpdate()
+        {
+            InitializeComponent();
+            LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
+            FormClosing += (_, e) => { if (!e.Cancel && !_requestDisposed) _request.Cancel(); };
+        }
 
-		private void frmUpdate_Load(object sender, EventArgs e)
-		{
-			// Count the number of instances of Chummer that are currently running.
-			string strFileName = Process.GetCurrentProcess().MainModule.FileName;
-			int intCount = 0;
-			foreach (Process objProcess in Process.GetProcesses())
-			{
-				try
-				{
-					if (objProcess.MainModule.FileName == strFileName)
-						intCount++;
-				}
-				catch
-				{
-				}
-			}
+        private async void frmUpdate_Load(object sender, EventArgs e)
+        {
+            cmdDownload.Enabled = false;
+            lblCurrentVersion.Text = LanguageManager.Instance.GetString("Label_Update_CurrentVersion") + " " + Application.ProductVersion;
+            lblLatestVersion.Text = "Checking Nightly releases…";
+            try
+            {
+                var release = _cached ?? await ReleaseUpdates.CheckAsync(_request.Token);
+                if (_request.IsCancellationRequested || IsDisposed) return;
+                if (SilentMode && !release.Newer) { Close(); return; }
+                lblLatestVersion.Text = release.Newer ? "A newer Nightly build is available." : "Latest Nightly release";
+                txtReleaseNotes.Text = release.Notes;
+                cmdDownload.Enabled = true;
+                AppDiagnostics.Record("update-check-completed");
+            }
+            catch (OperationCanceledException) when (_request.IsCancellationRequested) { }
+            catch (Exception error)
+            {
+                AppDiagnostics.Record("update-check-failed", error);
+                if (!_request.IsCancellationRequested && !IsDisposed)
+                {
+                    if (SilentMode) Close();
+                    else { lblLatestVersion.Text = "Unable to check for updates. You can still open the release page."; cmdDownload.Enabled = true; }
+                }
+            }
+        }
 
-			// If there is more than 1 instance running, do not let the application be updated.
-			if (intCount > 1)
-			{
-				if (!_blnSilentMode)
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_Update_MultipleInstances"), LanguageManager.Instance.GetString("Title_Update"), MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-				this.Close();
-				return;
-			}
-
-			CheckForUpdate();
-		}
-
-		private void cmdDownload_Click(object sender, EventArgs e)
-		{
-			if (string.IsNullOrEmpty(_strReleaseHtmlUrl))
-				return;
-
-			// Opens the GitHub release page in the user's default browser rather than attempting to
-			// download/self-replace the running exe in place - the old per-file WCF-free replacement
-			// for that (see git history) was Windows-only (renaming the locked running exe) and
-			// doesn't translate to how Linux/AppImage packaging will actually deliver updates.
-			Process.Start(new ProcessStartInfo(_strReleaseHtmlUrl) { UseShellExecute = true });
-		}
-
-		private void cmdClose_Click(object sender, EventArgs e)
-		{
-			this.Close();
-		}
-		#endregion
-
-		#region Custom Methods
-		/// <summary>
-		/// When running in silent mode, the update window is only shown if a newer release is
-		/// actually found - otherwise it closes quietly instead of announcing "you're up to date".
-		/// </summary>
-		public bool SilentMode
-		{
-			get
-			{
-				return _blnSilentMode;
-			}
-			set
-			{
-				_blnSilentMode = value;
-			}
-		}
-
-		/// <summary>
-		/// Check GitHub's Releases API for a newer version than the one currently running.
-		/// </summary>
-		private void CheckForUpdate()
-		{
-			string strCurrentVersion = Application.ProductVersion;
-			lblCurrentVersion.Text = LanguageManager.Instance.GetString("Label_Update_CurrentVersion") + " " + strCurrentVersion;
-
-			string strJson;
-			try
-			{
-				WebClient wc = new WebClient();
-				// GitHub's API rejects requests with no User-Agent header.
-				wc.Headers.Add("User-Agent", "ChummerGenSR4-UpdateCheck");
-				wc.Encoding = Encoding.UTF8;
-				strJson = wc.DownloadString(GitHubLatestReleaseApiUrl);
-			}
-			catch
-			{
-				if (!_blnSilentMode)
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_Update_CannotConnect"), LanguageManager.Instance.GetString("Title_Update"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-				this.Close();
-				return;
-			}
-
-			
-			System.Collections.Generic.Dictionary<string, string> objRelease;
-			try
-			{
-				objRelease = JsonDocument.Parse(strJson).RootElement.EnumerateObject().Where(x => x.Value.ValueKind == JsonValueKind.String).ToDictionary(x => x.Name, x => x.Value.GetString());
-			}
-			catch
-			{
-				if (!_blnSilentMode)
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_Update_CannotConnect"), LanguageManager.Instance.GetString("Title_Update"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-				this.Close();
-				return;
-			}
-
-			string strTagName = objRelease.ContainsKey("tag_name") ? objRelease["tag_name"] as string : null;
-			if (string.IsNullOrEmpty(strTagName))
-			{
-				if (!_blnSilentMode)
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_Update_CannotConnect"), LanguageManager.Instance.GetString("Title_Update"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-				this.Close();
-				return;
-			}
-
-			Version objLatest = ParseReleaseVersion(strTagName);
-			Version objCurrent = ParseReleaseVersion(strCurrentVersion);
-
-			if (objLatest == null || objCurrent == null || objLatest <= objCurrent)
-			{
-				if (!_blnSilentMode)
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_Update_NoNewUpdates"), LanguageManager.Instance.GetString("Title_Update"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-				this.Close();
-				return;
-			}
-
-			// A newer release exists - populate the dialog and show it, even in silent mode.
-			_strReleaseHtmlUrl = objRelease.ContainsKey("html_url") ? objRelease["html_url"] as string : "https://github.com/JonasTrampe/ChummerGenSR4/releases/latest";
-			lblLatestVersion.Text = LanguageManager.Instance.GetString("Label_Update_LatestVersion") + " " + strTagName;
-			txtReleaseNotes.Text = objRelease.ContainsKey("body") ? (objRelease["body"] as string ?? "") : "";
-
-			this.Show();
-		}
-
-		/// <summary>
-		/// Parses a version string that may have a leading "v" and/or a pre-release or build-metadata
-		/// suffix (e.g. "v0.1.501-beta+abc123") down to the plain Major.Minor.Build form used to
-		/// compare a release tag against Application.ProductVersion.
-		/// </summary>
-		private static Version ParseReleaseVersion(string strVersion)
-		{
-			string strTrimmed = strVersion.TrimStart('v', 'V');
-			int intSuffixIndex = strTrimmed.IndexOfAny(new[] { '-', '+' });
-			if (intSuffixIndex >= 0)
-				strTrimmed = strTrimmed.Substring(0, intSuffixIndex);
-
-			try
-			{
-				Version objParsed = new Version(strTrimmed);
-				return new Version(objParsed.Major, objParsed.Minor, Math.Max(objParsed.Build, 0));
-			}
-			catch
-			{
-				return null;
-			}
-		}
-		#endregion
-	}
+        private void cmdDownload_Click(object sender, EventArgs e)
+        {
+            try { Process.Start(new ProcessStartInfo(ReleaseUpdates.ReleasePage) { UseShellExecute = true }); }
+            catch (Exception error) { AppDiagnostics.Record("update-page-open-failed", error); AppErrors.Notify(this, "Unable to open the release page.", "Chummer updates"); }
+        }
+        private void cmdClose_Click(object sender, EventArgs e) => Close();
+    }
 }

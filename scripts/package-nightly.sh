@@ -12,6 +12,7 @@ bash scripts/build-mac.sh "$chummer_output/mac"
 "$chummer_dotnet" "$chummer_output/mac/publish/ChummerMac.dll" --smoke-test "$chummer_output/checks" Chummer.Mac/assets/saves
 "$chummer_dotnet" publish Chummer.Mac/Chummer.Mac.csproj -c Release -r win-x64 --self-contained true \
     -p:UsedAvaloniaProducts= -o "$chummer_output/windows"
+python3 scripts/write-build-revision.py "$chummer_output/windows/source-revision.txt"
 python3 packaging/windows/build-msi.py "$chummer_output/windows" "$chummer_assets/ChummerSR4-Windows-x64.msi"
 python3 packaging/windows/verify-msi.py "$chummer_output/windows" "$chummer_assets/ChummerSR4-Windows-x64.msi"
 # The WiX source contains builder paths; it is useful locally but is not a release asset.
