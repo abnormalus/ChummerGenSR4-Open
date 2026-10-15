@@ -10012,6 +10012,7 @@ namespace Chummer
 			frmPickVehicleMod.TotalWeaponCost = objWeapon.TotalCost;
 			frmPickVehicleMod.ModMultiplier = objWeapon.ModMultiplier;
 			frmPickVehicleMod.InputFile = "weapons";
+            frmPickVehicleMod.WeaponType = objWeapon.WeaponType;
 
 			frmPickVehicleMod.ShowDialog(this);
 
@@ -10658,6 +10659,7 @@ namespace Chummer
 			frmPickVehicleMod.TotalWeaponCost = objWeapon.TotalCost;
 			frmPickVehicleMod.ModMultiplier = objWeapon.ModMultiplier;
 			frmPickVehicleMod.InputFile = "weapons";
+            frmPickVehicleMod.WeaponType = objWeapon.WeaponType;
 
 			frmPickVehicleMod.ShowDialog(this);
 

@@ -24,4 +24,10 @@ Native testing reproduced a shared compatibility bug: closing a dialog without a
 
 ## Verification
 
-InventoryEnhancementChecks verifies commlink defaults/fallbacks, ammo family filtering in browsing and search, canonical rifle/pistol ammo fields, melee accessory round trips and modal result consistency. NativeInventoryEnhancementChecks drives real creation and career handlers: commlink cancellation, melee accessory purchasing, the right-click ammo menu, correct inventory destination and career charge, and purchase cancellation. Combined native CI coverage requires at least 60 checks on Mac and Windows. The full saved-character suite continues to verify compatibility.
+InventoryEnhancementChecks verifies commlink defaults/fallbacks, ammo family filtering in browsing and search, canonical rifle/pistol ammo fields, melee accessory round trips and modal result consistency. NativeInventoryEnhancementChecks drives real creation and career handlers: commlink cancellation, melee accessory purchasing, the right-click ammo menu, correct inventory destination and career charge, and purchase cancellation. Combined native CI coverage requires at least 64 checks on Mac and Windows. The full saved-character suite continues to verify compatibility.
+
+## Personalized Grip identity and bonuses
+
+Weapon modification selection displays one **Personalized Grip** entry. The attached weapon type chooses the original catalog definition: `Personalized Grip, Melee` supplies the established +1 melee dice pool; `Personalized Grip` supplies +1 recoil compensation for ranged weapons. Creation, career, carried and vehicle-mounted weapon callers all supply this context. Sourcebook filtering remains in effect. Search matches the display label and original catalog name using literal text.
+
+This is a presentation alias, not a file-format migration. WeaponMod.Name, saved names, recoil and dice-pool fields retain their legacy values, allowing older Chummer versions to load new purchases. Existing modifications are displayed with the common label without rewriting their stored definitions or bonuses. PersonalizedGripChecks covers both bonuses, source filtering, quoted search and snapshot round trips; native checks purchase both variants in creation and career editors.

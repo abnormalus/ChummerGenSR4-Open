@@ -34,6 +34,9 @@ namespace Chummer
 		private int _intDeviceRating = 0;
 		private bool _blnModularElectronics = false;
 
+        // This picker is shared by vehicle and weapon modifications. Only weapon
+        // callers set context; canonical catalog values remain the selected result.
+        public string WeaponType { get; set; } = "";
 		private string _strAllowedCategories = "";
 		private bool _blnAddAgain = false;
 
@@ -397,15 +400,20 @@ namespace Chummer
 			// Load the Mod information.
 			_objXmlDocument = XmlManager.Instance.Load(_strInputFile + ".xml");
 
-			// Retrieve the list of Mods for the selected Category.
-			if (txtSearch.Text == "")
-				objXmlModList = _objXmlDocument.SelectNodes("/chummer/mods/mod[(" + _objCharacter.Options.BookXPath() + ") and category != \"Special\"]");
-			else
-				objXmlModList = _objXmlDocument.SelectNodes("/chummer/mods/mod[(" + _objCharacter.Options.BookXPath() + ") and category != \"Special\" and ((contains(translate(name,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\") and not(translate)) or contains(translate(translate,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\"))]");
+            // Keep user text out of XPath. Search the presentation alias and the
+            // original name so old terminology remains discoverable without duplicates.
+            objXmlModList = _objXmlDocument.SelectNodes("/chummer/mods/mod[(" + _objCharacter.Options.BookXPath() + ") and category != \"Special\"]");
 			bool blnAdd = true;
 			List<ListItem> lstMods = new List<ListItem>();
 			foreach (XmlNode objXmlMod in objXmlModList)
 			{
+                string canonicalName = objXmlMod["name"].InnerText;
+                if (_strInputFile == "weapons" && !WeaponModificationNames.IsAvailableFor(canonicalName, WeaponType)) continue;
+                string displayName = _strInputFile == "weapons"
+                    ? WeaponModificationNames.DisplayName(canonicalName, objXmlMod["translate"]?.InnerText)
+                    : objXmlMod["translate"]?.InnerText ?? canonicalName;
+                if (txtSearch.Text.Length > 0 && displayName.IndexOf(txtSearch.Text, StringComparison.CurrentCultureIgnoreCase) < 0 &&
+                    canonicalName.IndexOf(txtSearch.Text, StringComparison.CurrentCultureIgnoreCase) < 0) continue;
 				blnAdd = true;
 				if (objXmlMod["response"] != null)
 				{
@@ -432,10 +440,7 @@ namespace Chummer
 				{
 					ListItem objItem = new ListItem();
 					objItem.Value = objXmlMod["name"].InnerText;
-					if (objXmlMod["translate"] != null)
-						objItem.Name = objXmlMod["translate"].InnerText;
-					else
-						objItem.Name = objXmlMod["name"].InnerText;
+                    objItem.Name = displayName;
 					lstMods.Add(objItem);
 				}
 			}

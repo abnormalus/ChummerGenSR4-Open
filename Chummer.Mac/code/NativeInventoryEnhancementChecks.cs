@@ -68,7 +68,24 @@ internal static class NativeInventoryEnhancementChecks
                 Invoke(editor, "tsWeaponAddAccessory_Click");
                 check(axe.WeaponAccessories.Any(item => item.Name == "Weapon Commlink"), "Native " + mode + " melee accessory purchase reaches the existing inventory path");
 
+                void AddGrip()
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        var picker = Forms.Application.OpenForms.OfType<frmSelectVehicleMod>().Last();
+                        Field<Forms.TextBox>(picker, "txtSearch").Text = "Personalized Grip";
+                        Field<Forms.ListBox>(picker, "lstMod").SelectedIndex = 0;
+                        Field<Forms.Button>(picker, "cmdOK").PerformClick();
+                    });
+                    Invoke(editor, "tsWeaponAddModification_Click");
+                }
+                AddGrip();
+                check(axe.WeaponMods.Any(item => item.Name == WeaponModificationNames.MeleePersonalizedGrip && item.DicePool == 1),
+                    "Native " + mode + " unified grip purchase applies the melee definition");
                 var rifle = AddWeapon("AK-97");
+                AddGrip();
+                check(rifle.WeaponMods.Any(item => item.Name == WeaponModificationNames.PersonalizedGrip && item.RC == "1" && item.DicePool == 0),
+                    "Native " + mode + " unified grip purchase applies the ranged definition");
                 var menu = Field<Forms.ContextMenuStrip>(editor, "cmsWeapon");
                 var command = menu.Items.OfType<Forms.ToolStripMenuItem>().Single(item => item.Name == "buyWeaponAmmunition");
                 menu.Show(weaponTree, new System.Drawing.Point(8, 8)); menu.Hide();

@@ -8774,17 +8774,7 @@ namespace Chummer
 		/// <summary>
 		/// The name of the object as it should appear on printouts (translated name only).
 		/// </summary>
-		public string DisplayNameShort
-		{
-			get
-			{
-				string strReturn = _strName;
-				if (_strAltName != string.Empty)
-					strReturn = _strAltName;
-
-				return strReturn;
-			}
-		}
+        public string DisplayNameShort => WeaponModificationNames.DisplayName(_strName, _strAltName);
 
 		/// <summary>
 		/// The name of the object as it should be displayed in lists. Qty Name (Rating) (Extra).
