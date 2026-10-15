@@ -60,3 +60,5 @@ Useful primary references:
 ## October 15 follow-up
 
 Native menus now recheck actual window enablement at invocation, including queued clicks, while keeping Quit available for cancellation. Native Mac/Windows CI exercises modal disable/re-enable, stale clicks, preferences and Quit. A local native startup previously failed in Avalonia render-timer registration; a later local run passed. Diagnostics now record the specific upstream numeric rendering code without arbitrary exception messages. No rendering fallback or dependency upgrade was guessed from this intermittent evidence.
+
+The ongoing section-by-section process is defined in [SECTION_MODERNIZATION.md](SECTION_MODERNIZATION.md): assess standard framework components, extract shared behavior and observable presentation, verify meaningful transitions on both platforms, then retire each replaced legacy path. Rendering/layout is a priority because repaint defects have recurred.

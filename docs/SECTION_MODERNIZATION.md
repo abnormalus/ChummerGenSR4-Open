@@ -1,0 +1,32 @@
+# Section-by-section modernization process
+
+As each application section is repaired or improved, review whether it recreates a capability already supplied by the modern framework or an appropriate maintained library. Prefer established components where they reduce maintenance and preserve the required behavior. This is an incremental process, not a wholesale rewrite or an edition expansion.
+
+## For each section
+
+1. **Record its behavior.** Identify the character data/rules it reads and changes, source filtering, saved fields, commands, validation, undo requirements and platform interactions. Preserve custom entries and existing character-file compatibility.
+2. **Identify reusable machinery.** Review the areas below. Check the existing shared implementation before introducing another component. Do not add a dependency merely because one exists; assess platform support, maintenance, licensing, size and integration/testing cost.
+3. **Choose a bounded replacement.** Keep rules and persistence separate from presentation. Prefer standard Avalonia controls and framework-managed layout/rendering over recreating controls in the compatibility layer. Use direct modern UI for new or substantially rebuilt sections when practical; leave unrelated working screens intact.
+4. **Extract shared behavior.** Put commands, validation, searchable editors and data-change notifications behind reusable interfaces/components. Avoid new copies of screen-specific fixes. Introduce observable view models in bounded sections rather than attempting to convert the entire mutable character model at once.
+5. **Verify actual transitions.** Test the section's meaningful operations and failures, not only its initial appearance. Include keyboard/mouse interaction, cancellation, selection changes, long-to-short text, resizing/scaling, tab/document switching and source-setting changes as relevant. Add regressions for observed defects. For migrated rendering, use targeted native visual checks on both Mac and Windows, alongside headless checks where useful.
+6. **Retire the old path after validation.** Remove obsolete drawing, manual synchronization and duplicate handlers for the migrated section once its required behavior passes. Keep explicit, documented adapters where legacy rules still require them; avoid maintaining two active implementations of the same screen.
+7. **Publish through the established process.** Run checks appropriate to the change plus required release checks, preserve prior downloads in the archive, and describe remaining limitations accurately.
+
+## Reusable areas to assess
+
+| Area | Preferred direction |
+|---|---|
+| Rendering, layout, lists and trees | Standard Avalonia controls and framework-managed measurement, clipping, selection, scrolling and repainting. |
+| Screen/data synchronization | Observable view models and bindings, with explicit boundaries around legacy mutable rules. |
+| Menus, toolbar buttons and shortcuts | Shared commands with one availability policy and error boundary. |
+| Input and validation | Reusable searchable/custom-entry editors, shared validation and consistent confirmation/cancellation behavior. |
+| Undo/redo | Reversible shared actions or appropriately bounded snapshots; preserve the existing inventory history while designing any expansion. |
+| Long-running work | Task-based operations, progress, cancellation, isolated preparation and safe commit/cleanup. |
+| Persistence and recovery | Atomic saves, backups and recovery behavior, retaining existing character encoding/schema and settings/PDF associations. |
+| Diagnostics, dependencies and testing | Structured privacy-preserving logs, reviewed dependency updates and meaningful automated/platform regressions. |
+
+## Rendering priority
+
+Repeated repaint defects justify examining shared invalidation/caching behavior before adding more screen-specific refresh calls. Prioritize the frequently affected item lists and changing detail values. A diagnostic full-redraw mode can help compare cached and complete rendering; it is a diagnostic proposal, not an implemented feature. Prefer event-driven correctness and standard controls over continuously repainting the whole window to hide defects.
+
+The next interaction-audit target remains repeated character switching and toolbar/menu behavior. Select the next substantial screen migration from confirmed defects and integration cost. Keep Shadowrun rules, character compatibility and Mac/Windows usability as acceptance criteria throughout.
