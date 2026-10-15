@@ -1,5 +1,8 @@
 <Project>
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(MSBuildProjectName)' != 'Chummer'">
+    <!-- Legacy XML/resource reflection is not validated for trimming or native AOT. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
     <RuntimeIdentifiers>osx-arm64;win-x64</RuntimeIdentifiers>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NuGetAudit>true</NuGetAudit>

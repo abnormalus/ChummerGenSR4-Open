@@ -57,6 +57,8 @@ def check(root=ROOT):
         for node in project.iter():
             if node.tag in ("NoWarn", "WarningsNotAsErrors") and re.search(r"CS061[28]|SYSLIB", node.text or ""):
                 errors.append(f"{path}: obsolete API diagnostics must not be suppressed globally")
+            if node.tag in ("IsTrimmable", "IsAotCompatible", "PublishTrimmed", "PublishAot") and node.text == "true":
+                errors.append(f"{path}: desktop trimming/AOT requires a separately validated migration")
             if node.tag == "EnableUnsafeBinaryFormatterSerialization" and node.text == "true":
                 errors.append(f"{path}: unsafe deserialization enabled")
             if node.tag in ("PackageReference", "PackageVersion") and (node.get("Version") and re.search(r"[*\[\](,]", node.get("Version"))):
