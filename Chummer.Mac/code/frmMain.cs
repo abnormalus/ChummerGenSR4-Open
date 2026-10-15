@@ -67,7 +67,7 @@ namespace Chummer
 			string[] strArgs = Environment.GetCommandLineArgs();
 			if (strArgs.GetUpperBound(0) > 0)
 			{
-				if (strArgs[1] != "/debug" && strArgs[1] != "--smoke-test" && strArgs[1] != "--pdf" && strArgs[1] != "--print-preview" && strArgs[1] != "--export-pdf")
+				if (strArgs[1] != "/debug" && strArgs[1] != "--smoke-test" && strArgs[1] != "--pdf" && strArgs[1] != "--print-preview" && strArgs[1] != "--export-pdf" && strArgs[1] != "--export-foundry")
 					LoadCharacter(strArgs[1]);
 				if (strArgs.Length > 2)
 				{

@@ -25,7 +25,11 @@ namespace Chummer
         private int _generation;
         private bool _closed;
         private string _html = "";
+        private Task<CharacterSheetServer> _sheetServerTask;
+        private Uri _sheetUri;
+        private readonly Button _openBrowser = new Button { Text = "Open in Browser", Enabled = false };
         private readonly Button _savePdf = new Button { Text = "Save PDF", Width = 120 };
+        private readonly Button _saveJson = new Button { Text = "Foundry JSON", Enabled = false };
         private readonly Label _status = new Label { AutoSize = false };
 
 		
@@ -39,24 +43,36 @@ namespace Chummer
             MoveControls();
             cmdPrint.Image = null;
             cmdPrint.TextAlign = ContentAlignment.MiddleCenter;
-            cmdPrint.SetBounds(12, 12, 125, 28);
-            _savePdf.SetBounds(145, 12, 120, 28);
+            cmdPrint.SetBounds(12, 12, 110, 28);
+            _savePdf.SetBounds(130, 12, 100, 28);
             cmdSaveHTML.AutoSize = cmdSaveXML.AutoSize = false;
-            cmdSaveHTML.SetBounds(273, 12, 140, 28);
-            cmdSaveXML.SetBounds(421, 12, 140, 28);
+            cmdSaveHTML.SetBounds(238, 12, 100, 28);
+            cmdSaveXML.SetBounds(346, 12, 100, 28);
             label1.SetBounds(12, 53, 100, 24);
             cboXSLT.SetBounds(120, 49, ClientSize.Width - 132, 28);
             _status.SetBounds(12, 80, ClientSize.Width - 24, 24);
             _status.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             webBrowser1.SetBounds(12, 108, ClientSize.Width - 24, ClientSize.Height - 120);
-            Controls.Add(_savePdf); Controls.Add(_status);
+            MinimumSize = new Size(795, 450);
+            Controls.Add(_savePdf); Controls.Add(_status); Controls.Add(_openBrowser); Controls.Add(_saveJson);
+            _saveJson.SetBounds(454, 12, 130, 28);
+            _saveJson.Click += async (sender, e) => await SaveFoundryAsync();
+            _openBrowser.SetBounds(592, 12, 175, 28);
+            _openBrowser.Click += (sender, e) => {
+                try { if (_sheetUri != null) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_sheetUri.AbsoluteUri) { UseShellExecute = true }); }
+                catch (Exception error) { ReportFailure("open browser", error); }
+            };
             if (System.OperatingSystem.IsMacOS())
             {
                 _savePdf.Visible = false;
-                cmdSaveHTML.Left = 145; cmdSaveXML.Left = 293;
+                cmdSaveHTML.Left = 130; cmdSaveXML.Left = 238; _saveJson.Left = 346; _openBrowser.Left = 484;
             }
             _savePdf.Click += async (sender, e) => await SaveOutputAsync("pdf");
             webBrowser1.DocumentCompleted += async (sender, e) => await PreviewReadyAsync();
+            webBrowser1.NavigationFailed += (sender, e) => {
+                AppDiagnostics.Record("character-sheet-navigation-failed");
+                if (!_closed) _status.Text = "Preview could not load. Choose Open in Browser to view and print.";
+            };
             cmdPrint.Enabled = _savePdf.Enabled = false;
 		}
 
@@ -186,6 +202,31 @@ namespace Chummer
             catch (Exception error) { ReportFailure("export", error); }
         }
 
+        private async Task SaveFoundryAsync()
+        {
+            try
+            {
+                if (_lstCharacters.Count == 0) return;
+                using var options = new FoundryExportDialog(_lstCharacters);
+                if (await options.ShowDialogAsync(this) != DialogResult.OK || _closed) return;
+                using var picker = new SaveFileDialog { Filter = "Foundry Actor JSON|*.json", Title = "Export Foundry actor", FileName = "chummer-actor.json" };
+                if (await picker.ShowDialogAsync(this) != DialogResult.OK || _closed) return;
+                await ExportFoundryAsync(picker.FileName, options.CharacterIndex, options.Target);
+                _status.Text = "Foundry actor exported. Check item notes for any manual adjustments.";
+            }
+            catch (Exception error) { ReportFailure("export Foundry JSON", error); }
+        }
+
+        internal async Task ExportFoundryAsync(string path, int characterIndex, FoundryActorExporter.Target target)
+        {
+            // Snapshot on the UI thread: model getters and temporary improvement measurements are synchronous.
+            string json = FoundryActorExporter.Serialize(_lstCharacters[characterIndex], target);
+            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try { await File.WriteAllTextAsync(temporary, json, new UTF8Encoding(false)); File.Move(temporary, path, true); }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            AppDiagnostics.Record("character-sheet-export-foundry");
+        }
+
         internal async Task ExportPdfAsync(string path)
         {
             await OutputTask;
@@ -205,22 +246,35 @@ namespace Chummer
         private async Task PreviewReadyAsync()
         {
             int generation = _generation;
+            if (!webBrowser1.IsWebViewFunctional) return;
+            Exception lastError = null;
+            var deadline = DateTime.UtcNow.AddSeconds(30);
             try
             {
-                for (int attempt = 0; attempt < 100 && !_closed && generation == _generation; ++attempt)
+                while (!_closed && generation == _generation && DateTime.UtcNow < deadline)
                 {
-                    string ready = await webBrowser1.ExecuteScriptAsync("window.chummerSheetGeneration === " + generation +
-                        " && document.readyState === 'complete' && Array.from(document.images).every(i => i.complete) && (!document.fonts || document.fonts.status === 'loaded')");
+                    string ready = null;
+                    try
+                    {
+                        ready = await webBrowser1.ExecuteScriptAsync("window.chummerSheetGeneration === " + generation +
+                            " && document.readyState === 'complete' && document.body.innerText.trim().length > 0 && Array.from(document.images).every(i => i.complete && i.naturalWidth > 0) && (!document.fonts || document.fonts.status === 'loaded')").WaitAsync(TimeSpan.FromSeconds(2));
+                    }
+                    catch (Exception error) { lastError = error; }
                     if (_closed || generation != _generation) return;
                     if (ready?.Trim().Trim('"') == "true")
                     {
                         cmdPrint.Enabled = _savePdf.Enabled = webBrowser1.CanPrint;
-                        _status.Text = webBrowser1.CanPrint ? "Ready" : "Native printing unavailable. Save HTML to print from your browser.";
+                        _status.Text = webBrowser1.CanPrint ? "Ready" : "Native printing unavailable. Choose Open in Browser to print.";
+                        AppDiagnostics.Record("character-sheet-preview-ready");
                         return;
                     }
                     await Task.Delay(100);
                 }
-                if (!_closed && generation == _generation) _status.Text = "Preview did not finish loading. Try another sheet or save HTML.";
+                if (!_closed && generation == _generation)
+                {
+                    _status.Text = "Preview did not finish loading. Choose Open in Browser to view and print.";
+                    AppDiagnostics.Record("character-sheet-preview-timeout", lastError);
+                }
             }
             catch (Exception error) { if (!_closed && generation == _generation) ReportFailure("load preview", error); }
         }
@@ -235,7 +289,7 @@ namespace Chummer
         private void frmViewer_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (e.Cancel) return;
-            _closed = true; ++_generation;
+            CloseOutput();
             foreach (Character character in _lstCharacters) character.PrintWindow = null;
         }
 		#endregion
@@ -257,6 +311,19 @@ namespace Chummer
             return Encoding.UTF8.GetString(stream.ToArray()).TrimStart('\uFEFF');
         }
 
+        private void CloseOutput()
+        {
+            if (_closed) return;
+            _closed = true; ++_generation;
+            _ = StopSheetServerAsync();
+        }
+
+        private async Task StopSheetServerAsync()
+        {
+            try { if (_sheetServerTask != null) await (await _sheetServerTask.ConfigureAwait(false)).DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { AppDiagnostics.Record("character-sheet-server-close-failed", error); }
+        }
+
         internal Task OutputTask { get; private set; } = Task.CompletedTask;
 
         private void GenerateOutput() => OutputTask = GenerateOutputAsync();
@@ -264,7 +331,8 @@ namespace Chummer
         private async Task GenerateOutputAsync()
         {
             int generation = ++_generation;
-            cmdPrint.Enabled = _savePdf.Enabled = cmdSaveHTML.Enabled = cmdSaveXML.Enabled = false;
+            cmdPrint.Enabled = _savePdf.Enabled = cmdSaveHTML.Enabled = cmdSaveXML.Enabled = _openBrowser.Enabled = false;
+            _sheetUri = null;
             _status.Text = "Preparing character sheet…";
             try
             {
@@ -273,9 +341,19 @@ namespace Chummer
                 string html = await Task.Run(() => TransformSheet(document, sheet));
                 if (_closed || generation != _generation) return;
                 _html = html;
-                webBrowser1.DocumentText = html + "<script>window.chummerSheetGeneration=" + generation + ";</script>";
                 cmdSaveHTML.Enabled = cmdSaveXML.Enabled = true;
-                if (!webBrowser1.IsWebViewFunctional) _status.Text = "Preview unavailable. You can still save HTML or XML.";
+                _sheetServerTask ??= CharacterSheetServer.CreateAsync();
+                var server = await _sheetServerTask;
+                if (_closed || generation != _generation) return;
+                _sheetUri = server.SetSheet(html + "<script>window.chummerSheetGeneration=" + generation + ";</script>", generation);
+                _openBrowser.Enabled = true;
+                if (webBrowser1.IsWebViewFunctional)
+                {
+                    webBrowser1.Navigate(_sheetUri);
+                    // Poll as well as listening for completion: initialization failures must not leave a blank, unexplained window.
+                    _ = PreviewReadyAsync();
+                }
+                else _status.Text = "Preview unavailable. Choose Open in Browser or save HTML/XML.";
                 AppDiagnostics.Record("character-sheet-rendered");
             }
             catch (Exception error) { if (generation == _generation) ReportFailure("prepare", error); }
@@ -339,6 +417,7 @@ namespace Chummer
 			set
 			{
 				_lstCharacters = value;
+                _saveJson.Enabled = value.Count > 0;
 			}
 		}
 		#endregion

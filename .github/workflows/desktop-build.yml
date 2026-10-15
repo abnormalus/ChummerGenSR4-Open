@@ -34,6 +34,32 @@ jobs:
         run: dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts=
       - name: Check characters and UI behavior
         run: dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
+      - name: Ensure native Windows browser runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/ensure-webview2.ps1
+      - name: Verify native Windows character preview and PDF output
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $character = (Resolve-Path 'artifacts/checks/career.chum').Path
+          $pdf = Join-Path $PWD 'artifacts/checks/native-character.pdf'
+          $exe = (Resolve-Path 'Chummer.Mac/bin/Release/net10.0/ChummerMac.exe').Path
+          # Use the STA apphost and its Windows manifest, not the dotnet DLL host.
+          $process = Start-Process -FilePath $exe -ArgumentList @('--export-pdf', "`"$character`"", "`"$pdf`"") -PassThru
+          if (-not $process.WaitForExit(90000)) {
+            taskkill /PID $process.Id /T /F
+            throw 'Native character preview timed out.'
+          }
+          $diagnostics = Join-Path $env:APPDATA 'ChummerGenSR4Mac/logs'
+          if (Test-Path $diagnostics) { Copy-Item $diagnostics 'artifacts/checks/native-logs' -Recurse -Force }
+          if ($process.ExitCode -ne 0) { throw "Native preview failed: $($process.ExitCode)" }
+          if (-not (Test-Path $pdf)) { throw 'Native preview produced no PDF.' }
+          $bytes = [IO.File]::ReadAllBytes($pdf)
+          $content = [Text.Encoding]::Latin1.GetString($bytes)
+          if ($bytes.Length -lt 1000 -or -not $content.StartsWith('%PDF-') -or $content -notmatch '/Type\s*/Page\b') {
+            throw 'Native preview produced an invalid or empty PDF.'
+          }
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

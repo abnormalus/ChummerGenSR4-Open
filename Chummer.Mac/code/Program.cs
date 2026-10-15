@@ -60,6 +60,21 @@ namespace Chummer
                             }
                         };
                     }
+                    if (args.Length >= 3 && args[0] == "--export-foundry")
+                    {
+                        main.Shown += async (_, _) => {
+                            try {
+                                var character = new Character { FileName = args[1] };
+                                if (!character.Load()) throw new System.IO.InvalidDataException("Character could not be loaded.");
+                                var target = args.Length >= 4 && args[3] == "1.26" ? FoundryActorExporter.Target.Version126 : FoundryActorExporter.Target.Version16;
+                                string json = FoundryActorExporter.Serialize(character, target);
+                                await System.IO.File.WriteAllTextAsync(args[2], json, new System.Text.UTF8Encoding(false));
+                                AppDiagnostics.Record("character-foundry-command-completed");
+                            }
+                            catch (Exception error) { AppDiagnostics.Record("character-foundry-command-failed", error); Environment.ExitCode = 1; }
+                            finally { Application.Exit(); }
+                        };
+                    }
                     // Native PDF export can also be reproduced without a printer or preference changes.
                     if (args.Length >= 3 && args[0] == "--export-pdf")
                     {

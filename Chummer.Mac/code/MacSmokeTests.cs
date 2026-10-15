@@ -1095,6 +1095,8 @@ namespace Chummer
                     Check(html.ToString().Contains("Mac Smoke Test"), "HTML character sheet transformation");
                 }
 
+                FoundryExportChecks.Run(output, Check);
+
                 using (var stream = new MemoryStream())
                 {
                     careerCharacter.Mugshot = Convert.ToBase64String(File.ReadAllBytes(Path.Combine(output, "portrait-input.png")));
@@ -1110,6 +1112,35 @@ namespace Chummer
                     bool rejected = false;
                     try { frmViewer.TransformSheet(document, "../data/qualities"); } catch (InvalidOperationException) { rejected = true; }
                     Check(rejected, "character output rejects templates outside the bundled folder");
+                    var sheetServer = CharacterSheetServer.CreateAsync().GetAwaiter().GetResult();
+                    Uri sheetAddress;
+                    try
+                    {
+                        using var client = new System.Net.Http.HttpClient();
+                        string largeSheet = "<!doctype html><p>Résumé ¥</p>" + new string('x', 3 * 1024 * 1024);
+                        sheetAddress = sheetServer.SetSheet(largeSheet, 1);
+                        Check(client.GetStringAsync(sheetAddress).GetAwaiter().GetResult() == largeSheet,
+                            "character preview serves UTF-8 sheets larger than WebView2's string navigation limit");
+                        using var head = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Head, sheetAddress);
+                        using var headResponse = client.SendAsync(head).GetAwaiter().GetResult();
+                        Check(headResponse.IsSuccessStatusCode && headResponse.Content.Headers.ContentLength == Encoding.UTF8.GetByteCount(largeSheet) &&
+                            headResponse.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult().Length == 0,
+                            "character preview HEAD returns metadata without character content");
+                        var nextAddress = sheetServer.SetSheet("<p>New character sheet</p>", 2);
+                        Check((int)client.GetAsync(sheetAddress).GetAwaiter().GetResult().StatusCode == 404 &&
+                            client.GetStringAsync(nextAddress).GetAwaiter().GetResult() == "<p>New character sheet</p>" &&
+                            (int)client.GetAsync(new Uri(sheetAddress, "/sheet-2.html")).GetAwaiter().GetResult().StatusCode == 404 &&
+                            (int)client.PostAsync(nextAddress, new System.Net.Http.StringContent("")).GetAwaiter().GetResult().StatusCode == 404,
+                            "character preview rejects stale generations, missing tokens and writes");
+                    }
+                    finally { sheetServer.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+                    using (var probe = new System.Net.Sockets.TcpClient())
+                    {
+                        bool stopped = false;
+                        try { probe.ConnectAsync(System.Net.IPAddress.Loopback, sheetAddress.Port).WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult(); }
+                        catch (System.Net.Sockets.SocketException) { stopped = true; }
+                        Check(stopped, "closing character preview releases the local server port");
+                    }
                     using var browser = new WebBrowser();
                     Check(!browser.CanPrint, "headless output reports native printing unavailable");
                     bool printRejected = false;
@@ -1152,9 +1183,18 @@ namespace Chummer
                         copy.Save();
                         if (!XNode.DeepEquals(original, XDocument.Load(copy.FileName)))
                             throw new InvalidOperationException("Serialized round trip changed: " + file);
+                        foreach (var target in new[] { FoundryActorExporter.Target.Version16, FoundryActorExporter.Target.Version126 })
+                        {
+                            var actor = FoundryActorExporter.Export(copy, target);
+                            if (actor["type"]?.GetValue<string>() != "character" || actor["items"] is not System.Text.Json.Nodes.JsonArray)
+                                throw new InvalidOperationException("Foundry fixture export failed: " + file);
+                        }
+                        copy.Save();
+                        if (!XNode.DeepEquals(original, XDocument.Load(copy.FileName)))
+                            throw new InvalidOperationException("Foundry export changed the saved character: " + file);
                         count++;
                     }
-                    Console.WriteLine("PASS upstream fixture round trips: " + count);
+                    Console.WriteLine("PASS upstream fixture round trips and both Foundry export versions: " + count);
                 }
                 using (var quitGuard = new Form { Width = 300, Height = 140 })
                 {

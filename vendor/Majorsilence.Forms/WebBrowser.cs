@@ -246,6 +246,9 @@ namespace Majorsilence.Forms
         public event EventHandler? StatusTextChanged;
 #pragma warning restore CS0067
 
+        /// <summary>Raised when the native engine reports a failed navigation.</summary>
+        public event EventHandler? NavigationFailed;
+
         // Upstream's order on a completed navigation: Navigated, then DocumentCompleted.
         private void OnNavigationCompleted (object? sender, WebViewNavigationCompletedEventArgs e)
         {
@@ -259,6 +262,11 @@ namespace Majorsilence.Forms
 
             _pendingTravel = null;
 
+            if (!e.IsSuccess) {
+                ReadyState = WebBrowserReadyState.Uninitialized;
+                NavigationFailed?.Invoke(this, EventArgs.Empty);
+                return;
+            }
             ReadyState = WebBrowserReadyState.Complete;
             OnNavigated (new WebBrowserNavigatedEventArgs (url));
             OnDocumentCompleted (new WebBrowserDocumentCompletedEventArgs (url));
