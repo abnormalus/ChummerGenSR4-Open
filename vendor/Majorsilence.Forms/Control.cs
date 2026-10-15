@@ -1134,11 +1134,15 @@ namespace Majorsilence.Forms
             if (!Created)
                 return;
 
-            SetState (States.IsDirty, true);
+            DiscardCachedPixels ();
 
             foreach (var child in Controls.GetAllControls ())
                 child.MarkDirtyDeep ();
         }
+
+        // Full refresh must also invalidate control-specific shortcuts such as scroll blits.
+        // Merely marking IsDirty does not clear those shortcuts' pending "reuse pixels" flags.
+        internal virtual void DiscardCachedPixels () => SetState (States.IsDirty, true);
 
         /// <summary>
         /// Paints every dirty control in this subtree now, the synchronous half of a window's
@@ -1837,6 +1841,9 @@ namespace Majorsilence.Forms
 
                 var info = new SKImageInfo (control.ScaledSize.Width, control.ScaledSize.Height, SKImageInfo.PlatformColorType, SKAlphaType.Premul);
                 var buffer = control.GetBackBuffer ();
+
+                if (RenderingDiagnostics.ForceFullRedraw)
+                    control.DiscardCachedPixels ();
 
                 if (control.NeedsPaint) {
                     using (var buffer_canvas = BufferCanvas.Open (buffer)) {
@@ -3119,6 +3126,10 @@ namespace Majorsilence.Forms
                         OnVisibleChanged (EventArgs.Empty);
                 else
                     OnVisibleChanged (EventArgs.Empty);
+
+                // Hiding a child removes pixels from the parent's cached composite too.
+                // A hidden child cannot propagate NeedsPaint through the visible-child walk.
+                Parent?.Invalidate ();
 
                 // A control that just became visible has to repaint. WinForms shows the window
                 // handle, which paints it; there is no handle here, so without this the newly

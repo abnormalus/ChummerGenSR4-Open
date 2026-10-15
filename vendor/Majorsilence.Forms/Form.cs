@@ -2401,20 +2401,27 @@ namespace Majorsilence.Forms
                 }
             }
 
-            /// <summary>Paints nothing of its own.</summary>
+            /// <summary>Clears the cached client composite without painting an ambient background.</summary>
             /// <remarks>
             /// The window paints the background and border (WindowBase.RenderFrame) and the form's own
-            /// Paint handler draws over that, so painting here would cover both.
+            /// Paint handler draws over that. This layer clears only its own bitmap to
+            /// transparent, allowing that window painting to remain visible underneath.
             /// <para>
-            /// Suppressed by overriding the paint rather than by setting this control's background to
-            /// transparent, which is the trap that sank the first attempt at this change: ambient
-            /// colour is resolved by walking the PARENT CHAIN, so an explicit transparent here became
-            /// the answer for every descendant. Buttons and labels then painted transparent and
-            /// whatever was behind them showed through, which reads exactly like a child being
-            /// overpainted by its parent.
+            /// Do not implement this by setting BackColor to transparent. Ambient colour is
+            /// resolved through the parent chain; an explicit transparent colour here would
+            /// also make descendants inherit transparency instead of the window's background.
             /// </para>
             /// </remarks>
-            protected override void OnPaintBackground (PaintEventArgs e) { }
+            protected override void OnPaintBackground (PaintEventArgs e)
+            {
+                // This client area has its own cached bitmap, unlike ControlAdapter,
+                // which paints directly onto the window. Clear its previous composite
+                // without supplying an ambient transparent BackColor to descendants.
+                // Otherwise moved, hidden or smaller children leave their old pixels
+                // above the newly painted window background indefinitely.
+                using var device = e.DeviceSpace ();
+                e.Canvas.Clear (SkiaSharp.SKColors.Transparent);
+            }
         }
 
         /// <summary>Gets or sets the MenuStrip that is the main menu for the form.</summary>

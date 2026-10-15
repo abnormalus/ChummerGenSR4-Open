@@ -796,9 +796,10 @@ namespace Majorsilence.Forms
                     (ShowDropdownGlyph ? 10 : 0) + (ShowItemImages ? 16 : 0) + (CheckBoxes ? 20 : 0) + 12;
                 contentWidth = Math.Max(contentWidth, textWidth + LogicalToDeviceUnits(decorations));
 
-                // Items below the scroll offset are still counted but not added to the page.
-                if (totalVisible > top_index)
-                    _layoutItems.Add (item);
+                // Keep the traversal until scrollbar updates clamp the final top index.
+                // Collapsing a scrolled branch can reset it to zero during this layout;
+                // filtering beforehand produces an empty first frame after collapse.
+                _layoutItems.Add (item);
 
                 totalVisible++;
             }
@@ -829,6 +830,9 @@ namespace Majorsilence.Forms
                 client_rect.Width = Math.Max(client_rect.Width, contentWidth);
                 client_rect.X -= LogicalToDeviceUnits(hscrollbar.Value);
             }
+
+            if (top_index > 0)
+                _layoutItems.RemoveRange (0, Math.Min (top_index, _layoutItems.Count));
 
             // Push the whole stack up by the sub-row scroll offset; item[top_index] is then partly
             // clipped at the top and one extra row peeks in at the bottom (drawn by TreeViewRenderer).
@@ -1340,7 +1344,7 @@ namespace Majorsilence.Forms
         /// </summary>
         private bool TryFastScrollBlit (int shiftPx)
         {
-            if (shiftPx == 0 || (NeedsPaint && !_skipNextRepaint) || BackgroundImage is not null || CurrentStyle.Border.HasRadius)
+            if (RenderingDiagnostics.ForceFullRedraw || shiftPx == 0 || (NeedsPaint && !_skipNextRepaint) || BackgroundImage is not null || CurrentStyle.Border.HasRadius)
                 return false;
             if (hscrollbar.Visible) return false;
             if (BackBufferPixels is not { } buffer || buffer.Width != ScaledSize.Width || buffer.Height != ScaledSize.Height)
@@ -1384,6 +1388,13 @@ namespace Majorsilence.Forms
             _invalidatingForFastScroll = true;
             try { Invalidate (); } finally { _invalidatingForFastScroll = false; }
             return true;
+        }
+
+        // A full refresh cannot consume a previously patched scroll buffer as a fresh paint.
+        internal override void DiscardCachedPixels ()
+        {
+            _skipNextRepaint = false;
+            base.DiscardCachedPixels ();
         }
 
         /// <inheritdoc/>

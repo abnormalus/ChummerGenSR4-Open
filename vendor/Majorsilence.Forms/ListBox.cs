@@ -827,6 +827,13 @@ namespace Majorsilence.Forms
         private bool _skipNextRepaint;
         private bool _invalidatingForFastScroll;
 
+        // A full refresh cannot consume a previously patched scroll buffer as a fresh paint.
+        internal override void DiscardCachedPixels ()
+        {
+            _skipNextRepaint = false;
+            base.DiscardCachedPixels ();
+        }
+
         /// <inheritdoc/>
         protected override void OnInvalidated (InvalidateEventArgs e)
         {
@@ -863,7 +870,7 @@ namespace Majorsilence.Forms
         // just the exposed strip.
         private bool TryFastScrollBlit (int shiftPx)
         {
-            if (shiftPx == 0 || (NeedsPaint && !_skipNextRepaint) || BackgroundImage is not null || CurrentStyle.Border.HasRadius)
+            if (RenderingDiagnostics.ForceFullRedraw || shiftPx == 0 || (NeedsPaint && !_skipNextRepaint) || BackgroundImage is not null || CurrentStyle.Border.HasRadius)
                 return false;
 
             if (BackBufferPixels is not { } buffer || buffer.Width != ScaledSize.Width || buffer.Height != ScaledSize.Height)

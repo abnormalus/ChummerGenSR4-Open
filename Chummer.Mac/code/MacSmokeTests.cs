@@ -107,6 +107,7 @@ namespace Chummer
                 foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data"), "*.xml"))
                     XmlManager.Instance.Load(Path.GetFileName(file));
                 Console.WriteLine("PASS ruleset XML loads");
+                RenderingChecks.Run(output, Check);
                 using (var repaintForm = new Form { Width = 300, Height = 120 })
                 {
                     var valueLabel = new Label { Text = "MMMM", AutoSize = false, Width = 120 };

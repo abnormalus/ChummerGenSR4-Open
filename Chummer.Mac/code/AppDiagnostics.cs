@@ -92,6 +92,7 @@ namespace Chummer
                         build = typeof(Program).Module.ModuleVersionId.ToString(),
                         runtime = Environment.Version.ToString(), platform = Environment.OSVersion.Platform.ToString(),
                         osVersion = Environment.OSVersion.VersionString, architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+                        fullRedraw = Majorsilence.Forms.RenderingDiagnostics.ForceFullRedraw,
                         exceptions
                     }) + Environment.NewLine);
                 }

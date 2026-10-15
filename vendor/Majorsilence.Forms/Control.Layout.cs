@@ -656,6 +656,14 @@ public partial class Control
         //_clientWidth = clientWidth;
         //_clientHeight = clientHeight;
 
+        // Cached parent pixels include this child's previous position and extent.
+        // Recompose the parent after any geometry change so moved/shrunk controls
+        // erase their old footprint, even when no content property changed.
+        if (newLocation || newSize) {
+            Invalidate ();
+            Parent?.Invalidate ();
+        }
+
         if (newLocation)
             OnLocationChanged (EventArgs.Empty);
 

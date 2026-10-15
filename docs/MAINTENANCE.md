@@ -72,3 +72,5 @@ The MSI embeds the full publish output, installs per user into `%LOCALAPPDATA%\P
 Windows executables must embed `packaging/windows/app.manifest` via `ApplicationManifest`. The explicit Windows 10/11 compatibility declaration permits the layered child windows used by Avalonia's native PDF browser host; an unmanifested build can fail in `Win32NativeControlHost.DumbWindow` before the PDF loads. Keep standard-user (`asInvoker`) privileges and per-monitor DPI awareness. Check the published PE's RT_MANIFEST resource, not just the source XML, when diagnosing this failure.
 
 Compatibility capabilities and remaining interaction checks are recorded in `COMPATIBILITY_CONTROLS.md`. Bundled reader integrity and update procedures are in `PDFJS_MAINTENANCE.md`.
+
+Rendering ownership, the Help → Full Redraw (Diagnostic) option, visual regressions and the next bounded control migration are documented in [RENDERING.md](RENDERING.md).

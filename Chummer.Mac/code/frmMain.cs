@@ -103,6 +103,7 @@ namespace Chummer
             var logsCommand = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_OpenDiagnosticLogs")) { Name = "openDiagnosticLogs", Tag = "Menu_OpenDiagnosticLogs" };
             logsCommand.Click += (_, _) => AppPlatform.OpenLogs(this);
             helpMenu.DropDownItems.Add(logsCommand);
+            helpMenu.DropDownItems.Add(AppRenderingDiagnostics.CreateMenuCommand());
 
 
 			// Attempt to cache the XML files that are used the most.

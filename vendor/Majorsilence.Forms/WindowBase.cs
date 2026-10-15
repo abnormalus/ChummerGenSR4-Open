@@ -1145,9 +1145,14 @@ namespace Majorsilence.Forms
         /// <summary>Marks the specified portion of the window as needing to be redrawn.</summary>
         public void Invalidate (System.Drawing.Rectangle rectangle) => Invalidate ();
 
-        /// <summary>Marks the window as needing to be redrawn. Mirrors WinForms Invalidate(bool);
-        /// children repaint with the window here regardless.</summary>
-        public void Invalidate (bool invalidateChildren) => Invalidate ();
+        /// <summary>Marks the window for redraw and optionally invalidates all cached child pixels.</summary>
+        public void Invalidate (bool invalidateChildren)
+        {
+            if (invalidateChildren)
+                adapter.Invalidate (true);
+            else
+                Invalidate ();
+        }
 
         /// <summary>Forces the window and every control on it to repaint, painting the controls before
         /// this returns. Mirrors WinForms Control.Refresh.</summary>
