@@ -106,6 +106,9 @@ jobs:
           path: artifacts/nightly/assets
           if-no-files-found: error
   publish:
+    concurrency:
+      group: chummer-release-assets
+      cancel-in-progress: false
     needs: package
     runs-on: ubuntu-latest
     permissions:

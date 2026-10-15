@@ -1,0 +1,27 @@
+name: Consolidate daily download archives
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - scripts/archive-nightly.py
+      - scripts/tests/test_archive_nightly.py
+      - .github/workflows/archive-maintenance.yml
+permissions:
+  contents: write
+concurrency:
+  group: chummer-release-assets
+  cancel-in-progress: false
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify archival safeguards
+        run: python3 scripts/tests/test_archive_nightly.py
+      - name: Consolidate verified archives by local calendar day
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: python3 scripts/archive-nightly.py --consolidate

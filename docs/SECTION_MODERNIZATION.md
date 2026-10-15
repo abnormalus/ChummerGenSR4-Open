@@ -10,7 +10,8 @@ As each application section is repaired or improved, review whether it recreates
 4. **Extract shared behavior.** Put commands, validation, searchable editors and data-change notifications behind reusable interfaces/components. Avoid new copies of screen-specific fixes. Introduce observable view models in bounded sections rather than attempting to convert the entire mutable character model at once.
 5. **Verify actual transitions.** Test the section's meaningful operations and failures, not only its initial appearance. Include keyboard/mouse interaction, cancellation, selection changes, long-to-short text, resizing/scaling, tab/document switching and source-setting changes as relevant. Add regressions for observed defects. For migrated rendering, use targeted native visual checks on both Mac and Windows, alongside headless checks where useful.
 6. **Retire the old path after validation.** Remove obsolete drawing, manual synchronization and duplicate handlers for the migrated section once its required behavior passes. Keep explicit, documented adapters where legacy rules still require them; avoid maintaining two active implementations of the same screen.
-7. **Publish through the established process.** Run checks appropriate to the change plus required release checks, preserve prior downloads in the archive, and describe remaining limitations accurately.
+7. **Finish documentation and naming.** Document the purpose of meaningful code blocks, non-obvious rules and assumptions, data flow, ownership, error/cancellation handling and how to verify the section. Explain why choices exist rather than paraphrasing every statement. Replace unclear abbreviations and generic temporary names with descriptive names as the affected code is modernized; avoid unrelated bulk renaming. Preserve serialized field names, reflection-sensitive identifiers, external contracts and localization keys unless explicitly migrated and tested. Refresh section-level maintenance guidance and remove stale comments.
+8. **Publish through the established process.** Run checks appropriate to the change plus required release checks, preserve prior downloads in the archive, and describe remaining limitations accurately.
 
 ## Reusable areas to assess
 
@@ -30,3 +31,7 @@ As each application section is repaired or improved, review whether it recreates
 Repeated repaint defects justify examining shared invalidation/caching behavior before adding more screen-specific refresh calls. Prioritize the frequently affected item lists and changing detail values. A diagnostic full-redraw mode can help compare cached and complete rendering; it is a diagnostic proposal, not an implemented feature. Prefer event-driven correctness and standard controls over continuously repainting the whole window to hide defects.
 
 The next interaction-audit target remains repeated character switching and toolbar/menu behavior. Select the next substantial screen migration from confirmed defects and integration cost. Keep Shadowrun rules, character compatibility and Mac/Windows usability as acceptance criteria throughout.
+
+## Final consistency pass
+
+After the section migrations are complete, review the modernized code and maintenance documentation together for consistent terminology, descriptive variable names, stale comments, missing explanations of non-obvious blocks, architecture boundaries and reproducible verification instructions. Documentation and naming are acceptance work for each section as well as this final pass; they should not accumulate until the end of the project.

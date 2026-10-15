@@ -28,8 +28,12 @@ Mac builds are ad-hoc signed development previews, not Apple-notarized releases.
 
 ## Archived builds
 
-Before replacing Nightly, the publisher downloads every old asset, creates a separate **Archive — timestamp** prerelease retaining the original source commit in its notes and BUILD.txt, and downloads that archive again to verify all SHA-256 hashes. If archiving fails, publication stops before replacing Nightly. Archive tags are immutable, and retries reuse the same archive instead of duplicating it. Identical republishing does not create another archive.
+Before replacing Nightly, the publisher preserves its downloads in one **Archive — YYYY-MM-DD** prerelease per America/Chicago calendar day. Downloads from each build share a UTC timestamp and identity prefix, so names cannot collide even when daylight saving repeats a local time. The release body lists local build times, source commits and download links in a table.
 
-The Nightly Assets section contains only the current packages and metadata. Older or legacy filenames are removed from Nightly only after successful archival and upload of the replacement. Find older downloads under **Releases**, in releases titled **Archive — timestamp**. GitHub releases have no custom archive category; separate archive releases provide that organization.
+Every original asset is preserved byte-for-byte under its prefixed filename, including BUILD.txt and its original checksum file. ARCHIVE.json retains original names, source commits, original release notes and SHA-256 hashes. SHA256SUMS-ARCHIVE.txt validates the renamed downloads directly. Original checksum files still refer to the original filenames; use the daily checksum file for the grouped assets.
 
-Archive tags identify the publishing revision, which allows creation using the workflow token without broader workflow-edit permissions. The archived app’s actual source revision remains in BUILD.txt and the archive notes.
+Each copied build and its uploaded metadata are downloaded again and hash-verified before publication proceeds. A failure leaves Nightly and the original archive release available. Retries reuse verified build assets and reject conflicting content. Daily archives append builds rather than overwrite them. Archive tags stay fixed; actual application source revisions are recorded separately for each build.
+
+The **Consolidate daily download archives** workflow safely migrates the old timestamped archive releases. It runs when the archival scripts change or can be started manually from Actions. It removes each old release heading only after its daily copy and metadata are verified; original Git tags remain. It never removes Nightly. Consolidation and Nightly publication share a release-assets concurrency lock to prevent concurrent metadata edits.
+
+The Nightly Assets section contains only the current packages and metadata. Superseded filenames are removed from Nightly only after verified archival and successful replacement uploads. GitHub does not provide nested release categories; daily releases keep the main Releases page compact while preserving individual builds.
