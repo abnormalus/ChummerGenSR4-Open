@@ -36,12 +36,12 @@ internal static class NativeWeaponPickerChecks
             var pending = picker.ShowDialogAsync(main);
             var window = (WeaponPickerWindow)NativeDialogHost.ActiveWindow!;
             window.SearchBox.Text = "Ares Predator";
-            try { await WaitForAsync(() => window.WeaponList.SelectedItem is WeaponCatalogEntry && window.AcceptButton.IsEnabled); }
+            try { await WaitForAsync(() => window.WeaponList.SelectedItem is CatalogEntry && window.AcceptButton.IsEnabled); }
             catch
             {
                 File.WriteAllText(Path.Combine(output, "native-picker-state.json"), System.Text.Json.JsonSerializer.Serialize(new {
                     modelItems = window.Model.Items.Count, listItems = window.WeaponList.ItemCount,
-                    modelSelection = window.Model.SelectedEntry?.Name, listSelection = (window.WeaponList.SelectedItem as WeaponCatalogEntry)?.Name,
+                    modelSelection = window.Model.SelectedEntry?.Name, listSelection = (window.WeaponList.SelectedItem as CatalogEntry)?.Name,
                     modelSearch = window.Model.SearchText, inputSearch = window.SearchBox.Text, window.Model.CanAccept, window.Model.Error
                 }));
                 using var failed = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width, (int)window.ClientSize.Height));

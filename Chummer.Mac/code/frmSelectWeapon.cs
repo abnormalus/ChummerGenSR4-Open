@@ -14,7 +14,7 @@ public sealed class frmSelectWeapon : IDisposable
     private readonly Character character;
     private readonly WeaponPickerModel model;
     private WeaponPickerWindow? window;
-    private WeaponSelection? selection;
+    private CatalogSelection? selection;
     public DialogResult DialogResult { get; private set; } = DialogResult.Cancel;
     public string SelectedWeapon => selection?.Name ?? "";
     public bool AddAgain => selection?.AddAgain ?? false;
@@ -43,7 +43,7 @@ public sealed class frmSelectWeapon : IDisposable
         window = new WeaponPickerWindow(model, character);
         try
         {
-            selection = await NativeDialogHost.ShowAsync<WeaponSelection>(window, owner);
+            selection = await NativeDialogHost.ShowAsync<CatalogSelection>(window, owner);
             if (selection != null) DialogResult = DialogResult.OK;
             return DialogResult;
         }

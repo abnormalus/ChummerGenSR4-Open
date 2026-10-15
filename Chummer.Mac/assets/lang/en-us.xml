@@ -6753,5 +6753,10 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>Packs_Progress</key><text>Preparing kit item {0} of {1}…</text></string>
 <string><key>Packs_Failed</key><text>The PACKS kit could not be imported. Your original character is unchanged. Check the diagnostic log; the kit may reference missing or invalid catalog data.</text></string>
 <string><key>Packs_Changed</key><text>The character or its rules changed while the kit was being prepared. No kit was applied, and your latest changes were kept. Please try again.</text></string>
+    <string><key>CatalogPicker_DetailError</key><text>This item could not be previewed. Please select another item and check diagnostic logs.</text></string>
+    <string><key>CatalogPicker_SelectionChanged</key><text>The selected item is no longer available with the current sources. Please select again.</text></string>
+    <string><key>CatalogPicker_SearchHint</key><text>Search enabled sources</text></string>
+    <string><key>CatalogPicker_NoMatches</key><text>No matching items in the enabled sources.</text></string>
+    <string><key>Menu_BuyAmmunition</key><text>Buy Ammunition…</text></string>
 </strings>
 </chummer>

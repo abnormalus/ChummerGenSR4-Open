@@ -475,8 +475,12 @@ namespace Majorsilence.Forms
                 var task = dialog_task;
                 dialog_task = null;
 
-                // Dismissing a dialog without setting a result is a cancel, as in WinForms.
-                task.SetResult (dialog_result == DialogResult.None ? DialogResult.Cancel : dialog_result);
+                // Keep the property and returned task consistent. Legacy callers often
+                // read DialogResult after ShowDialog instead of inspecting its return value.
+                // Leaving None here let title-bar cancellation proceed as a purchase.
+                if (dialog_result == DialogResult.None)
+                    dialog_result = DialogResult.Cancel;
+                task.SetResult (dialog_result);
             }
 
             // Pop only if we are the innermost modal -- always true for correctly-nested show/close

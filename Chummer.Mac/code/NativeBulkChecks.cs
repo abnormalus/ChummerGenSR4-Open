@@ -37,9 +37,15 @@ internal static class NativeBulkChecks
     {
         var checks = new List<string>();
         bool passed = false;
+        string? failedCheck = null;
         int uiThread = Environment.CurrentManagedThreadId;
         void Check(bool valid, string name)
-        { if (!valid) throw new InvalidOperationException(name); checks.Add(name); AppDiagnostics.Record("bulk.native-check"); }
+        {
+            // Only fixed check labels enter the report: exception messages may
+            // contain local paths or character data and remain excluded.
+            if (!valid) { failedCheck = name; throw new InvalidOperationException(name); }
+            checks.Add(name); AppDiagnostics.Record("bulk.native-check");
+        }
         try
         {
             Check(SynchronizationContext.Current != null, "Native UI synchronization context is installed");
@@ -50,6 +56,8 @@ internal static class NativeBulkChecks
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
             await NativeCharacterSwitchChecks.RunAsync(main, character, Check);
             await NativeWeaponPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeArmorPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeInventoryEnhancementChecks.RunAsync(main, character, Check);
             var editor = new frmCreate(character) { Loading = true, MdiParent = main };
             editor.Show();
             byte[] original = character.CaptureSnapshot();
@@ -136,7 +144,7 @@ internal static class NativeBulkChecks
         finally
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))!);
-            await File.WriteAllTextAsync(report, JsonSerializer.Serialize(new { passed, checks }, new JsonSerializerOptions { WriteIndented = true }));
+            await File.WriteAllTextAsync(report, JsonSerializer.Serialize(new { passed, checks, failedCheck }, new JsonSerializerOptions { WriteIndented = true }));
         }
     }
 }

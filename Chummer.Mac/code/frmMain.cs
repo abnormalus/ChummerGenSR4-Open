@@ -304,6 +304,8 @@ namespace Chummer
 
         internal void RefreshCharacterToolbar()
         {
+            if (ActiveMdiChild is frmCreate creationEditor) creationEditor.RefreshEditCommands();
+            else if (ActiveMdiChild is frmCareer careerEditor) careerEditor.RefreshEditCommands();
             ToolStrip source = ActiveMdiChild switch
             {
                 frmCreate creation => creation.CharacterToolbar,

@@ -988,7 +988,8 @@ namespace Chummer
                     Field<Button>(licensePrompt, "cmdOK").PerformClick();
                     Check(licensePrompt.SelectedItem == PromptDetails.Placeholder, "blank license detail accepts placeholder");
                 }
-                using (var dialog = new frmSelectArmor(character)) Capture(dialog, output, "armor-dialog");
+                ArmorPickerChecks.Run(character, Check);
+                InventoryEnhancementChecks.Run(character, Check);
                 using (var dialog = new frmSelectGear(character)) Capture(dialog, output, "gear-dialog");
                 using (var dialog = new frmSelectCyberware(character)) Capture(dialog, output, "cyberware-dialog");
                 using (var dialog = new frmSelectQuality(character)) Capture(dialog, output, "quality-dialog");

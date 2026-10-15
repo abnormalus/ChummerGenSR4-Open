@@ -1,6 +1,6 @@
 # Native weapon picker
 
-`WeaponPickerWindow` uses standard Avalonia layout, lists, scrolling, prefix typing and bindings. `WeaponPickerModel` owns observable presentation state and literal search across enabled sourcebooks. Browsing creates an unattached core Weapon for established calculated values; it never purchases or changes inventory.
+`WeaponPickerWindow` configures the shared `CatalogPickerWindow` with weapon detail fields. Its standard Avalonia layout, lists, scrolling, prefix typing and bindings are shared with armor. `WeaponPickerModel` supplies weapon calculations; `CatalogPickerModel` owns observable presentation state and literal search across enabled sourcebooks. See [CATALOG_PICKERS.md](CATALOG_PICKERS.md). Browsing creates an unattached core Weapon for established calculated values; it never purchases or changes inventory.
 
 `frmSelectWeapon` is the compatibility boundary for existing creation and career handlers. Acceptance returns name, category, free purchase, markup and Add More. Name plus category identifies duplicate catalog names correctly. The callers retain purchase, add-in and inventory rules. Character file fields and encoding are unchanged. The old picker designer and resource file are removed from the Mac/Windows application; historical original sources remain unchanged.
 
@@ -12,6 +12,6 @@ Invalid catalog definitions clear details, display a localized error and disable
 
 ## Verification
 
-`WeaponPickerChecks` runs in the headless smoke suite: source filtering, quoted search, calculated details, free/marked-up cost, duplicate names, malformed entries and unchanged character snapshots. `NativeWeaponPickerChecks` runs in the combined Mac/Windows bulk checks: real bindings, cumulative typing, empty search, resizing, Add More, cancellation, Quit and the existing synchronous creation handler. CI requires at least 41 combined native checks. The generated native picker screenshot supports visual inspection of the smaller layout.
+`WeaponPickerChecks` runs in the headless smoke suite: source filtering, quoted search, calculated details, free/marked-up cost, duplicate names, malformed entries and unchanged character snapshots. `NativeWeaponPickerChecks` runs in the combined Mac/Windows bulk checks: real bindings, cumulative typing, empty search, resizing, Add More, cancellation, Quit and the existing synchronous creation handler. CI requires at least 60 combined native checks. The generated native picker screenshot supports visual inspection of the smaller layout.
 
-Future migrations should keep rules out of the window and move callers to asynchronous commands incrementally. Other equipment pickers still use the compatibility controls; they are separate bounded migrations.
+Future migrations should keep rules out of the window and move callers to asynchronous commands incrementally. Armor now uses the same catalog components. Remaining equipment pickers use compatibility controls and remain separate bounded migrations.

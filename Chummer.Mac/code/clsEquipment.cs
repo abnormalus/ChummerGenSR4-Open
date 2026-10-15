@@ -9858,13 +9858,18 @@ namespace Chummer
 			// If the Gear is Ammunition, ask the user to select a Weapon Category for it to be limited to.
 			if (_strCategory == "Ammunition" && _strName.StartsWith("Ammo:"))
 			{
-				frmSelectWeaponCategory frmPickWeaponCategory = new frmSelectWeaponCategory();
-				frmPickWeaponCategory.Description = LanguageManager.Instance.GetString("String_SelectWeaponCategoryAmmo");
-				if (strForceValue != "")
-					frmPickWeaponCategory.OnlyCategory = strForceValue;
-				frmPickWeaponCategory.ShowDialog();
+                // A weapon-aware purchase already knows the canonical category.
+                // Avoid opening even a one-choice dialog in that case.
+                if (strForceValue != "" && AmmunitionSelectionPolicy.IsKnownCategory(strForceValue))
+                    _strExtra = strForceValue;
+                else
+                {
+                    using var categoryPicker = new frmSelectWeaponCategory();
+                    categoryPicker.Description = LanguageManager.Instance.GetString("String_SelectWeaponCategoryAmmo");
+                    categoryPicker.ShowDialog();
+                    _strExtra = categoryPicker.SelectedCategory;
+                }
 
-				_strExtra = frmPickWeaponCategory.SelectedCategory;
 				objNode.Text += " (" + _strExtra + ")";
 			}
 

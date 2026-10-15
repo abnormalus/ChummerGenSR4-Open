@@ -32,6 +32,18 @@ namespace Chummer
 		private int _intMaximumCapacity = -1;
 		private bool _blnAddAgain = false;
 		private static string _strSelectCategory = "";
+
+        // A caller can prefer a contextual category without overriding the allowed
+        // categories or source filters. Missing categories fall back normally.
+        public string InitialCategory { get; set; } = "";
+        public string AmmunitionCategory { get; set; } = "";
+        private bool MatchesAmmunitionContext(XmlNode definition) => AmmunitionCategory == "" ||
+            definition["category"]?.InnerText == "Ammunition" &&
+            AmmunitionSelectionPolicy.IsCompatible(definition["name"].InnerText, AmmunitionCategory, _objCharacter.Options);
+        internal void PreferCategoryForParent(Gear parent)
+        {
+            if (parent is Commlink) InitialCategory = "Commlink Operating System";
+        }
 		private bool _blnShowPositiveCapacityOnly = false;
 		private bool _blnShowNegativeCapacityOnly = false;
 		private bool _blnShowArmorCapacityOnly = false;
@@ -176,11 +188,13 @@ namespace Chummer
 			cboCategory.DisplayMember = "Name";
 			cboCategory.DataSource = _lstCategory;
 
-			// Select the first Category in the list.
-			if (_strSelectCategory == "")
+            // Context takes precedence over session memory only if it survived filtering.
+            string preferredCategory = _lstCategory.Any(item => item.Value == InitialCategory)
+                ? InitialCategory : _strSelectCategory;
+			if (preferredCategory == "")
 				cboCategory.SelectedIndex = 0;
 			else
-				cboCategory.SelectedValue = _strSelectCategory;
+				cboCategory.SelectedValue = preferredCategory;
 
 			if (cboCategory.SelectedIndex == -1)
 				cboCategory.SelectedIndex = 0;
@@ -241,6 +255,7 @@ namespace Chummer
 
 			foreach (XmlNode objXmlGear in objXmlGearList)
 			{
+                if (!MatchesAmmunitionContext(objXmlGear)) continue;
 				ListItem objItem = new ListItem();
 				objItem.Value = objXmlGear["name"].InnerText;
 				if (objXmlGear["translate"] != null)
@@ -362,6 +377,7 @@ namespace Chummer
 			bool blnAddToList;
 			foreach (XmlNode objXmlGear in objXmlGearList)
 			{
+                if (!MatchesAmmunitionContext(objXmlGear)) continue;
 				blnAddToList = true;
 				if (_blnShowArmorCapacityOnly)
 				{

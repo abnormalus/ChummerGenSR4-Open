@@ -57,6 +57,7 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
+            InitializeWeaponAmmunitionMenus();
             Load += (_, _) => { if (!_packsWorkspace) InitializeInventoryUndo(); };
             treQualities.ShowLines = false;
             splitMain.Dock = DockStyle.Fill;
@@ -1439,6 +1440,10 @@ namespace Chummer
 		}
 
         internal ToolStrip CharacterToolbar => toolStrip;
+
+        // Clipboard contents belong to the session, while the paste destination
+        // belongs to this editor. Re-evaluate both when returning to a document.
+        internal void RefreshEditCommands() => RefreshPasteStatus();
 
         private void frmCreate_Activated(object sender, EventArgs e)
         {
@@ -6151,17 +6156,15 @@ namespace Chummer
 
 		private void cmdAddArmor_Click(object sender, EventArgs e)
 		{
-			frmSelectArmor frmPickArmor = new frmSelectArmor(_objCharacter);
+			using frmSelectArmor frmPickArmor = new frmSelectArmor(_objCharacter);
 			frmPickArmor.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
 			if (frmPickArmor.DialogResult == DialogResult.Cancel)
 				return;
 
-			// Open the Armor XML file and locate the selected piece.
-			XmlDocument objXmlDocument = XmlManager.Instance.Load("armor.xml");
-
-			XmlNode objXmlArmor = objXmlDocument.SelectSingleNode("/chummer/armors/armor[name = \"" + frmPickArmor.SelectedArmor + "\"]");
+            // Resolve the exact catalog identity accepted by the native picker.
+            XmlNode objXmlArmor = frmPickArmor.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			Armor objArmor = new Armor(_objCharacter);
@@ -8705,7 +8708,7 @@ namespace Chummer
 			}
 			
 			// Make sure the Weapon allows Accessories to be added to it.
-			if (!Convert.ToBoolean(objXmlWeapon["allowaccessory"].InnerText))
+			if (!WeaponAccessoryPolicy.CanAdd(objWeapon, objXmlWeapon))
 			{
 				MessageBox.Show(LanguageManager.Instance.GetString("Message_CannotModifyWeapon"), LanguageManager.Instance.GetString("MessageTitle_CannotModifyWeapon"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				return;
@@ -8722,7 +8725,7 @@ namespace Chummer
 
 			frmPickWeaponAccessory.WeaponCost = objWeapon.Cost;
 			frmPickWeaponAccessory.AccessoryMultiplier = objWeapon.AccessoryMultiplier;
-			frmPickWeaponAccessory.ShowDialog();
+			frmPickWeaponAccessory.ShowDialog(this);
 
 			if (frmPickWeaponAccessory.DialogResult == DialogResult.Cancel)
 				return;
@@ -9099,7 +9102,7 @@ namespace Chummer
 			}
 
 			// Make sure the Weapon allows Accessories to be added to it.
-			if (!Convert.ToBoolean(objXmlWeapon["allowaccessory"].InnerText))
+			if (!WeaponAccessoryPolicy.CanAdd(objWeapon, objXmlWeapon))
 			{
 				MessageBox.Show(LanguageManager.Instance.GetString("Message_CannotModifyWeapon"), LanguageManager.Instance.GetString("MessageTitle_CannotModifyWeapon"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				return;
@@ -9125,7 +9128,7 @@ namespace Chummer
 
 			frmPickWeaponAccessory.WeaponCost = objWeapon.Cost;
 			frmPickWeaponAccessory.AccessoryMultiplier = objWeapon.AccessoryMultiplier;
-			frmPickWeaponAccessory.ShowDialog();
+			frmPickWeaponAccessory.ShowDialog(this);
 
 			if (frmPickWeaponAccessory.DialogResult == DialogResult.Cancel)
 				return;
@@ -9542,6 +9545,8 @@ namespace Chummer
 
 			if (frmPickGear.AllowedCategories != "")
 				frmPickGear.AllowedCategories += objSensor.Category + ",";
+
+            frmPickGear.PreferCategoryForParent(objSensor);
 			
 			frmPickGear.ShowDialog(this);
 
@@ -9670,20 +9675,8 @@ namespace Chummer
 			return 0;
 		}
 
-		private bool IsAmmunitionCompatible(string strAmmoName, string strAmmoCategory)
-		{
-			if (strAmmoCategory == string.Empty) return false;
-			if (strAmmoName == "Ammo: Stick-n-Shock" && _objOptions.RestrictStickNShock && _objOptions.StickNShockExcludedWeaponCategories.Contains(strAmmoCategory)) return false;
-			if (strAmmoName.Contains("Arrow")) return strAmmoCategory == "Bows";
-			if (strAmmoName.Contains("Bolt")) return strAmmoCategory == "Crossbows";
-			if (strAmmoName.Contains("Assault Cannon")) return strAmmoCategory == "Assault Cannons";
-			if (strAmmoName.Contains("Taser Dart")) return strAmmoCategory == "Tasers";
-			if (strAmmoName.Contains("Gauss Rifle")) return strAmmoCategory == "Gauss Rifles";
-			if (strAmmoName.Contains("Grenade") || strAmmoName.Contains("Minigrenade")) return strAmmoCategory == "Grenade Launchers";
-			if (strAmmoName.Contains("Missile") || strAmmoName.Contains("Rocket")) return strAmmoCategory == "Missile Launchers";
-			if (strAmmoName.Contains("Mortar")) return strAmmoCategory == "Mortar Launchers";
-			return strAmmoCategory != "Bows" && strAmmoCategory != "Crossbows" && strAmmoCategory != "Grenade Launchers" && strAmmoCategory != "Missile Launchers" && strAmmoCategory != "Mortar Launchers";
-		}
+        private bool IsAmmunitionCompatible(string name, string category) =>
+            AmmunitionSelectionPolicy.IsCompatible(name, category, _objOptions);
 
 		private void tsVehicleGearAddAsPlugin_Click(object sender, EventArgs e)
 		{
@@ -11566,6 +11559,8 @@ namespace Chummer
 			if (frmPickGear.AllowedCategories != "")
 				frmPickGear.AllowedCategories += objSensor.Category + ",";
 
+            frmPickGear.PreferCategoryForParent(objSensor);
+
 			frmPickGear.ShowDialog(this);
 
 			if (frmPickGear.DialogResult == DialogResult.Cancel)
@@ -11711,6 +11706,8 @@ namespace Chummer
 
 			if (frmPickGear.AllowedCategories != "")
 				frmPickGear.AllowedCategories += objSensor.Category + ",";
+
+            frmPickGear.PreferCategoryForParent(objSensor);
 
 			frmPickGear.ShowDialog(this);
 
@@ -11994,6 +11991,8 @@ namespace Chummer
 			if (frmPickGear.AllowedCategories != "")
 				frmPickGear.AllowedCategories += objSensor.Category + ",";
 
+            frmPickGear.PreferCategoryForParent(objSensor);
+
 			frmPickGear.ShowDialog(this);
 
 			if (frmPickGear.DialogResult == DialogResult.Cancel)
@@ -12239,6 +12238,8 @@ namespace Chummer
 
 			if (frmPickGear.AllowedCategories != "")
 				frmPickGear.AllowedCategories += objSensor.Category + ",";
+
+            frmPickGear.PreferCategoryForParent(objSensor);
 
 			frmPickGear.ShowDialog(this);
 
@@ -18221,7 +18222,7 @@ namespace Chummer
         /// <summary>
 		/// Select a piece of Gear to be added to the character.
 		/// </summary>
-		private bool PickGear(string strForceItemValue = "")
+		private bool PickGear(string strForceItemValue = "", bool ammunitionOnly = false)
 		{
 			bool blnNullParent = false;
 			Gear objSelectedGear = _objFunctions.FindGear(treGear.SelectedNode.Tag.ToString(), _objCharacter.Gear);
@@ -18263,6 +18264,7 @@ namespace Chummer
 
 					if (objSelectedGear.Category == "Commlink")
 					{
+                        frmPickGear.PreferCategoryForParent(objSelectedGear);
 						Commlink objCommlink = (Commlink)objSelectedGear;
 						frmPickGear.CommlinkResponse = objCommlink.Response;
 						frmPickGear.CommlinkSignal = objCommlink.Signal;
@@ -18280,6 +18282,12 @@ namespace Chummer
 			catch
 			{
 			}
+
+            if (ammunitionOnly)
+            {
+                frmPickGear.AllowedCategories = "Ammunition";
+                frmPickGear.AmmunitionCategory = strForceItemValue;
+            }
 
 			frmPickGear.ShowDialog(this);
 
@@ -18511,6 +18519,7 @@ namespace Chummer
 
 					if (objSelectedGear.Category == "Commlink")
 					{
+                        frmPickGear.PreferCategoryForParent(objSelectedGear);
 						Commlink objCommlink = (Commlink)objSelectedGear;
 						frmPickGear.CommlinkResponse = objCommlink.Response;
 						frmPickGear.CommlinkSignal = objCommlink.Signal;

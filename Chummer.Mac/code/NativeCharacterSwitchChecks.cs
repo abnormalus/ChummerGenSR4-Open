@@ -25,9 +25,25 @@ internal static class NativeCharacterSwitchChecks
         var toolbar = Field<ToolStrip>(main, "toolStrip");
         var save = Field<ToolStripMenuItem>(main, "_mnuSaveCharacter");
         var close = Field<ToolStripMenuItem>(main, "_mnuCloseCharacter");
+        var previousClipboardType = GlobalOptions.Instance.ClipboardContentType;
         first.Show(); second.Show();
         try
         {
+            // Clipboard contents are shared across editors, unlike selection state.
+            // Returning to an unchanged tab must re-evaluate its edit commands.
+            GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+            Field<TabControl>(first, "tabCharacterTabs").SelectedTab = Field<TabPage>(first, "tabStreetGear");
+            Field<TabControl>(first, "tabStreetGearTabs").SelectedTab = Field<TabPage>(first, "tabGear");
+            first.Select(); second.Select();
+            GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Lifestyle;
+            first.Select();
+            check(!Field<ToolStripMenuItem>(first, "mnuEditPaste").Enabled && !Field<ToolStripButton>(first, "tsbPaste").Enabled,
+                "Returning to a character disables stale Paste after incompatible clipboard changes");
+            second.Select();
+            GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+            first.Select();
+            check(Field<ToolStripMenuItem>(first, "mnuEditPaste").Enabled && Field<ToolStripButton>(first, "tsbPaste").Enabled,
+                "Returning to a character enables compatible Paste in both menu and toolbar");
             for (int iteration = 0; iteration < 5; iteration++)
             {
                 first.Select(); await Task.Delay(20);
@@ -54,6 +70,7 @@ internal static class NativeCharacterSwitchChecks
         }
         finally
         {
+            GlobalOptions.Instance.ClipboardContentType = previousClipboardType;
             foreach (var editor in new Form[] { first, second })
                 if (!editor.IsDisposed)
                 {
