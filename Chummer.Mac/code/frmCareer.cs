@@ -1179,9 +1179,7 @@ namespace Chummer
 			treImprovements.DragDrop += treImprovements_DragDrop;
 
 			// Merge the ToolStrips.
-			ToolStripManager.RevertMerge("toolStrip");
-			ToolStripManager.Merge(toolStrip, "toolStrip");
-                if (toolStrip.Items.Count == 0) toolStrip.Visible = false;
+			if (MdiParent is frmMain main) main.RefreshCharacterToolbar();
 
 			// If this is a Sprite, re-label the Mental Attribute Labels.
 			if (_objCharacter.Metatype.EndsWith("Sprite"))
@@ -1413,11 +1411,12 @@ namespace Chummer
 					e.Cancel = true;
 				}
 			}
-			// Reset the ToolStrip so the Save button is removed for the currently closing window.
+			// Only the active editor owns the shared toolbar. Closing an inactive editor
+            // must leave the active editor's merged commands in place.
 			if (!e.Cancel)
 			{
-				if (!_blnSkipToolStripRevert)
-					ToolStripManager.RevertMerge("toolStrip");
+                if (!_blnSkipToolStripRevert && MdiParent is frmMain main)
+                    main.ReleaseCharacterToolbar(this);
 
 				// Unsubscribe from events.
 				_objCharacter.MAGEnabledChanged -= objCharacter_MAGEnabledChanged;
@@ -1538,13 +1537,12 @@ namespace Chummer
 			}
 		}
 
-		private void frmCareer_Activated(object sender, EventArgs e)
-		{
-			// Merge the ToolStrips.
-			ToolStripManager.RevertMerge("toolStrip");
-			ToolStripManager.Merge(toolStrip, "toolStrip");
-                if (toolStrip.Items.Count == 0) toolStrip.Visible = false;
-		}
+        internal ToolStrip CharacterToolbar => toolStrip;
+
+        private void frmCareer_Activated(object sender, EventArgs e)
+        {
+            if (MdiParent is frmMain main) main.RefreshCharacterToolbar();
+        }
 
 		private void frmCareer_Shown(object sender, EventArgs e)
 		{

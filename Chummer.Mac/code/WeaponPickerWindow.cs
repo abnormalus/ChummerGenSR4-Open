@@ -10,6 +10,7 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 
 namespace Chummer;
 
@@ -52,7 +53,14 @@ internal sealed class WeaponPickerWindow : Window
         var listPanel = new Grid { RowDefinitions = new RowDefinitions("*,Auto"), MinWidth = 220 };
         WeaponList = new ListBox { Name = "weaponChoices", IsTextSearchEnabled = true,
             ItemTemplate = new FuncDataTemplate<WeaponCatalogEntry>((entry, _) => new TextBlock {
-                Text = entry?.DisplayName, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 5) }) };
+                Text = entry?.DisplayName, TextWrapping = TextWrapping.Wrap }) };
+        // Compact desktop rows; minimum size rather than fixed height keeps wrapped
+        // names and larger accessibility fonts readable.
+        WeaponList.Styles.Add(new Style(selector => selector.OfType<ListBoxItem>())
+        {
+            Setters = { new Setter(Layoutable.MinHeightProperty, 26.0),
+                new Setter(TemplatedControl.PaddingProperty, new Thickness(6, 2)) }
+        });
         WeaponList.Bind(ItemsControl.ItemsSourceProperty, Read(nameof(model.Items)));
         WeaponList.Bind(SelectingItemsControl.SelectedItemProperty, Edit(nameof(model.SelectedEntry)));
         TextSearch.SetTextBinding(WeaponList, Read(nameof(WeaponCatalogEntry.DisplayName)));

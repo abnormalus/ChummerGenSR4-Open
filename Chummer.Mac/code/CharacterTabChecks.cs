@@ -16,6 +16,17 @@ internal static class CharacterTabChecks
         using var third = new Form { MdiParent = main, Text = "Third" };
         first.Show(); second.Show(); third.Show();
         check(tabs.TabCount == 3, "character tabs track three open editors");
+        first.Select();
+        check(main.ActiveMdiChild == first && tabs.SelectedTab == first.Tag,
+            "programmatic character activation selects its existing tab");
+        for (int iteration = 0; iteration < 5; iteration++)
+        {
+            tabs.SelectedTab = (TabPage)second.Tag!;
+            check(main.ActiveMdiChild == second, "tab selection activates its character on repeated switches " + iteration);
+            first.Select();
+        }
+        check(tabs.TabCount == 3, "repeated activation reuses existing headers");
+        third.Select();
         FormClosingEventHandler cancel = (_, args) => args.Cancel = true;
         third.FormClosing += cancel; third.Close();
         check(tabs.TabCount == 3 && !third.IsDisposed, "cancelled character close retains its tab");

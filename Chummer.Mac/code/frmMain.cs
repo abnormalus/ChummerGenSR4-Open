@@ -292,8 +292,39 @@ namespace Chummer
 			}
 		}
 
+        // The container's actual active document is the single toolbar owner. Hosted
+        // MDI activation does not reliably raise a separate native Activated event.
+        // Use explicit strips rather than the global name lookup across open forms.
+        internal void ReleaseCharacterToolbar(Form editor)
+        {
+            if (ActiveMdiChild != editor) return;
+            try { ToolStripManager.RevertMerge(toolStrip); }
+            catch (Exception exception) { AppDiagnostics.Record("toolbar-close-revert-failed", exception); }
+        }
+
+        internal void RefreshCharacterToolbar()
+        {
+            ToolStrip source = ActiveMdiChild switch
+            {
+                frmCreate creation => creation.CharacterToolbar,
+                frmCareer career => career.CharacterToolbar,
+                _ => null
+            };
+            try
+            {
+                ToolStripManager.RevertMerge(toolStrip);
+                if (source != null)
+                {
+                    ToolStripManager.Merge(source, toolStrip);
+                    source.Visible = source.Items.Count > 0;
+                }
+            }
+            catch (Exception exception) { AppDiagnostics.Record("toolbar-activation-merge-failed", exception); }
+        }
+
 		private void frmMain_MdiChildActivate(object sender, EventArgs e)
 		{
+            RefreshCharacterToolbar();
 			// If there are no child forms, hide the tab control.
 			if (this.ActiveMdiChild == null)
 				tabForms.Visible = false;
@@ -319,6 +350,11 @@ namespace Chummer
 					this.ActiveMdiChild.Tag = tp;
 					this.ActiveMdiChild.FormClosed += ActiveMdiChild_FormClosed;
 				}
+
+                // Activation can come from a menu or code as well as a tab click.
+                // Always synchronize the header, including already-open editors.
+                if (ActiveMdiChild.Tag is TabPage activeTab)
+                    tabForms.SelectedTab = activeTab;
 
 				// Don't show the tab control if there is only one window open.
 				if (tabForms.TabCount <= 1)

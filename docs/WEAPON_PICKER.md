@@ -12,6 +12,6 @@ Invalid catalog definitions clear details, display a localized error and disable
 
 ## Verification
 
-`WeaponPickerChecks` runs in the headless smoke suite: source filtering, quoted search, calculated details, free/marked-up cost, duplicate names, malformed entries and unchanged character snapshots. `NativeWeaponPickerChecks` runs in the combined Mac/Windows bulk checks: real bindings, cumulative typing, empty search, resizing, Add More, cancellation, Quit and the existing synchronous creation handler. CI requires at least 33 combined native checks. The generated native picker screenshot supports visual inspection of the smaller layout.
+`WeaponPickerChecks` runs in the headless smoke suite: source filtering, quoted search, calculated details, free/marked-up cost, duplicate names, malformed entries and unchanged character snapshots. `NativeWeaponPickerChecks` runs in the combined Mac/Windows bulk checks: real bindings, cumulative typing, empty search, resizing, Add More, cancellation, Quit and the existing synchronous creation handler. CI requires at least 41 combined native checks. The generated native picker screenshot supports visual inspection of the smaller layout.
 
 Future migrations should keep rules out of the window and move callers to asynchronous commands incrementally. Other equipment pickers still use the compatibility controls; they are separate bounded migrations.
