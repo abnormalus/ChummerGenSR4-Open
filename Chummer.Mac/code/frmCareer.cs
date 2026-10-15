@@ -5983,7 +5983,7 @@ namespace Chummer
 
 		private void cmdAddWeapon_Click(object sender, EventArgs e)
 		{
-			frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
+			using frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
 			frmPickWeapon.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
@@ -5993,7 +5993,7 @@ namespace Chummer
 			// Open the Weapons XML file and locate the selected piece.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("weapons.xml");
 
-			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + frmPickWeapon.SelectedWeapon + "\"]");
+			XmlNode objXmlWeapon = frmPickWeapon.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			Weapon objWeapon = new Weapon(_objCharacter);
@@ -10419,8 +10419,8 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
-			frmPickWeapon.ShowDialog();
+			using frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
+			frmPickWeapon.ShowDialog(this);
 
 			if (frmPickWeapon.DialogResult == DialogResult.Cancel)
 				return;
@@ -10428,7 +10428,7 @@ namespace Chummer
 			// Open the Weapons XML file and locate the selected piece.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("weapons.xml");
 
-			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + frmPickWeapon.SelectedWeapon + "\"]");
+			XmlNode objXmlWeapon = frmPickWeapon.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			Weapon objWeapon = new Weapon(_objCharacter);
@@ -10755,7 +10755,7 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
+			using frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
 			frmPickWeapon.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
@@ -10765,7 +10765,7 @@ namespace Chummer
 			// Open the Weapons XML file and locate the selected piece.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("weapons.xml");
 
-			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + frmPickWeapon.SelectedWeapon + "\"]");
+			XmlNode objXmlWeapon = frmPickWeapon.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			Weapon objWeapon = new Weapon(_objCharacter);
@@ -13195,7 +13195,7 @@ namespace Chummer
 			if (objSelectedWeapon == null)
 				return;
 
-			frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
+			using frmSelectWeapon frmPickWeapon = new frmSelectWeapon(_objCharacter, true);
 			frmPickWeapon.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
@@ -13205,7 +13205,7 @@ namespace Chummer
 			// Open the Weapons XML file and locate the selected piece.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("weapons.xml");
 
-			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + frmPickWeapon.SelectedWeapon + "\"]");
+			XmlNode objXmlWeapon = frmPickWeapon.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			Weapon objWeapon = new Weapon(_objCharacter);

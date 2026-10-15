@@ -108,6 +108,7 @@ namespace Chummer
                     XmlManager.Instance.Load(Path.GetFileName(file));
                 Console.WriteLine("PASS ruleset XML loads");
                 RenderingChecks.Run(output, Check);
+                CharacterTabChecks.Run(Check);
                 using (var repaintForm = new Form { Width = 300, Height = 120 })
                 {
                     var valueLabel = new Label { Text = "MMMM", AutoSize = false, Width = 120 };
@@ -933,7 +934,7 @@ namespace Chummer
                     Field<Button>(metatype, "cmdOK").PerformClick();
                     Check(character.Metatype == "Human", "metatype selection creates a Human");
                 }
-                using (var dialog = new frmSelectWeapon(character)) Capture(dialog, output, "weapon-dialog");
+                WeaponPickerChecks.Run(character, Check);
                 var qualityXml = XmlManager.Instance.Load("qualities.xml");
                 var detailQuality = new Quality(character);
                 detailQuality.Create(qualityXml.SelectSingleNode("/chummer/qualities/quality[name='Codeslinger']"),

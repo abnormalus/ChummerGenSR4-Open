@@ -44,6 +44,7 @@ namespace Chummer
             AppDiagnostics.Record("quit-start");
             try
             {
+                NativeDialogHost.CancelAll();
                 // Cancel preparation before the one shared close sequence, so a running
                 // batch does not cancel Quit or repeat unsaved-character prompts.
                 foreach (var editor in Application.OpenForms.OfType<frmCreate>().ToArray())

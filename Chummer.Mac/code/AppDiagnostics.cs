@@ -17,7 +17,7 @@ namespace Chummer
         internal static void CaptureUiState()
         {
             openFormCount = Majorsilence.Forms.Application.OpenForms.Count;
-            modalType = Majorsilence.Forms.Application.OpenForms.Cast<Majorsilence.Forms.Form>().LastOrDefault(form => form.Modal)?.GetType().Name;
+            modalType = Majorsilence.Forms.Application.OpenForms.Cast<Majorsilence.Forms.Form>().LastOrDefault(form => form.Modal)?.GetType().Name ?? NativeDialogHost.ActiveDialogType;
         }
         internal static IDisposable StartWatchdog()
         {

@@ -30,7 +30,7 @@ As each application section is repaired or improved, review whether it recreates
 
 Repeated repaint defects justify examining shared invalidation/caching behavior before adding more screen-specific refresh calls. Prioritize the frequently affected item lists and changing detail values. The first shared repaint corrections and session-only full-redraw diagnostic are implemented and documented in [RENDERING.md](RENDERING.md). Use the cached-versus-complete frame checks as acceptance coverage for the next bounded standard-control migration. Prefer event-driven correctness and standard controls over continuously repainting the whole window to hide defects.
 
-The next interaction-audit target remains repeated character switching and toolbar/menu behavior. Select the next substantial screen migration from confirmed defects and integration cost. Keep Shadowrun rules, character compatibility and Mac/Windows usability as acceptance criteria throughout.
+The first bounded migration is the weapon picker: standard Avalonia controls bind to `WeaponPickerModel`, while `frmSelectWeapon` preserves existing purchase callers. See [WEAPON_PICKER.md](WEAPON_PICKER.md). Character close now explicitly removes its tab header before disposing the editor; regression checks cover canceled, inactive, active and final closes. Continue the interaction audit with repeated character switching and toolbar/menu behavior. Select subsequent screen migrations from confirmed defects and integration cost. Keep Shadowrun rules, character compatibility and Mac/Windows usability as acceptance criteria throughout.
 
 ## Final consistency pass
 

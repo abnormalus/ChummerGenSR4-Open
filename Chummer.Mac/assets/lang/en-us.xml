@@ -636,6 +636,10 @@
             <key>Menu_OpenDiagnosticLogs</key>
             <text>Open Diagnostic Logs</text>
         </string>
+        <string><key>WeaponPicker_SearchHint</key><text>Search enabled sources</text></string>
+        <string><key>WeaponPicker_NoMatches</key><text>No matching weapons in the enabled sources.</text></string>
+        <string><key>WeaponPicker_DetailError</key><text>This weapon's details could not be loaded. Select another item. Diagnostic logs contain the error.</text></string>
+        <string><key>WeaponPicker_SelectionChanged</key><text>The selected weapon is no longer available in the enabled sources. Review the list and select again.</text></string>
         <string><key>Menu_FullRedrawDiagnostic</key><text>Full Redraw (Diagnostic)</text></string>
         <string><key>Menu_MacPreferences</key><text>Preferences…</text></string>
         <string><key>Menu_MacQuit</key><text>Quit Chummer</text></string>

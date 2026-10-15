@@ -328,21 +328,29 @@ namespace Chummer
 			}
 		}
 
-		private void ActiveMdiChild_FormClosed(object sender, FormClosedEventArgs e)
-		{
-			(sender as Form).FormClosed -= ActiveMdiChild_FormClosed;
-			(sender as Form).Dispose();
-			((sender as Form).Tag as TabPage).Dispose();
-			GC.Collect();
-			// Don't show the tab control if there is only one window open.
-			if (tabForms.TabCount <= 1)
-				tabForms.Visible = false;
-		}
+        private void ActiveMdiChild_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            if (sender is not Form closedEditor) return;
+            closedEditor.FormClosed -= ActiveMdiChild_FormClosed;
+            // TabPages owns the headers as well as the page controls. Disposing just
+            // the page can leave a header holding a disposed editor in the compat UI.
+            if (closedEditor.Tag is TabPage closedTab)
+            {
+                closedEditor.Tag = null;
+                closedTab.Tag = null;
+                tabForms.TabPages.Remove(closedTab);
+                closedTab.Dispose();
+            }
+            closedEditor.Dispose();
+            tabForms.Visible = tabForms.TabCount > 1;
+            if (ActiveMdiChild?.Tag is TabPage activeTab)
+                tabForms.SelectedTab = activeTab;
+        }
 
 		private void tabForms_SelectedIndexChanged(object sender, EventArgs e)
 		{
-			if (tabForms.SelectedTab != null && tabForms.SelectedTab.Tag != null)
-				(tabForms.SelectedTab.Tag as Form).Select();
+            if (tabForms.SelectedTab?.Tag is Form editor && !editor.IsDisposed)
+                editor.Select();
 		}
 
         internal void ObserveReplacementCharacter(Character original, Character replacement)
