@@ -1,0 +1,3 @@
+
+# Preserve reviewed upstream reader bytes and identical integrity hashes on every OS.
+Chummer.Mac/pdfjs/** -text

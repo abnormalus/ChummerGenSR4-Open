@@ -21,6 +21,11 @@ class PdfJsSafeguards(unittest.TestCase):
         (self.bundle / 'reader.mjs').write_bytes(b'reviewed code')
         self.manifest['files'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in self.bundle.iterdir()}
 
+    def test_checkouts_preserve_reviewed_reader_bytes(self):
+        # CRLF conversion changes upstream assets and must not be hidden by hash normalization.
+        attributes = SCRIPT.parents[1] / '.gitattributes'
+        self.assertIn('Chummer.Mac/pdfjs/** -text', attributes.read_text(encoding='utf-8').splitlines())
+
     def test_reviewed_bundle_passes(self):
         audit.verify(self.bundle, self.manifest)
 

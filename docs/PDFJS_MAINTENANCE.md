@@ -4,7 +4,7 @@ The offline reader uses pdfjs-dist 6.4.299. NuGet auditing does not cover this J
 
 `scripts/pdfjs-manifest.json` records SHA256 for every shipped reader file, including Chummer's custom reader.html, reader.css, reader.mjs and VERSION.txt. The initial baseline's 285 upstream files were compared byte-for-byte against the official npm tarball after verifying its recorded SHA512 integrity. The custom wrapper and provenance are separate reviewed application files.
 
-Run `python scripts/check-pdfjs.py` offline. Added, missing or changed files, symlinks, and inconsistent provenance fail. Both desktop CI jobs run this check and its regression tests before building. This manifest is a review record, not a cryptographic publisher signature; a reviewer must assess intentional code and manifest changes together.
+Run `python scripts/check-pdfjs.py` offline. Added, missing or changed files, symlinks, and inconsistent provenance fail. Git attributes preserve the exact reader bytes on Windows as well as Mac; hashes are not normalized to conceal line-ending changes. Both desktop CI jobs run this check and its regression tests before building. This manifest is a review record, not a cryptographic publisher signature; a reviewer must assess intentional code and manifest changes together.
 
 Dependency health runs `python scripts/check-pdfjs.py --upstream` weekly and during releases. It verifies the pinned version's tarball URL/integrity against the official npm registry and fails if the latest stable version differs. Missing/malformed/unavailable metadata fails rather than reporting success. A newer version requires review, not necessarily an emergency upgrade. This is update detection, not a comprehensive JavaScript vulnerability audit.
 
