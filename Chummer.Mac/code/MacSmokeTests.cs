@@ -1088,6 +1088,7 @@ namespace Chummer
                 Check(loaded.Name == character.Name && loaded.BOD.Value == 4 && !loaded.Created,
                     "creation identity and attributes survive save");
 
+                PacksImportChecks.Run(loaded, main, Check);
                 loaded.Created = true;
                 loaded.Karma = 8;
                 loaded.Nuyen = 5000;
@@ -1136,6 +1137,23 @@ namespace Chummer
                     Check(html.ToString().Contains("Mac Smoke Test"), "HTML character sheet transformation");
                 }
 
+                BatchOutputChecks.Run(careerCharacter, output, Check);
+                using (var batch = new frmPrintMultiple())
+                {
+                    batch.Show();
+                    Field<TreeView>(batch, "treCharacters").Nodes.Add(new TreeNode("Character") { Tag = careerCharacter.FileName });
+                    Field<Button>(batch, "cmdPrint").PerformClick();
+                    Check(!Field<Button>(batch, "cmdSelectCharacter").Enabled && !Field<TreeView>(batch, "treCharacters").Enabled,
+                        "batch preparation prevents changes to its character list");
+                    Field<Button>(batch, "cmdPrint").PerformClick();
+                    Check(System.Threading.SpinWait.SpinUntil(() => Field<System.Threading.CancellationTokenSource>(batch, "batchCancellation") == null && Field<Button>(batch, "cmdSelectCharacter").Enabled, 5000) &&
+                        Field<Button>(batch, "cmdSelectCharacter").Enabled && Field<Label>(batch, "batchStatus").Text.Contains("cancelled"),
+                        "batch Cancel restores controls without opening a partial preview");
+                    Field<Button>(batch, "cmdPrint").PerformClick();
+                    batch.Close();
+                    Check(System.Threading.SpinWait.SpinUntil(() => batch.IsDisposed, 5000),
+                        "closing a running batch cancels preparation before disposing the window");
+                }
                 FoundryExportChecks.Run(output, Check);
 
                 using (var stream = new MemoryStream())
@@ -1212,6 +1230,17 @@ namespace Chummer
                         fixture.FileName = Path.Combine(output, "fixture-copy.chum");
                         fixture.Save();
                         var original = XDocument.Load(fixture.FileName);
+                        byte[] snapshot = fixture.CaptureSnapshot();
+                        var isolated = new Character { FileName = fixture.FileName };
+                        bool snapshotLoaded = isolated.LoadSnapshot(snapshot);
+                        using var beforeSnapshot = new MemoryStream(snapshot, false);
+                        using var afterSnapshot = new MemoryStream(isolated.CaptureSnapshot(), false);
+                        if (!snapshotLoaded || !XNode.DeepEquals(XDocument.Load(beforeSnapshot), XDocument.Load(afterSnapshot)))
+                        {
+                            File.WriteAllBytes(Path.Combine(output, "snapshot-before.xml"), snapshot);
+                            File.WriteAllBytes(Path.Combine(output, "snapshot-after.xml"), isolated.CaptureSnapshot());
+                            throw new InvalidOperationException("In-memory snapshot changed fixture state: " + file);
+                        }
                         var fixtureHistory = new InventoryUndo(fixture);
                         fixture.Gear.Add(new Gear(fixture) { Name = "Undo probe", Category = "General", Cost = "0", Quantity = 1 });
                         fixtureHistory.Observe(); fixtureHistory.Undo(); fixture.Save();
@@ -1236,7 +1265,16 @@ namespace Chummer
                             throw new InvalidOperationException("Foundry export changed the saved character: " + file);
                         count++;
                     }
-                    Console.WriteLine("PASS upstream fixture round trips and both Foundry export versions: " + count);
+                    Console.WriteLine("PASS upstream fixture file and memory round trips and both Foundry export versions: " + count);
+                }
+                using (var quitBatch = new frmPrintMultiple())
+                {
+                    quitBatch.Show();
+                    Field<TreeView>(quitBatch, "treCharacters").Nodes.Add(new TreeNode("Character") { Tag = careerCharacter.FileName });
+                    Field<Button>(quitBatch, "cmdPrint").PerformClick();
+                    AppPlatform.QuitApplicationAsync().GetAwaiter().GetResult();
+                    Check(quitBatch.IsDisposed && AppPlatform.CanTerminateAfterQuit,
+                        "Quit cancels running batch preparation and completes without requiring a second Quit command");
                 }
                 using (var quitGuard = new Form { Width = 300, Height = 140 })
                 {

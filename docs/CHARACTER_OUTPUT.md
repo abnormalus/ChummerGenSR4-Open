@@ -19,3 +19,20 @@ Portable smoke checks cover transformation, embedded portraits, template path co
 The preview's **Foundry JSON** button exports the live character independently of HTML rendering or native printing. Choose the character and the installed Shadowrun 4e system version (1.6 or 1.26); then save a UTF-8 actor JSON file and use Foundry's actor import command. See [Foundry export behavior and limitations](FOUNDRY_EXPORT.md).
 
 For reproducible support checks, `--export-foundry /path/to/disposable-character.chum /path/to/actor.json [1.26]` exports one actor and exits. The default is 1.6, matching the supplied samples. The normal character loader may migrate old character files, so use disposable copies for command-line checks. Interactive JSON export never saves or changes the character file.
+
+## Batch character preparation
+
+The multi-character window snapshots its selected file list and disables list editing
+while preparing output. Print becomes Cancel; closing requests cancellation and waits
+for cleanup before disposing the window. Progress counts completed characters. Work
+yields between characters on the UI context because legacy rules and loaders can use
+UI-dependent code; it is not moved blindly to a worker thread. A single character load
+or serialization is not preempted. Cancellation is checked before each character and
+before publishing the completed document. Cancelled or failed batches never open a
+partial preview. Quit cancels active batch preparation and waits for cleanup before
+the shared close sequence, so another Quit command is not required. Errors are logged
+without character paths or contents.
+
+Batch preparation uses read-only loading: legacy quality conversion happens in memory,
+without automatically saving or making a backup of the original character file. Normal
+interactive loading retains its existing conversion/save behavior.

@@ -34,6 +34,22 @@ jobs:
         run: dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts=
       - name: Check characters and UI behavior
         run: dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
+      - name: Verify native bulk-operation cancellation and shutdown
+        shell: pwsh
+        run: |
+          $character = (Resolve-Path 'artifacts/checks/creation.chum').Path
+          $report = Join-Path $PWD 'artifacts/checks/native-bulk.json'
+          $appName = if ($IsWindows) { 'ChummerMac.exe' } else { 'ChummerMac' }
+          $exe = (Resolve-Path "Chummer.Mac/bin/Release/net10.0/$appName").Path
+          $process = Start-Process -FilePath $exe -ArgumentList @('--check-bulk', "`"$character`"", "`"$report`"") -PassThru
+          if (-not $process.WaitForExit(120000)) {
+            $process.Kill($true)
+            throw 'Native bulk-operation checks timed out.'
+          }
+          if ($process.ExitCode -ne 0) { throw "Native bulk-operation checks failed: $($process.ExitCode)" }
+          if (-not (Test-Path $report)) { throw 'Native bulk-operation report is missing.' }
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          if (-not $result.passed -or $result.checks.Count -lt 10) { throw 'Native bulk-operation checks did not complete.' }
       - name: Ensure native Windows browser runtime
         if: runner.os == 'Windows'
         shell: pwsh

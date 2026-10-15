@@ -1,6 +1,8 @@
 using System;
 using System.IO;
-using System.Text;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Majorsilence.Forms;
 using System.Xml;
 
@@ -12,16 +14,43 @@ namespace Chummer
 {
 	public partial class frmPrintMultiple : Form
 	{
+        private CancellationTokenSource batchCancellation;
+        private TaskCompletionSource preparationFinished;
+        internal Task CancelPreparationForQuitAsync()
+        {
+            CancelPreparation();
+            return preparationFinished?.Task ?? Task.CompletedTask;
+        }
+        private void CancelPreparation()
+        {
+            batchCancellation?.Cancel();
+            BulkOperationDialogs.CancelOwned(this);
+        }
+        private bool closeAfterCancellation;
+        private Label batchStatus;
+
 		#region Control Events
 		public frmPrintMultiple()
 		{
 			InitializeComponent();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			MoveControls();
+            batchStatus = new Label { Left = prgProgress.Left, Top = prgProgress.Bottom + 6,
+                Width = prgProgress.Width, Height = 36, Text = "" };
+            Controls.Add(batchStatus);
+            ClientSize = new System.Drawing.Size(ClientSize.Width, batchStatus.Bottom + 8);
+            Disposed += (_, _) => CancelPreparation();
+            FormClosing += (_, args) => {
+                if (batchCancellation == null) return;
+                args.Cancel = true;
+                closeAfterCancellation = true;
+                CancelPreparation();
+            };
 		}
 
 		private void cmdSelectCharacter_Click(object sender, EventArgs e)
 		{
+			if (batchCancellation != null) return;
 			// Add the selected Files to the list of characters to print.
 			if (dlgOpenFile.ShowDialog(this) == DialogResult.OK)
 			{
@@ -38,6 +67,7 @@ namespace Chummer
 
 		private void cmdDelete_Click(object sender, EventArgs e)
 		{
+            if (batchCancellation != null) return;
 			try
 			{
 				treCharacters.SelectedNode.Remove();
@@ -47,58 +77,66 @@ namespace Chummer
 			}
 		}
 
-		private void cmdPrint_Click(object sender, EventArgs e)
-		{
-			prgProgress.Value = 0;
-			prgProgress.Maximum = treCharacters.Nodes.Count;
+        private async void cmdPrint_Click(object sender, EventArgs e)
+        {
+            if (batchCancellation != null) { CancelPreparation(); return; }
+            if (AppPlatform.QuitInProgress) return;
+            string[] files = treCharacters.Nodes.Cast<TreeNode>().Select(n => n.Tag.ToString()).ToArray();
+            if (files.Length == 0) return;
+            using var cancellation = new CancellationTokenSource();
+            preparationFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            batchCancellation = cancellation;
+            cmdSelectCharacter.Enabled = cmdDelete.Enabled = treCharacters.Enabled = false;
+            string printCaption = cmdPrint.Text;
+            cmdPrint.Text = LanguageManager.Instance.GetString("String_Cancel");
+            XmlDocument document = null;
+            AppDiagnostics.Record("batch-output-start");
+            try
+            {
+                document = await BatchCharacterOutput.BuildAsync(files, cancellation.Token, (done, total) => {
+                    prgProgress.Maximum = total;
+                    prgProgress.Value = done;
+                    batchStatus.Text = string.Format(LanguageManager.Instance.GetString("BatchOutput_Progress"), done, total);
+                });
+                batchStatus.Text = "";
+                AppDiagnostics.Record("batch-output-completed");
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                if (!IsDisposed) batchStatus.Text = LanguageManager.Instance.GetString("BatchOutput_Cancelled");
+                AppDiagnostics.Record("batch-output-cancelled");
+            }
+            catch (Exception error)
+            {
+                AppDiagnostics.Record("batch-output-failed", error);
+                if (!IsDisposed) batchStatus.Text = LanguageManager.Instance.GetString("BatchOutput_Failed");
+            }
+            finally
+            {
+                batchCancellation = null;
+                if (!IsDisposed)
+                {
+                    cmdPrint.Text = printCaption;
+                    cmdSelectCharacter.Enabled = cmdDelete.Enabled = treCharacters.Enabled = true;
+                    prgProgress.Value = 0;
+                }
+                preparationFinished.TrySetResult();
+            }
+            if (IsDisposed) return;
+            if (closeAfterCancellation) { Close(); return; }
+            if (document == null || IsDisposed) return;
+            try
+            {
+                using var preview = new frmViewer { CharacterXML = document, SelectedSheet = "Game Master Summary" };
+                await preview.ShowDialogAsync(this);
+            }
+            catch (Exception error)
+            {
+                AppDiagnostics.Record("batch-preview-failed", error);
+                if (!IsDisposed) batchStatus.Text = LanguageManager.Instance.GetString("BatchOutput_Failed");
+            }
+        }
 
-			// Write the Character information to a MemoryStream so we don't need to create any files.
-			MemoryStream objStream = new MemoryStream();
-			XmlTextWriter objWriter = new XmlTextWriter(objStream, Encoding.UTF8);
-
-			// Being the document.
-			objWriter.WriteStartDocument();
-			// <characters>
-			objWriter.WriteStartElement("characters");
-
-			// Fire the PrintToStream method for all of the characters in the list.
-			foreach (TreeNode objNode in treCharacters.Nodes)
-			{
-				Character objCharacter = new Character();
-				objCharacter.FileName = objNode.Tag.ToString();
-				objCharacter.Load();
-
-				objCharacter.PrintToStream(objStream, objWriter);
-				prgProgress.Value++;
-				Application.DoEvents();
-			}
-
-			// Finish the document and flush the Writer and Stream.
-			// </characters>
-			objWriter.WriteEndElement();
-			objWriter.WriteEndDocument();
-			objWriter.Flush();
-			objStream.Flush();
-
-			// Read the stream.
-			StreamReader objReader = new StreamReader(objStream);
-			objStream.Position = 0;
-			XmlDocument objCharacterXML = new XmlDocument();
-
-			// Put the stream into an XmlDocument and send it off to the Viewer.
-			string strXML = objReader.ReadToEnd();
-			objCharacterXML.LoadXml(strXML);
-
-			objWriter.Close();
-
-			// Set the ProgressBar back to 0.
-			prgProgress.Value = 0;
-
-			frmViewer frmViewCharacter = new frmViewer();
-			frmViewCharacter.CharacterXML = objCharacterXML;
-			frmViewCharacter.SelectedSheet = "Game Master Summary";
-			frmViewCharacter.ShowDialog();
-		}
 		#endregion
 
 		#region Methods

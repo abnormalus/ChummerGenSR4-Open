@@ -84,6 +84,17 @@ namespace Chummer
             current = next;
             UpdateCommands();
         }
+        // Serialized history has no references to the retired editor or character model.
+        internal void ContinueAfterImport(InventoryUndo previous)
+        {
+            if (previous == null || current == null) return;
+            actions.Clear();
+            actions.AddRange(previous.actions);
+            if (previous.current != null && previous.current.Inventory != current.Inventory)
+                actions.Add((previous.current, current));
+            while (actions.Count > 5) actions.RemoveAt(0);
+            UpdateCommands();
+        }
         private static XmlNode Node(string xml) { var doc = new XmlDocument(); doc.LoadXml(xml); return doc.DocumentElement; }
         private void RestoreInventory(string xml)
         {

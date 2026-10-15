@@ -26,10 +26,13 @@ namespace Chummer
                 Environment.Exit(MacSmokeTests.Run(args));
                 return;
             }
+            if (args.Length >= 3 && args[0] == "--check-bulk")
+                MacPaths.TestUserDirectory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(args[2])), "native-bulk-user");
             AppDiagnostics.Initialize();
             try
             {
                 MacPaths.Initialize();
+                if (args.Length >= 3 && args[0] == "--check-bulk") GlobalOptions.Instance.AutomaticUpdate = false;
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 LanguageManager.Instance.Load(GlobalOptions.Instance.Language, null);
@@ -37,6 +40,14 @@ namespace Chummer
                 {
                     using var main = new frmMain();
                     using var watchdog = AppDiagnostics.StartWatchdog();
+                    if (args.Length >= 3 && args[0] == "--check-bulk")
+                    {
+                        main.Shown += async (_, _) => {
+                            try { await NativeBulkChecks.RunAsync(main, args[1], args[2]); }
+                            catch (Exception error) { AppDiagnostics.Record("bulk.native-checks-failed", error); Environment.ExitCode = 1; }
+                            finally { NativeBulkChecks.DiscardEditors(); await AppPlatform.QuitApplicationAsync(); }
+                        };
+                    }
                     // Optional standalone PDF opening also provides a reproducible reader check
                     // without changing the user's sourcebook preferences.
                     if (args.Length >= 2 && args[0] == "--pdf")

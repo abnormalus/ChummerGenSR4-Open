@@ -62,6 +62,7 @@ namespace Chummer
 		private CommonFunctions _commonFunctions;
 
 		private string _strFileName = "";
+        private bool _suppressAutomaticSaves;
 		private string _strSettingsFileName = "default.xml";
 		private bool _blnIgnoreRules = false;
 		private int _intKarma = 0;
@@ -256,7 +257,20 @@ namespace Chummer
 
         private void SaveToFile()
         {
-            FileStream objStream = new FileStream(_strFileName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            using var stream = new FileStream(_strFileName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            WriteCharacterSnapshot(stream);
+        }
+
+        // Uses the exact character serializer without changing FileName or touching disk.
+        internal byte[] CaptureSnapshot()
+        {
+            using var stream = new MemoryStream();
+            WriteCharacterSnapshot(stream);
+            return stream.ToArray();
+        }
+
+        private void WriteCharacterSnapshot(Stream objStream)
+        {
 			XmlTextWriter objWriter = new XmlTextWriter(objStream, Encoding.Unicode);
 			objWriter.Formatting = Formatting.Indented;
 			objWriter.Indentation = 1;
@@ -731,12 +745,27 @@ namespace Chummer
 		/// <summary>
 		/// Load the Character from an XML file.
 		/// </summary>
-		public bool Load()
-		{
+		public bool Load() => Load(true);
 
-			XmlDocument objXmlDocument = new XmlDocument();
-			objXmlDocument.Load(_strFileName);
+        // Read-only consumers must not migrate and overwrite the source character file.
+        internal bool Load(bool allowAutomaticSaves)
+        {
+            var document = new XmlDocument();
+            document.Load(_strFileName);
+            return LoadDocument(document, allowAutomaticSaves);
+        }
 
+        internal bool LoadSnapshot(byte[] snapshot)
+        {
+            using var stream = new MemoryStream(snapshot, false);
+            var document = new XmlDocument();
+            document.Load(stream);
+            return LoadDocument(document, false);
+        }
+
+        private bool LoadDocument(XmlDocument objXmlDocument, bool allowAutomaticSaves)
+        {
+            _suppressAutomaticSaves = !allowAutomaticSaves;
 			XmlNode objXmlCharacter = objXmlDocument.SelectSingleNode("/character");
 			XmlNodeList objXmlNodeList;
 
@@ -1526,7 +1555,7 @@ namespace Chummer
 			}
 
 			// If the character had old Qualities that were converted, immediately save the file so they are in the new format.
-			if (blnHasOldQualities)
+			if (blnHasOldQualities && allowAutomaticSaves)
 				Save();
 
 			return true;
@@ -5253,7 +5282,7 @@ namespace Chummer
 					{
 						_strMovement = "0";
 					}
-					Save();
+					if (!_suppressAutomaticSaves) Save();
 				}
 
 				string[] strMovements = _strMovement.Split(',');

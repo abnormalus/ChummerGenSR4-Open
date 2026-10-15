@@ -15,11 +15,12 @@ This is an incremental maintenance policy, not a guarantee that all legacy techn
 - Added dependency metadata checks before release and every Monday. Missing feeds, malformed reports and metadata errors fail the audit rather than appearing as a clean result. Reports cover the app, compatibility core and Avalonia backend, including transitive packages. NuGet's published metadata reported no deprecated packages or known vulnerabilities during this audit. That does not prove that every upstream project is actively maintained.
 - Added weekly Dependabot proposals for NuGet and GitHub Actions, with no automatic merges. Updates must pass the Mac/Windows checks. Added `global.json` to stay on a serviced .NET 10 feature band and reject prerelease SDKs.
 
+- Batch character preparation now yields between characters, supports cancellation, locks its input list, discards partial output after cancellation/failure and loads legacy characters without automatically overwriting them. Cancellation occurs at character boundaries; a single legacy load or serialization still runs synchronously on the UI context. PACKS preparation now runs against an isolated in-memory character and private rule controls, with cooperative cancellation and progress. A complete result replaces the editor as an unsaved change; cancellation/failure keeps the original model and file. The established control-based rule adapter is isolated in `frmCreate.Packs.Rules.cs` for gradual future extraction. Inventory history is carried forward. Quit cancels owned detail prompts and waits for bulk cleanup before the normal close sequence.
+
 ## Existing exceptions and remaining priorities
 
 | Priority | Work | Why it remains |
 |---|---|---|
-| High | Replace manual message pumping in PACKS import and batch printing with cancellable operations and explicit progress. | Removing `DoEvents` without redesigning these stateful operations could cause hangs or partially applied character changes. Counts are frozen in `scripts/modernization-exceptions.json`: 10 PACKS calls, 1 batch-print call and 11 calls in the old developer validation screen. New occurrences fail CI. |
 | High | Inventory compatibility-layer capabilities used by each screen and add real platform interaction tests. | Successful compilation cannot detect every no-op method. Examples still present include `PrintDialog` (no real dialog), portions of `WebBrowser` such as synchronous script invocation, and legacy toolbar merging. Character output uses the real native browser printing path instead. |
 | High | Establish an explicit PDF.js vendoring/update check. | Bundled `pdfjs-dist` 6.4.299 is recorded in `Chummer.Mac/pdfjs/VERSION.txt`, with source, integrity and license. NuGet auditing and Dependabot do not automatically replace these bundled files. Updates need reader/security review and sourcebook navigation tests. |
 | Medium | Separate rules, file serialization and UI; gradually replace compatibility screens with direct Avalonia controls. | Large `frmCreate`/`frmCareer` classes still mix calculations and interface state. Keep 4e stable; no 3e/5e implementation or language rewrite is part of this work. |
@@ -28,6 +29,8 @@ This is an incremental maintenance policy, not a guarantee that all legacy techn
 | Low | Review the old zero-seed branch in `MTRNG(uint seed)`. | It generates entropy and then overwrites it with zero. Preserved intentionally in this API modernization to avoid silently changing historical deterministic behavior. |
 
 The vendored NRBF image reader retains one local `SYSLIB5005` experimental-API suppression. It extracts image bytes from legacy resource records without running BinaryFormatter object deserialization. It is a compatibility exception, not a blanket permission to suppress obsolete warnings. Common obsolete-API diagnostics also fail vendor builds. Existing vendor documentation/platform/naming warnings remain upstream compatibility debt; the stricter warning-clean policy applies to application code.
+
+The only remaining documented manual message pumping is the developer-only `frmTest` validation screen (11 calls). New production occurrences fail CI. Native bulk checks run on both Mac and Windows, including detail-prompt cancellation and shutdown.
 
 ## Verification and maintenance
 

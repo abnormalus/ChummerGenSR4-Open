@@ -22,9 +22,11 @@ class Safeguards(unittest.TestCase):
         self.assertTrue(source.source_errors("Chummer.Mac/code/test.cs", "#pragma warning disable"))
         self.assertFalse(source.source_errors(source.EXPERIMENTAL_READER, "#pragma warning disable SYSLIB5005"))
     def test_existing_debt_cannot_grow(self):
-        path = "Chummer.Mac/code/frmPrintMultiple.cs"
-        self.assertFalse(source.source_errors(path, "Application.DoEvents();"))
-        self.assertTrue(source.source_errors(path, "Application.DoEvents(); Application.DoEvents();"))
+        for path, exception in source.EXCEPTIONS["manual message pumping"].items():
+            with self.subTest(path=path):
+                self.assertFalse(source.source_errors(path, "Application.DoEvents();" * exception["count"]))
+                self.assertTrue(source.source_errors(path, "Application.DoEvents();" * (exception["count"] + 1)))
+        self.assertTrue(source.source_errors("Chummer.Mac/code/frmPrintMultiple.cs", "Application.DoEvents();"))
     def test_build_identity_only_claims_clean_revision(self):
         with patch.object(identity.subprocess, "check_output", side_effect=["a" * 40 + "\n", ""]):
             self.assertEqual(identity.revision(), "a" * 40)

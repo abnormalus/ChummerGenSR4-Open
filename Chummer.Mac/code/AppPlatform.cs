@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using Majorsilence.Forms;
 
 namespace Chummer
@@ -27,18 +29,36 @@ namespace Chummer
             }
         }
         internal static bool QuitApproved { get; private set; }
-        internal static void QuitApplication()
+        internal static bool QuitInProgress { get; private set; }
+        internal static async void QuitApplication()
         {
+            try { await QuitApplicationAsync(); }
+            catch (Exception error) { AppDiagnostics.Record("quit-failed", error); }
+        }
+        internal static async Task QuitApplicationAsync()
+        {
+            if (QuitInProgress) return;
+            QuitInProgress = true;
+            QuitApproved = false;
             AppDiagnostics.CaptureUiState();
             AppDiagnostics.Record("quit-start");
             try
             {
+                // Cancel preparation before the one shared close sequence, so a running
+                // batch does not cancel Quit or repeat unsaved-character prompts.
+                foreach (var editor in Application.OpenForms.OfType<frmCreate>().ToArray())
+                    await editor.CancelPacksForQuitAsync();
+                foreach (var operation in Application.OpenForms.OfType<BulkProgressDialog>().ToArray())
+                    await operation.CancelForQuitAsync();
+                foreach (var batch in Application.OpenForms.OfType<frmPrintMultiple>().ToArray())
+                    await batch.CancelPreparationForQuitAsync();
                 Application.Exit();
                 AppDiagnostics.CaptureUiState();
                 QuitApproved = Application.OpenForms.Count == 0;
                 AppDiagnostics.Record(QuitApproved ? "quit-completed" : "quit-cancelled-or-incomplete");
             }
             catch (Exception error) { QuitApproved = false; AppDiagnostics.Record("quit-failed", error); throw; }
+            finally { QuitInProgress = false; }
         }
         internal static bool CanTerminateAfterQuit => QuitApproved && Application.OpenForms.Count == 0;
         internal static void OpenLogs(Form owner)

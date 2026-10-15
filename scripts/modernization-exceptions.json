@@ -1,7 +1,5 @@
 {
   "manual message pumping": {
-    "Chummer.Mac/code/frmCreate.cs": {"count": 10, "reason": "Legacy PACKS import progress loop; replace with an atomic asynchronous import before removing message pumping."},
-    "Chummer.Mac/code/frmTest.cs": {"count": 11, "reason": "Legacy developer-only XML validation screen; replace with headless validations."},
-    "Chummer.Mac/code/frmPrintMultiple.cs": {"count": 1, "reason": "Batch character serialization progress loop; migrate to cancellable asynchronous batch output."}
+    "Chummer.Mac/code/frmTest.cs": {"count": 11, "reason": "Legacy developer-only XML validation screen; replace with headless validations."}
   }
 }

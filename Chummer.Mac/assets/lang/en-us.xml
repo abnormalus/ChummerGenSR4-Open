@@ -6740,5 +6740,12 @@ Guidance only; manual values may fall outside these ranges.</text></string>
 <string><key>SourceSets_Missing</key><text>Unavailable book codes skipped:</text></string>
 <string><key>SourceSets_NotFound</key><text>Choose a saved source set to load.</text></string>
 <string><key>SourceSets_Failed</key><text>The source set could not be saved or loaded. Use a name of 1–100 characters. Check the diagnostics log if the problem continues; existing sets are kept.</text></string>
+<string><key>BatchOutput_Progress</key><text>Preparing characters: {0} of {1}</text></string>
+<string><key>BatchOutput_Cancelled</key><text>Preparation cancelled. No character files were changed.</text></string>
+<string><key>BatchOutput_Failed</key><text>Unable to prepare the selected characters. No partial preview was opened. Check the diagnostic log and try the characters individually.</text></string>
+<string><key>Packs_ImportTitle</key><text>Import PACKS kit</text></string>
+<string><key>Packs_Preparing</key><text>Preparing your kit…</text></string>
+<string><key>Packs_Progress</key><text>Preparing kit item {0} of {1}…</text></string>
+<string><key>Packs_Failed</key><text>The PACKS kit could not be imported. Your original character is unchanged. Check the diagnostic log; the kit may reference missing or invalid catalog data.</text></string>
 </strings>
 </chummer>

@@ -67,7 +67,7 @@ namespace Chummer
 			string[] strArgs = Environment.GetCommandLineArgs();
 			if (strArgs.GetUpperBound(0) > 0)
 			{
-				if (strArgs[1] != "/debug" && strArgs[1] != "--smoke-test" && strArgs[1] != "--pdf" && strArgs[1] != "--print-preview" && strArgs[1] != "--export-pdf" && strArgs[1] != "--export-foundry")
+				if (strArgs[1] != "/debug" && strArgs[1] != "--smoke-test" && strArgs[1] != "--pdf" && strArgs[1] != "--print-preview" && strArgs[1] != "--export-pdf" && strArgs[1] != "--export-foundry" && strArgs[1] != "--check-bulk")
 					LoadCharacter(strArgs[1]);
 				if (strArgs.Length > 2)
 				{
@@ -169,11 +169,15 @@ namespace Chummer
 			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/JonasTrampe/ChummerGenSR4/issues") { UseShellExecute = true });
 		}
 
-		private void mnuFilePrintMultiple_Click(object sender, EventArgs e)
-		{
-			frmPrintMultiple frmPrintMultipleCharacters = new frmPrintMultiple();
-			frmPrintMultipleCharacters.ShowDialog(this);
-		}
+        private async void mnuFilePrintMultiple_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using var characters = new frmPrintMultiple();
+                await characters.ShowDialogAsync(this);
+            }
+            catch (Exception error) { AppDiagnostics.Record("batch-window-failed", error); AppErrors.Inform(this, "BatchOutput_Failed"); }
+        }
 
 		private void mnuHelpRevisionHistory_Click(object sender, EventArgs e)
 		{
@@ -339,6 +343,13 @@ namespace Chummer
 			if (tabForms.SelectedTab != null && tabForms.SelectedTab.Tag != null)
 				(tabForms.SelectedTab.Tag as Form).Select();
 		}
+
+        internal void ObserveReplacementCharacter(Character original, Character replacement)
+        {
+            original.CharacterNameChanged -= objCharacter_CharacterNameChanged;
+            replacement.CharacterNameChanged += objCharacter_CharacterNameChanged;
+            objCharacter_CharacterNameChanged(replacement);
+        }
 
 		private void objCharacter_CharacterNameChanged(Object sender)
 		{
