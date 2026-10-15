@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Linq;
+using System.IO;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Xml;
 using Majorsilence.Forms;
@@ -47,6 +49,11 @@ public partial class frmCreate
                 if (!picker.AddAgain) return;
             }
         }
+        catch (PacksImportConflictException error)
+        {
+            AppDiagnostics.Record("packs.import-conflict", error);
+            if (!editor.IsDisposed) AppErrors.Inform(editor, "Packs_Changed");
+        }
         catch (Exception error)
         {
             AppDiagnostics.Record("packs.command-failed", error);
@@ -61,6 +68,8 @@ public partial class frmCreate
         _inventoryUndo?.Observe();
         byte[] snapshot = _objCharacter.CaptureSnapshot();
         string filename = _objCharacter.FileName;
+        string rulesPath = Path.Combine(MacPaths.SettingsDirectory, _objCharacter.SettingsFile);
+        byte[]? rulesStamp = File.Exists(rulesPath) ? SHA256.HashData(File.ReadAllBytes(rulesPath)) : null;
         var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _packsCleanup = finished.Task;
         using var progress = new BulkProgressDialog();
@@ -73,6 +82,12 @@ public partial class frmCreate
                 work => PreparePacksKitAsync(snapshot, filename, kit, createChildren, work, progress));
             _packsProgress = null;
             if (prepared == null || IsDisposed || AppPlatform.QuitInProgress) return null;
+            bool sameRules = rulesStamp == null ? !File.Exists(rulesPath) : File.Exists(rulesPath) &&
+                SHA256.HashData(File.ReadAllBytes(rulesPath)).SequenceEqual(rulesStamp);
+            // A queued/native command may have edited the live character despite window
+            // modality. Never replace newer edits or a newly saved rules profile.
+            if (!sameRules || _objCharacter.FileName != filename || !_objCharacter.CaptureSnapshot().SequenceEqual(snapshot))
+                throw new PacksImportConflictException();
             var replacement = CommitPreparedPacks(prepared);
             AppDiagnostics.Record("packs.import-completed");
             return replacement;
@@ -148,4 +163,9 @@ public partial class frmCreate
             throw;
         }
     }
+}
+
+internal sealed class PacksImportConflictException : InvalidOperationException
+{
+    internal PacksImportConflictException() : base("The character or rules changed during PACKS preparation.") { }
 }

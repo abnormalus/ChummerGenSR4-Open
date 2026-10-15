@@ -69,6 +69,29 @@ internal static class NativeBulkChecks
             Check(await pending == null && !editor.IsDisposed && current.CaptureSnapshot().SequenceEqual(beforeCancel),
                 "Native Cancel discards partially prepared PACKS entries");
 
+            // Simulate a queued/native edit while a prepared copy is outstanding.
+            pending = editor.ImportPacksKitAsync(Kit("<gears><gear><name>Medkit</name><rating>2</rating></gear></gears>"), false);
+            Field<TextBox>(editor, "txtAlias").Text = "Native concurrent edit";
+            bool conflict = false;
+            try { await pending; } catch (PacksImportConflictException) { conflict = true; }
+            Check(conflict && !editor.IsDisposed && current.Alias == "Native concurrent edit",
+                "Native PACKS conflict preserves newer live-character edits instead of applying a stale copy");
+            beforeCancel = current.CaptureSnapshot();
+            string profilePath = Path.Combine(MacPaths.SettingsDirectory, current.SettingsFile);
+            byte[] profileBytes = File.ReadAllBytes(profilePath);
+            pending = editor.ImportPacksKitAsync(Kit("<gears><gear><name>Medkit</name><rating>2</rating></gear></gears>"), false);
+            conflict = false;
+            try
+            {
+                var changedProfile = new XmlDocument(); changedProfile.Load(profilePath);
+                changedProfile.AppendChild(changedProfile.CreateComment("Native rules change check"));
+                changedProfile.Save(profilePath);
+                try { await pending; } catch (PacksImportConflictException) { conflict = true; }
+            }
+            finally { File.WriteAllBytes(profilePath, profileBytes); }
+            Check(conflict && !editor.IsDisposed && current.CaptureSnapshot().SequenceEqual(beforeCancel),
+                "Native PACKS conflict preserves a changed rules profile without replacing the live character");
+
             // Quit while a legacy item-rule prompt owns a nested modal loop. Guard the
             // main close to simulate an unsaved-character cancellation after cleanup.
             pending = editor.ImportPacksKitAsync(Kit("<gears><gear><name>Fake SIN</name><rating>2</rating></gear></gears>"), false);

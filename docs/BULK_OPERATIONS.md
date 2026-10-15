@@ -21,7 +21,10 @@ UI control is moved to a worker thread. Cancel/close/quit cancels operation-owne
 detail dialogs so nested prompts can unwind before cleanup finishes. Invalid or
 missing catalog data raises a recoverable failure and discards the copy.
 
-Only a complete result is shown as a fully initialized replacement editor. The old
+Before commit, the live snapshot, filename and saved rules-profile hash must still
+match the inputs. A queued/native edit or changed profile discards the prepared copy
+and asks the user to retry, preserving the newer work. Only a complete result is
+shown as a fully initialized replacement editor. The old
 editor is then retired without saving; identity, filename and selected tab are kept,
 and the result is dirty until explicitly saved. Existing inventory history is carried
 forward, with the kit inventory change added within the five-action limit. Inventory
