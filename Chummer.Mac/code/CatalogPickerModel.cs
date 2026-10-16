@@ -12,7 +12,13 @@ internal sealed record CatalogCategory(string Code, string DisplayName)
     public override string ToString() => DisplayName;
 }
 internal sealed record CatalogEntry(string Name, string Category, string DisplayName, XmlNode Definition);
-internal sealed record CatalogSelection(string Name, string Category, bool FreeCost, int Markup, bool AddAgain, int Rating = 0);
+internal sealed record CatalogSelection(string Name, string Category, bool FreeCost, int Markup, bool AddAgain, int Rating = 0, int Quantity = 1);
+internal interface IQuantityCatalogPicker
+{
+    int Quantity { get; set; }
+    bool IsQuantityEnabled { get; }
+}
+
 internal interface ICatalogPickerDetails
 {
     string Source { get; }
@@ -164,6 +170,6 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
             error = LanguageManager.Instance.GetString("CatalogPicker_SelectionChanged"); Changed(); return null;
         }
         RememberCategory(selectedEntry!.Category);
-        return new CatalogSelection(selectedEntry.Name, selectedEntry.Category, freeCost, markup, addAgain, this is IRatedCatalogPicker rated ? rated.Rating : 0);
+        return new CatalogSelection(selectedEntry.Name, selectedEntry.Category, freeCost, markup, addAgain, this is IRatedCatalogPicker rated ? rated.Rating : 0, this is IQuantityCatalogPicker counted ? counted.Quantity : 1);
     }
 }

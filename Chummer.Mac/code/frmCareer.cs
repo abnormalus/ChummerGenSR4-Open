@@ -6062,6 +6062,20 @@ namespace Chummer
 
 		private void cmdDeleteWeapon_Click(object sender, EventArgs e)
 		{
+            if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode)) return;
+            if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode?.Parent))
+            {
+                var unit = _objFunctions.FindWeaponAccessory(treWeapons.SelectedNode.Tag.ToString(), _objCharacter.Weapons);
+                if (unit == null || !_objFunctions.ConfirmDelete(LanguageManager.Instance.GetString("Message_DeleteWeapon"))) return;
+                foreach (var gear in unit.Gear) _objFunctions.DeleteGear(gear, treWeapons, _objImprovementManager);
+                unit.Parent.WeaponAccessories.Remove(unit);
+                treWeapons.SelectedNode.Remove();
+                AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+                UpdateCharacterInfo();
+                _blnIsDirty = true; UpdateWindowTitle();
+                return;
+            }
+
 			// Delete the selected Weapon.
 			try
 			{
@@ -6457,6 +6471,20 @@ namespace Chummer
 
 		private void cmdDeleteVehicle_Click(object sender, EventArgs e)
 		{
+            if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode)) return;
+            if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode?.Parent))
+            {
+                var unit = _objFunctions.FindVehicleWeaponAccessory(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
+                if (unit == null || !_objFunctions.ConfirmDelete(LanguageManager.Instance.GetString("Message_DeleteWeapon"))) return;
+                foreach (var gear in unit.Gear) _objFunctions.DeleteGear(gear, treVehicles, _objImprovementManager);
+                unit.Parent.WeaponAccessories.Remove(unit);
+                treVehicles.SelectedNode.Remove();
+                AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+                UpdateCharacterInfo();
+                _blnIsDirty = true; UpdateWindowTitle();
+                return;
+            }
+
 			// Delete the selected Vehicle.
 			try
 			{
@@ -9898,61 +9926,17 @@ namespace Chummer
 			if (frmPickWeaponAccessory.DialogResult == DialogResult.Cancel)
 				return;
 
-			// Locate the selected piece.
-			objXmlWeapon = frmPickWeaponAccessory.SelectedDefinition;
-
-			TreeNode objNode = new TreeNode();
-			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);
-			objAccessory.Create(objXmlWeapon, objNode, frmPickWeaponAccessory.SelectedMount);
-			objAccessory.Parent = objWeapon;
-
-			// Check the item's Cost and make sure the character can afford it.
-			int intOriginalCost = objWeapon.TotalCost;
-			objWeapon.WeaponAccessories.Add(objAccessory);
-
-			int intCost = objWeapon.TotalCost - intOriginalCost;
-			// Apply a markup if applicable.
-			if (frmPickWeaponAccessory.Markup != 0)
-			{
-				double dblCost = Convert.ToDouble(intCost, GlobalOptions.Instance.CultureInfo);
-				dblCost *= 1 + (Convert.ToDouble(frmPickWeaponAccessory.Markup, GlobalOptions.Instance.CultureInfo) / 100.0);
-				intCost = Convert.ToInt32(dblCost);
-			}
-
-			// Multiply the cost if applicable.
-			if (objAccessory.TotalAvail.EndsWith(LanguageManager.Instance.GetString("String_AvailRestricted")) && _objOptions.MultiplyRestrictedCost)
-				intCost *= _objOptions.RestrictedCostMultiplier;
-			if (objAccessory.TotalAvail.EndsWith(LanguageManager.Instance.GetString("String_AvailForbidden")) && _objOptions.MultiplyForbiddenCost)
-				intCost *= _objOptions.ForbiddenCostMultiplier;
-
-			if (!frmPickWeaponAccessory.FreeCost)
-			{
-				if (intCost > _objCharacter.Nuyen)
-				{
-					objWeapon.WeaponAccessories.Remove(objAccessory);
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_NotEnoughNuyen"), LanguageManager.Instance.GetString("MessageTitle_NotEnoughNuyen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-					if (frmPickWeaponAccessory.AddAgain)
-						tsWeaponAddAccessory_Click(sender, e);
-
-					return;
-				}
-				else
-				{
-					// Create the Expense Log Entry.
-					ExpenseLogEntry objExpense = new ExpenseLogEntry();
-					objExpense.Create(intCost * -1, LanguageManager.Instance.GetString("String_ExpensePurchaseWeaponAccessory") + " " + objAccessory.DisplayNameShort, ExpenseType.Nuyen, DateTime.Now);
-					_objCharacter.ExpenseEntries.Add(objExpense);
-					_objCharacter.Nuyen -= intCost;
-
-					ExpenseUndo objUndo = new ExpenseUndo();
-					objUndo.CreateNuyen(NuyenExpenseType.AddWeaponAccessory, objAccessory.InternalId);
-					objExpense.Undo = objUndo;
-				}
-			}
-
-			objNode.ContextMenuStrip = cmsWeaponAccessory;
-			treWeapons.SelectedNode.Nodes.Add(objNode);
-			treWeapons.SelectedNode.Expand();
+            // Prepare and validate the entire batch before committing ordinary units.
+            if (!WeaponAccessoryBatch.TryPurchase(_objCharacter, objWeapon, frmPickWeaponAccessory.SelectedDefinition,
+                frmPickWeaponAccessory.SelectedMount, frmPickWeaponAccessory.SelectedQuantity, frmPickWeaponAccessory.Markup,
+                frmPickWeaponAccessory.FreeCost, true, false, this, out var purchase))
+                return;
+            foreach (var unit in purchase.Units)
+            {
+                unit.Node.ContextMenuStrip = cmsWeaponAccessory;
+                treWeapons.SelectedNode.Nodes.Add(unit.Node);
+            }
+            treWeapons.SelectedNode.Expand();
 
 			UpdateCharacterInfo();
 			RefreshSelectedWeapon();
@@ -10557,61 +10541,17 @@ namespace Chummer
 			if (frmPickWeaponAccessory.DialogResult == DialogResult.Cancel)
 				return;
 
-			// Locate the selected piece.
-			objXmlWeapon = frmPickWeaponAccessory.SelectedDefinition;
-
-			TreeNode objNode = new TreeNode();
-			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);
-			objAccessory.Create(objXmlWeapon, objNode, frmPickWeaponAccessory.SelectedMount);
-			objAccessory.Parent = objWeapon;
-
-			// Check the item's Cost and make sure the character can afford it.
-			int intOriginalCost = objWeapon.TotalCost;
-			objWeapon.WeaponAccessories.Add(objAccessory);
-
-			int intCost = objWeapon.TotalCost - intOriginalCost;
-			// Apply a markup if applicable.
-			if (frmPickWeaponAccessory.Markup != 0)
-			{
-				double dblCost = Convert.ToDouble(intCost, GlobalOptions.Instance.CultureInfo);
-				dblCost *= 1 + (Convert.ToDouble(frmPickWeaponAccessory.Markup, GlobalOptions.Instance.CultureInfo) / 100.0);
-				intCost = Convert.ToInt32(dblCost);
-			}
-
-			// Multiply the cost if applicable.
-			if (objAccessory.TotalAvail.EndsWith(LanguageManager.Instance.GetString("String_AvailRestricted")) && _objOptions.MultiplyRestrictedCost)
-				intCost *= _objOptions.RestrictedCostMultiplier;
-			if (objAccessory.TotalAvail.EndsWith(LanguageManager.Instance.GetString("String_AvailForbidden")) && _objOptions.MultiplyForbiddenCost)
-				intCost *= _objOptions.ForbiddenCostMultiplier;
-
-			if (!frmPickWeaponAccessory.FreeCost)
-			{
-				if (intCost > _objCharacter.Nuyen)
-				{
-					objWeapon.WeaponAccessories.Remove(objAccessory);
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_NotEnoughNuyen"), LanguageManager.Instance.GetString("MessageTitle_NotEnoughNuyen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-					if (frmPickWeaponAccessory.AddAgain)
-						tsVehicleAddWeaponAccessory_Click(sender, e);
-
-					return;
-				}
-				else
-				{
-					// Create the Expense Log Entry.
-					ExpenseLogEntry objExpense = new ExpenseLogEntry();
-					objExpense.Create(intCost * -1, LanguageManager.Instance.GetString("String_ExpensePurchaseVehicleWeaponAccessory") + " " + objAccessory.DisplayNameShort, ExpenseType.Nuyen, DateTime.Now);
-					_objCharacter.ExpenseEntries.Add(objExpense);
-					_objCharacter.Nuyen -= intCost;
-
-					ExpenseUndo objUndo = new ExpenseUndo();
-					objUndo.CreateNuyen(NuyenExpenseType.AddVehicleWeaponAccessory, objAccessory.InternalId);
-					objExpense.Undo = objUndo;
-				}
-			}
-
-			objNode.ContextMenuStrip = cmsVehicleWeaponAccessory;
-			treVehicles.SelectedNode.Nodes.Add(objNode);
-			treVehicles.SelectedNode.Expand();
+            // Prepare and validate the entire batch before committing ordinary units.
+            if (!WeaponAccessoryBatch.TryPurchase(_objCharacter, objWeapon, frmPickWeaponAccessory.SelectedDefinition,
+                frmPickWeaponAccessory.SelectedMount, frmPickWeaponAccessory.SelectedQuantity, frmPickWeaponAccessory.Markup,
+                frmPickWeaponAccessory.FreeCost, true, true, this, out var purchase))
+                return;
+            foreach (var unit in purchase.Units)
+            {
+                unit.Node.ContextMenuStrip = cmsVehicleWeaponAccessory;
+                treVehicles.SelectedNode.Nodes.Add(unit.Node);
+            }
+            treVehicles.SelectedNode.Expand();
 
 			if (frmPickWeaponAccessory.AddAgain)
 				tsVehicleAddWeaponAccessory_Click(sender, e);
@@ -14137,7 +14077,7 @@ namespace Chummer
 			}
 			else
 			{
-				if (MessageBox.Show(LanguageManager.Instance.GetString("Message_UndoExpense"), LanguageManager.Instance.GetString("MessageTitle_UndoExpense"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
+				if (MessageBox.Show(LanguageManager.Instance.GetString("Message_UndoExpense"), LanguageManager.Instance.GetString("MessageTitle_UndoExpense"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 					return;
 			}
 
@@ -14549,83 +14489,18 @@ namespace Chummer
 						}
 					}
 					break;
-				case NuyenExpenseType.AddVehicleWeaponAccessory:
-					// Locate the Weapon Accessory that was added.
-					foreach (Vehicle objVehicle in _objCharacter.Vehicles)
-					{
-						foreach (VehicleMod objMod in objVehicle.Mods)
-						{
-							foreach (Weapon objWeapon in objMod.Weapons)
-							{
-								foreach (WeaponAccessory objAccessory in objWeapon.WeaponAccessories)
-								{
-									if (objAccessory.InternalId == objEntry.Undo.ObjectId)
-									{
-										// Remove the Weapon Accessory.
-										objWeapon.WeaponAccessories.Remove(objAccessory);
-
-										// Remove the Weapon Accessory from the Tree.
-										foreach (TreeNode objVNode in treVehicles.Nodes[0].Nodes)
-										{
-											foreach (TreeNode objNode in objVNode.Nodes)
-											{
-												foreach (TreeNode objWNode in objNode.Nodes)
-												{
-													foreach (TreeNode objChild in objWNode.Nodes)
-													{
-														if (objChild.Tag.ToString() == objEntry.Undo.ObjectId)
-														{
-															objChild.Remove();
-															break;
-														}
-													}
-												}
-											}
-										}
-										break;
-									}
-								}
-								if (objWeapon.UnderbarrelWeapons.Count > 0)
-								{
-									foreach (Weapon objUnderbarrelWeapon in objWeapon.UnderbarrelWeapons)
-									{
-										foreach (WeaponAccessory objAccessory in objUnderbarrelWeapon.WeaponAccessories)
-										{
-											if (objAccessory.InternalId == objEntry.Undo.ObjectId)
-											{
-												// Remove the Weapon Accessory.
-												objUnderbarrelWeapon.WeaponAccessories.Remove(objAccessory);
-
-												// Remove the Weapon Accessory from the Tree.
-												foreach (TreeNode objVNode in treVehicles.Nodes[0].Nodes)
-												{
-													foreach (TreeNode objNode in objVNode.Nodes)
-													{
-														foreach (TreeNode objWNode in objNode.Nodes)
-														{
-															foreach (TreeNode objChild in objWNode.Nodes)
-															{
-																foreach (TreeNode objSubChild in objChild.Nodes)
-																{
-																	if (objSubChild.Tag.ToString() == objEntry.Undo.ObjectId)
-																	{
-																		objSubChild.Remove();
-																		break;
-																	}
-																}
-															}
-														}
-													}
-												}
-												break;
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-					break;
+                case NuyenExpenseType.AddVehicleWeaponAccessory:
+                    // Ledger identity remains a single ordinary unit even when its
+                    // presentation is grouped or its weapon is nested/mounted.
+                    foreach (var weapon in AccessoryGroupViews.Weapons(_objCharacter, true))
+                    {
+                        var unit = weapon.WeaponAccessories.Find(item => item.InternalId == objEntry.Undo.ObjectId);
+                        if (unit == null) continue;
+                        weapon.WeaponAccessories.Remove(unit);
+                        break;
+                    }
+                    AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+                    break;
 				case NuyenExpenseType.AddVehicleWeaponMod:
 					// Locate the Weapon Mod that was added.
 					foreach (Vehicle objVehicle in _objCharacter.Vehicles)
@@ -14791,34 +14666,18 @@ namespace Chummer
 						}
 					}
 					break;
-				case NuyenExpenseType.AddWeaponAccessory:
-					// Locate the Weapon Accessory that was added.
-					foreach (Weapon objWeapon in _objCharacter.Weapons)
-					{
-						foreach (WeaponAccessory objAccessory in objWeapon.WeaponAccessories)
-						{
-							if (objAccessory.InternalId == objEntry.Undo.ObjectId)
-							{
-								// Remove the Weapon Accessory.
-								objWeapon.WeaponAccessories.Remove(objAccessory);
-
-								// Remove the Weapon Accessory from the tree.
-								foreach (TreeNode objNode in treWeapons.Nodes[0].Nodes)
-								{
-									foreach (TreeNode objChild in objNode.Nodes)
-									{
-										if (objChild.Tag.ToString() == objEntry.Undo.ObjectId)
-										{
-											objChild.Remove();
-											break;
-										}
-									}
-								}
-								break;
-							}
-						}
-					}
-					break;
+                case NuyenExpenseType.AddWeaponAccessory:
+                    // Ledger identity remains a single ordinary unit even when its
+                    // presentation is grouped or its weapon is nested/mounted.
+                    foreach (var weapon in AccessoryGroupViews.Weapons(_objCharacter, false))
+                    {
+                        var unit = weapon.WeaponAccessories.Find(item => item.InternalId == objEntry.Undo.ObjectId);
+                        if (unit == null) continue;
+                        weapon.WeaponAccessories.Remove(unit);
+                        break;
+                    }
+                    AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+                    break;
 				case NuyenExpenseType.AddWeaponMod:
 					// Locate the Weapon Mod that was added.
 					foreach (Weapon objWeapon in _objCharacter.Weapons)
@@ -15401,6 +15260,7 @@ namespace Chummer
 			else
 				treWeapons.SelectedNode.ForeColor = SystemColors.WindowText;
 			treWeapons.SelectedNode.ToolTipText = objAccessory.Notes;
+            AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
 		}
 
 		private void tsCyberwareNotes_Click(object sender, EventArgs e)
@@ -17267,6 +17127,7 @@ namespace Chummer
 			else
 				treVehicles.SelectedNode.ForeColor = SystemColors.WindowText;
 			treVehicles.SelectedNode.ToolTipText = objAccessory.Notes;
+            AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
 		}
 
 		private void tsVehicleWeaponModNotes_Click(object sender, EventArgs e)
@@ -21658,6 +21519,8 @@ namespace Chummer
 				string strTip = "";
 				_blnSkipUpdate = true;
                 WeaponFocusBindings.Synchronize(_objCharacter, treFoci);
+                AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+                AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
 
 				string strFormat;
 				if (_objCharacter.Options.EssenceDecimals == 4)
@@ -22740,10 +22603,11 @@ namespace Chummer
 		/// </summary>
 		public void RefreshSelectedWeapon()
 		{
+            AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
 			bool blnClear = false;
 			try
 			{
-				if (treWeapons.SelectedNode.Level == 0)
+				if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode) || treWeapons.SelectedNode.Level == 0)
 					blnClear = true;
 			}
 			catch
@@ -24634,10 +24498,11 @@ namespace Chummer
 		/// </summary>
 		private void RefreshSelectedVehicle()
 		{
+            AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
 			bool blnClear = false;
 			try
 			{
-				if (treVehicles.SelectedNode.Level == 0)
+				if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode) || treVehicles.SelectedNode.Level == 0)
 					blnClear = true;
 			}
 			catch

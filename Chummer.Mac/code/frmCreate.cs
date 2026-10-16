@@ -6418,6 +6418,20 @@ namespace Chummer
 
 		private void cmdDeleteWeapon_Click(object sender, EventArgs e)
 		{
+            if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode)) return;
+            if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode?.Parent))
+            {
+                var unit = _objFunctions.FindWeaponAccessory(treWeapons.SelectedNode.Tag.ToString(), _objCharacter.Weapons);
+                if (unit == null || !_objFunctions.ConfirmDelete(LanguageManager.Instance.GetString("Message_DeleteWeapon"))) return;
+                foreach (var gear in unit.Gear) _objFunctions.DeleteGear(gear, treWeapons, _objImprovementManager);
+                unit.Parent.WeaponAccessories.Remove(unit);
+                treWeapons.SelectedNode.Remove();
+                AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+                UpdateCharacterInfo();
+                _blnIsDirty = true; UpdateWindowTitle();
+                return;
+            }
+
 			// Delete the selected Weapon.
 			try
 			{
@@ -6769,6 +6783,20 @@ namespace Chummer
 
 		private void cmdDeleteVehicle_Click(object sender, EventArgs e)
 		{
+            if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode)) return;
+            if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode?.Parent))
+            {
+                var unit = _objFunctions.FindVehicleWeaponAccessory(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
+                if (unit == null || !_objFunctions.ConfirmDelete(LanguageManager.Instance.GetString("Message_DeleteWeapon"))) return;
+                foreach (var gear in unit.Gear) _objFunctions.DeleteGear(gear, treVehicles, _objImprovementManager);
+                unit.Parent.WeaponAccessories.Remove(unit);
+                treVehicles.SelectedNode.Remove();
+                AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+                UpdateCharacterInfo();
+                _blnIsDirty = true; UpdateWindowTitle();
+                return;
+            }
+
 			// Delete the selected Vehicle.
 			try
 			{
@@ -8751,18 +8779,17 @@ namespace Chummer
 			if (frmPickWeaponAccessory.DialogResult == DialogResult.Cancel)
 				return;
 
-			// Locate the selected piece.
-			objXmlWeapon = frmPickWeaponAccessory.SelectedDefinition;
-
-			TreeNode objNode = new TreeNode();
-			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);
-			objAccessory.Create(objXmlWeapon, objNode, frmPickWeaponAccessory.SelectedMount);
-			objAccessory.Parent = objWeapon;
-			objWeapon.WeaponAccessories.Add(objAccessory);
-
-			objNode.ContextMenuStrip = cmsWeaponAccessory;
-			treWeapons.SelectedNode.Nodes.Add(objNode);
-			treWeapons.SelectedNode.Expand();
+            // Prepare and validate the entire batch before committing ordinary units.
+            if (!WeaponAccessoryBatch.TryPurchase(_objCharacter, objWeapon, frmPickWeaponAccessory.SelectedDefinition,
+                frmPickWeaponAccessory.SelectedMount, frmPickWeaponAccessory.SelectedQuantity, frmPickWeaponAccessory.Markup,
+                frmPickWeaponAccessory.FreeCost, false, false, this, out var purchase))
+                return;
+            foreach (var unit in purchase.Units)
+            {
+                unit.Node.ContextMenuStrip = cmsWeaponAccessory;
+                treWeapons.SelectedNode.Nodes.Add(unit.Node);
+            }
+            treWeapons.SelectedNode.Expand();
 
 			UpdateCharacterInfo();
 			RefreshSelectedWeapon();
@@ -9155,18 +9182,17 @@ namespace Chummer
 			if (frmPickWeaponAccessory.DialogResult == DialogResult.Cancel)
 				return;
 
-			// Locate the selected piece.
-			objXmlWeapon = frmPickWeaponAccessory.SelectedDefinition;
-
-			TreeNode objNode = new TreeNode();
-			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);
-			objAccessory.Create(objXmlWeapon, objNode, frmPickWeaponAccessory.SelectedMount);
-			objAccessory.Parent = objWeapon;
-			objWeapon.WeaponAccessories.Add(objAccessory);
-
-			objNode.ContextMenuStrip = cmsVehicleWeaponAccessory;
-			treVehicles.SelectedNode.Nodes.Add(objNode);
-			treVehicles.SelectedNode.Expand();
+            // Prepare and validate the entire batch before committing ordinary units.
+            if (!WeaponAccessoryBatch.TryPurchase(_objCharacter, objWeapon, frmPickWeaponAccessory.SelectedDefinition,
+                frmPickWeaponAccessory.SelectedMount, frmPickWeaponAccessory.SelectedQuantity, frmPickWeaponAccessory.Markup,
+                frmPickWeaponAccessory.FreeCost, false, true, this, out var purchase))
+                return;
+            foreach (var unit in purchase.Units)
+            {
+                unit.Node.ContextMenuStrip = cmsVehicleWeaponAccessory;
+                treVehicles.SelectedNode.Nodes.Add(unit.Node);
+            }
+            treVehicles.SelectedNode.Expand();
 
 			if (frmPickWeaponAccessory.AddAgain)
 				tsVehicleAddWeaponAccessory_Click(sender, e);
@@ -10393,6 +10419,7 @@ namespace Chummer
 			else
 				treWeapons.SelectedNode.ForeColor = SystemColors.WindowText;
 			treWeapons.SelectedNode.ToolTipText = objAccessory.Notes;
+            AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
 		}
 
 		private void tsCyberwareNotes_Click(object sender, EventArgs e)
@@ -12198,6 +12225,7 @@ namespace Chummer
 			else
 				treVehicles.SelectedNode.ForeColor = SystemColors.WindowText;
 			treVehicles.SelectedNode.ToolTipText = objAccessory.Notes;
+            AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
 		}
 
 		private void tsVehicleWeaponModNotes_Click(object sender, EventArgs e)
@@ -16271,6 +16299,8 @@ namespace Chummer
 				string strTip = "";
 				_blnSkipUpdate = true;
                 WeaponFocusBindings.Synchronize(_objCharacter, treFoci);
+                AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+                AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
 
 				// If the character is an A.I., set the Edge MetatypeMaximum to their Rating.
 				if (_objCharacter.Metatype.EndsWith("A.I.") || _objCharacter.MetatypeCategory == "Technocritters" || _objCharacter.MetatypeCategory == "Protosapients")
@@ -17164,10 +17194,11 @@ namespace Chummer
 		/// </summary>
 		public void RefreshSelectedWeapon()
 		{
+            AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
 			bool blnClear = false;
 			try
 			{
-				if (treWeapons.SelectedNode.Level == 0)
+				if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode) || treWeapons.SelectedNode.Level == 0)
 					blnClear = true;
 			}
 			catch
@@ -18824,11 +18855,12 @@ namespace Chummer
 		/// </summary>
 		private void RefreshSelectedVehicle()
 		{
+            AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
 			bool blnClear = false;
 
 			try
 			{
-				if (treVehicles.SelectedNode.Level == 0)
+				if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode) || treVehicles.SelectedNode.Level == 0)
 					blnClear = true;
 			}
 			catch

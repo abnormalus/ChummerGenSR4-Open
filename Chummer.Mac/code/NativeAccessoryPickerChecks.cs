@@ -45,8 +45,17 @@ internal static class NativeAccessoryPickerChecks
             await WaitForAsync(() => !window.AcceptButton.IsEnabled && window.ItemList.ItemCount == 0);
             check(window.Model.Details == null && string.IsNullOrEmpty(Find<TextBlock>(window, "accessoryMount").Text),
                 "Native empty accessory search clears details and disables acceptance");
+            window.SearchBox.Text = "Spare Clips";
+            await WaitForAsync(() => window.Model.IsQuantityEnabled);
+            var quantity = Find<NumericUpDown>(window, "accessoryQuantity");
+            quantity.Value = 3;
+            await WaitForAsync(() => window.Model.Quantity == 3);
+            check(quantity.IsEnabled && window.Model.Accept(false)?.Quantity == 3,
+                "Native accessory quantity control returns multiple ordinary units for spare clips");
             window.SearchBox.Text = "Laser Sight";
             await WaitForAsync(() => window.AcceptButton.IsEnabled);
+            check(!quantity.IsEnabled && window.Model.Quantity == 1,
+                "Native installed accessory selection resets to one unit and disables quantity");
             window.Width = 760; window.Height = 480; await Task.Delay(120);
             using (var bitmap = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width * 2, (int)window.ClientSize.Height * 2), new Vector(192, 192)))
             {
