@@ -13563,7 +13563,7 @@ namespace Chummer
 			}
 			else
 			{
-				if (MessageBox.Show(LanguageManager.Instance.GetString("Message_UndoExpense"), LanguageManager.Instance.GetString("MessageTitle_UndoExpense"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
+				if (MessageBox.Show(LanguageManager.Instance.GetString("Message_UndoExpense"), LanguageManager.Instance.GetString("MessageTitle_UndoExpense"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 					return;
 			}
 
@@ -19474,6 +19474,13 @@ namespace Chummer
 
 		private void treFoci_AfterCheck(object sender, TreeViewEventArgs e)
 		{
+            if (WeaponFocusBindings.SetBound(_objCharacter, e.Node.Tag?.ToString() ?? "", e.Node.Checked))
+            {
+                UpdateCharacterInfo();
+                _blnIsDirty = true; UpdateWindowTitle();
+                return;
+            }
+
 			if (e.Node.Checked)
 			{
 				// Locate the Focus that is being touched.
@@ -19587,61 +19594,15 @@ namespace Chummer
 			// If the item is being unchecked, confirm that the user wants to un-bind the Focus.
 			if (e.Node.Checked)
 			{
-				if (MessageBox.Show(LanguageManager.Instance.GetString("Message_UnbindFocus"), LanguageManager.Instance.GetString("MessageTitle_UnbindFocus"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
+				if (MessageBox.Show(LanguageManager.Instance.GetString("Message_UnbindFocus"), LanguageManager.Instance.GetString("MessageTitle_UnbindFocus"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 					e.Cancel = true;
 				return;
 			}
 
-			// Locate the Focus that is being touched.
-			Gear objSelectedFocus = new Gear(_objCharacter);
-			objSelectedFocus = _objFunctions.FindGear(e.Node.Tag.ToString(), _objCharacter.Gear);
-
-			// Set the Focus count to 1 and get its current Rating (Force). This number isn't used in the following loops because it isn't yet checked or unchecked.
-			int intFociCount = 1;
-			int intFociTotal = 0;
-
-			if (objSelectedFocus != null)
-				intFociTotal = objSelectedFocus.Rating;
-			else
-			{
-				// This is a Stacked Focus.
-				StackedFocus objStack = new StackedFocus(_objCharacter);
-				foreach (StackedFocus objCharacterFocus in _objCharacter.StackedFoci)
-				{
-					if (e.Node.Tag.ToString() == objCharacterFocus.InternalId)
-					{
-						objStack = objCharacterFocus;
-						break;
-					}
-				}
-				intFociTotal = objStack.TotalForce;
-			}
-
-			// Run through the list of items. Count the number of Foci the character would have bonded including this one, plus the total Force of all checked Foci.
-			foreach (TreeNode objNode in treFoci.Nodes)
-			{
-				if (objNode.Checked)
-				{
-					intFociCount++;
-					foreach (Gear objCharacterFocus in _objCharacter.Gear)
-					{
-						if (objNode.Tag.ToString() == objCharacterFocus.InternalId)
-						{
-							intFociTotal += objCharacterFocus.Rating;
-							break;
-						}
-					}
-
-					foreach (StackedFocus objStack in _objCharacter.StackedFoci)
-					{
-						if (objNode.Tag.ToString() == objStack.InternalId)
-						{
-							intFociTotal += objStack.TotalForce;
-							break;
-						}
-					}
-				}
-			}
+            var totals = WeaponFocusBindings.TotalsIncluding(_objCharacter,
+                treFoci.Nodes.Cast<TreeNode>().Where(node => node.Checked).Select(node => node.Tag.ToString()), e.Node.Tag.ToString());
+            int intFociCount = totals.Count;
+            int intFociTotal = totals.Force;
 
 			if (intFociTotal > _objCharacter.MAG.TotalValue * 5)
 			{
@@ -19656,6 +19617,27 @@ namespace Chummer
 				e.Cancel = true;
 				return;
 			}
+
+            if (WeaponFocusBindings.Find(_objCharacter, e.Node.Tag.ToString()) is { } modificationFocus)
+            {
+                int cost = checked(modificationFocus.Force * _objOptions.KarmaWeaponFocus);
+                if (cost > _objCharacter.Karma)
+                {
+                    MessageBox.Show(LanguageManager.Instance.GetString("Message_NotEnoughKarma"),
+                        LanguageManager.Instance.GetString("MessageTitle_NotEnoughKarma"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    e.Cancel = true; return;
+                }
+                if (!ConfirmKarmaExpense(LanguageManager.Instance.GetString("Message_ConfirmKarmaExpenseFocus")
+                    .Replace("{0}", cost.ToString()).Replace("{1}", modificationFocus.DisplayName)))
+                { e.Cancel = true; return; }
+                var expense = new ExpenseLogEntry();
+                expense.Create(-cost, LanguageManager.Instance.GetString("String_ExpenseBound") + " " + modificationFocus.DisplayName,
+                    ExpenseType.Karma, DateTime.Now);
+                expense.Undo = new ExpenseUndo();
+                expense.Undo.CreateKarma(KarmaExpenseType.BindFocus, modificationFocus.Id);
+                _objCharacter.ExpenseEntries.Add(expense); _objCharacter.Karma -= cost;
+                return;
+            }
 
 			// If we've made it this far, everything is okay, so create a Karma Expense for the newly-bound Focus.
 			bool blnFound = false;
@@ -21671,6 +21653,7 @@ namespace Chummer
 			{
 				string strTip = "";
 				_blnSkipUpdate = true;
+                WeaponFocusBindings.Synchronize(_objCharacter, treFoci);
 
 				string strFormat;
 				if (_objCharacter.Options.EssenceDecimals == 4)
@@ -25915,10 +25898,9 @@ namespace Chummer
 				return true;
 			else
 			{
-				if (MessageBox.Show(strMessage, LanguageManager.Instance.GetString("MessageTitle_ConfirmKarmaExpense"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
-					return false;
-				else
-					return true;
+				// Only an explicit Yes authorizes spending; title-bar close is Cancel.
+                return MessageBox.Show(strMessage, LanguageManager.Instance.GetString("MessageTitle_ConfirmKarmaExpense"),
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
 			}
 		}
 

@@ -13913,6 +13913,13 @@ namespace Chummer
 
 		private void treFoci_AfterCheck(object sender, TreeViewEventArgs e)
 		{
+            if (WeaponFocusBindings.SetBound(_objCharacter, e.Node.Tag?.ToString() ?? "", e.Node.Checked))
+            {
+                UpdateCharacterInfo();
+                _blnIsDirty = true; UpdateWindowTitle();
+                return;
+            }
+
 			if (e.Node.Checked)
 			{
 				// Locate the Focus that is being touched.
@@ -14023,59 +14030,10 @@ namespace Chummer
 			if (e.Node.Checked)
 				return;
 
-			// Locate the Focus that is being touched.
-			Gear objSelectedFocus = new Gear(_objCharacter);
-			objSelectedFocus = _objFunctions.FindGear(e.Node.Tag.ToString(), _objCharacter.Gear);
-
-			// Set the Focus count to 1 and get its current Rating (Force). This number isn't used in the following loops because it isn't yet checked or unchecked.
-			int intFociCount = 1;
-			int intFociTotal = 0;
-
-			if (objSelectedFocus != null)
-				intFociTotal = objSelectedFocus.Rating;
-			else
-			{
-				// This is a Stacked Focus.
-				StackedFocus objStack = new StackedFocus(_objCharacter);
-				foreach (StackedFocus objCharacterFocus in _objCharacter.StackedFoci)
-				{
-					if (e.Node.Tag.ToString() == objCharacterFocus.InternalId)
-					{
-						objStack = objCharacterFocus;
-						break;
-					}
-				}
-				intFociTotal = objStack.TotalForce;
-			}
-
-			// Run through the list of items. Count the number of Foci the character would have bonded including this one, plus the total Force of all checked Foci.
-			foreach (TreeNode objNode in treFoci.Nodes)
-			{
-				if (objNode.Checked)
-				{
-					intFociCount++;
-					foreach (Gear objCharacterFocus in _objCharacter.Gear)
-					{
-						if (objNode.Tag.ToString() == objCharacterFocus.InternalId)
-						{
-							intFociTotal += objCharacterFocus.Rating;
-							break;
-						}
-					}
-
-					foreach (StackedFocus objStack in _objCharacter.StackedFoci)
-					{
-						if (objNode.Tag.ToString() == objStack.InternalId)
-						{
-							if (objStack.Bonded)
-							{
-								intFociTotal += objStack.TotalForce;
-								break;
-							}
-						}
-					}
-				}
-			}
+            var totals = WeaponFocusBindings.TotalsIncluding(_objCharacter,
+                treFoci.Nodes.Cast<TreeNode>().Where(node => node.Checked).Select(node => node.Tag.ToString()), e.Node.Tag.ToString());
+            int intFociCount = totals.Count;
+            int intFociTotal = totals.Force;
 
 			if (intFociTotal > _objCharacter.MAG.TotalValue * 5 && !_objCharacter.IgnoreRules)
 			{
@@ -16309,6 +16267,7 @@ namespace Chummer
 			{
 				string strTip = "";
 				_blnSkipUpdate = true;
+                WeaponFocusBindings.Synchronize(_objCharacter, treFoci);
 
 				// If the character is an A.I., set the Edge MetatypeMaximum to their Rating.
 				if (_objCharacter.Metatype.EndsWith("A.I.") || _objCharacter.MetatypeCategory == "Technocritters" || _objCharacter.MetatypeCategory == "Protosapients")

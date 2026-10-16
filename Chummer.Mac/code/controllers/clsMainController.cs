@@ -767,6 +767,8 @@ namespace Chummer
 				}
 			}
 
+            WeaponFocusBindings.Synchronize(_objCharacter, treFoci);
+
 			// Add Stacked Foci.
 			foreach (Gear objGear in _objCharacter.Gear)
 			{
