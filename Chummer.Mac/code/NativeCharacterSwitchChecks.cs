@@ -17,6 +17,19 @@ internal static class NativeCharacterSwitchChecks
     internal static async Task RunAsync(frmMain main, Character character, Action<bool, string> check)
     {
         byte[] original = character.CaptureSnapshot();
+        if (System.OperatingSystem.IsMacOS())
+        {
+            var nativeMain = main.ToAvaloniaWindow();
+            nativeMain.WindowState = Avalonia.Controls.WindowState.FullScreen; await Task.Delay(100);
+            check(Field<MenuStrip>(main, "menuStrip").Visible && Field<ToolStripMenuItem>(main, "optionsToolStripMenuItem").Visible &&
+                Field<ToolStripMenuItem>(main, "exitToolStripMenuItem").Visible,
+                "Mac full-screen fallback includes Preferences and Quit");
+            nativeMain.WindowState = Avalonia.Controls.WindowState.Normal; await Task.Delay(100);
+            check(!Field<MenuStrip>(main, "menuStrip").Visible && !Field<ToolStripMenuItem>(main, "optionsToolStripMenuItem").Visible &&
+                !Field<ToolStripMenuItem>(main, "exitToolStripMenuItem").Visible,
+                "Mac leaving full screen restores application-menu command placement");
+        }
+
         Character Copy() { var copy = new Character(); copy.LoadSnapshot(original); return copy; }
         using var first = new frmCreate(Copy()) { Loading = true, MdiParent = main };
         var careerCharacter = Copy(); careerCharacter.Created = true;
