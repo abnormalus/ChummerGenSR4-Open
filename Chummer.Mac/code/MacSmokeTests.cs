@@ -109,6 +109,7 @@ namespace Chummer
                 Console.WriteLine("PASS ruleset XML loads");
                 RenderingChecks.Run(output, Check);
                 CharacterTabChecks.Run(Check);
+                DropDownPlacementChecks.Run(Check);
                 using (var repaintForm = new Form { Width = 300, Height = 120 })
                 {
                     var valueLabel = new Label { Text = "MMMM", AutoSize = false, Width = 120 };

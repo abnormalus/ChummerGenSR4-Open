@@ -632,7 +632,7 @@ namespace Majorsilence.Forms
                     popup.Controls.Add (popup_listbox);
                     popup.Size = ComputePopupSize ();
 
-                    popup.Show (this, 1, Height);
+                    popup.ShowBelow (this);
 
                     OnDropDownOpened (EventArgs.Empty);
                 }
