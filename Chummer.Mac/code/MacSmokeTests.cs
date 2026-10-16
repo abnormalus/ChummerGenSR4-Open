@@ -1003,6 +1003,7 @@ namespace Chummer
                     Check(licensePrompt.SelectedItem == PromptDetails.Placeholder, "blank license detail accepts placeholder");
                 }
                 BuildPointPersistenceChecks.Run(character, Check);
+                WeaponFocusBindingChecks.Run(character, Check);
                 ArmorPickerChecks.Run(character, Check);
                 ArmorModPickerChecks.Run(character, Check);
                 AccessoryPickerChecks.Run(character, Check);

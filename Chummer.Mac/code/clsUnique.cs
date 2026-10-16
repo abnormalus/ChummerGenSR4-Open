@@ -4562,7 +4562,7 @@ namespace Chummer
 		}
 
 		/// <summary>
-		/// GUID of the linked Gear.
+		/// GUID of the linked equipment. The legacy gearid field also references a Weapon Focus modification.
 		/// </summary>
 		public string GearId
 		{

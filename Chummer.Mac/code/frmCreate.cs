@@ -13913,6 +13913,13 @@ namespace Chummer
 
 		private void treFoci_AfterCheck(object sender, TreeViewEventArgs e)
 		{
+            if (WeaponFocusBindings.SetBound(_objCharacter, e.Node.Tag?.ToString() ?? "", e.Node.Checked))
+            {
+                UpdateCharacterInfo();
+                _blnIsDirty = true; UpdateWindowTitle();
+                return;
+            }
+
 			if (e.Node.Checked)
 			{
 				// Locate the Focus that is being touched.
@@ -14019,74 +14026,28 @@ namespace Chummer
 
 		private void treFoci_BeforeCheck(object sender, TreeViewCancelEventArgs e)
 		{
+            AppDiagnostics.Action(e.Node.Checked ? "focus.unbind" : "focus.bind");
 			// Don't bother to do anything since a node is being unchecked.
 			if (e.Node.Checked)
 				return;
 
-			// Locate the Focus that is being touched.
-			Gear objSelectedFocus = new Gear(_objCharacter);
-			objSelectedFocus = _objFunctions.FindGear(e.Node.Tag.ToString(), _objCharacter.Gear);
-
-			// Set the Focus count to 1 and get its current Rating (Force). This number isn't used in the following loops because it isn't yet checked or unchecked.
-			int intFociCount = 1;
-			int intFociTotal = 0;
-
-			if (objSelectedFocus != null)
-				intFociTotal = objSelectedFocus.Rating;
-			else
-			{
-				// This is a Stacked Focus.
-				StackedFocus objStack = new StackedFocus(_objCharacter);
-				foreach (StackedFocus objCharacterFocus in _objCharacter.StackedFoci)
-				{
-					if (e.Node.Tag.ToString() == objCharacterFocus.InternalId)
-					{
-						objStack = objCharacterFocus;
-						break;
-					}
-				}
-				intFociTotal = objStack.TotalForce;
-			}
-
-			// Run through the list of items. Count the number of Foci the character would have bonded including this one, plus the total Force of all checked Foci.
-			foreach (TreeNode objNode in treFoci.Nodes)
-			{
-				if (objNode.Checked)
-				{
-					intFociCount++;
-					foreach (Gear objCharacterFocus in _objCharacter.Gear)
-					{
-						if (objNode.Tag.ToString() == objCharacterFocus.InternalId)
-						{
-							intFociTotal += objCharacterFocus.Rating;
-							break;
-						}
-					}
-
-					foreach (StackedFocus objStack in _objCharacter.StackedFoci)
-					{
-						if (objNode.Tag.ToString() == objStack.InternalId)
-						{
-							if (objStack.Bonded)
-							{
-								intFociTotal += objStack.TotalForce;
-								break;
-							}
-						}
-					}
-				}
-			}
+            var totals = WeaponFocusBindings.TotalsIncluding(_objCharacter,
+                treFoci.Nodes.Cast<TreeNode>().Where(node => node.Checked).Select(node => node.Tag.ToString()), e.Node.Tag.ToString());
+            int intFociCount = totals.Count;
+            int intFociTotal = totals.Force;
 
 			if (intFociTotal > _objCharacter.MAG.TotalValue * 5 && !_objCharacter.IgnoreRules)
 			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumForce"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+				AppDiagnostics.Record("focus.binding-rejected-force");
+                MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumForce"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				e.Cancel = true;
 				return;
 			}
 
 			if (intFociCount > _objCharacter.MAG.TotalValue && !_objCharacter.IgnoreRules)
 			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumNumber"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+				AppDiagnostics.Record("focus.binding-rejected-count");
+                MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumNumber"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				e.Cancel = true;
 			}
 		}
@@ -16309,6 +16270,7 @@ namespace Chummer
 			{
 				string strTip = "";
 				_blnSkipUpdate = true;
+                WeaponFocusBindings.Synchronize(_objCharacter, treFoci);
 
 				// If the character is an A.I., set the Edge MetatypeMaximum to their Rating.
 				if (_objCharacter.Metatype.EndsWith("A.I.") || _objCharacter.MetatypeCategory == "Technocritters" || _objCharacter.MetatypeCategory == "Protosapients")
