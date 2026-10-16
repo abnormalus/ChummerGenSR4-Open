@@ -40,6 +40,17 @@ namespace Chummer
         private bool MatchesAmmunitionContext(XmlNode definition) => AmmunitionCategory == "" ||
             definition["category"]?.InnerText == "Ammunition" &&
             AmmunitionSelectionPolicy.IsCompatible(definition["name"].InnerText, AmmunitionCategory, _objCharacter.Options);
+        private GearSelectionContext SelectionContext => new(_blnShowPositiveCapacityOnly,
+            _blnShowNegativeCapacityOnly, _blnShowArmorCapacityOnly, _intMaxResponse, _intMaxSignal, _intMaxFirewall, _intMaxSystem);
+
+        // One source/context gate serves category discovery, browsing, searching and
+        // final confirmation. Typed text never changes purchase eligibility.
+        private IEnumerable<XmlNode> EligibleDefinitions()
+        {
+            var context = SelectionContext;
+            return _objXmlDocument.SelectNodes("/chummer/gears/gear[(" + _objCharacter.Options.BookXPath() + ")]")
+                .Cast<XmlNode>().Where(context.Allows).Where(MatchesAmmunitionContext);
+        }
         internal void PreferCategoryForParent(Gear parent)
         {
             if (parent is Commlink) InitialCategory = "Commlink Operating System";
@@ -110,6 +121,7 @@ namespace Chummer
 			}
 
 			// Create a list of any Categories that should not be in the list.
+            var eligibleCategories = EligibleDefinitions().Select(node => node["category"]?.InnerText).ToHashSet();
 			List<string> lstRemoveCategory = new List<string>();
 			foreach (XmlNode objXmlCategory in objXmlCategoryList)
 			{
@@ -131,19 +143,8 @@ namespace Chummer
 						lstRemoveCategory.Add(objXmlCategory.InnerText);
 				}
 
-				string strXPath = "/chummer/gears/gear[category = \"" + objXmlCategory.InnerText + "\" and (" + _objCharacter.Options.BookXPath() + ")";
-				if (_blnShowArmorCapacityOnly)
-					strXPath += " and contains(armorcapacity, \"[\")";
-				else
-				{
-					if (_blnShowPositiveCapacityOnly)
-						strXPath += " and not(contains(capacity, \"[\"))";
-				}
-				strXPath += "]";
-
-				XmlNodeList objItems = _objXmlDocument.SelectNodes(strXPath);
-				if (objItems.Count > 0)
-					blnRemoveItem = false;
+                if (eligibleCategories.Contains(objXmlCategory.InnerText))
+                    blnRemoveItem = false;
 
 				if (blnRemoveItem)
 					lstRemoveCategory.Add(objXmlCategory.InnerText);
@@ -188,6 +189,11 @@ namespace Chummer
 			cboCategory.DisplayMember = "Name";
 			cboCategory.DataSource = _lstCategory;
 
+            if (_lstCategory.Count == 0)
+            {
+                RefreshSelectionState();
+                return;
+            }
             // Context takes precedence over session memory only if it survived filtering.
             string preferredCategory = _lstCategory.Any(item => item.Value == InitialCategory)
                 ? InitialCategory : _strSelectCategory;
@@ -214,48 +220,13 @@ namespace Chummer
 			if (cboCategory.SelectedValue == null)
 				return;
 
-			// Update the list of Weapon based on the selected Category.
-			XmlNodeList objXmlGearList;
-			List<ListItem> lstGears = new List<ListItem>();
-			txtSearch.Text = "";
-
-			// Retrieve the list of Gear for the selected Category.
-			if (cboCategory.SelectedValue.ToString() != "Commlink Upgrade" && cboCategory.SelectedValue.ToString() != "Commlink Operating System Upgrade")
-			{
-				if (!_blnShowNegativeCapacityOnly && !_blnShowPositiveCapacityOnly && !_blnShowArmorCapacityOnly)
-					objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[category = \"" + cboCategory.SelectedValue + "\" and (" + _objCharacter.Options.BookXPath() + ")]");
-				else
-				{
-					if (_blnShowArmorCapacityOnly)
-						objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[category = \"" + cboCategory.SelectedValue + "\" and (" + _objCharacter.Options.BookXPath() + ") and contains(armorcapacity, \"[\")]");
-					else
-					{
-						if (_blnShowPositiveCapacityOnly)
-							objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[category = \"" + cboCategory.SelectedValue + "\" and (" + _objCharacter.Options.BookXPath() + ") and not(contains(capacity, \"[\"))]");
-						else
-							objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[category = \"" + cboCategory.SelectedValue + "\" and (" + _objCharacter.Options.BookXPath() + ") and contains(capacity, \"[\")]");
-					}
-				}
-			}
-			else
-			{
-				if (cboCategory.SelectedValue.ToString() == "Commlink Upgrade")
-				{
-					// Custom Commlinks have no MaxResponse or MaxSignal (they're 2 since 0 + 2 = 2).
-					if (_intMaxResponse == 2 && _intMaxSignal == 2)
-						objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[category = \"" + cboCategory.SelectedValue + "\" and (" + _objCharacter.Options.BookXPath() + ")]");
-					else
-						objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[category = \"" + cboCategory.SelectedValue + "\" and (" + _objCharacter.Options.BookXPath() + ") and ((response > " + (_intMaxResponse - 2) + " and response <= " + _intMaxResponse + ") or (signal > " + (_intMaxSignal - 2) + " and signal <= " + _intMaxSignal + "))]");
-				}
-				else
-				{
-					objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[category = \"" + cboCategory.SelectedValue + "\" and (" + _objCharacter.Options.BookXPath() + ") and ((firewall > " + (_intMaxFirewall) + ") or (system > " + (_intMaxSystem) + "))]");
-				}
-			}
+            // Browsing and search share the exact purchase context.
+            List<ListItem> lstGears = new List<ListItem>();
+            txtSearch.Text = "";
+            var objXmlGearList = EligibleDefinitions().Where(node => node["category"]?.InnerText == cboCategory.SelectedValue.ToString());
 
 			foreach (XmlNode objXmlGear in objXmlGearList)
 			{
-                if (!MatchesAmmunitionContext(objXmlGear)) continue;
 				ListItem objItem = new ListItem();
 				objItem.Value = objXmlGear["name"].InnerText;
 				if (objXmlGear["translate"] != null)
@@ -372,19 +343,12 @@ namespace Chummer
 
             // Typed text is data, never XPath syntax. Source and contextual filters
             // still constrain the candidate catalog before literal name matching.
-            var objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[(" + _objCharacter.Options.BookXPath() + ")]")
-                .Cast<XmlNode>().Where(node => CatalogSearch.MatchesDisplayName(node, txtSearch.Text));
+            var objXmlGearList = EligibleDefinitions().Where(node => CatalogSearch.MatchesDisplayName(node, txtSearch.Text));
 			List<ListItem> lstGears = new List<ListItem>();
 			bool blnAddToList;
 			foreach (XmlNode objXmlGear in objXmlGearList)
 			{
-                if (!MatchesAmmunitionContext(objXmlGear)) continue;
 				blnAddToList = true;
-				if (_blnShowArmorCapacityOnly)
-				{
-					if (objXmlGear["armorcapacity"] == null)
-						blnAddToList = false;
-				}
 				// Only add items that appear in the list of Categories.
 				bool blnFound = false;
 				foreach (object objListItem in cboCategory.Items)
@@ -1196,6 +1160,13 @@ namespace Chummer
 				else
 					objNode = _objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"" + lstGear.SelectedValue + "\" and category = \"" + cboCategory.SelectedValue + "\"]");
 
+                // Source preferences or parent device context may have changed since
+                // selection. Refresh, but never accept a replacement row implicitly.
+                if (objNode == null || !EligibleDefinitions().Any(node => ReferenceEquals(node, objNode)))
+                {
+                    txtSearch_TextChanged(this, EventArgs.Empty);
+                    return;
+                }
 				_strSelectedGear = objNode["name"].InnerText;
 				_strSelectedCategory = objNode["category"].InnerText;
 				_strSelectCategory = objNode["category"].InnerText;
