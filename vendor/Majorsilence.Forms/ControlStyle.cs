@@ -84,10 +84,21 @@ namespace Majorsilence.Forms
         /// </summary>
         public DataGridViewContentAlignment Alignment { get; set; } = DataGridViewContentAlignment.NotSet;
 
-        /// <summary>
-        /// Gets or sets the background color.
-        /// </summary>
-        public SKColor? BackgroundColor { get; set; }
+        private SKColor? backgroundColor;
+        private System.Drawing.Color? systemBackgroundColor;
+        /// <summary>Gets or sets the background, resolving retained system colors through the live theme.</summary>
+        public SKColor? BackgroundColor {
+            get => systemBackgroundColor is { } color ? color.ToSKColor () : backgroundColor;
+            set { systemBackgroundColor = null; backgroundColor = value; }
+        }
+
+        // Keep system-color identity until paint time. Designer assignments must follow live
+        // theme changes; explicit Skia/CSS colors still replace this semantic declaration.
+        internal void SetBackgroundColor (System.Drawing.Color color)
+        {
+            BackgroundColor = color.IsEmpty ? null : color.ToSKColor ();
+            if (color.IsSystemColor) systemBackgroundColor = color;
+        }
 
         /// <summary>
         /// Provides access to border style properties.
@@ -118,10 +129,19 @@ namespace Majorsilence.Forms
         /// </summary>
         public int? FontSize { get; set; }
 
-        /// <summary>
-        /// Gets or sets the foreground color.
-        /// </summary>
-        public SKColor? ForegroundColor { get; set; }
+        private SKColor? foregroundColor;
+        private System.Drawing.Color? systemForegroundColor;
+        /// <summary>Gets or sets the foreground, resolving retained system colors through the live theme.</summary>
+        public SKColor? ForegroundColor {
+            get => systemForegroundColor is { } color ? color.ToSKColor () : foregroundColor;
+            set { systemForegroundColor = null; foregroundColor = value; }
+        }
+
+        internal void SetForegroundColor (System.Drawing.Color color)
+        {
+            ForegroundColor = color.IsEmpty ? null : color.ToSKColor ();
+            if (color.IsSystemColor) systemForegroundColor = color;
+        }
 
         /// <summary>
         /// Gets the computed background color.
@@ -186,13 +206,13 @@ namespace Majorsilence.Forms
         /// <summary>Gets or sets the background color as a <see cref="System.Drawing.Color"/>. WinForms compatibility.</summary>
         public System.Drawing.Color BackColor {
             get => BackgroundColor is { } c ? System.Drawing.Color.FromArgb (c.Alpha, c.Red, c.Green, c.Blue) : System.Drawing.Color.Empty;
-            set => BackgroundColor = value.IsEmpty ? null : value.ToSKColor ();
+            set => SetBackgroundColor (value);
         }
 
         /// <summary>Gets or sets the foreground color as a <see cref="System.Drawing.Color"/>. WinForms compatibility.</summary>
         public System.Drawing.Color ForeColor {
             get => ForegroundColor is { } c ? System.Drawing.Color.FromArgb (c.Alpha, c.Red, c.Green, c.Blue) : System.Drawing.Color.Empty;
-            set => ForegroundColor = value.IsEmpty ? null : value.ToSKColor ();
+            set => SetForegroundColor (value);
         }
 
         /// <summary>Gets or sets the selection background color. WinForms compatibility stub (stored, not rendered).</summary>

@@ -3283,10 +3283,12 @@ namespace Majorsilence.Forms
 
                 // Only a real change notifies -- assigning the same color again must not fire
                 // BackColorChanged (nor re-cascade it to every child).
-                if (Style.BackgroundColor == color)
+                if (Style.BackgroundColor == color) {
+                    Style.SetBackgroundColor (value);
                     return;
+                }
 
-                Style.BackgroundColor = color;
+                Style.SetBackgroundColor (value);
                 OnBackColorChanged (EventArgs.Empty);
             }
         }
@@ -3302,10 +3304,12 @@ namespace Majorsilence.Forms
             set {
                 var color = value.ToSKColor ();
 
-                if (Style.ForegroundColor == color)
+                if (Style.ForegroundColor == color) {
+                    Style.SetForegroundColor (value);
                     return;
+                }
 
-                Style.ForegroundColor = color;
+                Style.SetForegroundColor (value);
                 OnForeColorChanged (EventArgs.Empty);
             }
         }

@@ -57,3 +57,5 @@ Weapon-modification foci now share the existing binding record and limit/account
 Accessory quantities retain individual legacy records while grouping equivalent units in the tree. The standard native quantity input and shared purchase plan avoid new save fields; canonical unit deletion and expense undo no longer depend on presentation depth. See [ACCESSORY_QUANTITIES.md](ACCESSORY_QUANTITIES.md). Shared ammunition views remain separate work.
 
 Cyberware deletion now removes actual nested rows, and stale selections clear safely in creation/career mode; see [CYBERWARE_SELECTION.md](CYBERWARE_SELECTION.md). Release identity is shared by About, diagnostics, binaries and package metadata, with source and consistency checks documented in [BUILD_IDENTITY.md](BUILD_IDENTITY.md).
+
+Character attribute and BP-summary contrast now has actual-screen light/dark transition coverage. Shared system-color declarations retain their identity and resolve against the host theme instead of the drawing package's fixed classic palette. See [CHARACTER_THEME.md](CHARACTER_THEME.md).

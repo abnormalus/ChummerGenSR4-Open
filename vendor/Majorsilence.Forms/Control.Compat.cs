@@ -1216,7 +1216,28 @@ namespace Majorsilence.Forms
         /// A system color (<c>SystemColors.Control</c>, a deserialised <c>KnownColor.Control</c>) converts
         /// to this library's palette value, not the runtime's channels for it -- see <see cref="SystemColors"/>.
         /// </remarks>
-        public static SKColor ToSKColor (this Color color) => Majorsilence.Forms.Drawing.SystemColorPalette.ToSKColor (color);
+        public static SKColor ToSKColor (this Color color)
+        {
+            // The drawing package supplies a fixed classic system palette. UI system colors
+            // instead resolve through the current host theme; named warning/custom colors retain
+            // their literal channels. Retained declarations in ControlStyle resolve on every read.
+            if (color.IsSystemColor)
+                return color.ToKnownColor () switch {
+                    KnownColor.Control or KnownColor.ButtonFace or KnownColor.Menu or KnownColor.MenuBar => Theme.ControlMidColor,
+                    KnownColor.Window or KnownColor.AppWorkspace or KnownColor.Desktop => Theme.BackgroundColor,
+                    KnownColor.Info => Theme.ControlMidColor,
+                    KnownColor.ControlText or KnownColor.WindowText or KnownColor.MenuText or KnownColor.InfoText => Theme.ForegroundColor,
+                    KnownColor.GrayText or KnownColor.InactiveCaptionText => Theme.ForegroundDisabledColor,
+                    KnownColor.Highlight or KnownColor.HotTrack => Theme.AccentColor,
+                    KnownColor.HighlightText or KnownColor.ActiveCaptionText => Theme.ForegroundColorOnAccent,
+                    KnownColor.ButtonShadow or KnownColor.ControlDark or KnownColor.ControlDarkDark or KnownColor.WindowFrame => Theme.BorderHighColor,
+                    KnownColor.ButtonHighlight or KnownColor.ControlLight or KnownColor.ControlLightLight => Theme.ControlHighColor,
+                    KnownColor.ActiveCaption or KnownColor.GradientActiveCaption => Theme.AccentColor,
+                    KnownColor.InactiveCaption or KnownColor.GradientInactiveCaption => Theme.ControlLowColor,
+                    _ => Majorsilence.Forms.Drawing.SystemColorPalette.ToSKColor (color)
+                };
+            return Majorsilence.Forms.Drawing.SystemColorPalette.ToSKColor (color);
+        }
 
         /// <summary>Converts an <see cref="SKColor"/> to a <see cref="System.Drawing.Color"/>.</summary>
         public static Color ToDrawingColor (this SKColor color) => Color.FromArgb (color.Alpha, color.Red, color.Green, color.Blue);
