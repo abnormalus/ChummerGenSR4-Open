@@ -32,8 +32,15 @@ internal static class NativeAccessoryPickerChecks
         {
             var pending = picker.ShowDialogAsync(main);
             var window = (AccessoryPickerWindow)NativeDialogHost.ActiveWindow!;
+            window.SearchBox.Text = "Spare Clips";
+            window.Model.SelectedEntry = window.Model.Items.Single(item => item.Name == "Spare Clips");
+            var quantity = Find<NumericUpDown>(window, "accessoryQuantity"); quantity.Value = 4;
+            await WaitForAsync(() => window.Model.Quantity == 4);
+            check(quantity.IsEnabled && window.Model.Details!.Cost == string.Format("{0:###,###,##0¥}", 20),
+                "Native accessory quantity input updates aggregate price");
             window.SearchBox.Text = "Laser Sight";
             await WaitForAsync(() => window.AcceptButton.IsEnabled && window.ItemList.SelectedItem is CatalogEntry);
+            check(!quantity.IsEnabled && quantity.Value == 1, "Native non-stack accessories disable and reset quantity");
             check(window.Model.SelectedEntry?.Name == "Laser Sight" && !Forms.AvaloniaHostInterop.ToAvaloniaWindow(main).IsEnabled,
                 "Native accessory picker binds filtered selection and disables its owner");
             Find<NumericUpDown>(window, "accessoryMarkup").Value = 25;

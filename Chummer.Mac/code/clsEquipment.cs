@@ -7279,6 +7279,13 @@ namespace Chummer
 	/// </summary>
 	public class WeaponAccessory
 	{
+        private int quantity = 1;
+        /// <summary>Number of identical spare containers represented by this accessory.</summary>
+        public int Quantity
+        {
+            get => quantity;
+            set => quantity = Math.Clamp(value, 1, 1000);
+        }
 		private Guid _guiID = new Guid();
 		private string _strName = "";
 		private string _strMount = "";
@@ -7402,6 +7409,8 @@ namespace Chummer
 				}
 				objWriter.WriteEndElement();
 			}
+            // Omit the extension for single units so existing character round trips stay unchanged.
+            if (Quantity != 1) objWriter.WriteElementString("quantity", Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			objWriter.WriteElementString("notes", _strNotes);
 			objWriter.WriteElementString("discountedcost", DiscountCost.ToString());
 			objWriter.WriteEndElement();
@@ -7414,6 +7423,7 @@ namespace Chummer
 		public void Load(XmlNode objNode, bool blnCopy = false)
 		{
 			_guiID = Guid.Parse(objNode["guid"].InnerText);
+            Quantity = int.TryParse(objNode["quantity"]?.InnerText, out int savedQuantity) ? savedQuantity : 1;
 			_strName = objNode["name"].InnerText;
 			_strMount = objNode["mount"].InnerText;
 			_strRC = objNode["rc"].InnerText;
@@ -7632,7 +7642,7 @@ namespace Chummer
 		{
 			get
 			{
-				string strReturn = DisplayNameShort;
+				string strReturn = DisplayNameShort + (Quantity > 1 ? " ×" + Quantity.ToString(GlobalOptions.Instance.CultureInfo) : "");
 
 				return strReturn;
 			}
@@ -7899,6 +7909,7 @@ namespace Chummer
 
 				if (DiscountCost)
 					intReturn = Convert.ToInt32(Convert.ToDouble(intReturn, GlobalOptions.Instance.CultureInfo) * 0.9);
+                intReturn = checked(intReturn * Quantity);
 
 				// Add in the cost of any Gear the Weapon Accessory has attached to it.
 				foreach (Gear objGear in _lstGear)
@@ -7924,6 +7935,7 @@ namespace Chummer
 
 				if (DiscountCost)
 					intReturn = Convert.ToInt32(Convert.ToDouble(intReturn, GlobalOptions.Instance.CultureInfo) * 0.9);
+                intReturn = checked(intReturn * Quantity);
 
 				return intReturn;
 			}

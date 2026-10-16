@@ -11,8 +11,19 @@ internal sealed record AccessoryPickerDetails(string Recoil, string Mount, strin
 
 // Accessories have mounts rather than catalog categories. Keep selection filtering
 // separate from the window and preserve the existing preview rounding/cost policy.
-internal sealed class AccessoryPickerModel : CatalogPickerModel<AccessoryPickerDetails>
+internal sealed class AccessoryPickerModel : CatalogPickerModel<AccessoryPickerDetails>, IQuantityCatalogPicker
 {
+    private int quantity = 1;
+    public bool IsQuantityEnabled => SelectedEntry != null && WeaponAccessoryStacks.SupportsQuantity(SelectedEntry.Name);
+    public int Quantity
+    {
+        get => IsQuantityEnabled ? quantity : 1;
+        set { int next = Math.Clamp(value, 1, 1000); if (quantity == next) return; quantity = next; UpdateDetails(); }
+    }
+    protected override void NotifyAdditionalProperties()
+    {
+        Notify(nameof(Quantity)); Notify(nameof(IsQuantityEnabled));
+    }
     private readonly string[] allowedMounts;
     private readonly int weaponCost;
     internal AccessoryPickerModel(Character character, bool career, string mounts, int weaponCost, XmlDocument? catalog = null)
@@ -37,7 +48,7 @@ internal sealed class AccessoryPickerModel : CatalogPickerModel<AccessoryPickerD
         string expression = FreeCost ? "0" : definition["cost"]!.InnerText.Replace("Weapon Cost", weaponCost.ToString(System.Globalization.CultureInfo.InvariantCulture));
         XPathNavigator navigator = Catalog.CreateNavigator()!;
         int cost = Convert.ToInt32(Convert.ToDouble(navigator.Evaluate(expression), GlobalOptions.Instance.CultureInfo));
-        cost = Convert.ToInt32(cost * (1 + Markup / 100.0));
+        cost = checked(Convert.ToInt32(cost * (1 + Markup / 100.0)) * Quantity);
         string availability = definition["avail"]!.InnerText
             .Replace("R", LanguageManager.Instance.GetString("String_AvailRestricted"))
             .Replace("F", LanguageManager.Instance.GetString("String_AvailForbidden"));

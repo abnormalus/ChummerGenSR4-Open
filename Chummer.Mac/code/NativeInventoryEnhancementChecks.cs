@@ -87,6 +87,18 @@ internal static class NativeInventoryEnhancementChecks
                 AddGrip();
                 check(rifle.WeaponMods.Any(item => item.Name == WeaponModificationNames.PersonalizedGrip && item.RC == "1" && item.DicePool == 0),
                     "Native " + mode + " unified grip purchase applies the ranged definition");
+                int stackMoney = character.Nuyen, stackWeaponCost = rifle.TotalCost;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+                    var picker = (AccessoryPickerWindow)NativeDialogHost.ActiveWindow!;
+                    picker.SearchBox.Text = "Spare Clips";
+                    picker.Model.SelectedEntry = picker.Model.Items.Single(item => item.Name == "Spare Clips");
+                    picker.Model.Quantity = 4; picker.AcceptButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+                });
+                Invoke(editor, "tsWeaponAddAccessory_Click");
+                check(rifle.WeaponAccessories.Count(item => item.Name == "Spare Clips") == 1 &&
+                    rifle.WeaponAccessories.Single(item => item.Name == "Spare Clips").Quantity == 4 &&
+                    character.Nuyen == stackMoney - (career ? rifle.TotalCost - stackWeaponCost : 0),
+                    "Native " + mode + " spare-clip quantity purchases one stack with aggregate charging");
                 var menu = Field<Forms.ContextMenuStrip>(editor, "cmsWeapon");
                 var command = menu.Items.OfType<Forms.ToolStripMenuItem>().Single(item => item.Name == "buyWeaponAmmunition");
                 menu.Show(weaponTree, new System.Drawing.Point(8, 8)); menu.Hide();
@@ -146,6 +158,17 @@ internal static class NativeInventoryEnhancementChecks
                 check(mounted.DisplayName != mounted.Name && mounted.WeaponAccessories.Any(item => item.Name == "Weapon Commlink") &&
                     character.Nuyen == vehicleMoney - (career ? mounted.TotalCost - weaponCost : 0),
                     "Native " + mode + " decorated vehicle weapon buys an accessory with its existing cost rules");
+                vehicleTree.SelectedNode = mountedNode; vehicleMoney = character.Nuyen; weaponCost = mounted.TotalCost;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+                    var picker = (AccessoryPickerWindow)NativeDialogHost.ActiveWindow!;
+                    picker.SearchBox.Text = "Speed Loader";
+                    picker.Model.SelectedEntry = picker.Model.Items.Single(item => item.Name == "Speed Loader");
+                    picker.Model.Quantity = 3; picker.AcceptButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+                });
+                Invoke(editor, "tsVehicleAddWeaponAccessory_Click");
+                check(mounted.WeaponAccessories.Single(item => item.Name == "Speed Loader").Quantity == 3 &&
+                    character.Nuyen == vehicleMoney - (career ? mounted.TotalCost - weaponCost : 0),
+                    "Native " + mode + " vehicle accessory quantity uses one stack and existing cost rules");
                 int accessoryCount = mounted.WeaponAccessories.Count;
                 vehicleMoney = character.Nuyen; vehicleTree.SelectedNode = mountedNode;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => NativeDialogHost.ActiveWindow!.Close());

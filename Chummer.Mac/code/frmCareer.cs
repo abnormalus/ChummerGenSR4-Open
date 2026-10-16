@@ -9900,6 +9900,8 @@ namespace Chummer
 			TreeNode objNode = new TreeNode();
 			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);
 			objAccessory.Create(objXmlWeapon, objNode, frmPickWeaponAccessory.SelectedMount);
+            objAccessory.Quantity = frmPickWeaponAccessory.SelectedQuantity;
+            objNode.Text = objAccessory.DisplayName;
 			objAccessory.Parent = objWeapon;
 
 			// Check the item's Cost and make sure the character can afford it.
@@ -10559,6 +10561,8 @@ namespace Chummer
 			TreeNode objNode = new TreeNode();
 			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);
 			objAccessory.Create(objXmlWeapon, objNode, frmPickWeaponAccessory.SelectedMount);
+            objAccessory.Quantity = frmPickWeaponAccessory.SelectedQuantity;
+            objNode.Text = objAccessory.DisplayName;
 			objAccessory.Parent = objWeapon;
 
 			// Check the item's Cost and make sure the character can afford it.

@@ -1,0 +1,11 @@
+# Spare accessory quantities
+
+The shared native catalog window supports IQuantityCatalogPicker with the standard NativeIntegerInput control. AccessoryPickerModel enables quantities of 1–1000 for Spare Clips, Speed Loader, Ammo Drum/Box and the existing 2050 clip/loader variants. Installed upgrades remain single-unit purchases. Accepted selections capture quantity alongside identity and purchase options, and the preview shows the batch cost.
+
+Each purchase creates one WeaponAccessory with its quantity, one tree entry and one career expense/undo identity. Creation/career and carried/vehicle handlers share the same selected-quantity contract. Distinct purchases are not automatically merged: existing customized accessories and earlier expense-undo identities remain separate. This avoids undoing an earlier purchase when reversing a later one. A batch can be deleted or reversed through the existing inventory/expense paths.
+
+TotalCost and OwnCost multiply the existing rounded per-unit cost, preserving weapon multipliers and per-unit discount rounding. Attached child gear remains owned once; quantity purchasing is restricted to catalog spare containers without predefined children or combat bonuses. The displayed name includes quantity; canonical Name stays unchanged for lookups. Printing uses the existing aggregate cost and displayed name.
+
+Character files retain XML/UTF-16 encoding. An optional accessory quantity element is written only for stacks larger than one; older saves default to one, and ordinary fixture round trips remain byte-schema equivalent. Older Chummer executables do not understand this new accessory quantity extension: they may treat a stack as a single unit. Both current desktop platforms support it. Keep this limitation explicit when exchanging newly stacked characters with older applications.
+
+AccessoryStackChecks covers all five canonical definitions, cost/discount rounding, single-entry serialization and picker state changes. Native checks exercise numeric input and aggregate pricing plus real carried/vehicle purchases in creation and career, with aggregate charging and existing cancellation checks. Combined native CI minimum is 115 checks plus all 399 fixtures. Shared ammunition views are separate work: loading reserves and firing counters must not be conflated.

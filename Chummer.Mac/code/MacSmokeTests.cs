@@ -1006,6 +1006,7 @@ namespace Chummer
                 ArmorPickerChecks.Run(character, Check);
                 ArmorModPickerChecks.Run(character, Check);
                 AccessoryPickerChecks.Run(character, Check);
+                AccessoryStackChecks.Run(character, Check);
                 InventoryEnhancementChecks.Run(character, Check);
                 GearEligibilityChecks.Run(character, Check);
                 PersonalizedGripChecks.Run(character, Check);

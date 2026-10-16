@@ -19,6 +19,7 @@ public sealed class frmSelectWeaponAccessory : IDisposable
     public DialogResult DialogResult { get; private set; } = DialogResult.Cancel;
     public string SelectedAccessory => selection?.Name ?? "";
     public string SelectedMount => selectedMount;
+    public int SelectedQuantity => selection?.Quantity ?? 1;
     public bool AddAgain => selection?.AddAgain ?? false;
     public bool FreeCost => selection?.FreeCost ?? false;
     public int Markup => selection?.Markup ?? 0;
