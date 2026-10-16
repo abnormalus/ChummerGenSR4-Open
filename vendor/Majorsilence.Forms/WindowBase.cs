@@ -3338,10 +3338,12 @@ namespace Majorsilence.Forms
             set {
                 // Compare the stored SKColor, not the System.Drawing.Color: Color.Red and the same ARGB read
                 // back from the style are not Equal (named vs. unnamed), so the Color compare never matched.
-                if (Style.BackgroundColor == value.ToSKColor ())
+                if (Style.BackgroundColor == value.ToSKColor ()) {
+                    Style.SetBackgroundColor (value);
                     return;
+                }
 
-                Style.BackgroundColor = value.ToSKColor ();
+                Style.SetBackgroundColor (value);
                 Invalidate ();
                 back_color_changed?.Invoke (this, EventArgs.Empty);
             }
@@ -3354,10 +3356,12 @@ namespace Majorsilence.Forms
         public virtual System.Drawing.Color ForeColor {
             get => Style.ForegroundColor?.ToDrawingColor () ?? Style.GetForegroundColor ().ToDrawingColor ();
             set {
-                if (Style.ForegroundColor == value.ToSKColor ())
+                if (Style.ForegroundColor == value.ToSKColor ()) {
+                    Style.SetForegroundColor (value);
                     return;
+                }
 
-                Style.ForegroundColor = value.ToSKColor ();
+                Style.SetForegroundColor (value);
                 Invalidate ();
                 fore_color_changed?.Invoke (this, EventArgs.Empty);
             }

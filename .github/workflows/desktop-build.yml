@@ -98,6 +98,10 @@ jobs:
         with:
           name: synthetic-details-visual-${{ matrix.os }}
           path: |
+            artifacts/checks/native-character-theme-light-light.png
+            artifacts/checks/native-character-theme-light-dark.png
+            artifacts/checks/native-character-theme-dark-dark.png
+            artifacts/checks/native-character-theme-dark-light.png
             artifacts/checks/native-character-details-creation-2x.png
             artifacts/checks/native-character-details-career-2x.png
             artifacts/checks/native-empty-workspace-light-900.png

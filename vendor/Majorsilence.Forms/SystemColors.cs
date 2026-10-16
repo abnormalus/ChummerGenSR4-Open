@@ -14,10 +14,9 @@ namespace Majorsilence.Forms
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This library paints a system color with its own palette -- the light Windows 10 defaults
-    /// (<see cref="Control"/> is 240,240,240, <see cref="Highlight"/> 0,120,215) -- on every platform.
-    /// The palette is applied when a color is drawn, so anything handed to a control, pen, brush or
-    /// <see cref="Graphics"/> paints those values.
+    /// Controls resolve supported system roles through the current UI theme, retaining the known
+    /// color identity for live theme changes. The separate drawing package uses its classic palette
+    /// for pens, brushes and non-control drawing; explicit custom colors remain literal.
     /// </para>
     /// <para>
     /// Caveat: a known color's <see cref="Color.R"/>/<see cref="Color.G"/>/<see cref="Color.B"/>
