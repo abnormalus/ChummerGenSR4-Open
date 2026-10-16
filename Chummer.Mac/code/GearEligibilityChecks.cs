@@ -44,6 +44,13 @@ internal static class GearEligibilityChecks
                 "Skinlink", "Self-Destruct, Area Effect", "installed capacity");
             Compare(new frmSelectGear(character) { AllowedCategories = "Electronics and Sensor Options", ShowArmorCapacityOnly = true },
                 "Self-Destruct, Area Effect", "Skinlink", "armor capacity");
+            using (var exhausted = new frmSelectGear(character) { AllowedCategories = "Commlink Operating System Upgrade", CommlinkFirewall = 10, CommlinkSystem = 10 })
+            {
+                exhausted.Show();
+                check(Field<ComboBox>(exhausted, "cboCategory").Items.Count == 0 && !Field<Button>(exhausted, "cmdOK").Enabled,
+                    "gear with no eligible categories opens safely with purchasing disabled");
+                exhausted.Close();
+            }
             using (var custom = new frmSelectGear(character) { AllowedCategories = "Commlink Upgrade", CommlinkResponse = 0, CommlinkSignal = 0 })
             {
                 custom.Show(); Field<TextBox>(custom, "txtSearch").Text = "Response 8";

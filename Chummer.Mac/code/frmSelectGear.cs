@@ -189,6 +189,11 @@ namespace Chummer
 			cboCategory.DisplayMember = "Name";
 			cboCategory.DataSource = _lstCategory;
 
+            if (_lstCategory.Count == 0)
+            {
+                RefreshSelectionState();
+                return;
+            }
             // Context takes precedence over session memory only if it survived filtering.
             string preferredCategory = _lstCategory.Any(item => item.Value == InitialCategory)
                 ? InitialCategory : _strSelectCategory;
