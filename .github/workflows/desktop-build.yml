@@ -80,6 +80,16 @@ jobs:
           if ($bytes.Length -lt 1000 -or -not $content.StartsWith('%PDF-') -or $content -notmatch '/Type\s*/Page\b') {
             throw 'Native preview produced an invalid or empty PDF.'
           }
+      # These two window-only images contain fixed synthetic text assigned in
+      # NativeCharacterDetailsChecks, not source-character fields or diagnostics.
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: synthetic-details-visual-${{ matrix.os }}
+          path: |
+            artifacts/checks/native-character-details-creation-2x.png
+            artifacts/checks/native-character-details-career-2x.png
+          retention-days: 7
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
