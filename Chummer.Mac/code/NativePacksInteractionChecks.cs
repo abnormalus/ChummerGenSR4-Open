@@ -31,6 +31,10 @@ internal static class NativePacksInteractionChecks
         var workspace = main.Controls.OfType<MdiClient>().Single();
         check(main.MdiChildren.Length == 0 && workspace.BackgroundImage != null && workspace.BackgroundImageLayout == ImageLayout.Zoom,
             "Native empty workspace displays aspect-preserving artwork before character selection");
+        using (var artwork = SkiaSharp.SKBitmap.Decode(Path.Combine(AppContext.BaseDirectory, "branding", "workspace-emblem.png")))
+            check(artwork != null && artwork.GetPixel(0, 0).Alpha == 0 &&
+                artwork.GetPixel(artwork.Width - 1, artwork.Height - 1).Alpha == 0,
+                "Native workspace artwork retains transparent corners instead of an opaque rectangle");
         var app = Avalonia.Application.Current!;
         var originalTheme = app.RequestedThemeVariant;
         try
@@ -50,18 +54,23 @@ internal static class NativePacksInteractionChecks
         try
         {
             nativeMain.WindowState = Avalonia.Controls.WindowState.Normal;
+            foreach (var theme in new[] { Avalonia.Styling.ThemeVariant.Light, Avalonia.Styling.ThemeVariant.Dark })
             foreach (var size in new[] { (Width: 900, Height: 650), (Width: 1200, Height: 850) })
             {
+                app.RequestedThemeVariant = theme;
                 nativeMain.Width = size.Width; nativeMain.Height = size.Height; await Task.Delay(120);
                 // Capture only the empty workspace: no character fields are visible.
                 using var image = new Avalonia.Media.Imaging.RenderTargetBitmap(
                     new Avalonia.PixelSize((int)nativeMain.ClientSize.Width, (int)nativeMain.ClientSize.Height));
                 image.Render(nativeMain);
-                image.Save(Path.Combine(output, "native-empty-workspace-" + size.Width + ".png"),
+                image.Save(Path.Combine(output, "native-empty-workspace-" + theme.Key.ToString()!.ToLowerInvariant() + "-" + size.Width + ".png"),
                     Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
             }
         }
-        finally { nativeMain.Width = originalWidth; nativeMain.Height = originalHeight; nativeMain.WindowState = originalState; }
+        finally {
+            app.RequestedThemeVariant = originalTheme;
+            nativeMain.Width = originalWidth; nativeMain.Height = originalHeight; nativeMain.WindowState = originalState;
+        }
         var copy = new Character(); copy.LoadSnapshot(source.CaptureSnapshot());
         var editor = new frmCreate(copy) { Loading = true, MdiParent = main };
         frmCreate? replacement = null;
