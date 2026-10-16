@@ -27,6 +27,7 @@ internal sealed class CharacterDetailsWindow : Window
     {
         Title = T("Details_Editor"); Width = 960; Height = 740; MinWidth = 560; MinHeight = 420;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         Icon = new WindowIcon(Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico"));
         var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(16), RowSpacing = 12 };
         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -50,7 +51,7 @@ internal sealed class CharacterDetailsWindow : Window
             editor.PropertyChanged += (_, change) => { if (change.Property == TextBox.FontSizeProperty) editor.LineHeight = editor.FontSize * 1.625; };
             return editor;
         }).ToArray();
-        Sections = new TabControl { ItemsSource = labels.Select((key, index) => new TabItem { Header = T(key), Content = Editors[index] }).ToArray(), SelectedIndex = Math.Clamp(section, 0, 3) };
+        Sections = new TabControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, ItemsSource = labels.Select((key, index) => new TabItem { Header = T(key), Content = Editors[index] }).ToArray(), SelectedIndex = Math.Clamp(section, 0, 3) };
         Grid.SetRow(Sections, 1); layout.Children.Add(Sections);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8 };
         var cancel = new Button { Content = T("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
