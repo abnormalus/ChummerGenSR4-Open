@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Xml;
 namespace Chummer;
 
@@ -35,6 +36,14 @@ internal static class ArmorModPickerChecks
             character.Options.Books.Clear(); check(model.Accept(false) == null, "armor modification acceptance rejects disabled sources");
             var catalog = XmlManager.Instance.Load("armor.xml");
             foreach (string book in catalog.SelectNodes("/chummer/mods/mod/source")!.Cast<XmlNode>().Select(node => node.InnerText).Distinct()) character.Options.Books.Add(book);
+            var environmental = new ArmorModPickerModel(character, true, "Environmental Armor", 5000, CapacityStyle.Standard)
+                { SearchText = "Transparent Ruthenium Polymer Coating" };
+            using (var adapter = new frmSelectArmorMod(character))
+            {
+                typeof(frmSelectArmorMod).GetField("selection", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(adapter, environmental.Accept(false));
+                check(adapter.SelectedDefinition["category"]!.InnerText == "Environmental Armor" && adapter.SelectedDefinition["cost"]!.InnerText == "200",
+                    "same-name armor modifications retain the selected category and purchase definition");
+            }
             var all = new ArmorModPickerModel(character, false, string.Join(',', catalog.SelectNodes("/chummer/mods/mod/category")!.Cast<XmlNode>().Select(node => node.InnerText).Distinct()), 5000, CapacityStyle.Standard);
             foreach (var entry in all.Items)
             {

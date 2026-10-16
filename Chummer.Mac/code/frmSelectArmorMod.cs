@@ -25,7 +25,7 @@ public sealed class frmSelectArmorMod : IDisposable
     public int ArmorCost { private get; set; }
     public CapacityStyle CapacityDisplayStyle { private get; set; } = CapacityStyle.Zero;
     internal XmlNode SelectedDefinition => XmlManager.Instance.Load("armor.xml").SelectNodes("/chummer/mods/mod")!
-        .Cast<XmlNode>().First(node => node["name"]?.InnerText == selection?.Name);
+        .Cast<XmlNode>().First(node => node["name"]?.InnerText == selection?.Name && node["category"]?.InnerText == selection?.Category);
     public frmSelectArmorMod(Character character, bool career = false)
     { this.character = character; this.career = career; }
     public DialogResult ShowDialog(Form owner)
