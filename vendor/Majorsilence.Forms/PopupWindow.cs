@@ -118,6 +118,26 @@ namespace Majorsilence.Forms
                 style.BackgroundColor = Theme.ControlMidColor;
             });
 
+        /// <summary>Shows a dropdown next to its control within the monitor working area.</summary>
+        /// <remarks>Screen coordinates are device pixels; backend window sizes are logical units.
+        /// Do not multiply absolute desktop coordinates by scaling (negative monitor origins matter).</remarks>
+        public void ShowBelow(Control control)
+        {
+            var origin = control.PointToScreen(new System.Drawing.Point(1, 0));
+            var bottom = control.PointToScreen(new System.Drawing.Point(control.Width, control.Height));
+            var anchor = System.Drawing.Rectangle.FromLTRB(origin.X, origin.Y, bottom.X, bottom.Y);
+            var screen = Screen.FromRectangle(anchor);
+            if (screen == null) { Show(origin.X, bottom.Y); return; }
+            double scale = parent_form.DesktopScaling;
+            if (!double.IsFinite(scale) || scale <= 0) scale = 1;
+            var requested = new System.Drawing.Size((int)System.Math.Ceiling(Size.Width * scale), (int)System.Math.Ceiling(Size.Height * scale));
+            var area = screen.WorkingArea.Width > 0 && screen.WorkingArea.Height > 0 ? screen.WorkingArea : screen.Bounds;
+            var placement = DropDownPlacement.Calculate(anchor, requested, area);
+            Size = new System.Drawing.Size(System.Math.Max(1, (int)System.Math.Floor(placement.Width / scale)),
+                System.Math.Max(1, (int)System.Math.Floor(placement.Height / scale)));
+            Show(placement.X, placement.Y);
+        }
+
         /// <summary>Show the PopupWindow at the specified screen coordinates.</summary>
         public void Show (int x, int y)
         {
