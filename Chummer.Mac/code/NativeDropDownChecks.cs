@@ -27,7 +27,8 @@ internal static class NativeDropDownChecks
             var anchor = combo.PointToScreen(Point.Empty);
             check(area.Contains(Bounds()) && Bounds().Bottom <= anchor.Y,
                 "Native dropdown flips upward clear of the Dock or taskbar");
-            typeof(ComboBox).GetMethod("OnKeyDown", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(combo, new object[] { new KeyEventArgs(Keys.End) });
+            for (int i = 0; i < 49; i++)
+                typeof(ComboBox).GetMethod("OnKeyDown", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(combo, new object[] { new KeyEventArgs(Keys.Down) });
             check(combo.SelectedIndex == 49, "Native constrained dropdown retains keyboard access to its final entry");
             typeof(ComboBox).GetMethod("OnKeyUp", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(combo, new object[] { new KeyEventArgs(Keys.Escape) });
             check(!combo.DroppedDown, "Native upward dropdown dismisses through Escape");
