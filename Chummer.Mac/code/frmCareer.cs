@@ -9862,7 +9862,7 @@ namespace Chummer
 
 			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + objWeapon.Name + "\"]");
 
-			frmSelectWeaponAccessory frmPickWeaponAccessory = new frmSelectWeaponAccessory(_objCharacter, true);
+			using frmSelectWeaponAccessory frmPickWeaponAccessory = new frmSelectWeaponAccessory(_objCharacter, true);
 
 			if (objXmlWeapon == null)
 			{
@@ -9894,7 +9894,7 @@ namespace Chummer
 				return;
 
 			// Locate the selected piece.
-			objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/accessories/accessory[name = \"" + frmPickWeaponAccessory.SelectedAccessory + "\"]");
+			objXmlWeapon = frmPickWeaponAccessory.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);
@@ -10512,7 +10512,7 @@ namespace Chummer
 
 			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + treVehicles.SelectedNode.Text + "\"]");
 
-			frmSelectWeaponAccessory frmPickWeaponAccessory = new frmSelectWeaponAccessory(_objCharacter, true);
+			using frmSelectWeaponAccessory frmPickWeaponAccessory = new frmSelectWeaponAccessory(_objCharacter, true);
 
 			if (objXmlWeapon == null)
 			{
@@ -10553,7 +10553,7 @@ namespace Chummer
 				return;
 
 			// Locate the selected piece.
-			objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/accessories/accessory[name = \"" + frmPickWeaponAccessory.SelectedAccessory + "\"]");
+			objXmlWeapon = frmPickWeaponAccessory.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			WeaponAccessory objAccessory = new WeaponAccessory(_objCharacter);

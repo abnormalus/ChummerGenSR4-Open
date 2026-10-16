@@ -40,8 +40,8 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         var root = new Grid { Margin = new Thickness(18), RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"), RowSpacing = 12 };
         var filters = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,2*,Auto,3*"), ColumnSpacing = 10 };
-        filters.Children.Add(new TextBlock { Text = T("Label_Category"), VerticalAlignment = VerticalAlignment.Center });
-        var categories = new ComboBox { MinWidth = 180, HorizontalAlignment = HorizontalAlignment.Stretch };
+        filters.Children.Add(new TextBlock { Text = T("Label_Category"), VerticalAlignment = VerticalAlignment.Center, IsVisible = model.Categories.Count > 0 });
+        var categories = new ComboBox { IsVisible = model.Categories.Count > 0, MinWidth = 180, HorizontalAlignment = HorizontalAlignment.Stretch };
         categories.Bind(ItemsControl.ItemsSourceProperty, Read(nameof(model.Categories)));
         categories.Bind(SelectingItemsControl.SelectedItemProperty, Edit(nameof(model.Category)));
         Grid.SetColumn(categories, 1); filters.Children.Add(categories);
@@ -49,6 +49,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         Grid.SetColumn(searchLabel, 2); filters.Children.Add(searchLabel);
         SearchBox = new TextBox { PlaceholderText = T("CatalogPicker_SearchHint"), Name = namePrefix + "Search" };
         SearchBox.Bind(TextBox.TextProperty, Edit(nameof(model.SearchText)));
+        if (model.Categories.Count == 0) filters.ColumnDefinitions = new ColumnDefinitions("0,0,Auto,*");
         Grid.SetColumn(SearchBox, 3); filters.Children.Add(SearchBox); root.Children.Add(filters);
 
         var body = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,Auto,3*"), ColumnSpacing = 10 };
