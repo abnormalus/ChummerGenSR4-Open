@@ -45,3 +45,9 @@ Native checks verify artwork before opening a character, hide it while an editor
 ## Interaction stability acceptance
 
 Actual PACKS replacement followed by Add Armor/Add Gear cancellation is part of native validation. Menu refresh errors fail the regression rather than being swallowed behind a passing test. Structural command/editor/modal diagnostics supplement errors without recording character content. See [CHARACTER_SWITCHING.md](CHARACTER_SWITCHING.md). The intermittent blocked-input report remains under observation; the confirmed menu restoration index defect is covered.
+
+## Theme acceptance
+
+Every migrated section must respect the application/system light and dark theme, including live changes. Prefer theme resources to fixed presentation colors; explicit semantic colors such as review-required warnings still need readable contrast. Workspace artwork must use real alpha transparency rather than a baked light/dark rectangle. Native checks exercise the maintained host-theme bridge for the legacy workspace; native screen migrations also need light/dark visual review. The top-level legacy window explicitly starts `MajorsilenceFormsTheme.FollowHost` because it is not an embedded presenter. This does not claim all legacy designer colors have already been migrated.
+
+The workspace uses the user's transparent circular dragon PNG unchanged. Native checks verify transparent corners and capture the empty workspace at two sizes in both themes, so an opaque background cannot silently return.
