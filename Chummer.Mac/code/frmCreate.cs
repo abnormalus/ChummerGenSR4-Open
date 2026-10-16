@@ -8858,7 +8858,7 @@ namespace Chummer
 
 			XmlNode objXmlArmor = objXmlDocument.SelectSingleNode("/chummer/armors/armor[name = \"" + objArmor.Name + "\"]");
 
-			frmSelectArmorMod frmPickArmorMod = new frmSelectArmorMod(_objCharacter);
+			using frmSelectArmorMod frmPickArmorMod = new frmSelectArmorMod(_objCharacter);
 			frmPickArmorMod.ArmorCost = objArmor.Cost;
 			frmPickArmorMod.AllowedCategories = objArmor.Category + "," + objArmor.Name;
 			frmPickArmorMod.CapacityDisplayStyle = objArmor.CapacityDisplayStyle;
@@ -8871,7 +8871,7 @@ namespace Chummer
 				return;
 
 			// Locate the selected piece.
-			objXmlArmor = objXmlDocument.SelectSingleNode("/chummer/mods/mod[name = \"" + frmPickArmorMod.SelectedArmorMod + "\"]");
+			objXmlArmor = frmPickArmorMod.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			ArmorMod objMod = new ArmorMod(_objCharacter);

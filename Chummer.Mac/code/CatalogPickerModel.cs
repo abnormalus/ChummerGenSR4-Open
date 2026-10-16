@@ -12,7 +12,7 @@ internal sealed record CatalogCategory(string Code, string DisplayName)
     public override string ToString() => DisplayName;
 }
 internal sealed record CatalogEntry(string Name, string Category, string DisplayName, XmlNode Definition);
-internal sealed record CatalogSelection(string Name, string Category, bool FreeCost, int Markup, bool AddAgain);
+internal sealed record CatalogSelection(string Name, string Category, bool FreeCost, int Markup, bool AddAgain, int Rating = 0);
 internal interface ICatalogPickerDetails
 {
     string Source { get; }
@@ -121,7 +121,9 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
         UpdateDetails();
     }
 
-    private void Notify(string property) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
+    protected void Notify(string property) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
+
+    protected virtual void NotifyAdditionalProperties() { }
 
     private void Changed()
     {
@@ -130,9 +132,10 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
         foreach (string property in new[] { nameof(Category), nameof(SearchText), nameof(SelectedEntry),
             nameof(Markup), nameof(FreeCost), nameof(Details), nameof(Error), nameof(HasError),
             nameof(IsEmpty), nameof(CanAccept) }) Notify(property);
+        NotifyAdditionalProperties();
     }
 
-    private void UpdateDetails()
+    protected void UpdateDetails()
     {
         details = null; error = "";
         if (selectedEntry == null) { Changed(); return; }
@@ -161,6 +164,6 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
             error = LanguageManager.Instance.GetString("CatalogPicker_SelectionChanged"); Changed(); return null;
         }
         RememberCategory(selectedEntry!.Category);
-        return new CatalogSelection(selectedEntry.Name, selectedEntry.Category, freeCost, markup, addAgain);
+        return new CatalogSelection(selectedEntry.Name, selectedEntry.Category, freeCost, markup, addAgain, this is IRatedCatalogPicker rated ? rated.Rating : 0);
     }
 }

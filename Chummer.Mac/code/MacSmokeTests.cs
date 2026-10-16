@@ -196,6 +196,19 @@ namespace Chummer
                     PdfCollectionMatcher.Candidates(collectionFiles, "AR", "Arsenal French Content").Single() == collectionFiles[2] &&
                     PdfCollectionMatcher.Candidates(collectionFiles, "SR", "Unknown").Length == 0,
                     "PDF wildcard matching handles prefixes, full titles and bounded source codes");
+                var anniversaryNames = new[] { "Shadowrun_4e_Anniversary.pdf", "SR4A.pdf", "Shadowrun20thAnniversaryEdition.pdf",
+                    "Shadowrun_Anniversary_4th_Edition_Core_Rulebook.pdf", "SR-4-A-Core.pdf", "Shadowrun4eAnniversary.pdf",
+                    "ShadowrunFourthEdition20thAnniversary.pdf", "Shadowrun4A.pdf", "SR4 Anniversary.pdf" };
+                foreach (string filename in anniversaryNames)
+                    Check(PdfCollectionMatcher.Candidates(new[] { "/books/" + filename }, "SR4", "Shadowrun 4th Edition").Length == 1,
+                        "core PDF alias matches " + filename);
+                var misleadingCoreNames = new[] { "/books/SR4A_Unwired.pdf", "/books/Shadowrun_4e_Anniversary_Arsenal.pdf",
+                    "/books/SR4A_Runner's_Companion.pdf", "/books/Shadowrun_5e_Core_Rulebook.pdf", "/books/SR4Adventures.pdf", "/books/SR4A_CharacterSheet.pdf",
+                    "/books/SR4A_QuickStart.pdf", "/books/SR4A_Errata.pdf", "/books/SR4A_Shadowrun_5e.pdf" };
+                Check(PdfCollectionMatcher.Candidates(misleadingCoreNames, "SR4", "Shadowrun 4th Edition").Length == 0,
+                    "core PDF matching excludes named supplements and other editions");
+                Check(PdfCollectionMatcher.Candidates(new[] { "/books/Shadowrun 4th Edition.pdf", "/books/SR4A.pdf" }, "SR4", "Shadowrun 4th Edition").Single() == "/books/SR4A.pdf",
+                    "anniversary core PDF takes priority over an older generic core title");
                 Check(new SourcebookInfo().Offset == 2, "new sourcebook links default to page offset 2");
                 string collectionRoot = Path.Combine(output, "collection");
                 Directory.CreateDirectory(Path.Combine(collectionRoot, "nested"));
@@ -989,6 +1002,7 @@ namespace Chummer
                     Check(licensePrompt.SelectedItem == PromptDetails.Placeholder, "blank license detail accepts placeholder");
                 }
                 ArmorPickerChecks.Run(character, Check);
+                ArmorModPickerChecks.Run(character, Check);
                 AccessoryPickerChecks.Run(character, Check);
                 InventoryEnhancementChecks.Run(character, Check);
                 GearEligibilityChecks.Run(character, Check);
