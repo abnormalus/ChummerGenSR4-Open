@@ -35,3 +35,5 @@ Creation also exposes a PACKS tab under Street Gear. Add PACKS Kit opens the exi
 ## Mac full-screen menu access
 
 DesktopMenus keeps the shared command strip visible inside a full-screen window, while retaining the system-menu projection. This fallback uses the same items and handlers as the native menu, so character switching and modal availability retain their existing ownership. Leaving full screen hides the fallback again. NativeControlChecks verifies both transitions. It does not change the user’s macOS menu-bar preferences.
+
+Preferences and Quit also reappear in the shared strip during Mac full screen, since the application menu can be hidden with the system bar. Returning to normal removes those duplicate placements. NativeCharacterSwitchChecks exercises the actual main-window command visibility on Mac.

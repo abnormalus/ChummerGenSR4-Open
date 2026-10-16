@@ -22,8 +22,19 @@ namespace Chummer
                 var macQuit = new ToolStripMenuItem(LanguageManager.Instance.GetString("Menu_MacQuit")) { Name = "quitApplication" };
                 macQuit.Click += (_, _) => QuitApplication();
                 try { DesktopMenus.Install(owner, menus, macPreferences, about, macQuit); AppDiagnostics.Record("native-menu-installed");
-                    // Remove Windows-only placements from the source tree projected into native menus.
-                    preferences.Visible = false; quit.Visible = false;
+                    var nativeWindow = owner.ToAvaloniaWindow();
+                    void RefreshFallbackCommands()
+                    {
+                        // The Mac application menu may also be hidden in full screen.
+                        // Retain its essential commands in the visible shared strip.
+                        bool fullScreen = nativeWindow.WindowState == Avalonia.Controls.WindowState.FullScreen;
+                        preferences.Visible = fullScreen; quit.Visible = fullScreen;
+                        DesktopMenus.Refresh(owner);
+                    }
+                    nativeWindow.PropertyChanged += (_, change) => {
+                        if (change.Property == Avalonia.Controls.Window.WindowStateProperty) RefreshFallbackCommands();
+                    };
+                    RefreshFallbackCommands();
                 }
                 catch (Exception error) { AppDiagnostics.Record("native-menu-fallback", error); }
             }
