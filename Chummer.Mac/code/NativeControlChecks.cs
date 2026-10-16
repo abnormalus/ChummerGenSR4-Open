@@ -62,6 +62,12 @@ internal static class NativeControlChecks
             action.Enabled = true; file.DropDownItems.Remove(action); DesktopMenus.Refresh(owner);
             Click(staleCommand);
             check(commands == 2, "A queued native click cannot invoke a detached character command");
+            nativeOwner.WindowState = Avalonia.Controls.WindowState.FullScreen;
+            await Task.Delay(100);
+            check(source.Visible, "Native full-screen windows retain an in-window menu fallback");
+            nativeOwner.WindowState = Avalonia.Controls.WindowState.Normal;
+            await Task.Delay(100);
+            check(!source.Visible, "Native menu fallback hides again after leaving full screen");
         }
         finally
         {

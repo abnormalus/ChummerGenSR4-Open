@@ -1,0 +1,9 @@
+# Expanded character details editor
+
+Creation and career Character Info show an Expand button beside Description, Background, Concept and Notes. It opens a shared standard Avalonia editor centered on the main character window, selecting the requested section. Tabs expose all four fields, one at a time, with a bounded reading width, padding, wrapped paragraphs, generous line spacing, adjustable text size and standard undo/redo. The editor resizes independently and uses the available vertical space. Inline character fields remain available; their larger layout migration is separate work.
+
+The window owns private text drafts. Cancel, title-bar close and application Quit discard the draft. Explicit OK returns plain strings; the adapter assigns changed values to the existing compatibility TextBoxes, whose original TextChanged handlers own model updates and dirty state. Accept is deliberately not a default button: Enter remains a paragraph break. NativeDialogHost owns modality, menu availability and Quit cancellation. Exceptions are logged without character content.
+
+No rich-text markup, new serialized field, text-size setting or character format is introduced. Description/Background/Concept/Notes remain their existing strings, including Unicode and newline content. Printing and Foundry export continue to consume the existing model fields. The standard TextBox supplies selection, clipboard and undo behavior; formatting tools await a separate compatibility decision.
+
+NativeCharacterDetailsChecks exercises both actual editor types, owner disabling/restoration, requested-tab selection, draft cancellation, text input and toolbar undo/redo, resizing and 2x snapshots, acceptance and save-format round trips. The source fixture is preserved. CI minimum is122 combined native checks plus399 saved-character fixtures. Screenshots are native-character-details-creation-2x.png and native-character-details-career-2x.png in diagnostic artifacts.

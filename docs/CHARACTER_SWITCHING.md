@@ -31,3 +31,7 @@ DesktopMenus.Refresh explicitly republishes the native projection after shared m
 The two supplied character saves were inspected read-only and opened from temporary copies. Both reopened with 1 BP remaining under the test profile, 0 BP charged for knowledge skills and 3 BP charged for the bonded Force-3 sustaining focus. Their knowledge changes do not explain a 3 BP increase. This does not establish the cause of the user's observed 4 BP; profile settings or an intermediate UI state still require reproduction. Do not change point rules based on this evidence alone. BuildPointPersistenceChecks exercises free-knowledge changes and focus costs across serialization and editor reopening using synthetic data; no personal character files are committed.
 
 Creation also exposes a PACKS tab under Street Gear. Add PACKS Kit opens the existing kit browser and safe import workflow; Create PACKS Kit opens the existing selection/export dialog. Buttons delegate to the same menu commands to avoid maintaining a second import path. Career import remains unsupported.
+
+## Mac full-screen menu access
+
+DesktopMenus keeps the shared command strip visible inside a full-screen window, while retaining the system-menu projection. This fallback uses the same items and handlers as the native menu, so character switching and modal availability retain their existing ownership. Leaving full screen hides the fallback again. NativeControlChecks verifies both transitions. It does not change the user’s macOS menu-bar preferences.

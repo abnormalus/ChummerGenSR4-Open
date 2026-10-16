@@ -113,13 +113,17 @@ namespace Majorsilence.Forms
             Refresh();
             root.NeedsUpdate += (_, _) => Refresh();
             window.PropertyChanged += (_, change) => {
+                // Full-screen macOS can hide the system menu bar. Keep the same
+                // command tree reachable inside the window while it is full screen.
+                if (change.Property == Avalonia.Controls.Window.WindowStateProperty)
+                    source.Visible = window.WindowState == Avalonia.Controls.WindowState.FullScreen;
                 if (change.Property == Avalonia.Input.InputElement.IsEnabledProperty) {
                     Refresh();
                     refreshApplicationCommands();
                 }
             };
             NativeMenu.SetMenu(window, root);
-            source.Visible = false;
+            source.Visible = window.WindowState == Avalonia.Controls.WindowState.FullScreen;
             // Keep the source command tree for MDI merging and shortcut behavior, without drawing Windows chrome.
             form.MdiChildActivate += (_, _) => Refresh();
         }
