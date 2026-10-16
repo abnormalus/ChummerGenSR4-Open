@@ -95,7 +95,7 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
             .Where(IncludeEntry)
             .Where(node => searching
                 ? IncludeInSearch(node) &&
-                  (node["translate"]?.InnerText ?? node["name"]?.InnerText ?? "").IndexOf(searchText, StringComparison.CurrentCultureIgnoreCase) >= 0
+                  CatalogSearch.MatchesDisplayName(node, searchText)
                 : Categories.Count == 0 || node["category"]?.InnerText == category?.Code)
             .Where(node => Categories.Count == 0 || categoryNames.ContainsKey(node["category"]?.InnerText ?? ""))
             .Select(node => new CatalogEntry(node["name"]!.InnerText, node["category"]?.InnerText ?? "",

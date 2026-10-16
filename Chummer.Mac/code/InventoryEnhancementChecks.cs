@@ -31,6 +31,13 @@ internal static class InventoryEnhancementChecks
                 "contextual ammo buying filters incompatible families and respects unavailable default categories");
             Field<TextBox>(picker, "txtSearch").Text = "Arrow";
             check(Field<ListBox>(picker, "lstGear").Items.Count == 0, "ammo search cannot reintroduce incompatible weapon families");
+            Field<TextBox>(picker, "txtSearch").Text = "missing \"quoted\" ammunition";
+            check(Field<ListBox>(picker, "lstGear").Items.Count == 0 && Field<Label>(picker, "lblCost").Text == "" && !Field<Button>(picker, "cmdOK").Enabled,
+                "gear search handles quoted input, clears stale details and disables purchase");
+            Field<TextBox>(picker, "txtSearch").Text = "Regular Ammo";
+            Field<ListBox>(picker, "lstGear").SelectedIndex = 0;
+            check(Field<Button>(picker, "cmdOK").Enabled && Field<Label>(picker, "lblCost").Text != "",
+                "gear purchase recovers after an empty quoted search");
             picker.Close();
         }
         var copy = new Character(); copy.LoadSnapshot(original);
@@ -38,6 +45,9 @@ internal static class InventoryEnhancementChecks
         XmlNode Definition(string name) => weapons.SelectNodes("/chummer/weapons/weapon")!.Cast<XmlNode>().First(node => node["name"]?.InnerText == name);
         var axe = new Weapon(copy); axe.Create(Definition("Combat Axe"), copy, new TreeNode(), null, null, null);
         check(WeaponAccessoryPolicy.CanAdd(axe, Definition("Combat Axe")), "ordinary melee weapons allow mount-free accessories despite legacy catalog flag");
+        axe.WeaponName = "Custom axe";
+        check(axe.DisplayName != axe.Name && WeaponAccessoryPolicy.FindDefinition(axe, weapons) == Definition("Combat Axe"),
+            "accessory lookup uses canonical weapon identity instead of its decorated display label");
         var accessory = new WeaponAccessory(copy);
         accessory.Create(weapons.SelectSingleNode("/chummer/accessories/accessory[name='Weapon Commlink']")!, new TreeNode(), "");
         accessory.Parent = axe; axe.WeaponAccessories.Add(accessory); copy.Weapons.Add(axe);

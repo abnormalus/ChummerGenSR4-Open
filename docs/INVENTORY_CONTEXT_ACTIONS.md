@@ -24,10 +24,18 @@ Native testing reproduced a shared compatibility bug: closing a dialog without a
 
 ## Verification
 
-InventoryEnhancementChecks verifies commlink defaults/fallbacks, ammo family filtering in browsing and search, canonical rifle/pistol ammo fields, melee accessory round trips and modal result consistency. NativeInventoryEnhancementChecks drives real creation and career handlers: commlink cancellation, melee accessory purchasing, the right-click ammo menu, correct inventory destination and career charge, and purchase cancellation. Combined native CI coverage requires at least 71 checks on Mac and Windows. The full saved-character suite continues to verify compatibility.
+InventoryEnhancementChecks verifies commlink defaults/fallbacks, ammo family filtering in browsing and search, canonical rifle/pistol ammo fields, melee accessory round trips and modal result consistency. NativeInventoryEnhancementChecks drives real creation and career handlers: commlink cancellation, melee accessory purchasing, the right-click ammo menu, correct inventory destination and career charge, and purchase cancellation. Combined native CI coverage requires at least 77 checks on Mac and Windows. The full saved-character suite continues to verify compatibility.
 
 ## Personalized Grip identity and bonuses
 
 Weapon modification selection displays one **Personalized Grip** entry. The attached weapon type chooses the original catalog definition: `Personalized Grip, Melee` supplies the established +1 melee dice pool; `Personalized Grip` supplies +1 recoil compensation for ranged weapons. Creation, career, carried and vehicle-mounted weapon callers all supply this context. Sourcebook filtering remains in effect. Search matches the display label and original catalog name using literal text.
 
 This is a presentation alias, not a file-format migration. WeaponMod.Name, saved names, recoil and dice-pool fields retain their legacy values, allowing older Chummer versions to load new purchases. Existing modifications are displayed with the common label without rewriting their stored definitions or bonuses. PersonalizedGripChecks covers both bonuses, source filtering, quoted search and snapshot round trips; native checks purchase both variants in creation and career editors.
+
+## Catalog identity and search safety
+
+Accessory purchase handlers resolve the parent weapon from its canonical model name and category, never its displayed tree label. Vehicle weapon labels can contain translations or custom names; looking those labels up as catalog names previously rejected valid accessory purchases. Creation/career and carried/vehicle paths share WeaponAccessoryPolicy.FindDefinition. Purchase charging, expense logs and cancellation remain in their established handlers.
+
+Gear search now shares literal localized-name matching with native catalog pickers through CatalogSearch. Typed quotes/operators are ordinary text rather than XPath expressions. Existing sourcebook, category and ammunition filters remain in place. When a search has no selected result, the picker clears previous cost/capacity/source and device details, disables acceptance and guards direct acceptance against a null selection; selecting a valid result restores purchase controls. This is a bounded safety fix, not the full gear-screen migration. Capacity/device eligibility consistency and the remaining legacy identity lookups should be reviewed during that migration.
+
+Regression coverage includes the reproduced quoted-search failure, recovery after empty results and canonical parent-weapon lookup. Native checks exercise quoted search during real ammo buying, and decorated vehicle weapon accessory purchases/cancellation in creation and career modes, including career funds.
