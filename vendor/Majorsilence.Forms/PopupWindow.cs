@@ -123,7 +123,7 @@ namespace Majorsilence.Forms
         /// Do not multiply absolute desktop coordinates by scaling (negative monitor origins matter).</remarks>
         public void ShowBelow(Control control)
         {
-            var origin = control.PointToScreen(System.Drawing.Point.Empty);
+            var origin = control.PointToScreen(new System.Drawing.Point(1, 0));
             var bottom = control.PointToScreen(new System.Drawing.Point(control.Width, control.Height));
             var anchor = System.Drawing.Rectangle.FromLTRB(origin.X, origin.Y, bottom.X, bottom.Y);
             var screen = Screen.FromRectangle(anchor);
