@@ -61,9 +61,10 @@ internal static class NativeInventoryEnhancementChecks
                 var axe = AddWeapon("Combat Axe");
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    var picker = Forms.Application.OpenForms.OfType<frmSelectWeaponAccessory>().Last();
-                    Field<Forms.ListBox>(picker, "lstAccessory").SelectedValue = "Weapon Commlink";
-                    Field<Forms.Button>(picker, "cmdOK").PerformClick();
+                    var picker = (AccessoryPickerWindow)NativeDialogHost.ActiveWindow!;
+                    picker.SearchBox.Text = "Weapon Commlink";
+                    picker.Model.SelectedEntry = picker.Model.Items.Single(item => item.Name == "Weapon Commlink");
+                    picker.Accept(false);
                 });
                 Invoke(editor, "tsWeaponAddAccessory_Click");
                 check(axe.WeaponAccessories.Any(item => item.Name == "Weapon Commlink"), "Native " + mode + " melee accessory purchase reaches the existing inventory path");

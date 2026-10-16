@@ -71,16 +71,17 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
     }
 
     protected CatalogPickerModel(Character character, bool career, XmlDocument catalog,
-        string itemXPath, string lastCategory, string diagnosticName)
+        string itemXPath, string lastCategory, string diagnosticName, bool hasCategories = true)
     {
         Character = character; Catalog = catalog; this.itemXPath = itemXPath;
         this.diagnosticName = diagnosticName; IsCareer = career;
-        Categories = catalog.SelectNodes("/chummer/categories/category")!.Cast<XmlNode>()
+        Categories = !hasCategories ? Array.Empty<CatalogCategory>() : catalog.SelectNodes("/chummer/categories/category")!.Cast<XmlNode>()
             .Select(node => new CatalogCategory(node.InnerText, node.Attributes?["translate"]?.InnerText ?? node.InnerText)).ToArray();
         category = Categories.FirstOrDefault(item => item.Code == lastCategory) ?? Categories.FirstOrDefault();
         // Derived constructors call Refresh after their own initialization is complete.
     }
     protected virtual bool IncludeInSearch(XmlNode definition) => true;
+    protected virtual bool IncludeEntry(XmlNode definition) => true;
     protected abstract TDetails CalculateDetails(CatalogEntry entry);
     protected abstract void RememberCategory(string category);
 
@@ -91,14 +92,15 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
         var categoryNames = Categories.ToDictionary(item => item.Code, item => item.DisplayName);
         bool searching = searchText.Length > 0;
         return Catalog.SelectNodes(itemXPath + "[(" + Character.Options.BookXPath() + ")]")!.Cast<XmlNode>()
+            .Where(IncludeEntry)
             .Where(node => searching
                 ? IncludeInSearch(node) &&
                   (node["translate"]?.InnerText ?? node["name"]?.InnerText ?? "").IndexOf(searchText, StringComparison.CurrentCultureIgnoreCase) >= 0
-                : node["category"]?.InnerText == category?.Code)
-            .Where(node => categoryNames.ContainsKey(node["category"]?.InnerText ?? ""))
-            .Select(node => new CatalogEntry(node["name"]!.InnerText, node["category"]!.InnerText,
+                : Categories.Count == 0 || node["category"]?.InnerText == category?.Code)
+            .Where(node => Categories.Count == 0 || categoryNames.ContainsKey(node["category"]?.InnerText ?? ""))
+            .Select(node => new CatalogEntry(node["name"]!.InnerText, node["category"]?.InnerText ?? "",
                 (node["translate"]?.InnerText ?? node["name"]!.InnerText) +
-                (searching ? " [" + categoryNames[node["category"]!.InnerText] + "]" : ""), node))
+                (searching && Categories.Count > 0 ? " [" + categoryNames[node["category"]!.InnerText] + "]" : ""), node))
             .OrderBy(item => item.DisplayName, StringComparer.CurrentCulture);
     }
 

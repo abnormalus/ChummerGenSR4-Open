@@ -14,7 +14,7 @@ The existing Save/Save As/Close menu actions resolve the current active editor w
 
 `CharacterTabChecks` covers canceled/active/inactive/final closes, programmatic activation, repeated tab selection and header reuse in the headless smoke suite. The programmatic activation assertion reproduced the previous header mismatch before the fix.
 
-`NativeCharacterSwitchChecks` uses real creation and career editors on the native dispatcher. It checks five repeated switches, exact Save-button ownership, menu availability, inactive close, the shared Close Character command and an unchanged source character snapshot. The combined native CI report requires at least 60 checks on Mac and Windows. Generic MDI forms alone cannot verify editor toolbar handlers.
+`NativeCharacterSwitchChecks` uses real creation and career editors on the native dispatcher. It checks five repeated switches, exact Save-button ownership, menu availability, inactive close, the shared Close Character command and an unchanged source character snapshot. The combined native CI report requires at least 71 checks on Mac and Windows. Generic MDI forms alone cannot verify editor toolbar handlers.
 
 ## Remaining work
 
