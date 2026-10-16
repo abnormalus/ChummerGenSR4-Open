@@ -21,6 +21,7 @@ public sealed class frmSelectWeaponAccessory : IDisposable
     public string SelectedMount => selectedMount;
     public bool AddAgain => selection?.AddAgain ?? false;
     public bool FreeCost => selection?.FreeCost ?? false;
+    public int SelectedQuantity => selection?.Quantity ?? 1;
     public int Markup => selection?.Markup ?? 0;
     public string AllowedMounts { private get; set; } = "";
     public int WeaponCost { private get; set; }

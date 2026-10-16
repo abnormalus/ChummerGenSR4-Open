@@ -1004,6 +1004,7 @@ namespace Chummer
                 }
                 BuildPointPersistenceChecks.Run(character, Check);
                 WeaponFocusBindingChecks.Run(character, Check);
+                AccessoryBatchChecks.Run(character, Check);
                 ArmorPickerChecks.Run(character, Check);
                 ArmorModPickerChecks.Run(character, Check);
                 AccessoryPickerChecks.Run(character, Check);

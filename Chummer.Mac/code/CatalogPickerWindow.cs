@@ -107,6 +107,15 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
             rating.Bind(IsEnabledProperty, Read(nameof(IRatedCatalogPicker.IsRatingEnabled)));
             ratingRow.Children.Add(rating); details.Children.Add(ratingRow);
         }
+        if (model is IQuantityCatalogPicker)
+        {
+            var quantityRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            quantityRow.Children.Add(new TextBlock { Text = T("Label_Qty"), VerticalAlignment = VerticalAlignment.Center });
+            var quantity = NativeIntegerInput.Create(namePrefix + "Quantity", 1, 1000);
+            quantity.Bind(NumericUpDown.ValueProperty, Edit(nameof(IQuantityCatalogPicker.Quantity)));
+            quantity.Bind(IsEnabledProperty, Read(nameof(IQuantityCatalogPicker.IsQuantityEnabled)));
+            quantityRow.Children.Add(quantity); details.Children.Add(quantityRow);
+        }
         var fields = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 14, RowSpacing = 8 };
         details.Children.Add(fields);
         void Detail(string labelKey, string property)

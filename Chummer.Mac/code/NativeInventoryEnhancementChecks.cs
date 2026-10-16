@@ -14,6 +14,26 @@ internal static class NativeInventoryEnhancementChecks
         .GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(owner)!;
     private static void Invoke(object owner, string name) => owner.GetType()
         .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(owner, new object[] { owner, EventArgs.Empty });
+    private static async Task ChooseAsync(Action command, Forms.DialogResult answer)
+    {
+        var answered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(15);
+                while (!Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Any())
+                {
+                    if (DateTime.UtcNow >= deadline) throw new TimeoutException("Accessory confirmation did not open.");
+                    await Task.Delay(20);
+                }
+                var dialog = Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Last();
+                dialog.DialogResult = answer; dialog.Close(); answered.TrySetResult();
+            }
+            catch (Exception error) { answered.TrySetException(error); }
+        });
+        command(); await answered.Task;
+    }
     internal static async Task RunAsync(Forms.Form main, Character originalCharacter, Action<bool, string> check)
     {
         byte[] original = originalCharacter.CaptureSnapshot();
@@ -87,6 +107,80 @@ internal static class NativeInventoryEnhancementChecks
                 AddGrip();
                 check(rifle.WeaponMods.Any(item => item.Name == WeaponModificationNames.PersonalizedGrip && item.RC == "1" && item.DicePool == 0),
                     "Native " + mode + " unified grip purchase applies the ranged definition");
+                void BuyClips(string handler)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        var picker = (AccessoryPickerWindow)NativeDialogHost.ActiveWindow!;
+                        picker.SearchBox.Text = "Spare Clips";
+                        picker.Model.SelectedEntry = picker.Model.Items.Single(item => item.Name == "Spare Clips");
+                        picker.Model.Quantity = 3; picker.Accept(false);
+                    });
+                    Invoke(editor, handler);
+                }
+                int clipMoney = character.Nuyen, clipExpenses = character.ExpenseEntries.Count;
+                BuyClips("tsWeaponAddAccessory_Click");
+                var rifleNode = weaponTree.Nodes[0].Nodes.Cast<Forms.TreeNode>().Single(node => node.Tag?.ToString() == rifle.InternalId);
+                var clipGroup = rifleNode.Nodes.Cast<Forms.TreeNode>().Single(AccessoryGroupViews.IsHeader);
+                check(rifle.WeaponAccessories.Count(item => item.Name == "Spare Clips") == 3 && clipGroup.Nodes.Count == 3 && clipGroup.Text.Contains("×3") &&
+                    (!career || character.Nuyen == clipMoney - 15 && character.ExpenseEntries.Count == clipExpenses + 3),
+                    "Native " + mode + " spare clips buy as a grouped quantity with ordinary units and per-unit career expenses");
+                weaponTree.SelectedNode = clipGroup;
+                Invoke(editor, "cmdDeleteWeapon_Click");
+                check(rifle.WeaponAccessories.Count(item => item.Name == "Spare Clips") == 3,
+                    "Native " + mode + " accessory group header cannot delete its weapon or an arbitrary unit");
+                var clipUnit = rifle.WeaponAccessories.First(item => item.Name == "Spare Clips");
+                clipUnit.Notes = "synthetic customized clip";
+                AccessoryGroupViews.Refresh(character, weaponTree, false);
+                check(rifleNode.Nodes.Cast<Forms.TreeNode>().Single(AccessoryGroupViews.IsHeader).Nodes.Count == 2 &&
+                    rifleNode.Nodes.Cast<Forms.TreeNode>().Any(node => node.Tag?.ToString() == clipUnit.InternalId),
+                    "Native " + mode + " customized accessory unit separates from its equivalent group");
+                clipUnit.Notes = ""; AccessoryGroupViews.Refresh(character, weaponTree, false);
+                clipGroup = rifleNode.Nodes.Cast<Forms.TreeNode>().Single(AccessoryGroupViews.IsHeader);
+                bool confirmDelete = character.Options.ConfirmDelete;
+                try
+                {
+                    character.Options.ConfirmDelete = false;
+                    weaponTree.SelectedNode = clipGroup.Nodes[0]; Invoke(editor, "cmdDeleteWeapon_Click");
+                }
+                finally { character.Options.ConfirmDelete = confirmDelete; }
+                check(rifle.WeaponAccessories.Count(item => item.Name == "Spare Clips") == 2 &&
+                    rifleNode.Nodes.Cast<Forms.TreeNode>().Single(AccessoryGroupViews.IsHeader).Nodes.Count == 2,
+                    "Native " + mode + " deleting an expanded accessory unit removes exactly its canonical record");
+                weaponTree.SelectedNode = rifleNode;
+                if (career)
+                {
+                    var expense = character.ExpenseEntries.Last(item => item.Undo?.NuyenType == NuyenExpenseType.AddWeaponAccessory &&
+                        rifle.WeaponAccessories.Any(unit => unit.InternalId == item.Undo.ObjectId));
+                    ((frmCareer)editor).PopulateExpenseList();
+                    var row = Field<Forms.ListView>(editor, "lstNuyen").Items.Cast<Forms.ListViewItem>().Single(item => item.SubItems[3].Text == expense.InternalId);
+                    row.Selected = true;
+                    int moneyBeforeUndo = character.Nuyen;
+                    await ChooseAsync(() => Invoke(editor, "tsUndoNuyenExpense_Click"), Forms.DialogResult.Cancel);
+                    check(character.Nuyen == moneyBeforeUndo && character.ExpenseEntries.Contains(expense),
+                        "Native closing accessory expense undo confirmation changes neither money nor units");
+                    await ChooseAsync(() => Invoke(editor, "tsUndoNuyenExpense_Click"), Forms.DialogResult.Yes);
+                    AccessoryGroupViews.Refresh(character, weaponTree, false);
+                    check(character.Nuyen == moneyBeforeUndo + 5 && !character.ExpenseEntries.Contains(expense) &&
+                        rifle.WeaponAccessories.Count(unit => unit.Name == "Spare Clips") == 1 && !rifleNode.Nodes.Cast<Forms.TreeNode>().Any(AccessoryGroupViews.IsHeader),
+                        "Native accessory expense undo refunds one canonical grouped unit and restores a single row");
+                    character.Nuyen = 4; weaponTree.SelectedNode = rifleNode;
+                    int unitsBeforeRejection = rifle.WeaponAccessories.Count, expensesBeforeRejection = character.ExpenseEntries.Count;
+                    await ChooseAsync(() => BuyClips("tsWeaponAddAccessory_Click"), Forms.DialogResult.OK);
+                    check(character.Nuyen == 4 && rifle.WeaponAccessories.Count == unitsBeforeRejection && character.ExpenseEntries.Count == expensesBeforeRejection,
+                        "Native unaffordable accessory batch creates no partial units or expenses");
+                    character.Nuyen = moneyBeforeUndo + 5;
+                }
+                weaponTree.SelectedNode = rifleNode;
+                int unitsBeforeCancel = rifle.WeaponAccessories.Count, moneyBeforeCancel = character.Nuyen;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    var picker = (AccessoryPickerWindow)NativeDialogHost.ActiveWindow!;
+                    picker.SearchBox.Text = "Spare Clips"; picker.Model.Quantity = 3; picker.Close();
+                });
+                Invoke(editor, "tsWeaponAddAccessory_Click");
+                check(rifle.WeaponAccessories.Count == unitsBeforeCancel && character.Nuyen == moneyBeforeCancel,
+                    "Native " + mode + " cancelling a configured quantity does not buy any units");
                 var menu = Field<Forms.ContextMenuStrip>(editor, "cmsWeapon");
                 var command = menu.Items.OfType<Forms.ToolStripMenuItem>().Single(item => item.Name == "buyWeaponAmmunition");
                 menu.Show(weaponTree, new System.Drawing.Point(8, 8)); menu.Hide();
@@ -146,12 +240,41 @@ internal static class NativeInventoryEnhancementChecks
                 check(mounted.DisplayName != mounted.Name && mounted.WeaponAccessories.Any(item => item.Name == "Weapon Commlink") &&
                     character.Nuyen == vehicleMoney - (career ? mounted.TotalCost - weaponCost : 0),
                     "Native " + mode + " decorated vehicle weapon buys an accessory with its existing cost rules");
+                vehicleTree.SelectedNode = mountedNode;
+                int mountedMoney = character.Nuyen;
+                BuyClips("tsVehicleAddWeaponAccessory_Click");
+                AccessoryGroupViews.Refresh(character, vehicleTree, true);
+                check(mounted.WeaponAccessories.Count(item => item.Name == "Spare Clips") == 3 &&
+                    mountedNode.Nodes.Cast<Forms.TreeNode>().Single(AccessoryGroupViews.IsHeader).Nodes.Count == 3 &&
+                    (!career || character.Nuyen == mountedMoney - 15),
+                    "Native " + mode + " vehicle accessory quantity uses ordinary records and grouped views");
+                if (career)
+                {
+                    var expense = character.ExpenseEntries.Last(item => item.Undo?.NuyenType == NuyenExpenseType.AddVehicleWeaponAccessory);
+                    ((frmCareer)editor).PopulateExpenseList();
+                    Field<Forms.ListView>(editor, "lstNuyen").Items.Cast<Forms.ListViewItem>().Single(item => item.SubItems[3].Text == expense.InternalId).Selected = true;
+                    await ChooseAsync(() => Invoke(editor, "tsUndoNuyenExpense_Click"), Forms.DialogResult.Yes);
+                    AccessoryGroupViews.Refresh(character, vehicleTree, true);
+                    check(mounted.WeaponAccessories.Count(unit => unit.Name == "Spare Clips") == 2 && character.Nuyen == mountedMoney - 10 &&
+                        mountedNode.Nodes.Cast<Forms.TreeNode>().Single(AccessoryGroupViews.IsHeader).Nodes.Count == 2,
+                        "Native mounted accessory expense undo finds its canonical unit and updates the group");
+                }
                 int accessoryCount = mounted.WeaponAccessories.Count;
                 vehicleMoney = character.Nuyen; vehicleTree.SelectedNode = mountedNode;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => NativeDialogHost.ActiveWindow!.Close());
                 Invoke(editor, "tsVehicleAddWeaponAccessory_Click");
                 check(mounted.WeaponAccessories.Count == accessoryCount && character.Nuyen == vehicleMoney,
                     "Native " + mode + " cancelled vehicle accessory purchase changes neither inventory nor funds");
+                var mountedGroup = mountedNode.Nodes.Cast<Forms.TreeNode>().Single(AccessoryGroupViews.IsHeader);
+                bool previousDelete = character.Options.ConfirmDelete;
+                try
+                {
+                    character.Options.ConfirmDelete = false;
+                    vehicleTree.SelectedNode = mountedGroup.Nodes[0]; Invoke(editor, "cmdDeleteVehicle_Click");
+                }
+                finally { character.Options.ConfirmDelete = previousDelete; }
+                check(mounted.WeaponAccessories.Count == accessoryCount - 1 && character.Vehicles.Contains(vehicle),
+                    "Native " + mode + " deleting a grouped vehicle accessory removes only the canonical unit");
             }
             finally
             {
