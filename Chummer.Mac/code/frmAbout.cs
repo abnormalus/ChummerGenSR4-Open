@@ -15,10 +15,10 @@ namespace Chummer
             logoPictureBox.SizeMode = Majorsilence.Forms.PictureBoxSizeMode.Zoom;
 			this.Text = String.Format("About {0}", AssemblyTitle);
 			this.labelProductName.Text = AssemblyProduct;
-			this.labelVersion.Text = String.Format("Version {0}", AssemblyVersion);
+			this.labelVersion.Text = String.Format("Version {0}", BuildIdentity.ReleaseVersion);
 			this.labelCopyright.Text = AssemblyCopyright;
 			this.labelCompanyName.Text = AssemblyCompany;
-			this.textBoxDescription.Text = AssemblyDescription;
+			this.textBoxDescription.Text = "Version: " + BuildIdentity.Version + "\r\nChannel: " + BuildIdentity.Channel + "\r\nSource commit: " + (BuildIdentity.SourceCommit ?? "unavailable (development build)") + "\r\nBuild: " + typeof(Program).Module.ModuleVersionId + "\r\n\r\n" + AssemblyDescription;
 			textBoxDescription.Text += "\n\r\n\rBig thanks to everyone in the Dumpshock community for supporting this project with all of their valuable feedback, great ideas, bug reports, and pointing out of my silly mistakes. Also a big thanks to everyone who has volunteered their time to translate Chummer in other languages!";
 			this.txtDisclaimer.Text = "Chummer is completely unofficial and is in no way endorsed by The Topps Company, Inc. or Catalyst Game Labs. The Topps Company, Inc. has sole ownership of the names, logo, artwork, marks, photographs, sounds, audio, video and/or any proprietary material used in connection with the game Shadowrun.";
 			txtDisclaimer.Text += "\n\r\n\rUnless agreed to in writing, the developer provides the Work (and each Contributor provides its Contributions) on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE.";

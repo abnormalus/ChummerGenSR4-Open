@@ -2,6 +2,7 @@
 """Verify MSI architecture, embedded Windows manifest, and all payload hashes."""
 import argparse
 import hashlib
+import json
 import pathlib
 import struct
 import subprocess
@@ -51,6 +52,10 @@ def main():
     assert b'PerMonitorV2' in manifest and b'asInvoker' in manifest, 'DPI or standard-user manifest declaration missing'
     summary = subprocess.check_output(['msiinfo', 'suminfo', str(args.msi)], text=True)
     assert 'Template: x64;1033' in summary, 'MSI must target x64'
+    identity = json.loads((args.publish / 'build-identity.json').read_text(encoding='utf-8'))
+    properties = subprocess.check_output(['msiinfo', 'export', str(args.msi), 'Property'], text=True)
+    assert any(line.split('\t')[:2] == ['ProductVersion', identity['version']] for line in properties.splitlines()), 'MSI release version differs from its payload identity'
+
     source = {file.relative_to(args.publish): file for file in args.publish.rglob('*') if file.is_file()}
     with tempfile.TemporaryDirectory(prefix='chummer-msi-') as temporary:
         subprocess.run(['msiextract', '-C', temporary, str(args.msi)], check=True, stdout=subprocess.DEVNULL)

@@ -5,6 +5,8 @@
     <AssemblyName>ChummerMac</AssemblyName>
     <RootNamespace>Chummer</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ChummerReleaseVersion Condition="'$(ChummerReleaseVersion)' == ''">0.2.0-development</ChummerReleaseVersion>
+    <ChummerFileVersion Condition="'$(ChummerFileVersion)' == ''">0.2.0.0</ChummerFileVersion>
     <ApplicationIcon>branding/chummer.ico</ApplicationIcon>
     <ApplicationManifest>../packaging/windows/app.manifest</ApplicationManifest>
     <Nullable>disable</Nullable>
@@ -38,4 +40,18 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
     <PackageReference Include="System.CodeDom" Version="10.0.0" />
   </ItemGroup>
+  <!-- Generate only reporting attributes; retain the legacy assembly identity. -->
+  <Target Name="GenerateChummerBuildIdentity" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <ChummerIdentityAttribute Include="System.Reflection.AssemblyInformationalVersionAttribute">
+        <_Parameter1>$(ChummerReleaseVersion)</_Parameter1>
+      </ChummerIdentityAttribute>
+      <ChummerIdentityAttribute Include="System.Reflection.AssemblyFileVersionAttribute">
+        <_Parameter1>$(ChummerFileVersion)</_Parameter1>
+      </ChummerIdentityAttribute>
+    </ItemGroup>
+    <WriteCodeFragment Language="C#" OutputFile="$(IntermediateOutputPath)ChummerBuildIdentity.g.cs" AssemblyAttributes="@(ChummerIdentityAttribute)">
+      <Output TaskParameter="OutputFile" ItemName="Compile" />
+    </WriteCodeFragment>
+  </Target>
 </Project>

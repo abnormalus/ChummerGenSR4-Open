@@ -16,6 +16,11 @@ namespace Chummer
         [STAThread]
         static void Main(string[] args)
         {
+            if (args.Length == 1 && args[0] == "--version-json")
+            {
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(BuildIdentity.Summary));
+                return;
+            }
             DesktopMenus.ApplicationName = "Chummer";
             ListBox.DefaultIncrementalSearch = true;
             Form.ApplicationIconOverride = new Majorsilence.Forms.Drawing.Icon(

@@ -33,4 +33,4 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("0.1.501.0")]
-[assembly: AssemblyFileVersion("0.1.501.0")]
+// File/informational versions are generated from the release identity by MSBuild.

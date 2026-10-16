@@ -2,6 +2,7 @@
 """Package a self-contained win-x64 publish directory using msitools/wixl."""
 import argparse
 import hashlib
+import json
 import pathlib
 import subprocess
 import uuid
@@ -24,7 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('publish', type=pathlib.Path)
     parser.add_argument('output', type=pathlib.Path)
-    parser.add_argument('--version', default='0.1.501')
+    parser.add_argument('--version', help='Must match the embedded release identity')
     parser.add_argument('--compiler', default='wixl')
     args = parser.parse_args()
     source = args.publish.resolve()
@@ -34,6 +35,13 @@ def main():
     if output.exists():
         parser.error('Choose a new installer output path.')
     output.parent.mkdir(parents=True, exist_ok=True)
+    identity_path = source / 'build-identity.json'
+    if not identity_path.is_file():
+        parser.error('build-identity.json is required; use the reviewed packaging scripts.')
+    identity = json.loads(identity_path.read_text(encoding='utf-8'))
+    if args.version and args.version != identity['version']:
+        parser.error('MSI version must match build-identity.json.')
+    args.version = identity['version']
     root = ET.Element('{%s}Wix' % NS)
     product = add(root, 'Product', Id='*', Name='Chummer SR4', Language='1033',
                   Version=args.version, Manufacturer='Chummer SR4 Community', UpgradeCode=str(UPGRADE).upper())

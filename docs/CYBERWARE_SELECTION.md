@@ -1,0 +1,9 @@
+# Cyberware deletion and stale selections
+
+GitHub issue #16 supplied Windows diagnostics showing `RefreshSelectedCyberware` throwing during a tree selection after deleting a spur from a lower arm. The saved character already had the spur removed from the model. Its originals were kept read-only; regression characters recreate that structure without copying private character details into source or CI fixtures.
+
+The native baseline reproduced a child removed from the model while its tree row remained attached. Creation and career handlers called `treCyberware.Nodes.Remove(child)`, which searches the root collection and cannot remove nested rows. Clicking the leftover row missed the cyberware lookup, then fell through to a Gear lookup and dereferenced null. The baseline failed the explicit nested-row deletion assertion before the fix.
+
+Deletion now removes each actual node through `TreeNode.Remove`, including associated cyberweapon rows, so its owning collection and selection cleanup run. The existing model/rules cleanup remains authoritative. A queued or otherwise obsolete selection that matches neither cyberware nor attached Gear is diagnosed and removed as a stale view, then details clear; it never invents or deletes a model record. Creation and career share the same policy. Deletion action IDs now identify this command explicitly, and unexpected deletion exceptions are logged/reported rather than silently swallowed.
+
+`NativeCyberwareRemovalChecks` drives the actual creation/career commands, verifies model and nested-row removal, simulates an already-queued stale row, checks safe detail clearing and verifies the parent limb remains selectable. The original issue's last action label referred to an earlier Add as Plugin action; the stack showed selection refresh, so that stale label alone was not treated as evidence that adding a plugin caused the failure.

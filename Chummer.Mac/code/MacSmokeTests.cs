@@ -1002,6 +1002,7 @@ namespace Chummer
                     Field<Button>(licensePrompt, "cmdOK").PerformClick();
                     Check(licensePrompt.SelectedItem == PromptDetails.Placeholder, "blank license detail accepts placeholder");
                 }
+                BuildIdentityChecks.Run(Check);
                 BuildPointPersistenceChecks.Run(character, Check);
                 WeaponFocusBindingChecks.Run(character, Check);
                 AccessoryBatchChecks.Run(character, Check);

@@ -41,3 +41,9 @@ The Nightly Assets section contains only the current packages and metadata. Supe
 ## Local retention
 
 Keep one verified Stable package set and one verified Nightly package set locally. Use temporary directories for intermediate builds and remove their generated bundles/publish folders after validation, provided they are not running. Do not delete logs, screenshots, character exports, source files or installed/running applications as part of build cleanup. Replace a retained channel only after verifying the replacement checksums. Older releases remain in GitHub daily archives; local per-iteration bundles are unnecessary.
+
+## Required release identity
+
+Every published source revision must have a distinct user-visible release/build identifier tied to its exact source commit. Rebuilds of identical source retain that version, with module IDs/runtime details available as supplemental evidence. About, diagnostics, BUILD.txt and platform package metadata must agree. A fixed assembly version plus an opaque module ID is insufficient for bug reporting. Keep the module ID as supplemental evidence, identify channel explicitly, and mark development/dirty builds honestly instead of attributing them to an unchanged release. Increment release/build versions automatically in the publishing process; preserve any assembly identity required for compatibility. Add automated checks for missing or inconsistent metadata before publishing.
+
+The shared implementation and verification policy are documented in [BUILD_IDENTITY.md](BUILD_IDENTITY.md). The legacy assembly identity stays fixed for compatibility, while reported release/file versions identify the actual release. Nightly packaging requires a clean checkout and full Git history.

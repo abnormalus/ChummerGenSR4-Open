@@ -1,0 +1,13 @@
+# Release and diagnostic identity
+
+`scripts/build_identity.py` is the source of release metadata. `release-version.json` supplies the major/minor epoch; the full checkout's first-parent commit height supplies the automatically increasing patch/build number. Thus successive master revisions have distinct numeric versions, while rebuilding the same source keeps its version. A shallow checkout is rejected rather than quietly resetting the counter. MSI's numeric bounds are checked before packaging.
+
+The informational version includes build channel and full source SHA, for example `0.2.126-nightly+<40-character commit>`. Dirty checkouts always become Development and add `.dirty`. Ordinary SDK builds without supplied metadata report Development with an unavailable source, rather than claiming a release revision. The module ID and runtime version remain supplemental evidence for binary/runtime differences between rebuilds.
+
+MSBuild generates file and informational attributes from the shared metadata. The historical assembly identity remains unchanged for compatibility. `BuildIdentity` reads the actual binary attributes; About, `--version-json` and diagnostics share that value. Diagnostics also retain explicitly named assembly/file versions, source commit, build channel and dirty status (unknown for an unlabelled local build). No character data is included.
+
+Both publishing paths receive the same metadata. Mac bundle versions and Windows MSI ProductVersion use the numeric version; `build-identity.json` accompanies both payloads. `BUILD.txt` records version/channel/source. Mac packaging compares the embedded binary identity and plist with the metadata before signing; MSI verification compares ProductVersion and all payload hashes. CI builds with full Git history and checks the actual binary's `--version-json` output against the checkout-derived identity on both platforms. Missing/mismatched metadata fails packaging instead of publishing a misleading identifier.
+
+Nightly packaging requires a clean source checkout. `build-mac.sh` can still build a clearly labelled local Development application. Merely moving the Stable/Nightly download tag does not rewrite a binary's original build channel; any future Stable build/promotion process must preserve or explicitly regenerate that provenance and pass the same checks. This stage does not move Stable.
+
+`test_build_identity.py` covers clean/dirty provenance, monotonic source revisions, deterministic rebuilds, full-history enforcement, MSI bounds and explicit channel selection. `BuildIdentityChecks` verifies runtime source parsing, generated attributes and About. Installer-version changes do not alter user settings, source/PDF associations or character schema.
