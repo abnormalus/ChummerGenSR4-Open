@@ -93,14 +93,20 @@ internal static class NativeInventoryEnhancementChecks
                 if (!command.Visible) throw new InvalidOperationException("Ranged weapon ammunition command is unavailable.");
                 gearTree.SelectedNode = linkNode;
                 int beforeCount = character.Gear.Count, beforeMoney = character.Nuyen;
+                bool literalSearchRecovered = false;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     var picker = Forms.Application.OpenForms.OfType<frmSelectGear>().Last();
+                    Field<Forms.TextBox>(picker, "txtSearch").Text = "missing \"quoted\" ammunition";
+                    literalSearchRecovered = Field<Forms.ListBox>(picker, "lstGear").Items.Count == 0 &&
+                        !Field<Forms.Button>(picker, "cmdOK").Enabled && Field<Forms.Label>(picker, "lblCost").Text == "";
+                    Field<Forms.TextBox>(picker, "txtSearch").Text = "";
                     Field<Forms.ListBox>(picker, "lstGear").SelectedValue = "Ammo: Regular Ammo";
                     Field<Forms.NumericUpDown>(picker, "nudGearQty").Value = 10;
                     Field<Forms.Button>(picker, "cmdOK").PerformClick();
                 });
                 command.PerformClick();
+                check(literalSearchRecovered, "Native " + mode + " quoted gear search clears stale purchase state and recovers");
                 var ammo = character.Gear.Last(item => item.Name == "Ammo: Regular Ammo");
                 check(character.Gear.Count == beforeCount + 1 && ammo.Extra == rifle.AmmoCategory && ammo.Quantity == 10 &&
                     ammo.Parent == null && link.Children.Count == 0 && gearTree.SelectedNode == linkNode &&
@@ -113,6 +119,39 @@ internal static class NativeInventoryEnhancementChecks
                 menu.Show(weaponTree, new System.Drawing.Point(8, 8)); menu.Hide();
                 check(character.Gear.Count == beforeCount && character.Nuyen == beforeMoney && !command.Visible,
                     "Native " + mode + " cancelled ammo purchase changes nothing and melee weapons hide the command");
+
+                // Use a decorated label to reproduce the vehicle path's former lookup
+                // bug. The purchase must use the weapon's canonical name/category.
+                var vehicleTree = Field<Forms.TreeView>(editor, "treVehicles");
+                var vehicle = new Vehicle(character); var vehicleNode = new Forms.TreeNode();
+                vehicle.Create(XmlManager.Instance.Load("vehicles.xml").SelectSingleNode("/chummer/vehicles/vehicle[name='Dodge Scoot (Scooter)']")!,
+                    vehicleNode, null, null, null, null, null, false);
+                character.Vehicles.Add(vehicle); vehicleTree.Nodes[0].Nodes.Add(vehicleNode);
+                var mounted = new Weapon(character); var mountedNode = new Forms.TreeNode();
+                mounted.Create(catalog.SelectSingleNode("/chummer/weapons/weapon[name='AK-97']")!, character, mountedNode, null, null, null);
+                mounted.VehicleMounted = true; mounted.WeaponName = "Custom vehicle rifle";
+                mountedNode.Text = mounted.DisplayName;
+                vehicle.Weapons.Add(mounted); vehicleNode.Nodes.Add(mountedNode);
+                topTabs.SelectedTab = Field<Forms.TabPage>(editor, "tabVehicles");
+                vehicleTree.SelectedNode = mountedNode;
+                int vehicleMoney = character.Nuyen, weaponCost = mounted.TotalCost;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    var picker = (AccessoryPickerWindow)NativeDialogHost.ActiveWindow!;
+                    picker.SearchBox.Text = "Weapon Commlink";
+                    picker.Model.SelectedEntry = picker.Model.Items.Single(item => item.Name == "Weapon Commlink");
+                    picker.Accept(false);
+                });
+                Invoke(editor, "tsVehicleAddWeaponAccessory_Click");
+                check(mounted.DisplayName != mounted.Name && mounted.WeaponAccessories.Any(item => item.Name == "Weapon Commlink") &&
+                    character.Nuyen == vehicleMoney - (career ? mounted.TotalCost - weaponCost : 0),
+                    "Native " + mode + " decorated vehicle weapon buys an accessory with its existing cost rules");
+                int accessoryCount = mounted.WeaponAccessories.Count;
+                vehicleMoney = character.Nuyen; vehicleTree.SelectedNode = mountedNode;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => NativeDialogHost.ActiveWindow!.Close());
+                Invoke(editor, "tsVehicleAddWeaponAccessory_Click");
+                check(mounted.WeaponAccessories.Count == accessoryCount && character.Nuyen == vehicleMoney,
+                    "Native " + mode + " cancelled vehicle accessory purchase changes neither inventory nor funds");
             }
             finally
             {

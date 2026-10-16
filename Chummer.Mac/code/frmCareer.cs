@@ -9860,7 +9860,7 @@ namespace Chummer
 			// Open the Weapons XML file and locate the selected Weapon.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("weapons.xml");
 
-			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + objWeapon.Name + "\"]");
+            XmlNode objXmlWeapon = WeaponAccessoryPolicy.FindDefinition(objWeapon, objXmlDocument);
 
 			using frmSelectWeaponAccessory frmPickWeaponAccessory = new frmSelectWeaponAccessory(_objCharacter, true);
 
@@ -10510,7 +10510,7 @@ namespace Chummer
 			// Open the Weapons XML file and locate the selected Weapon.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("weapons.xml");
 
-			XmlNode objXmlWeapon = objXmlDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + treVehicles.SelectedNode.Text + "\"]");
+            XmlNode objXmlWeapon = WeaponAccessoryPolicy.FindDefinition(objWeapon, objXmlDocument);
 
 			using frmSelectWeaponAccessory frmPickWeaponAccessory = new frmSelectWeaponAccessory(_objCharacter, true);
 

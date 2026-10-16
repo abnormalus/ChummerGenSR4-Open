@@ -270,6 +270,7 @@ namespace Chummer
 			lstGear.ValueMember = "Value";
 			lstGear.DisplayMember = "Name";
 			lstGear.DataSource = lstGears;
+            RefreshSelectionState();
 
 			// Show the Do It Yourself CheckBox if the Commlink Upgrade category is selected.
 			if (cboCategory.SelectedValue.ToString() == "Commlink Upgrade")
@@ -281,9 +282,24 @@ namespace Chummer
 			}
 		}
 
+        // A search can remove every row. Clear the previous item's information
+        // and disable purchase actions until the user selects another valid item.
+        private bool RefreshSelectionState()
+        {
+            bool selected = lstGear.SelectedValue != null;
+            cmdOK.Enabled = cmdOKAdd.Enabled = selected;
+            if (!selected)
+            {
+                foreach (Label label in new[] { lblCost, lblCapacity, lblAvail, lblTest, lblSource,
+                    lblGearResponse, lblGearSignal, lblGearSystem, lblGearFirewall }) label.Text = "";
+                nudRating.Enabled = false;
+            }
+            return selected;
+        }
+
 		private void lstGear_SelectedIndexChanged(object sender, EventArgs e)
 		{
-			if (lstGear.SelectedValue == null)
+			if (!RefreshSelectionState())
 				return;
 
 			// Retireve the information for the selected piece of Cyberware.
@@ -354,25 +370,10 @@ namespace Chummer
 				return;
 			}
 
-			string strCategoryFilter = "";
-
-			if (_strAllowedCategories != "")
-			{
-				string[] strAllowed = _strAllowedCategories.Split(',');
-				foreach (string strAllowedMount in strAllowed)
-				{
-					if (strAllowedMount != "")
-						strCategoryFilter += ". = \"" + strAllowedMount + "\" or ";
-				}
-				strCategoryFilter += "category = \"General\"";
-			}
-			else
-				strCategoryFilter += "category != \"General\"";
-
-			// Treat everything as being uppercase so the search is case-insensitive.
-			string strSearch = "/chummer/gears/gear[(" + _objCharacter.Options.BookXPath() + ") and ((contains(translate(name,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\") and not(translate)) or contains(translate(translate,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\"))]";
-
-			XmlNodeList objXmlGearList = _objXmlDocument.SelectNodes(strSearch);
+            // Typed text is data, never XPath syntax. Source and contextual filters
+            // still constrain the candidate catalog before literal name matching.
+            var objXmlGearList = _objXmlDocument.SelectNodes("/chummer/gears/gear[(" + _objCharacter.Options.BookXPath() + ")]")
+                .Cast<XmlNode>().Where(node => CatalogSearch.MatchesDisplayName(node, txtSearch.Text));
 			List<ListItem> lstGears = new List<ListItem>();
 			bool blnAddToList;
 			foreach (XmlNode objXmlGear in objXmlGearList)
@@ -424,6 +425,7 @@ namespace Chummer
 			lstGear.ValueMember = "Value";
 			lstGear.DisplayMember = "Name";
 			lstGear.DataSource = lstGears;
+            RefreshSelectionState();
 		}
 
 		private void lstGear_DoubleClick(object sender, EventArgs e)
@@ -786,7 +788,7 @@ namespace Chummer
 		/// </summary>
 		private void UpdateGearInfo()
 		{
-			if (lstGear.Text != "")
+			if (lstGear.SelectedValue != null && lstGear.Text != "")
 			{
 				// Retireve the information for the selected piece of Cyberware.
 				XmlNode objXmlGear;
@@ -1178,6 +1180,7 @@ namespace Chummer
 		/// </summary>
 		private void AcceptForm()
 		{
+            if (lstGear.SelectedValue == null) return;
 			if (lstGear.Text != "")
 			{
 				XmlNode objNode;
