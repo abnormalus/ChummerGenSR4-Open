@@ -1,4 +1,4 @@
-using Majorsilence.Forms.Drawing;
+﻿using Majorsilence.Forms.Drawing;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -5736,6 +5736,7 @@ namespace Chummer
 
 		private void cmdAddArmor_Click(object sender, EventArgs e)
 		{
+            AppDiagnostics.Action("inventory.add-armor");
 			using frmSelectArmor frmPickArmor = new frmSelectArmor(_objCharacter, true);
 			frmPickArmor.ShowDialog(this);
 
@@ -6294,6 +6295,7 @@ namespace Chummer
 
 		private void cmdAddGear_Click(object sender, EventArgs e)
 		{
+            AppDiagnostics.Action("inventory.add-gear");
 			// Select the root Gear node then open the Select Gear window.
 			treGear.SelectedNode = treGear.Nodes[0];
 			Gear objParentGear = _objFunctions.FindGear(treGear.SelectedNode.Tag.ToString(), _objCharacter.Gear);

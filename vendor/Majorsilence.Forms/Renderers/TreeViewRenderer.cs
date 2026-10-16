@@ -318,8 +318,14 @@ namespace Majorsilence.Forms.Renderers
             var show_glyph = control.ShowDropdownGlyph;
             var show_image = control.ShowItemImages;
 
-            if (!show_glyph && !show_image)
-                return new Rectangle (GetIndentStart (control, item), item.Bounds.Top, item.Bounds.Right - GetIndentStart (control, item), item.Bounds.Height);
+            if (!show_glyph && !show_image) {
+                // Hidden expand arrows do not hide connector lines. Reserve their gutter
+                // so expanded read-only trees (such as PACKS contents) cannot draw through text.
+                var connector_width = control.ShowLines && (item.IndentLevel > 0 || control.ShowRootLines)
+                    ? control.LogicalToDeviceUnits (GLYPH_SIZE + 6) : 0;
+                var text_left = GetIndentStart (control, item) + connector_width;
+                return new Rectangle (text_left, item.Bounds.Top, System.Math.Max (0, item.Bounds.Right - text_left), item.Bounds.Height);
+            }
 
             // One of these will be valid because we handled the other case above
             var padding = control.LogicalToDeviceUnits (6);

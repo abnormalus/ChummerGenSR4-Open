@@ -14,8 +14,24 @@ namespace Chummer
         private static long lastUiResponse = Environment.TickCount64;
         private static int openFormCount;
         private static string modalType;
+        private static object interactionState;
         internal static void CaptureUiState()
         {
+            var main = Majorsilence.Forms.Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+            var editor = main?.ActiveMdiChild;
+            bool? nativeMainEnabled = null;
+            // Headless checks have no native window. Keep the two enabled states
+            // separate: native modal ownership can block input while Form.Enabled is true.
+            if (main != null)
+                try { nativeMainEnabled = Majorsilence.Forms.AvaloniaHostInterop.ToAvaloniaWindow(main).IsEnabled; }
+                catch (InvalidOperationException) { }
+            // Capture only structural state on the UI thread. Never record window titles,
+            // field contents, character identities, or the text of focused controls.
+            interactionState = new {
+                mainEnabled = main?.Enabled, nativeMainEnabled, mainContainsFocus = main?.ContainsFocus,
+                editorType = editor?.GetType().Name, editorEnabled = editor?.Enabled,
+                editorContainsFocus = editor?.ContainsFocus, nativeDialogCount = NativeDialogHost.Count
+            };
             openFormCount = Majorsilence.Forms.Application.OpenForms.Count;
             modalType = Majorsilence.Forms.Application.OpenForms.Cast<Majorsilence.Forms.Form>().LastOrDefault(form => form.Modal)?.GetType().Name ?? NativeDialogHost.ActiveDialogType;
         }
@@ -62,6 +78,7 @@ namespace Chummer
         {
             // Callers supply fixed command IDs, never user-entered text or paths.
             CurrentAction = id;
+            CaptureUiState();
             Record("action");
         }
         internal static void Record(string kind, Exception error = null)
@@ -86,7 +103,7 @@ namespace Chummer
                     }).ToArray();
                     File.AppendAllText(LogPath, JsonSerializer.Serialize(new {
                         utc = DateTimeOffset.UtcNow, kind, action = CurrentAction,
-                        session = Session, processId = Environment.ProcessId, openFormCount, modalType,
+                        session = Session, processId = Environment.ProcessId, openFormCount, modalType, interactionState,
                         uiResponseAgeMs = Math.Max(0, Environment.TickCount64 - System.Threading.Interlocked.Read(ref lastUiResponse)),
                         version = typeof(Program).Assembly.GetName().Version?.ToString(),
                         build = typeof(Program).Module.ModuleVersionId.ToString(),

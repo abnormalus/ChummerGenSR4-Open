@@ -11,6 +11,12 @@ namespace Chummer;
 
 internal static class RenderingChecks
 {
+    private sealed class TreeLayoutProbe : Majorsilence.Forms.Renderers.TreeViewRenderer
+    {
+        internal System.Drawing.Rectangle TextBounds(TreeView tree, TreeNode node)
+            => GetTextBounds(tree, node, null!);
+    }
+
     // Compare a normal cached frame with a fresh frame of exactly the same state.
     // Save both images only on failure so a platform discrepancy can be inspected.
     private static void CompareFrames(Form window, string output, string transition, Action<bool, string> check)
@@ -60,6 +66,16 @@ internal static class RenderingChecks
                 value.Paint += (_, _) => paints++;
                 window.Show();
                 HeadlessRenderer.CapturePng(window, 1120, 760);
+
+                // PACKS displays expanded contents without arrows or images. Its connector
+                // gutter must remain outside labels, including at doubled display scale.
+                tree.ShowPlusMinus = false;
+                tree.ShowItemImages = false;
+                var probe = new TreeLayoutProbe();
+                var firstChild = equipment.Nodes[0];
+                check(probe.TextBounds(tree, firstChild).Left > probe.GetGlyphBounds(tree, firstChild).Right,
+                    "arrowless tree connector stays outside text at scale " + scale);
+                tree.ShowPlusMinus = true;
 
                 paints = 0;
                 window.Invalidate(false);

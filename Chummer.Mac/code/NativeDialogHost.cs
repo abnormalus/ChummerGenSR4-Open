@@ -21,18 +21,29 @@ internal static class NativeDialogHost
         var nativeOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner.MdiParent ?? owner);
         bool wasEnabled = nativeOwner.IsEnabled;
         windows.Add(window);
+        AppDiagnostics.CaptureUiState();
+        AppDiagnostics.Record("native-dialog-opening");
         try
         {
             var pending = window.ShowDialog<T?>(nativeOwner);
             // Native modality blocks pointer input, but desktop menu commands use
             // IsEnabled as their shared availability guard. Keep that guard in sync.
             nativeOwner.IsEnabled = false;
+            AppDiagnostics.CaptureUiState();
+            AppDiagnostics.Record("native-dialog-opened");
             return await pending;
+        }
+        catch (System.Exception error)
+        {
+            AppDiagnostics.Record("native-dialog-failed", error);
+            throw;
         }
         finally
         {
             windows.Remove(window);
             nativeOwner.IsEnabled = wasEnabled;
+            AppDiagnostics.CaptureUiState();
+            AppDiagnostics.Record("native-dialog-cleaned-up");
         }
     }
     internal static void CancelAll()

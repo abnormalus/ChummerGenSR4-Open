@@ -37,3 +37,17 @@ Creation also exposes a PACKS tab under Street Gear. Add PACKS Kit opens the exi
 DesktopMenus keeps the shared command strip visible inside a full-screen window, while retaining the system-menu projection. This fallback uses the same items and handlers as the native menu, so character switching and modal availability retain their existing ownership. Leaving full screen hides the fallback again. NativeControlChecks verifies both transitions. It does not change the user’s macOS menu-bar preferences.
 
 Preferences and Quit also reappear in the shared strip during Mac full screen, since the application menu can be hidden with the system bar. Returning to normal removes those duplicate placements. NativeCharacterSwitchChecks exercises the actual main-window command visibility on Mac.
+
+## PACKS replacement and menu ownership
+
+PACKS import replaces the creation editor after preparing a complete character snapshot. The new editor must become the active MDI child, retain the toolbar and menu ownership, and accept subsequent inventory commands. `NativePacksInteractionChecks` imports a synthetic Backpack kit, opens and cancels the real Add Armor and Add Gear buttons, verifies owner enabled state and rejects swallowed toolbar refresh errors.
+
+Merging moves the character menu roots into the main menu. The File root is temporarily excluded because main-window File commands already route to the active character. Restoring File must account for the source collection shrinking during the merge: its former index can exceed the remaining count. Restoration clamps the insertion point, and a finally-reset guard prevents synchronous callbacks from entering a half-completed transfer. A refresh failure counter makes errors observable to native regressions as well as diagnostic logs.
+
+The reported intermittent unresponsive inventory buttons recovered after saving, closing and reopening the character. Tests reproduce and cover the menu restoration exception and the subsequent purchase transitions, but do not establish that every blocked-input sequence is resolved. Preserve this distinction when triaging future reports.
+
+## Interaction diagnostics
+
+Fixed Add Armor/Add Gear command IDs are logged in creation and career editors. Diagnostic UI snapshots include main Form enabled state, native main-window enabled state, editor type/enabled/focus state and dialog count. Native dialogs record opening, opened, failed and cleanup transitions; cleanup captures state after restoring ownership. The two enabled states are deliberately separate because native modality can block input while the compatibility Form still reports enabled.
+
+Snapshots run on the UI thread. Logs exclude titles, input text and character identities. Initial coverage does not imply that every blocked command or duration is instrumented. Use the lifecycle events and structural state to identify missing coverage for the next confirmed defect.
