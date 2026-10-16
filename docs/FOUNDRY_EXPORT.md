@@ -37,3 +37,9 @@ Age is always numeric for Foundry validation; a nonnumeric age is retained in no
 ## Verification
 
 Portable regression checks exercise supported and inactive activation, nonadditive initiative stacking, numeric age, unique embedded IDs, preserved notes, repeated exports and restoration after a thrown calculation. An independent contract check validates emitted numeric types, whole-number ratings, item/effect types and attachment/container references against the upstream field constraints. Both target formats are exported from all bundled character fixtures, followed by a serialization comparison proving the original character state did not change. Native Foundry import/roll behavior still requires validation in a running world; schema-shaped JSON alone is not evidence of successful in-world automation.
+
+## Stored API values versus prepared sheet values (issue18)
+
+In the pinned 1.6.0 source, `derivedStats.finalStats` is declared with default fields but is not populated or consumed by the actor calculation. Chummer does not export `derivedStats`; Foundry owns preparation. Executing the actual pinned `computeDerivedStats` with synthetic nondefault inputs produces the expected initiative and monitors while `finalStats` remains default. Its defaults alone are therefore insufficient evidence of an import error.
+
+The user confirmed that the reported character's expected Body/Agility and 6 ballistic/5 impact armor display correctly in the live sheet, while the connector document read still contains default derived values and zero armor. Treat the visible/prepared values and the API representation separately. This does not verify initiative, all active effects, or every downstream consumer. Check the exact system version, supported prepared-data API and equipped/activation state before exporting guessed derived caches or changing input totals. See ISSUE_TRIAGE.md for remaining investigation.
