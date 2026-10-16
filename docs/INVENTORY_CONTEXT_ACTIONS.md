@@ -24,7 +24,7 @@ Native testing reproduced a shared compatibility bug: closing a dialog without a
 
 ## Verification
 
-InventoryEnhancementChecks verifies commlink defaults/fallbacks, ammo family filtering in browsing and search, canonical rifle/pistol ammo fields, melee accessory round trips and modal result consistency. NativeInventoryEnhancementChecks drives real creation and career handlers: commlink cancellation, melee accessory purchasing, the right-click ammo menu, correct inventory destination and career charge, and purchase cancellation. Combined native CI coverage requires at least 83 checks on Mac and Windows. The full saved-character suite continues to verify compatibility.
+InventoryEnhancementChecks verifies commlink defaults/fallbacks, ammo family filtering in browsing and search, canonical rifle/pistol ammo fields, melee accessory round trips and modal result consistency. NativeInventoryEnhancementChecks drives real creation and career handlers: commlink cancellation, melee accessory purchasing, the right-click ammo menu, correct inventory destination and career charge, and purchase cancellation. Combined native CI coverage requires at least 95 checks on Mac and Windows. The full saved-character suite continues to verify compatibility.
 
 ## Personalized Grip identity and bonuses
 

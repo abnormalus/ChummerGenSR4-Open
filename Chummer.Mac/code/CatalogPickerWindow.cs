@@ -96,6 +96,17 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         var details = new StackPanel { Spacing = 10, MinWidth = 260 };
         var name = new TextBlock { FontSize = 20, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
         name.Bind(TextBlock.TextProperty, Read("SelectedEntry.DisplayName")); details.Children.Add(name);
+        if (model is IRatedCatalogPicker)
+        {
+            var ratingRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            ratingRow.Children.Add(new TextBlock { Text = T("Label_Rating"), VerticalAlignment = VerticalAlignment.Center });
+            var rating = NativeIntegerInput.Create(namePrefix + "Rating", 1, 1);
+            rating.Bind(NumericUpDown.MinimumProperty, Read(nameof(IRatedCatalogPicker.MinimumRating)));
+            rating.Bind(NumericUpDown.MaximumProperty, Read(nameof(IRatedCatalogPicker.MaximumRating)));
+            rating.Bind(NumericUpDown.ValueProperty, Edit(nameof(IRatedCatalogPicker.Rating)));
+            rating.Bind(IsEnabledProperty, Read(nameof(IRatedCatalogPicker.IsRatingEnabled)));
+            ratingRow.Children.Add(rating); details.Children.Add(ratingRow);
+        }
         var fields = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 14, RowSpacing = 8 };
         details.Children.Add(fields);
         void Detail(string labelKey, string property)
@@ -131,7 +142,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         var free = new CheckBox { Name = namePrefix + "FreeCost", Content = T("Checkbox_Free"), VerticalAlignment = VerticalAlignment.Center };
         free.Bind(ToggleButton.IsCheckedProperty, Edit(nameof(model.FreeCost))); purchase.Children.Add(free);
         purchase.Children.Add(new TextBlock { Text = T("Label_SelectGear_Markup"), VerticalAlignment = VerticalAlignment.Center });
-        var markup = new NumericUpDown { Name = namePrefix + "Markup", Minimum = -99, Maximum = 1000, Increment = 1, Width = 100, FormatString = "0" };
+        var markup = NativeIntegerInput.Create(namePrefix + "Markup", -99, 1000);
         markup.Bind(NumericUpDown.ValueProperty, Edit(nameof(model.Markup))); purchase.Children.Add(markup);
         purchase.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center }); footer.Children.Add(purchase);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
