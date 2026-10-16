@@ -35,3 +35,13 @@ The first bounded migrations are the weapon, armor and weapon-accessory pickers.
 ## Final consistency pass
 
 After the section migrations are complete, review the modernized code and maintenance documentation together for consistent terminology, descriptive variable names, stale comments, missing explanations of non-obvious blocks, architecture boundaries and reproducible verification instructions. Documentation and naming are acceptance work for each section as well as this final pass; they should not accumulate until the end of the project.
+
+## Empty workspace artwork
+
+The supplied `branding/workspace-emblem.png` is shown only while the main MDI workspace has no character windows. `frmMain.InitializeEmptyWorkspace` uses the existing aspect-preserving centered Zoom layout and MDI activation notifications, including final-character closure. Artwork load failures are diagnostic-only; closing the main window releases the image. This does not change character or settings persistence. Verify startup, opening a character, closing the final character, and resizing at different display scales before release.
+
+Native checks verify artwork before opening a character, hide it while an editor is open and restore it after final closure. Empty-workspace screenshots at two window sizes support visual inspection without capturing character fields.
+
+## Interaction stability acceptance
+
+Actual PACKS replacement followed by Add Armor/Add Gear cancellation is part of native validation. Menu refresh errors fail the regression rather than being swallowed behind a passing test. Structural command/editor/modal diagnostics supplement errors without recording character content. See [CHARACTER_SWITCHING.md](CHARACTER_SWITCHING.md). The intermittent blocked-input report remains under observation; the confirmed menu restoration index defect is covered.

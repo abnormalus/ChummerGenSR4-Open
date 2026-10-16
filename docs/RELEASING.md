@@ -37,3 +37,7 @@ Each copied build and its uploaded metadata are downloaded again and hash-verifi
 The **Consolidate daily download archives** workflow safely migrates the old timestamped archive releases. It runs when the archival scripts change or can be started manually from Actions. It removes each old release heading only after its daily copy and metadata are verified; original Git tags remain. It never removes Nightly. Consolidation and Nightly publication share a release-assets concurrency lock to prevent concurrent metadata edits.
 
 The Nightly Assets section contains only the current packages and metadata. Superseded filenames are removed from Nightly only after verified archival and successful replacement uploads. GitHub does not provide nested release categories; daily releases keep the main Releases page compact while preserving individual builds.
+
+## Local retention
+
+Keep one verified Stable package set and one verified Nightly package set locally. Use temporary directories for intermediate builds and remove their generated bundles/publish folders after validation, provided they are not running. Do not delete logs, screenshots, character exports, source files or installed/running applications as part of build cleanup. Replace a retained channel only after verifying the replacement checksums. Older releases remain in GitHub daily archives; local per-iteration bundles are unnecessary.

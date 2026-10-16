@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using Majorsilence.Forms;
@@ -17,10 +17,39 @@ namespace Chummer
         private ToolStripMenuItem _mnuSaveCharacterAs;
         private ToolStripMenuItem _mnuCloseCharacter;
 
+        /// <summary>Brand only the empty MDI workspace; character editors retain their own backgrounds.</summary>
+        private void InitializeEmptyWorkspace()
+        {
+            var workspace = Controls.OfType<MdiClient>().FirstOrDefault();
+            if (workspace == null) return;
+            Majorsilence.Forms.Drawing.Image emblem;
+            try
+            {
+                emblem = Majorsilence.Forms.Drawing.Image.FromFile(
+                    Path.Combine(AppContext.BaseDirectory, "branding", "workspace-emblem.png"));
+            }
+            catch (Exception error)
+            {
+                // Optional artwork must never prevent opening characters.
+                AppDiagnostics.Record("workspace-emblem-unavailable", error);
+                return;
+            }
+            workspace.BackgroundImageLayout = ImageLayout.Zoom;
+            void RefreshEmblem()
+            {
+                workspace.BackgroundImage = MdiChildren.Length == 0 ? emblem : null;
+                workspace.Invalidate();
+            }
+            MdiChildActivate += (_, _) => RefreshEmblem();
+            FormClosed += (_, _) => { workspace.BackgroundImage = null; emblem.Dispose(); };
+            RefreshEmblem();
+        }
+
 		#region Control Events
 		public frmMain()
 		{
 			InitializeComponent();
+            InitializeEmptyWorkspace();
             _mnuSaveCharacter = new ToolStripMenuItem { Name = "nativeSaveCharacter", Text = "&Save", Tag = "Menu_FileSave", Enabled = false };
             _mnuSaveCharacterAs = new ToolStripMenuItem { Name = "nativeSaveCharacterAs", Text = "Save &As…", Tag = "Menu_FileSaveAs", Enabled = false };
             _mnuSaveCharacter.ShortcutKeys = Keys.Control | Keys.S;
@@ -302,7 +331,19 @@ namespace Chummer
             catch (Exception exception) { AppDiagnostics.Record("toolbar-close-revert-failed", exception); }
         }
 
+        internal int ToolbarRefreshFailureCount { get; private set; }
+        private bool _refreshingCharacterToolbar;
         internal void RefreshCharacterToolbar()
+        {
+            // Moving menu items raises activation callbacks synchronously. Re-entering
+            // while the File root is temporarily detached corrupts its restoration index.
+            if (_refreshingCharacterToolbar) return;
+            _refreshingCharacterToolbar = true;
+            try { RefreshCharacterToolbarCore(); }
+            finally { _refreshingCharacterToolbar = false; }
+        }
+
+        private void RefreshCharacterToolbarCore()
         {
             if (ActiveMdiChild is frmCreate creationEditor) creationEditor.RefreshEditCommands();
             else if (ActiveMdiChild is frmCareer careerEditor) careerEditor.RefreshEditCommands();
@@ -329,7 +370,11 @@ namespace Chummer
                     int fileIndex = fileMenu == null ? -1 : characterMenus.Items.IndexOf(fileMenu);
                     if (fileMenu != null) characterMenus.Items.Remove(fileMenu);
                     try { ToolStripManager.Merge(characterMenus, menuStrip); }
-                    finally { if (fileMenu != null) characterMenus.Items.Insert(fileIndex, fileMenu); }
+                    finally {
+                        // Merge moves the other roots out of the source collection. Its
+                        // original File index may now be beyond the remaining item count.
+                        if (fileMenu != null) characterMenus.Items.Insert(Math.Min(fileIndex, characterMenus.Items.Count), fileMenu);
+                    }
                     characterMenus.Visible = false;
                 }
                 DesktopMenus.Refresh(this);
@@ -339,7 +384,7 @@ namespace Chummer
                     source.Visible = source.Items.Count > 0;
                 }
             }
-            catch (Exception exception) { AppDiagnostics.Record("toolbar-activation-merge-failed", exception); }
+            catch (Exception exception) { ToolbarRefreshFailureCount++; AppDiagnostics.Record("toolbar-activation-merge-failed", exception); }
         }
 
 		private void frmMain_MdiChildActivate(object sender, EventArgs e)

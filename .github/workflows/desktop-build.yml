@@ -53,7 +53,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Native bulk-operation checks failed: $($process.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'Native bulk-operation report is missing.' }
           $result = Get-Content $report -Raw | ConvertFrom-Json
-          if (-not $result.passed -or $result.checks.Count -lt 124) { throw 'Native bulk-operation checks did not complete.' }
+          if (-not $result.passed -or $result.checks.Count -lt 132) { throw 'Native bulk-operation checks did not complete.' }
       - name: Ensure native Windows browser runtime
         if: runner.os == 'Windows'
         shell: pwsh
@@ -80,7 +80,8 @@ jobs:
           if ($bytes.Length -lt 1000 -or -not $content.StartsWith('%PDF-') -or $content -notmatch '/Type\s*/Page\b') {
             throw 'Native preview produced an invalid or empty PDF.'
           }
-      # These two window-only images contain fixed synthetic text assigned in
+      # Window-only images contain fixed synthetic text or an empty workspace.
+      # The detail text is assigned in
       # NativeCharacterDetailsChecks, not source-character fields or diagnostics.
       - uses: actions/upload-artifact@v7
         if: success()
@@ -89,6 +90,8 @@ jobs:
           path: |
             artifacts/checks/native-character-details-creation-2x.png
             artifacts/checks/native-character-details-career-2x.png
+            artifacts/checks/native-empty-workspace-900.png
+            artifacts/checks/native-empty-workspace-1200.png
           retention-days: 7
       - uses: actions/upload-artifact@v7
         if: failure()

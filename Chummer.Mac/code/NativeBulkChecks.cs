@@ -55,6 +55,7 @@ internal static class NativeBulkChecks
             byte[] originalFile = File.ReadAllBytes(path);
             var character = new Character { FileName = path };
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
+            await NativePacksInteractionChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCharacterSwitchChecks.RunAsync(main, character, Check);
             await NativeCharacterDetailsChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeWeaponPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);

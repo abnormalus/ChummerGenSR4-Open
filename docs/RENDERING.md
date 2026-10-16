@@ -29,3 +29,7 @@ The initial nested redraw test failed before the Invalidate correction. Frame co
 ## Next bounded migration
 
 Use these checks as acceptance coverage while moving a selected inventory list/detail section to standard Avalonia controls and observable presentation. The legacy editors still use compatibility controls directly in rule handlers, so changing all lists at once would also change rule/UI interfaces. Extract one bounded section first, retain source filtering, editable details, selection, nested add-ins and undo behavior, then remove its old drawing path after native validation. This first pass does not claim that the inventory screens have already been rewritten as standard Avalonia controls.
+
+## Arrowless tree connectors
+
+Expanded read-only trees such as PACKS contents hide expand arrows and images while retaining connector lines. `TreeViewRenderer.TextBoundsFor` reserves the connector gutter even in that configuration. Previously labels started at the indent origin and the connector crossed their text, which resembled a stale redraw artifact. Scale-1 and scale-2 checks in `RenderingChecks` independently verify that labels start beyond that gutter. Do not enable continuous repainting or suppress the hierarchy to conceal this layout defect.
