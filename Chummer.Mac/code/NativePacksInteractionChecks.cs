@@ -31,6 +31,19 @@ internal static class NativePacksInteractionChecks
         var workspace = main.Controls.OfType<MdiClient>().Single();
         check(main.MdiChildren.Length == 0 && workspace.BackgroundImage != null && workspace.BackgroundImageLayout == ImageLayout.Zoom,
             "Native empty workspace displays aspect-preserving artwork before character selection");
+        var app = Avalonia.Application.Current!;
+        var originalTheme = app.RequestedThemeVariant;
+        try
+        {
+            app.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+            await Task.Delay(120);
+            var darkBackground = workspace.Style.GetBackgroundColor();
+            app.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+            await Task.Delay(120);
+            check(darkBackground != workspace.Style.GetBackgroundColor(),
+                "Native legacy workspace follows live application light and dark theme changes");
+        }
+        finally { app.RequestedThemeVariant = originalTheme; }
         var nativeMain = main.ToAvaloniaWindow();
         double originalWidth = nativeMain.Width, originalHeight = nativeMain.Height;
         var originalState = nativeMain.WindowState;

@@ -48,6 +48,9 @@ namespace Chummer
 		#region Control Events
 		public frmMain()
 		{
+            // The legacy top-level window is not an embedded presenter, so explicitly
+            // follow Avalonia's system theme using the maintained framework bridge.
+            MajorsilenceFormsTheme.FollowHost();
 			InitializeComponent();
             InitializeEmptyWorkspace();
             _mnuSaveCharacter = new ToolStripMenuItem { Name = "nativeSaveCharacter", Text = "&Save", Tag = "Menu_FileSave", Enabled = false };
