@@ -27,6 +27,11 @@ internal static class NativeGearEligibilityChecks
                 string excluded = mode == "hardware" ? "Response 1" : mode == "positive capacity" ? "Self-Destruct, Area Effect" : "Skinlink";
                 string included = mode == "hardware" ? "Response 4" : mode == "positive capacity" ? "Skinlink" : "Self-Destruct, Area Effect";
                 var pending = picker.ShowDialogAsync(owner);
+                Field<Forms.TextBox>(picker, "txtSearch").Text = mode == "hardware" ? "comlink" : "Electronics and Sensor Options";
+                await Task.Delay(20);
+                check(Field<Forms.ListBox>(picker, "lstGear").Items.Cast<ListItem>().Any(item => item.Value.StartsWith(included + "^", StringComparison.Ordinal)) &&
+                    !Field<Forms.ListBox>(picker, "lstGear").Items.Cast<ListItem>().Any(item => item.Value.StartsWith(excluded + "^", StringComparison.Ordinal)),
+                    "Native gear " + mode + " category search preserves eligibility");
                 Field<Forms.TextBox>(picker, "txtSearch").Text = excluded;
                 await Task.Delay(20);
                 check(Field<Forms.ListBox>(picker, "lstGear").Items.Count == 0 && !Field<Forms.Button>(picker, "cmdOK").Enabled,
