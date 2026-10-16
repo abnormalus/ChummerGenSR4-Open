@@ -57,6 +57,7 @@ internal static class NativeBulkChecks
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
             await NativePacksInteractionChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCharacterThemeChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeAmmunitionViewChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCyberwareRemovalChecks.RunAsync(main, character, Check);
             await NativeWeaponFocusChecks.RunAsync(main, character, Check);
             await NativeCharacterSwitchChecks.RunAsync(main, character, Check);

@@ -3135,8 +3135,15 @@ namespace Chummer
 			}
 		}
 
+        // Clipboard commands follow the active page, not a hidden tree's old selection.
+        private bool IsAmmunitionViewActive() =>
+            tabCharacterTabs.SelectedTab == tabVehicles && WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode) ||
+            tabCharacterTabs.SelectedTab == tabStreetGear && tabStreetGearTabs.SelectedTab == tabWeapons &&
+                WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode);
+
 		private void mnuEditCopy_Click(object sender, EventArgs e)
 		{
+            if (IsAmmunitionViewActive()) return;
 			if (tabCharacterTabs.SelectedTab == tabStreetGear)
 			{
 				// Lifestyle Tab.
@@ -6064,6 +6071,7 @@ namespace Chummer
 
 		private void cmdDeleteWeapon_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
             if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode)) return;
             if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode?.Parent))
             {
@@ -6072,7 +6080,7 @@ namespace Chummer
                 foreach (var gear in unit.Gear) _objFunctions.DeleteGear(gear, treWeapons, _objImprovementManager);
                 unit.Parent.WeaponAccessories.Remove(unit);
                 treWeapons.SelectedNode.Remove();
-                AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+                WeaponInventoryViews.Refresh(_objCharacter, treWeapons, false);
                 UpdateCharacterInfo();
                 _blnIsDirty = true; UpdateWindowTitle();
                 return;
@@ -6473,6 +6481,7 @@ namespace Chummer
 
 		private void cmdDeleteVehicle_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
             if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode)) return;
             if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode?.Parent))
             {
@@ -6481,7 +6490,7 @@ namespace Chummer
                 foreach (var gear in unit.Gear) _objFunctions.DeleteGear(gear, treVehicles, _objImprovementManager);
                 unit.Parent.WeaponAccessories.Remove(unit);
                 treVehicles.SelectedNode.Remove();
-                AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+                WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
                 UpdateCharacterInfo();
                 _blnIsDirty = true; UpdateWindowTitle();
                 return;
@@ -8158,6 +8167,7 @@ namespace Chummer
 
 		private void cmdVehicleMoveToInventory_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Locate the selected Weapon.
 			bool blnFound = false;
 			Weapon objWeapon = new Weapon(_objCharacter);
@@ -8462,6 +8472,7 @@ namespace Chummer
 
         private void cmdVehicleGearReduceQty_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			Gear objGear = new Gear(_objCharacter);
 			Gear objParent = new Gear(_objCharacter);
 			Vehicle objVehicle = new Vehicle(_objCharacter);
@@ -9861,6 +9872,7 @@ namespace Chummer
 
 		private void tsWeaponAddAccessory_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Make sure a parent item is selected, then open the Select Accessory window.
 			try
 			{
@@ -9952,6 +9964,7 @@ namespace Chummer
 
 		private void tsWeaponAddModification_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Make sure a parent item is selected, then open the Select Accessory window.
 			try
 			{
@@ -10251,6 +10264,7 @@ namespace Chummer
 
 		private void tsVehicleAddMod_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Make sure a parent items is selected, then open the Select Vehicle Mod window.
 			try
 			{
@@ -10391,6 +10405,7 @@ namespace Chummer
 
 		private void tsVehicleAddWeaponWeapon_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			VehicleMod objMod = new VehicleMod(_objCharacter);
 
 			// Make sure that a Weapon Mount has been selected.
@@ -10485,6 +10500,7 @@ namespace Chummer
 
 		private void tsVehicleAddWeaponAccessory_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Attempt to locate the selected VehicleWeapon.
 			bool blnWeaponFound = false;
 			Vehicle objFoundVehicle = new Vehicle(_objCharacter);
@@ -10566,6 +10582,7 @@ namespace Chummer
 
 		private void tsVehicleAddWeaponModification_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Attempt to locate the selected VehicleWeapon.
 			bool blnFound = false;
 			Vehicle objFoundVehicle = new Vehicle(_objCharacter);
@@ -10692,6 +10709,7 @@ namespace Chummer
 
 		private void tsVehicleAddUnderbarrelWeapon_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Attempt to locate the selected VehicleWeapon.
 			bool blnFound = false;
 			Vehicle objFoundVehicle = new Vehicle(_objCharacter);
@@ -10844,6 +10862,7 @@ namespace Chummer
 
 		private void tsVehicleAddGear_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Make sure a parent items is selected, then open the Select Gear window.
 			try
 			{
@@ -11034,6 +11053,7 @@ namespace Chummer
 
 		private void tsVehicleSensorAddAsPlugin_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Make sure a parent items is selected, then open the Select Gear window.
 			try
 			{
@@ -11226,6 +11246,7 @@ namespace Chummer
 
 		private void tsVehicleGearNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			try
 			{
 				bool blnFound = false;
@@ -11265,6 +11286,7 @@ namespace Chummer
 
 		private void cmsAmmoSingleShot_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Locate the selected Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Weapon objCharacterWeapon in _objCharacter.Weapons)
@@ -11304,6 +11326,7 @@ namespace Chummer
 
 		private void cmsAmmoShortBurst_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Locate the selected Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Weapon objCharacterWeapon in _objCharacter.Weapons)
@@ -11359,6 +11382,7 @@ namespace Chummer
 
 		private void cmsAmmoLongBurst_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Locate the selected Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Weapon objCharacterWeapon in _objCharacter.Weapons)
@@ -11429,6 +11453,7 @@ namespace Chummer
 
 		private void cmsAmmoFullBurst_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Locate the selected Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Weapon objCharacterWeapon in _objCharacter.Weapons)
@@ -11475,6 +11500,7 @@ namespace Chummer
 
 		private void cmsAmmoSuppressiveFire_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Locate the selected Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Weapon objCharacterWeapon in _objCharacter.Weapons)
@@ -11521,6 +11547,7 @@ namespace Chummer
 
 		private void cmsVehicleAmmoSingleShot_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Locate the selected Vehicle Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Vehicle objVehicle in _objCharacter.Vehicles)
@@ -11566,6 +11593,7 @@ namespace Chummer
 
 		private void cmsVehicleAmmoShortBurst_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Locate the selected Vehicle Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Vehicle objVehicle in _objCharacter.Vehicles)
@@ -11627,6 +11655,7 @@ namespace Chummer
 
 		private void cmsVehicleAmmoLongBurst_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Locate the selected Vehicle Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Vehicle objVehicle in _objCharacter.Vehicles)
@@ -11703,6 +11732,7 @@ namespace Chummer
 
 		private void cmsVehicleAmmoFullBurst_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Locate the selected Vehicle Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Vehicle objVehicle in _objCharacter.Vehicles)
@@ -11755,6 +11785,7 @@ namespace Chummer
 
 		private void cmsVehicleAmmoSuppressiveFire_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Locate the selected Vehicle Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Vehicle objVehicle in _objCharacter.Vehicles)
@@ -12145,6 +12176,7 @@ namespace Chummer
 
 		private void tsWeaponSell_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Delete the selected Weapon.
 			try
 			{
@@ -12368,6 +12400,7 @@ namespace Chummer
 
 		private void tsVehicleSell_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Delete the selected Vehicle.
 			try
 			{
@@ -12964,6 +12997,7 @@ namespace Chummer
 
 		private void tsWeaponName_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Make sure a parent item is selected, then open the Select Accessory window.
 			try
 			{
@@ -13108,6 +13142,7 @@ namespace Chummer
 
 		private void tsWeaponAddUnderbarrel_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Make sure a parent item is selected, then open the Select Accessory window.
 			try
 			{
@@ -13385,6 +13420,7 @@ namespace Chummer
 
 		private void tsVehicleAddNexus_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Make sure a parent items is selected, then open the Select Gear window.
 			try
 			{
@@ -14501,7 +14537,7 @@ namespace Chummer
                         weapon.WeaponAccessories.Remove(unit);
                         break;
                     }
-                    AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+                    WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
                     break;
 				case NuyenExpenseType.AddVehicleWeaponMod:
 					// Locate the Weapon Mod that was added.
@@ -14678,7 +14714,7 @@ namespace Chummer
                         weapon.WeaponAccessories.Remove(unit);
                         break;
                     }
-                    AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+                    WeaponInventoryViews.Refresh(_objCharacter, treWeapons, false);
                     break;
 				case NuyenExpenseType.AddWeaponMod:
 					// Locate the Weapon Mod that was added.
@@ -15171,6 +15207,7 @@ namespace Chummer
 
 		private void tsWeaponNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			try
 			{
 				bool blnFound = false;
@@ -15214,6 +15251,7 @@ namespace Chummer
 
 		private void tsWeaponModNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			WeaponMod objMod = _objFunctions.FindWeaponMod(treWeapons.SelectedNode.Tag.ToString(), _objCharacter.Weapons);
 
 			frmNotes frmItemNotes = new frmNotes();
@@ -15240,6 +15278,7 @@ namespace Chummer
 
 		private void tsWeaponAccessoryNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			WeaponAccessory objAccessory = _objFunctions.FindWeaponAccessory(treWeapons.SelectedNode.Tag.ToString(), _objCharacter.Weapons);
 
 			frmNotes frmItemNotes = new frmNotes();
@@ -15262,7 +15301,7 @@ namespace Chummer
 			else
 				treWeapons.SelectedNode.ForeColor = SystemColors.WindowText;
 			treWeapons.SelectedNode.ToolTipText = objAccessory.Notes;
-            AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+            WeaponInventoryViews.Refresh(_objCharacter, treWeapons, false);
 		}
 
 		private void tsCyberwareNotes_Click(object sender, EventArgs e)
@@ -15657,6 +15696,7 @@ namespace Chummer
 
 		private void tsVehicleNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			Vehicle objVehicle = new Vehicle(_objCharacter);
 			VehicleMod objMod = new VehicleMod(_objCharacter);
 			bool blnFoundVehicle = false;
@@ -15779,6 +15819,7 @@ namespace Chummer
 
 		private void tsVehicleWeaponNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			bool blnFound = false;
 			Vehicle objFoundVehicle = new Vehicle(_objCharacter);
 			Weapon objWeapon = _objFunctions.FindVehicleWeapon(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objFoundVehicle);
@@ -15850,6 +15891,7 @@ namespace Chummer
 
 		private void tsVehicleName_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Make sure a parent item is selected.
 			try
 			{
@@ -15889,6 +15931,7 @@ namespace Chummer
 
 		private void tsVehicleAddCyberware_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			Vehicle objVehicle = new Vehicle(_objCharacter);
 			VehicleMod objMod = _objFunctions.FindVehicleMod(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objVehicle);
 
@@ -16120,6 +16163,7 @@ namespace Chummer
 
 		private void tsWeaponRenameLocation_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			string strNewLocation = "";
 			frmSelectText frmPickText = new frmSelectText();
 			frmPickText.Description = LanguageManager.Instance.GetString("String_AddLocation");
@@ -16725,6 +16769,7 @@ namespace Chummer
 
 		private void tsWeaponAccessoryAddGear_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			WeaponAccessory objAccessory = _objFunctions.FindWeaponAccessory(treWeapons.SelectedNode.Tag.ToString(), _objCharacter.Weapons);
 
 			// Make sure the Weapon Accessory is allowed to accept Gear.
@@ -16877,6 +16922,7 @@ namespace Chummer
 
 		private void tsWeaponAccessoryGearMenuAddAsPlugin_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Locate the Vehicle Sensor Gear.
 			bool blnFound = false;
 			WeaponAccessory objFoundAccessory = new WeaponAccessory(_objCharacter);
@@ -17041,6 +17087,7 @@ namespace Chummer
 
 		private void tsVehicleRenameLocation_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			string strNewLocation = "";
 			frmSelectText frmPickText = new frmSelectText();
 			frmPickText.Description = LanguageManager.Instance.GetString("String_AddLocation");
@@ -17107,6 +17154,7 @@ namespace Chummer
 
 		private void tsVehicleWeaponAccessoryNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			WeaponAccessory objAccessory = _objFunctions.FindVehicleWeaponAccessory(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
 			frmNotes frmItemNotes = new frmNotes();
@@ -17129,11 +17177,12 @@ namespace Chummer
 			else
 				treVehicles.SelectedNode.ForeColor = SystemColors.WindowText;
 			treVehicles.SelectedNode.ToolTipText = objAccessory.Notes;
-            AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+            WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
 		}
 
 		private void tsVehicleWeaponModNotes_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			WeaponMod objMod = _objFunctions.FindVehicleWeaponMod(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
 			frmNotes frmItemNotes = new frmNotes();
@@ -17160,6 +17209,7 @@ namespace Chummer
 
 		private void tsVehicleWeaponAccessoryGearMenuAddAsPlugin_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			// Locate the Vehicle Sensor Gear.
 			bool blnFound = false;
 			Vehicle objFoundVehicle = new Vehicle(_objCharacter);
@@ -17324,6 +17374,7 @@ namespace Chummer
 
 		private void tsVehicleWeaponAccessoryAddGear_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			WeaponAccessory objAccessory = _objFunctions.FindVehicleWeaponAccessory(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
 			// Make sure the Weapon Accessory is allowed to accept Gear.
@@ -17539,6 +17590,7 @@ namespace Chummer
 
 		private void treWeapons_ItemDrag(object sender, ItemDragEventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			try
 			{
 				if (treWeapons.SelectedNode.Level != 1 && treWeapons.SelectedNode.Level != 0)
@@ -17563,8 +17615,10 @@ namespace Chummer
 
 		private void treWeapons_DragDrop(object sender, DragEventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
 			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
+            if (WeaponInventoryViews.IsAmmunition(nodDestination)) { e.Effect = DragDropEffects.None; return; }
 
 			int intNewIndex = 0;
 			try
@@ -17593,6 +17647,7 @@ namespace Chummer
 		{
 			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
 			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+            if (WeaponInventoryViews.IsAmmunition(objNode)) { e.Effect = DragDropEffects.None; return; }
 
 			if (objNode == null)
 				return;
@@ -17959,6 +18014,7 @@ namespace Chummer
 
 		private void cmdReloadWeapon_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			List<Gear> lstAmmo = new List<Gear>();
 			List<string> lstCount = new List<string>();
 			bool blnExternalSource = false;
@@ -18026,93 +18082,8 @@ namespace Chummer
 				lstCount.Add(strAmmo);
 			}
 
-			// Find all of the Ammo for the current Weapon that the character is carrying.
-			if (objWeapon.AmmoCategory != "Grenade Launchers" && objWeapon.AmmoCategory != "Missile Launchers" && objWeapon.AmmoCategory != "Mortar Launchers")
-			{
-				// This is a standard Weapon, so consume traditional Ammunition.
-				foreach (Gear objAmmo in _objCharacter.Gear)
-				{
-					if (objAmmo.Quantity > 0)
-					{
-						if (objAmmo.Category == "Ammunition" && objAmmo.Extra == objWeapon.AmmoCategory)
-							lstAmmo.Add(objAmmo);
-					}
-					foreach (Gear objChild in objAmmo.Children)
-					{
-						if (objChild.Quantity > 0)
-						{
-							if (objChild.Category == "Ammunition" && objChild.Extra == objWeapon.AmmoCategory)
-								lstAmmo.Add(objChild);
-						}
-					}
-				}
-			}
-			else
-			{
-				if (objWeapon.AmmoCategory == "Grenade Launchers")
-				{
-					// Grenade Launchers can only use Grenades.
-					foreach (Gear objAmmo in _objCharacter.Gear)
-					{
-						if (objAmmo.Quantity > 0)
-						{
-							if (objAmmo.Category == "Ammunition" && objAmmo.Name.StartsWith("Minigrenade:"))
-								lstAmmo.Add(objAmmo);
-						}
-						foreach (Gear objChild in objAmmo.Children)
-						{
-							if (objChild.Quantity > 0)
-							{
-								if (objChild.Category == "Ammunition" && objChild.Name.StartsWith("Minigrenade:"))
-									lstAmmo.Add(objChild);
-							}
-						}
-					}
-				}
-				if (objWeapon.AmmoCategory == "Missile Launchers")
-				{
-					// Missile Launchers can only use Missiles and Rockets.
-					foreach (Gear objAmmo in _objCharacter.Gear)
-					{
-						if (objAmmo.Quantity > 0)
-						{
-							if (objAmmo.Category == "Ammunition" && (objAmmo.Name.StartsWith("Missile:") || objAmmo.Name.StartsWith("Rocket:")))
-								lstAmmo.Add(objAmmo);
-						}
-						foreach (Gear objChild in objAmmo.Children)
-						{
-							if (objChild.Quantity > 0)
-							{
-								if (objChild.Category == "Ammunition" && (objChild.Name.StartsWith("Missile:") || objChild.Name.StartsWith("Rocket:")))
-									lstAmmo.Add(objChild);
-							}
-						}
-					}
-				}
-				if (objWeapon.AmmoCategory == "Mortar Launchers")
-				{
-					// Mortar Launchers can only use Mortars.
-					foreach (Gear objAmmo in _objCharacter.Gear)
-					{
-						if (objAmmo.Quantity > 0)
-						{
-							if (objAmmo.Category == "Ammunition" && objAmmo.Name.StartsWith("Mortar Round:"))
-								lstAmmo.Add(objAmmo);
-						}
-						foreach (Gear objChild in objAmmo.Children)
-						{
-							if (objChild.Quantity > 0)
-							{
-								if (objChild.Category == "Ammunition" && objChild.Name.StartsWith("Mortar Round:"))
-									lstAmmo.Add(objChild);
-							}
-						}
-					}
-				}
-			}
-
-			if (_objOptions.RestrictStickNShock && _objOptions.StickNShockExcludedWeaponCategories.Contains(objWeapon.AmmoCategory))
-				lstAmmo.RemoveAll(objAmmo => objAmmo.Name == "Ammo: Stick-n-Shock");
+			// Select canonical reserve objects; loading and consumption remain below.
+			lstAmmo = WeaponAmmunition.Carried(_objCharacter, objWeapon);
 
 			// If the Weapon is allowed to use an External Source, put in an External Source item.
 			if (blnExternalSource)
@@ -18227,7 +18198,7 @@ namespace Chummer
 					}
 				}
 
-				if (objSelectedAmmo.Quantity == intQty && objSelectedAmmo.Parent != null)
+				if (objSelectedAmmo.Quantity == intQty && objSelectedAmmo.Parent != null && objSelectedAmmo.Parent.Name.StartsWith("Spare Clip"))
 				{
 					// If the Ammo is coming from a Spare Clip, reduce the container quantity instead of the plugin quantity.
 					if (objSelectedAmmo.Parent.Name.StartsWith("Spare Clip"))
@@ -18285,6 +18256,7 @@ namespace Chummer
 
 		private void chkWeaponAccessoryInstalled_CheckedChanged(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			bool blnAccessory = false;
 
 			// Locate the selected Weapon Accessory or Modification.
@@ -18344,6 +18316,7 @@ namespace Chummer
 
 		private void chkIncludedInWeapon_CheckedChanged(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			bool blnAccessory = false;
 
 			// Locate the selected Weapon Accessory or Modification.
@@ -18518,6 +18491,7 @@ namespace Chummer
 
 		private void cboWeaponAmmo_SelectedIndexChanged(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			try
 			{
 				if (treWeapons.SelectedNode.Level == 0)
@@ -18555,6 +18529,7 @@ namespace Chummer
 
         private void cmdWeaponBuyAmmo_Click(object sender, EventArgs e)
         {
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
             string id = treWeapons.SelectedNode?.Tag?.ToString();
             if (string.IsNullOrEmpty(id)) return;
             var weapon = _objFunctions.FindWeapon(id, _objCharacter.Weapons);
@@ -18563,6 +18538,7 @@ namespace Chummer
 
 		private void cmdWeaponMoveToVehicle_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
 			// Locate the selected Weapon.
 			Weapon objWeapon = new Weapon(_objCharacter);
 			foreach (Weapon objCharacterWeapon in _objCharacter.Weapons)
@@ -18803,6 +18779,7 @@ namespace Chummer
 
 		private void treVehicles_ItemDrag(object sender, ItemDragEventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			try
 			{
 				if (treVehicles.SelectedNode.Level != 1)
@@ -18838,6 +18815,7 @@ namespace Chummer
 		{
 			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
 			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
+            if (WeaponInventoryViews.IsAmmunition(nodDestination)) { e.Effect = DragDropEffects.None; return; }
 
 			int intNewIndex = 0;
 			try
@@ -18873,6 +18851,7 @@ namespace Chummer
 		{
 			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
 			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+            if (WeaponInventoryViews.IsAmmunition(objNode)) { e.Effect = DragDropEffects.None; return; }
 
 			if (objNode == null)
 				return;
@@ -18906,6 +18885,7 @@ namespace Chummer
 
 		private void cmdReloadVehicleWeapon_Click(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			Vehicle objVehicle = new Vehicle(_objCharacter);
 
 			List<Gear> lstAmmo = new List<Gear>();
@@ -18956,58 +18936,8 @@ namespace Chummer
 				lstCount.Add(strAmmo);
 			}
 
-			// Find all of the Ammo for the current Weapon that the character is carrying.
-			if (objWeapon.AmmoCategory != "Grenade Launchers" && objWeapon.AmmoCategory != "Missile Launchers" && objWeapon.AmmoCategory != "Mortar Launchers")
-			{
-				// This is a standard Weapon, so consume traditional Ammunition.
-				foreach (Gear objAmmo in objVehicle.Gear)
-				{
-					if (objAmmo.Quantity > 0)
-					{
-						if (objAmmo.Category == "Ammunition" && objAmmo.Extra == objWeapon.AmmoCategory)
-							lstAmmo.Add(objAmmo);
-					}
-				}
-			}
-			else
-			{
-				if (objWeapon.AmmoCategory == "Grenade Launchers")
-				{
-					// Grenade Launchers can only use Grenades.
-					foreach (Gear objAmmo in objVehicle.Gear)
-					{
-						if (objAmmo.Quantity > 0)
-						{
-							if (objAmmo.Category == "Ammunition" && objAmmo.Name.StartsWith("Minigrenade:"))
-								lstAmmo.Add(objAmmo);
-						}
-					}
-				}
-				if (objWeapon.AmmoCategory == "Missile Launchers")
-				{
-					// Missile Launchers can only use Missiles and Rockets.
-					foreach (Gear objAmmo in objVehicle.Gear)
-					{
-						if (objAmmo.Quantity > 0)
-						{
-							if (objAmmo.Category == "Ammunition" && (objAmmo.Name.StartsWith("Missile:") || objAmmo.Name.StartsWith("Rocket:")))
-								lstAmmo.Add(objAmmo);
-						}
-					}
-				}
-				if (objWeapon.AmmoCategory == "Mortar Launchers")
-				{
-					// Mortar Launchers can only use Mortars.
-					foreach (Gear objAmmo in objVehicle.Gear)
-					{
-						if (objAmmo.Quantity > 0)
-						{
-							if (objAmmo.Category == "Ammunition" && objAmmo.Name.StartsWith("Mortar Round:"))
-								lstAmmo.Add(objAmmo);
-						}
-					}
-				}
-			}
+			// Mounted weapons retain the vehicle-owned reserve pool.
+			lstAmmo = WeaponAmmunition.Mounted(objVehicle, objWeapon);
 
 			// If the Weapon is allowed to use an External Source, put in an External Source item.
 			if (blnExternalSource)
@@ -19122,6 +19052,7 @@ namespace Chummer
 
 		private void chkVehicleWeaponAccessoryInstalled_CheckedChanged(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			bool blnAccessory = false;
 
 			// Locate the the Selected Vehicle Weapon Accessory of Modification.
@@ -19163,6 +19094,7 @@ namespace Chummer
 
 		private void cboVehicleWeaponAmmo_SelectedIndexChanged(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 
 			try
 			{
@@ -19214,6 +19146,7 @@ namespace Chummer
 
 		private void chkVehicleHomeNode_CheckedChanged(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			if (treVehicles.SelectedNode.Level == 1)
 			{
 				Vehicle objVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
@@ -21269,6 +21202,7 @@ namespace Chummer
 
 		private void chkVehicleCM_CheckedChanged(object sender, EventArgs e)
 		{
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			if (_blnSkipRefresh)
 				return;
 
@@ -21521,8 +21455,8 @@ namespace Chummer
 				string strTip = "";
 				_blnSkipUpdate = true;
                 WeaponFocusBindings.Synchronize(_objCharacter, treFoci);
-                AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
-                AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+                WeaponInventoryViews.Refresh(_objCharacter, treWeapons, false);
+                WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
 
 				string strFormat;
 				if (_objCharacter.Options.EssenceDecimals == 4)
@@ -22617,11 +22551,12 @@ namespace Chummer
 		/// </summary>
 		public void RefreshSelectedWeapon()
 		{
-            AccessoryGroupViews.Refresh(_objCharacter, treWeapons, false);
+            cmdDeleteWeapon.Enabled = !WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode);
+            WeaponInventoryViews.Refresh(_objCharacter, treWeapons, false);
 			bool blnClear = false;
 			try
 			{
-				if (AccessoryGroupViews.IsHeader(treWeapons.SelectedNode) || treWeapons.SelectedNode.Level == 0)
+				if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode) || AccessoryGroupViews.IsHeader(treWeapons.SelectedNode) || treWeapons.SelectedNode.Level == 0)
 					blnClear = true;
 			}
 			catch
@@ -24512,11 +24447,12 @@ namespace Chummer
 		/// </summary>
 		private void RefreshSelectedVehicle()
 		{
-            AccessoryGroupViews.Refresh(_objCharacter, treVehicles, true);
+            cmdDeleteVehicle.Enabled = !WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode);
+            WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
 			bool blnClear = false;
 			try
 			{
-				if (AccessoryGroupViews.IsHeader(treVehicles.SelectedNode) || treVehicles.SelectedNode.Level == 0)
+				if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode) || AccessoryGroupViews.IsHeader(treVehicles.SelectedNode) || treVehicles.SelectedNode.Level == 0)
 					blnClear = true;
 			}
 			catch
@@ -26820,6 +26756,8 @@ namespace Chummer
 		/// </summary>
 		private void RefreshPasteStatus()
 		{
+            mnuEditCopy.Enabled = !IsAmmunitionViewActive();
+            tsbCopy.Enabled = mnuEditCopy.Enabled;
 		}
 
 		/// <summary>
