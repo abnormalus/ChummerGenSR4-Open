@@ -19590,6 +19590,7 @@ namespace Chummer
 		{
 			if (_blnSkipRefresh)
 				return;
+            AppDiagnostics.Action(e.Node.Checked ? "focus.unbind" : "focus.bind");
 
 			// If the item is being unchecked, confirm that the user wants to un-bind the Focus.
 			if (e.Node.Checked)
@@ -19606,14 +19607,16 @@ namespace Chummer
 
 			if (intFociTotal > _objCharacter.MAG.TotalValue * 5)
 			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumForce"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+				AppDiagnostics.Record("focus.binding-rejected-force");
+                MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumForce"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				e.Cancel = true;
 				return;
 			}
 
 			if (intFociCount > _objCharacter.MAG.TotalValue)
 			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumNumber"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+				AppDiagnostics.Record("focus.binding-rejected-count");
+                MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumNumber"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				e.Cancel = true;
 				return;
 			}
@@ -19623,6 +19626,7 @@ namespace Chummer
                 int cost = checked(modificationFocus.Force * _objOptions.KarmaWeaponFocus);
                 if (cost > _objCharacter.Karma)
                 {
+                    AppDiagnostics.Record("focus.binding-rejected-karma");
                     MessageBox.Show(LanguageManager.Instance.GetString("Message_NotEnoughKarma"),
                         LanguageManager.Instance.GetString("MessageTitle_NotEnoughKarma"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     e.Cancel = true; return;

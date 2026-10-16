@@ -59,6 +59,8 @@ internal static class WeaponFocusBindings
                 character.Foci.Add(new Focus { Name = "Weapon Focus", GearId = id, Rating = reference.Force });
         }
         else character.Foci.RemoveAll(focus => focus.GearId == id);
+        AppDiagnostics.CaptureUiState();
+        AppDiagnostics.Record(bound ? "focus.binding-applied" : "focus.binding-removed");
         return true;
     }
 

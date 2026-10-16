@@ -14026,6 +14026,7 @@ namespace Chummer
 
 		private void treFoci_BeforeCheck(object sender, TreeViewCancelEventArgs e)
 		{
+            AppDiagnostics.Action(e.Node.Checked ? "focus.unbind" : "focus.bind");
 			// Don't bother to do anything since a node is being unchecked.
 			if (e.Node.Checked)
 				return;
@@ -14037,14 +14038,16 @@ namespace Chummer
 
 			if (intFociTotal > _objCharacter.MAG.TotalValue * 5 && !_objCharacter.IgnoreRules)
 			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumForce"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+				AppDiagnostics.Record("focus.binding-rejected-force");
+                MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumForce"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				e.Cancel = true;
 				return;
 			}
 
 			if (intFociCount > _objCharacter.MAG.TotalValue && !_objCharacter.IgnoreRules)
 			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumNumber"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+				AppDiagnostics.Record("focus.binding-rejected-count");
+                MessageBox.Show(LanguageManager.Instance.GetString("Message_FocusMaximumNumber"), LanguageManager.Instance.GetString("MessageTitle_FocusMaximum"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				e.Cancel = true;
 			}
 		}
