@@ -17,6 +17,26 @@ internal static class GearEligibilityChecks
         try
         {
             if (!character.Options.Books.Contains("AR")) character.Options.Books.Add("AR");
+            using (var categoryPicker = new frmSelectGear(character) { AllowedCategories = "Commlink" })
+            {
+                categoryPicker.Show();
+                var list = Field<ListBox>(categoryPicker, "lstGear");
+                string[] categoryItems = list.Items.Cast<ListItem>().Select(item => item.Value).OrderBy(name => name).ToArray();
+                check(categoryItems.Length > 0, "commlink category provides an eligible search baseline");
+                foreach (string query in new[] { "commlink", "comlink", "COMLINKS", "commlinks" })
+                {
+                    Field<TextBox>(categoryPicker, "txtSearch").Text = query;
+                    check(categoryItems.SequenceEqual(list.Items.Cast<ListItem>().Select(item => item.Value.Split('^')[0]).OrderBy(name => name)),
+                        "gear category search includes all eligible commlinks for " + query);
+                }
+                Field<TextBox>(categoryPicker, "txtSearch").Text = "comlink ' or true()";
+                check(list.Items.Count == 0, "category search treats quotes and operators literally");
+                categoryPicker.Close();
+            }
+            var sample = new System.Xml.XmlDocument(); sample.LoadXml("<gear><name>Model</name><translate>Modèle</translate><category>Commlink</category></gear>");
+            check(CatalogSearch.MatchesNameOrCategory(sample.DocumentElement!, "liaison", "Appareils de liaison") &&
+                CatalogSearch.MatchesNameOrCategory(sample.DocumentElement!, "Modèle", "Appareils de liaison"),
+                "catalog category search retains localized category and item names");
             void Compare(frmSelectGear picker, string excluded, string included, string description)
             {
                 using (picker)
@@ -24,6 +44,9 @@ internal static class GearEligibilityChecks
                     picker.Show(); var list = Field<ListBox>(picker, "lstGear");
                     check(!list.Items.Cast<ListItem>().Any(item => item.Value == excluded) && list.Items.Cast<ListItem>().Any(item => item.Value == included),
                         description + " browsing retains established eligibility");
+                    Field<TextBox>(picker, "txtSearch").Text = Field<ComboBox>(picker, "cboCategory").SelectedValue?.ToString() ?? "";
+                    check(list.Items.Cast<ListItem>().All(item => !item.Value.StartsWith(excluded + "^", StringComparison.Ordinal)),
+                        description + " category search retains contextual restrictions");
                     Field<TextBox>(picker, "txtSearch").Text = excluded;
                     check(!list.Items.Cast<ListItem>().Any(item => item.Value.StartsWith(excluded + "^", StringComparison.Ordinal)), description + " search cannot restore an ineligible choice");
                     Field<TextBox>(picker, "txtSearch").Text = included;

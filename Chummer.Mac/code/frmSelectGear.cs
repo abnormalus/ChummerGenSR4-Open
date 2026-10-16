@@ -342,8 +342,14 @@ namespace Chummer
 			}
 
             // Typed text is data, never XPath syntax. Source and contextual filters
-            // still constrain the candidate catalog before literal name matching.
-            var objXmlGearList = EligibleDefinitions().Where(node => CatalogSearch.MatchesDisplayName(node, txtSearch.Text));
+            // still constrain the candidate catalog before literal name/category matching.
+            string query = CatalogSearch.GearQuery(txtSearch.Text);
+            var categoryLabels = _lstCategory.ToDictionary(category => category.Value, category => category.Name);
+            var objXmlGearList = EligibleDefinitions().Where(node => {
+                string categoryLabel = categoryLabels.GetValueOrDefault(node["category"]?.InnerText ?? "");
+                return CatalogSearch.MatchesNameOrCategory(node, txtSearch.Text, categoryLabel) ||
+                    CatalogSearch.MatchesNameOrCategory(node, query, categoryLabel);
+            });
 			List<ListItem> lstGears = new List<ListItem>();
 			bool blnAddToList;
 			foreach (XmlNode objXmlGear in objXmlGearList)
