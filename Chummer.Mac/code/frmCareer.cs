@@ -5496,7 +5496,7 @@ namespace Chummer
 
 		private void cmdDeleteCyberware_Click(object sender, EventArgs e)
 		{
-			try
+            AppDiagnostics.Action("inventory.cyberware.delete");			try
 			{
 				if (treCyberware.SelectedNode.Level > 0)
 				{
@@ -5543,7 +5543,7 @@ namespace Chummer
 									if (objWeaponNode.Tag.ToString() == objChildCyberware.WeaponID)
 										objRemoveNode = objWeaponNode;
 								}
-								treWeapons.Nodes.Remove(objRemoveNode);
+								objRemoveNode.Remove();
 
 								// Remove the Weapon from the Character.
 								Weapon objRemoveWeapon = new Weapon(_objCharacter);
@@ -5568,7 +5568,7 @@ namespace Chummer
 								if (objWeaponNode.Tag.ToString() == objCyberware.WeaponID)
 									objRemoveNode = objWeaponNode;
 							}
-							treWeapons.Nodes.Remove(objRemoveNode);
+							objRemoveNode.Remove();
 
 							// Remove the Weapon from the Character.
 							Weapon objRemoveWeapon = new Weapon(_objCharacter);
@@ -5604,7 +5604,7 @@ namespace Chummer
 					}
 
 					// Remove the item from the TreeView.
-					treCyberware.Nodes.Remove(treCyberware.SelectedNode);
+					treCyberware.SelectedNode.Remove();
 
 					// If the Parent is populated, remove the item from its Parent.
 					if (objParent != null)
@@ -5615,10 +5615,12 @@ namespace Chummer
 				_blnIsDirty = true;
 				UpdateWindowTitle();
 			}
-			catch
-			{
-				return;
-			}
+            catch (Exception error)
+            {
+                AppDiagnostics.Record("cyberware.delete-failed", error);
+                AppErrors.Notify(this, LanguageManager.Instance.GetString("Message_CommandFailed"), "Chummer");
+                return;
+            }
 
 			UpdateCharacterInfo();
 		}
@@ -22525,6 +22527,18 @@ namespace Chummer
 				// Locate the selected piece of Gear.
 				Cyberware objFoundCyberware = new Cyberware(_objCharacter);
 				Gear objGear = _objFunctions.FindCyberwareGear(treCyberware.SelectedNode.Tag.ToString(), _objCharacter.Cyberware, out objFoundCyberware);
+                // A queued selection can outlive its model record. Remove only that
+                // stale projection; never treat a missing cyberware record as Gear.
+                if (objGear == null)
+                {
+                    AppDiagnostics.Record("cyberware.selection-missing");
+                    var staleNode = treCyberware.SelectedNode;
+                    treCyberware.SelectedNode = null;
+                    staleNode?.Remove();
+                    RefreshSelectedCyberware();
+                    return;
+                }
+
 
 				_blnSkipRefresh = true;
 				lblCyberwareName.Text = objGear.DisplayNameShort;

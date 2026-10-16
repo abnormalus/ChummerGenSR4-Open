@@ -55,3 +55,5 @@ The workspace uses the user's transparent circular dragon PNG unchanged. Native 
 Weapon-modification foci now share the existing binding record and limit/accounting paths without duplicate Gear or new save fields. Regression coverage includes BP/Karma, lifecycle and confirmation cancellation; see [WEAPON_FOCUS_BINDING.md](WEAPON_FOCUS_BINDING.md). The installed modifier remains the single source of its legacy dice bonus.
 
 Accessory quantities retain individual legacy records while grouping equivalent units in the tree. The standard native quantity input and shared purchase plan avoid new save fields; canonical unit deletion and expense undo no longer depend on presentation depth. See [ACCESSORY_QUANTITIES.md](ACCESSORY_QUANTITIES.md). Shared ammunition views remain separate work.
+
+Cyberware deletion now removes actual nested rows, and stale selections clear safely in creation/career mode; see [CYBERWARE_SELECTION.md](CYBERWARE_SELECTION.md). Release identity is shared by About, diagnostics, binaries and package metadata, with source and consistency checks documented in [BUILD_IDENTITY.md](BUILD_IDENTITY.md).

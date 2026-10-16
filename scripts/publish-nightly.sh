@@ -12,7 +12,10 @@ fi
 (cd "$chummer_assets" && sha256sum --check SHA256SUMS.txt)
 chummer_notes="$(mktemp)"
 trap 'rm -f "$chummer_notes"' EXIT
+chummer_label="$(head -n 1 "$chummer_assets/BUILD.txt")"
 cat > "$chummer_notes" <<EOF_NOTES
+**$chummer_label**
+
 Development builds from commit [$chummer_sha](https://github.com/$chummer_repo/commit/$chummer_sha).
 
 - **Mac:** download ChummerSR4-macOS-arm64.zip. Apple Silicon, macOS 15+. Locally signed preview; Apple notarization is not configured.
