@@ -46,6 +46,21 @@ namespace Chummer
 		// Create the XmlManager that will handle finding all of the XML files.
 		private ImprovementManager _objImprovementManager;
 
+        // Keep kit entry points beside individual equipment purchases. Both buttons
+        // reuse existing commands, including isolated import/progress/cancellation.
+        private void InitializePacksTab()
+        {
+            var packsTab = new TabPage { Name = "tabPacks", Text = "PACKS" };
+            var addKit = new Button { Name = "cmdAddPacksKit", Text = LanguageManager.Instance.GetString("Menu_SpecialAddPACKSKit"),
+                Left = 16, Top = 16, Width = 190, Height = 36 };
+            var createKit = new Button { Name = "cmdCreatePacksKit", Text = LanguageManager.Instance.GetString("Menu_SpecialCreatePACKSKit"),
+                Left = 220, Top = 16, Width = 190, Height = 36 };
+            addKit.Click += (_, _) => mnuSpecialAddPACKSKit.PerformClick();
+            createKit.Click += (_, _) => mnuSpecialCreatePACKSKit.PerformClick();
+            packsTab.Controls.Add(addKit); packsTab.Controls.Add(createKit);
+            tabStreetGearTabs.TabPages.Add(packsTab);
+        }
+
 		#region Form Events
         public frmCreate(Character objCharacter) : this(objCharacter, false) { }
         private frmCreate(Character objCharacter, bool packsWorkspace)
@@ -87,6 +102,7 @@ namespace Chummer
 			if (!_packsWorkspace) GlobalOptions.Instance.MRUChanged += PopulateMRU;
 
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
+            InitializePacksTab();
             MetatypeMeasurements.Attach(_objCharacter, tabCharacterInfo, lblMetatype, lblDescription);
             AliasRandomizer.Attach(this, _objCharacter, txtAlias, lblMetatypeLabel);
             hairChoices = AppearanceColors.Attach(txtHair);
@@ -1440,6 +1456,7 @@ namespace Chummer
 		}
 
         internal ToolStrip CharacterToolbar => toolStrip;
+        internal MenuStrip CharacterMenus => mnuCreateMenu;
 
         // Clipboard contents belong to the session, while the paste destination
         // belongs to this editor. Re-evaluate both when returning to a document.

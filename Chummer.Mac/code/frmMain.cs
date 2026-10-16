@@ -298,7 +298,7 @@ namespace Chummer
         internal void ReleaseCharacterToolbar(Form editor)
         {
             if (ActiveMdiChild != editor) return;
-            try { ToolStripManager.RevertMerge(toolStrip); }
+            try { ToolStripManager.RevertMerge(menuStrip); ToolStripManager.RevertMerge(toolStrip); DesktopMenus.Refresh(this); }
             catch (Exception exception) { AppDiagnostics.Record("toolbar-close-revert-failed", exception); }
         }
 
@@ -314,7 +314,25 @@ namespace Chummer
             };
             try
             {
+                ToolStripManager.RevertMerge(menuStrip);
                 ToolStripManager.RevertMerge(toolStrip);
+                MenuStrip characterMenus = ActiveMdiChild switch {
+                    frmCreate creation => creation.CharacterMenus,
+                    frmCareer career => career.CharacterMenus,
+                    _ => null
+                };
+                if (characterMenus != null)
+                {
+                    // File commands already route through the main window. Merge the
+                    // editor's remaining roots without duplicating Save/Close/Print.
+                    var fileMenu = characterMenus.Items.OfType<ToolStripMenuItem>().FirstOrDefault(item => item.Name == "mnuCreateFile");
+                    int fileIndex = fileMenu == null ? -1 : characterMenus.Items.IndexOf(fileMenu);
+                    if (fileMenu != null) characterMenus.Items.Remove(fileMenu);
+                    try { ToolStripManager.Merge(characterMenus, menuStrip); }
+                    finally { if (fileMenu != null) characterMenus.Items.Insert(fileIndex, fileMenu); }
+                    characterMenus.Visible = false;
+                }
+                DesktopMenus.Refresh(this);
                 if (source != null)
                 {
                     ToolStripManager.Merge(source, toolStrip);

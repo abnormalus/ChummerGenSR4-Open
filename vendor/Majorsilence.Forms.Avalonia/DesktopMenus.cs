@@ -8,6 +8,12 @@ namespace Majorsilence.Forms
     /// <summary>Projects shared command items into the Mac system menu bar.</summary>
     public static class DesktopMenus
     {
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Form, Action> refreshers = new();
+        /// <summary>Republishes the current shared menu tree after document commands change.</summary>
+        public static void Refresh(Form owner)
+        {
+            if (refreshers.TryGetValue(owner, out var refresh)) refresh();
+        }
         public static string? ApplicationName { get; set; }
         internal static bool CommandShortcutsEnabled { get; private set; }
         public static void Install(Form form, MenuStrip source, MenuItem preferences, MenuItem about,
@@ -20,7 +26,10 @@ namespace Majorsilence.Forms
             // A native menu can outlive a modal transition or queue a click before it.
             // Respect the actual host window state as well as the logical item state.
             // Quit remains available so the application can cancel and unwind owned work.
+            bool ContainsCommand(System.Collections.Generic.IEnumerable<MenuItem> items, MenuItem command)
+                => items.Any(item => ReferenceEquals(item, command) || ContainsCommand(item.Items, command));
             bool CanExecute(MenuItem item) => item.Enabled && item.Visible &&
+                (ReferenceEquals(item, preferences) || ReferenceEquals(item, about) || ReferenceEquals(item, quit) || ContainsCommand(source.Items, item)) &&
                 (ReferenceEquals(item, quit) || window.IsEnabled);
             Action refreshApplicationCommands = () => { };
             NativeMenuItem Entry(MenuItem item)
@@ -98,6 +107,9 @@ namespace Majorsilence.Forms
                 foreach (var item in source.Items.ToArray())
                     if (item.Visible && item is not MdiControlItem) root.Items.Add(Entry(item));
             }
+            refreshers.Remove(form);
+            refreshers.Add(form, Refresh);
+            form.FormClosed += (_, _) => refreshers.Remove(form);
             Refresh();
             root.NeedsUpdate += (_, _) => Refresh();
             window.PropertyChanged += (_, change) => {

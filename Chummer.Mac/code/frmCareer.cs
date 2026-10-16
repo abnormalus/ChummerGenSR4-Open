@@ -1539,6 +1539,7 @@ namespace Chummer
 		}
 
         internal ToolStrip CharacterToolbar => toolStrip;
+        internal MenuStrip CharacterMenus => mnuCreateMenu;
 
         // Clipboard contents belong to the session, while the paste destination
         // belongs to this editor. Re-evaluate both when returning to a document.
