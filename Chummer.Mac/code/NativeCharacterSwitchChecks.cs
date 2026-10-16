@@ -23,12 +23,16 @@ internal static class NativeCharacterSwitchChecks
         using var second = new frmCareer(careerCharacter) { Loading = true, MdiParent = main };
         var tabs = Field<TabControl>(main, "tabForms");
         var toolbar = Field<ToolStrip>(main, "toolStrip");
+        var menus = Field<MenuStrip>(main, "menuStrip");
         var save = Field<ToolStripMenuItem>(main, "_mnuSaveCharacter");
         var close = Field<ToolStripMenuItem>(main, "_mnuCloseCharacter");
         var previousClipboardType = GlobalOptions.Instance.ClipboardContentType;
         first.Show(); second.Show();
         try
         {
+            var packsTab = Field<TabControl>(first, "tabStreetGearTabs").TabPages.Cast<TabPage>().Single(page => page.Name == "tabPacks");
+            check(packsTab.Text == "PACKS" && packsTab.Controls.OfType<Button>().Count() == 2,
+                "Native Street Gear exposes PACKS browsing/import and creation commands");
             // Clipboard contents are shared across editors, unlike selection state.
             // Returning to an unchanged tab must re-evaluate its edit commands.
             GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
@@ -51,6 +55,17 @@ internal static class NativeCharacterSwitchChecks
                     toolbar.Items.Contains(Field<ToolStripButton>(first, "tsbSave")) &&
                     !toolbar.Items.Contains(Field<ToolStripButton>(second, "tsbSave")) && save.Enabled && close.Enabled,
                     "Native repeated character switch keeps tab, toolbar and commands aligned " + iteration);
+                check(menus.Items.Contains(Field<ToolStripMenuItem>(first, "mnuCreateSpecial")) &&
+                    menus.Items.Contains(Field<ToolStripMenuItem>(first, "mnuCreateEdit")) &&
+                    !menus.Items.Contains(Field<ToolStripMenuItem>(second, "mnuCreateSpecial")),
+                    "Native creation menu ownership follows active character " + iteration);
+                if (System.OperatingSystem.IsMacOS())
+                {
+                    var nativeMenu = Avalonia.Controls.NativeMenu.GetMenu(main.ToAvaloniaWindow())!;
+                    check(nativeMenu.Items.OfType<Avalonia.Controls.NativeMenuItem>().Any(item => item.Header == "Special" &&
+                        item.Menu!.Items.OfType<Avalonia.Controls.NativeMenuItem>().Any(command => command.Header == "Add PACKS Kit")),
+                        "Mac native Special menu exposes PACKS after character switch " + iteration);
+                }
                 tabs.SelectedTab = (TabPage)second.Tag!;
                 await Task.Delay(20);
             }
@@ -64,6 +79,7 @@ internal static class NativeCharacterSwitchChecks
             typeof(frmCareer).GetField("_blnIsDirty", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(second, false);
             close.PerformClick();
             check(second.IsDisposed && main.ActiveMdiChild == null && tabs.TabCount == 0 &&
+                !menus.Items.OfType<ToolStripMenuItem>().Any(item => item.Name == "mnuCreateSpecial" || item.Name == "mnuCreateEdit") &&
                 !save.Enabled && !close.Enabled && !toolbar.Items.Contains(Field<ToolStripButton>(second, "tsbSave")) &&
                 !toolbar.Items.OfType<ToolStripButton>().Any(item => item.Name == "tsbSave" && item.Visible),
                 "Native Close Character clears final tab, toolbar and document command availability");

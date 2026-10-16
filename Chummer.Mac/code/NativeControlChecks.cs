@@ -59,6 +59,9 @@ internal static class NativeControlChecks
             action.Enabled = false;
             Click(staleCommand);
             check(commands == 2, "A queued native click respects an item disabled after menu creation");
+            action.Enabled = true; file.DropDownItems.Remove(action); DesktopMenus.Refresh(owner);
+            Click(staleCommand);
+            check(commands == 2, "A queued native click cannot invoke a detached character command");
         }
         finally
         {
