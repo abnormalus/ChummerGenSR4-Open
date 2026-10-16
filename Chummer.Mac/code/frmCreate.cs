@@ -103,6 +103,8 @@ namespace Chummer
 
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
             InitializePacksTab();
+            CharacterDetailsEditor.Attach(this, new[] { txtDescription, txtBackground, txtConcept, txtNotes },
+                new[] { lblDescription, lblBackground, lblConcept, lblNotes });
             MetatypeMeasurements.Attach(_objCharacter, tabCharacterInfo, lblMetatype, lblDescription);
             AliasRandomizer.Attach(this, _objCharacter, txtAlias, lblMetatypeLabel);
             hairChoices = AppearanceColors.Attach(txtHair);

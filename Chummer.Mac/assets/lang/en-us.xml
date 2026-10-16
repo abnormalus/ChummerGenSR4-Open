@@ -6758,5 +6758,12 @@ Guidance only; manual values may fall outside these ranges.</text></string>
     <string><key>CatalogPicker_SearchHint</key><text>Search enabled sources</text></string>
     <string><key>CatalogPicker_NoMatches</key><text>No matching items in the enabled sources.</text></string>
     <string><key>Menu_BuyAmmunition</key><text>Buy Ammunition…</text></string>
+<string><key>Details_Editor</key><text>Character Details</text></string>
+<string><key>Details_Expand</key><text>Expand…</text></string>
+<string><key>Details_Undo</key><text>Undo</text></string>
+<string><key>Details_Redo</key><text>Redo</text></string>
+<string><key>Details_Smaller</key><text>Smaller text</text></string>
+<string><key>Details_Larger</key><text>Larger text</text></string>
+<string><key>Details_Error</key><text>The character details editor could not be opened. Your character text has been kept.</text></string>
 </strings>
 </chummer>
