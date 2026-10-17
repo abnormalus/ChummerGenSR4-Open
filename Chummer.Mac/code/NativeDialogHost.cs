@@ -20,11 +20,17 @@ internal static class NativeDialogHost
     {
         var nativeOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner.MdiParent ?? owner);
         bool wasEnabled = nativeOwner.IsEnabled;
+        var originalDialogTheme = window.RequestedThemeVariant;
+        // Owned windows are separate theme roots: native modality does not imply
+        // inheritance of an explicit owner override. Follow the actual owner live.
+        void FollowOwnerTheme(object? sender, System.EventArgs args) => window.RequestedThemeVariant = nativeOwner.ActualThemeVariant;
+        nativeOwner.ActualThemeVariantChanged += FollowOwnerTheme;
         windows.Add(window);
         AppDiagnostics.CaptureUiState();
         AppDiagnostics.Record("native-dialog-opening");
         try
         {
+            FollowOwnerTheme(null, System.EventArgs.Empty);
             var pending = window.ShowDialog<T?>(nativeOwner);
             // Native modality blocks pointer input, but desktop menu commands use
             // IsEnabled as their shared availability guard. Keep that guard in sync.
@@ -40,6 +46,8 @@ internal static class NativeDialogHost
         }
         finally
         {
+            nativeOwner.ActualThemeVariantChanged -= FollowOwnerTheme;
+            window.RequestedThemeVariant = originalDialogTheme;
             windows.Remove(window);
             nativeOwner.IsEnabled = wasEnabled;
             AppDiagnostics.CaptureUiState();

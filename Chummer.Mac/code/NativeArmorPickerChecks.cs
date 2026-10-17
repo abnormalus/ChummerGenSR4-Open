@@ -30,6 +30,54 @@ internal static class NativeArmorPickerChecks
     internal static async Task RunAsync(Forms.Form main, Character character, string output, Action<bool, string> check)
     {
         byte[] original = character.CaptureSnapshot();
+        var nativeOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(main);
+        var app = Avalonia.Application.Current!;
+        var originalApplicationTheme = app.RequestedThemeVariant;
+        var originalOwnerTheme = nativeOwner.RequestedThemeVariant;
+        try
+        {
+            // A native child is a separate theme root. An explicit owner override
+            // must win over an opposite application default, including live changes.
+            app.RequestedThemeVariant = ThemeVariant.Light;
+            nativeOwner.RequestedThemeVariant = ThemeVariant.Dark;
+            await Task.Delay(80);
+            using var themedPicker = new frmSelectArmor(character);
+            var shown = themedPicker.ShowDialogAsync(main);
+            var themedWindow = (ArmorPickerWindow)NativeDialogHost.ActiveWindow!;
+            await Task.Delay(80);
+            bool followsOwner = themedWindow.ActualThemeVariant == nativeOwner.ActualThemeVariant;
+            themedWindow.SearchBox.Text = "Armor Jacket";
+            await WaitForAsync(() => themedWindow.AcceptButton.IsEnabled &&
+                themedWindow.ItemList.ContainerFromIndex(0) is { IsEffectivelyVisible: true } row && row.Bounds.Height > 0);
+            await Task.Delay(100);
+            void CaptureTheme(string name)
+            {
+                using var bitmap = new RenderTargetBitmap(new PixelSize((int)themedWindow.ClientSize.Width * 2, (int)themedWindow.ClientSize.Height * 2), new Vector(192, 192));
+                bitmap.Render(themedWindow); bitmap.Save(Path.Combine(output, name), PngBitmapEncoderOptions.Default);
+            }
+            CaptureTheme("native-armor-owner-dark.png");
+            nativeOwner.RequestedThemeVariant = ThemeVariant.Light;
+            await Task.Delay(80);
+            bool followsLight = themedWindow.ActualThemeVariant == ThemeVariant.Light;
+            CaptureTheme("native-armor-owner-light.png");
+            nativeOwner.RequestedThemeVariant = ThemeVariant.Dark;
+            await Task.Delay(80);
+            bool followsDarkAgain = themedWindow.ActualThemeVariant == ThemeVariant.Dark;
+            themedWindow.Close(); await shown;
+            var closedTheme = themedWindow.RequestedThemeVariant;
+            nativeOwner.RequestedThemeVariant = ThemeVariant.Light;
+            await Task.Delay(40);
+            check(followsOwner, "Native armor dialog follows explicit dark owner over light application default");
+            check(followsLight && followsDarkAgain, "Native armor dialog follows live owner theme changes in both directions");
+            check(themedWindow.RequestedThemeVariant == closedTheme && nativeOwner.IsEnabled,
+                "Native dialog closure detaches theme subscription and restores owner input");
+        }
+        finally
+        {
+            nativeOwner.RequestedThemeVariant = originalOwnerTheme;
+            app.RequestedThemeVariant = originalApplicationTheme;
+        }
+
         using (var picker = new frmSelectArmor(character, true))
         {
             var pending = picker.ShowDialogAsync(main);
