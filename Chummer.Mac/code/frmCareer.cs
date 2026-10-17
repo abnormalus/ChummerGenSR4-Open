@@ -8396,7 +8396,8 @@ namespace Chummer
                     _objCharacter.ExpenseEntries.Add(objExpense);
                     _objCharacter.Nuyen -= intCost;
 
-                    objUndo.CreateNuyen(NuyenExpenseType.AddGear, objGear.InternalId, objGear.Quantity);
+                    // Undo removes the purchased increment, not the quantity already owned.
+                    objUndo.CreateNuyen(NuyenExpenseType.AddGear, objGear.InternalId, quantityDialog.Quantity);
                     objExpense.Undo = objUndo;
                 }
             }

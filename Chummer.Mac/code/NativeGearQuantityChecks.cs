@@ -1,5 +1,9 @@
 #nullable enable
 using System;
+using System.IO;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Styling;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
@@ -13,7 +17,7 @@ namespace Chummer;
 internal static class NativeGearQuantityChecks
 {
     private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(owner)!;
-    internal static async Task RunAsync(Forms.Form owner, Character original, Action<bool, string> check)
+    internal static async Task RunAsync(Forms.Form owner, Character original, string output, Action<bool, string> check)
     {
         using (var dialog = new frmSelectQuantity(frmSelectQuantity.Operation.Add, 8))
         {
@@ -27,6 +31,19 @@ internal static class NativeGearQuantityChecks
             check(window.QuantityInput.Value == 4, "Native quantity keyboard decreases quantity");
             window.QuantityInput.Text = "20"; window.MarkupInput.Text = "-120"; await Task.Delay(50);
             check(window.QuantityInput.Value == 8 && window.MarkupInput.Value == -99, "Native quantity and markup preserve domain clipping");
+            var nativeOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
+            var previousTheme = nativeOwner.RequestedThemeVariant;
+            try
+            {
+                foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                {
+                    nativeOwner.RequestedThemeVariant = theme; window.Width = 460; await Task.Delay(100);
+                    check(window.ActualThemeVariant == theme && window.QuantityInput.Bounds.Width >= 110, "Native quantity layout follows " + (theme == ThemeVariant.Dark ? "dark" : "light") + " owner theme");
+                    using var bitmap = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width * 2, (int)window.ClientSize.Height * 2), new Vector(192, 192));
+                    bitmap.Render(window); bitmap.Save(Path.Combine(output, "native-gear-quantity-" + (theme == ThemeVariant.Dark ? "dark" : "light") + ".png"), PngBitmapEncoderOptions.Default);
+                }
+            }
+            finally { nativeOwner.RequestedThemeVariant = previousTheme; }
             window.FreeInput.IsChecked = true;
             check(!window.MarkupInput.IsEnabled, "Native free quantity disables markup editing");
             window.Accept();
@@ -85,6 +102,30 @@ internal static class NativeGearQuantityChecks
             QuantityCommand("cmdGearIncreaseQty_Click", 1, true); await answered.Task;
             check(gear.Quantity == 5 && character.Nuyen == 0 && character.ExpenseEntries.Count == beforeRejectedExpenses && character.Improvements.Contains(existingImprovement), "Native unaffordable quantity purchase preserves owned gear improvements and accounting");
             check(purchaseExpense.Undo != null && purchaseExpense.Undo.Qty == 3, "Native quantity expense undo records purchased units rather than previous stock");
+            editor.PopulateExpenseList();
+            var expenseRow = Field<Forms.ListView>(editor, "lstNuyen").Items.Cast<Forms.ListViewItem>().Single(row => row.SubItems[3].Text == purchaseExpense.InternalId);
+            expenseRow.Selected = true;
+            async Task UndoAsync(Forms.DialogResult answer)
+            {
+                var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                Avalonia.Threading.Dispatcher.UIThread.Post(async () => {
+                    try
+                    {
+                        var deadline = DateTime.UtcNow.AddSeconds(15);
+                        while (!Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Any())
+                        { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Quantity undo confirmation did not open."); await Task.Delay(20); }
+                        var notice = Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Last(); notice.DialogResult = answer; notice.Close(); completion.TrySetResult();
+                    }
+                    catch (Exception error) { completion.TrySetException(error); }
+                });
+                Invoke("tsUndoNuyenExpense_Click"); await completion.Task;
+            }
+            await UndoAsync(Forms.DialogResult.Cancel);
+            check(gear.Quantity == 5 && character.Nuyen == 0 && character.ExpenseEntries.Contains(purchaseExpense), "Native quantity expense undo cancellation preserves stock funds and expense");
+            await UndoAsync(Forms.DialogResult.Yes);
+            check(gear.Quantity == 2 && character.Nuyen == unitCost * 3 && !character.ExpenseEntries.Contains(purchaseExpense), "Native quantity expense undo removes purchased units and refunds once");
+            tree.SelectedNode = node;
+            QuantityCommand("cmdGearIncreaseQty_Click", 3, true);
             QuantityCommand("cmdGearReduceQty_Click", 2, false);
             check(gear.Quantity == 5, "Native career quantity removal cancellation preserves stock");
             QuantityCommand("cmdGearReduceQty_Click", 2, true);
