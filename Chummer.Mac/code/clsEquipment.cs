@@ -1,4 +1,4 @@
-using Majorsilence.Forms.Drawing;
+﻿using Majorsilence.Forms.Drawing;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -1027,7 +1027,7 @@ namespace Chummer
 						frmPickNumber.Maximum = intMax;
 						frmPickNumber.Description = LanguageManager.Instance.GetString("String_SelectVariableCost").Replace("{0}", DisplayNameShort);
 						frmPickNumber.AllowCancel = false;
-						frmPickNumber.ShowDialog();
+						if (frmPickNumber.ShowDialog() != DialogResult.OK) { _guiID = Guid.Empty; return; }
 						_intCost = frmPickNumber.SelectedValue;
 					}
 				}
@@ -2491,7 +2491,7 @@ namespace Chummer
 					frmPickNumber.Maximum = intMax;
 					frmPickNumber.Description = LanguageManager.Instance.GetString("String_SelectVariableCost").Replace("{0}", DisplayNameShort);
 					frmPickNumber.AllowCancel = false;
-					frmPickNumber.ShowDialog();
+					if (frmPickNumber.ShowDialog() != DialogResult.OK) { _guiID = Guid.Empty; return; }
 					_strCost = frmPickNumber.SelectedValue.ToString();
 				}
 			}
@@ -9854,7 +9854,7 @@ namespace Chummer
 						frmPickNumber.Maximum = intMax;
 						frmPickNumber.Description = LanguageManager.Instance.GetString("String_SelectVariableCost").Replace("{0}", DisplayNameShort);
 						frmPickNumber.AllowCancel = false;
-						frmPickNumber.ShowDialog();
+						if (frmPickNumber.ShowDialog() != DialogResult.OK) { _guiID = Guid.Empty; return; }
 						_strCost = frmPickNumber.SelectedValue.ToString();
 					}
 				}
@@ -13590,7 +13590,7 @@ namespace Chummer
 						frmPickNumber.Maximum = intMax;
 						frmPickNumber.Description = LanguageManager.Instance.GetString("String_SelectVariableCost").Replace("{0}", DisplayNameShort);
 						frmPickNumber.AllowCancel = false;
-						frmPickNumber.ShowDialog();
+						if (frmPickNumber.ShowDialog() != DialogResult.OK) { _guiID = Guid.Empty; return; }
 						_strCost = frmPickNumber.SelectedValue.ToString();
 					}
 				}
