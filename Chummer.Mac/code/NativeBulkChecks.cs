@@ -82,6 +82,7 @@ internal static class NativeBulkChecks
             await NativeArmorPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeAccessoryPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeArmorModPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeGearQuantityChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeInventoryEnhancementChecks.RunAsync(main, character, Check);
             await NativeGearEligibilityChecks.RunAsync(main, character, Check);
             var editor = new frmCreate(character) { Loading = true, MdiParent = main };

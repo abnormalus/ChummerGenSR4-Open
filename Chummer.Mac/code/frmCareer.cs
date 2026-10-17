@@ -8344,20 +8344,20 @@ namespace Chummer
 			Gear objGear = _objFunctions.FindGear(treGear.SelectedNode.Tag.ToString(), _objCharacter.Gear);
             ExpenseUndo objUndo = new ExpenseUndo();
 
-            frmSelectQuantity frmSelectQuantity = new frmSelectQuantity(frmSelectQuantity.Operation.Add, Int32.MaxValue);
+            using var quantityDialog = new frmSelectQuantity(frmSelectQuantity.Operation.Add, Int32.MaxValue);
 
-            if (frmSelectQuantity.ShowDialog() == DialogResult.Cancel)
+            if (quantityDialog.ShowDialog(this) != DialogResult.OK || quantityDialog.Quantity == 0)
                 return;
 
             int intCost = Convert.ToInt32(objGear.TotalCost / objGear.Quantity);
 
-            intCost *= frmSelectQuantity.Quantity;
+            intCost *= quantityDialog.Quantity;
 
             // Apply a markup if applicable.
-            if (frmSelectQuantity.Markup != 0)
+            if (quantityDialog.Markup != 0)
             {
                 double dblCost = Convert.ToDouble(intCost, GlobalOptions.Instance.CultureInfo);
-                dblCost *= 1 + (Convert.ToDouble(frmSelectQuantity.Markup, GlobalOptions.Instance.CultureInfo) / 100.0);
+                dblCost *= 1 + (Convert.ToDouble(quantityDialog.Markup, GlobalOptions.Instance.CultureInfo) / 100.0);
                 intCost = Convert.ToInt32(dblCost);
             }
 
@@ -8380,13 +8380,12 @@ namespace Chummer
             }
 
             // Check the item's Cost and make sure the character can afford it.
-            if (!frmSelectQuantity.FreeCost)
+            if (!quantityDialog.FreeCost)
             {
                 if (intCost > _objCharacter.Nuyen)
                 {
                     MessageBox.Show(LanguageManager.Instance.GetString("Message_NotEnoughNuyen"), LanguageManager.Instance.GetString("MessageTitle_NotEnoughNuyen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    // Remove any Improvements created by the Gear.
-                    _objImprovementManager.RemoveImprovements(Improvement.ImprovementSource.Gear, objGear.InternalId);
+                    // This is existing inventory: rejecting an increase must preserve its bonuses.
                     return;
                 }
                 else
@@ -8397,12 +8396,13 @@ namespace Chummer
                     _objCharacter.ExpenseEntries.Add(objExpense);
                     _objCharacter.Nuyen -= intCost;
 
-                    objUndo.CreateNuyen(NuyenExpenseType.AddGear, objGear.InternalId, objGear.Quantity);
+                    // Undo removes the purchased increment, not the quantity already owned.
+                    objUndo.CreateNuyen(NuyenExpenseType.AddGear, objGear.InternalId, quantityDialog.Quantity);
                     objExpense.Undo = objUndo;
                 }
             }
 
-            objGear.Quantity += frmSelectQuantity.Quantity;
+            objGear.Quantity += quantityDialog.Quantity;
 
             UpdateCharacterInfo();
             RefreshSelectedGear();
@@ -8416,12 +8416,12 @@ namespace Chummer
             Gear objGear = _objFunctions.FindGear(treGear.SelectedNode.Tag.ToString(), _objCharacter.Gear);
             Gear objParent = _objFunctions.FindGear(treGear.SelectedNode.Parent.Tag.ToString(), _objCharacter.Gear);
 
-            frmSelectQuantity frmSelectQuantity = new frmSelectQuantity(frmSelectQuantity.Operation.Remove, objGear.Quantity);
+            using var quantityDialog = new frmSelectQuantity(frmSelectQuantity.Operation.Remove, objGear.Quantity);
 
-            if (frmSelectQuantity.ShowDialog() == DialogResult.Cancel)
+            if (quantityDialog.ShowDialog(this) != DialogResult.OK || quantityDialog.Quantity == 0)
                 return;
 
-            objGear.Quantity -= frmSelectQuantity.Quantity;
+            objGear.Quantity -= quantityDialog.Quantity;
 
             if (objGear.Quantity > 0)
             {
