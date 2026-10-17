@@ -62,6 +62,7 @@ internal static class NativeGearQuantityChecks
             int unitCost = Convert.ToInt32(gear.TotalCost / gear.Quantity);
             QuantityCommand("cmdGearIncreaseQty_Click", 3, true);
             check(gear.Quantity == 5 && character.Nuyen == money - unitCost * 3 && character.ExpenseEntries.Count == expenses + 1, "Native career quantity purchase preserves unit accounting and expense creation");
+            var purchaseExpense = character.ExpenseEntries.Last();
             // An unaffordable increase must not remove bonuses belonging to stock already owned.
             var existingImprovement = new Improvement { ImproveSource = Improvement.ImprovementSource.Gear, SourceName = gear.InternalId };
             character.Improvements.Add(existingImprovement); character.Nuyen = 0;
@@ -83,6 +84,7 @@ internal static class NativeGearQuantityChecks
             });
             QuantityCommand("cmdGearIncreaseQty_Click", 1, true); await answered.Task;
             check(gear.Quantity == 5 && character.Nuyen == 0 && character.ExpenseEntries.Count == beforeRejectedExpenses && character.Improvements.Contains(existingImprovement), "Native unaffordable quantity purchase preserves owned gear improvements and accounting");
+            check(purchaseExpense.Undo != null && purchaseExpense.Undo.Qty == 3, "Native quantity expense undo records purchased units rather than previous stock");
             QuantityCommand("cmdGearReduceQty_Click", 2, false);
             check(gear.Quantity == 5, "Native career quantity removal cancellation preserves stock");
             QuantityCommand("cmdGearReduceQty_Click", 2, true);

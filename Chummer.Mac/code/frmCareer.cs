@@ -8385,8 +8385,7 @@ namespace Chummer
                 if (intCost > _objCharacter.Nuyen)
                 {
                     MessageBox.Show(LanguageManager.Instance.GetString("Message_NotEnoughNuyen"), LanguageManager.Instance.GetString("MessageTitle_NotEnoughNuyen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    // Remove any Improvements created by the Gear.
-                    _objImprovementManager.RemoveImprovements(Improvement.ImprovementSource.Gear, objGear.InternalId);
+                    // This is existing inventory: rejecting an increase must preserve its bonuses.
                     return;
                 }
                 else
