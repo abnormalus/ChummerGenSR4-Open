@@ -25,7 +25,7 @@ internal static class NativeGearQuantityChecks
             check(window.QuantityInput.Value == 5, "Native quantity spinner increases quantity");
             window.QuantityInput.GetVisualDescendants().OfType<TextBox>().Single().RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
             check(window.QuantityInput.Value == 4, "Native quantity keyboard decreases quantity");
-            window.QuantityInput.Value = 20; window.MarkupInput.Value = -120;
+            window.QuantityInput.Text = "20"; window.MarkupInput.Text = "-120"; await Task.Delay(50);
             check(window.QuantityInput.Value == 8 && window.MarkupInput.Value == -99, "Native quantity and markup preserve domain clipping");
             window.FreeInput.IsChecked = true;
             check(!window.MarkupInput.IsEnabled, "Native free quantity disables markup editing");
