@@ -8802,6 +8802,26 @@ namespace Chummer
 			{
 				string strReturn = _strAvail;
 
+                // Rated modification availability must be evaluated before translating R/F;
+                // persisted literal values, including legacy zero-price focus markers, stay intact.
+                if (strReturn.Contains("Rating"))
+                {
+                    string suffix = strReturn.EndsWith("R") || strReturn.EndsWith("F") ? strReturn.Substring(strReturn.Length - 1) : "";
+                    string expression = suffix.Length == 0 ? strReturn : strReturn.Substring(0, strReturn.Length - 1);
+                    bool addition = expression.StartsWith("+");
+                    if (addition) expression = expression.Substring(1);
+                    try
+                    {
+                        var navigator = new XmlDocument().CreateNavigator();
+                        int availability = Convert.ToInt32(navigator.Evaluate(expression.Replace("Rating", _intRating.ToString(System.Globalization.CultureInfo.InvariantCulture))), System.Globalization.CultureInfo.InvariantCulture);
+                        strReturn = (addition ? "+" : "") + availability.ToString(GlobalOptions.Instance.CultureInfo) + suffix;
+                    }
+                    catch (XPathException) { /* Keep a custom literal expression readable. */ }
+                    catch (FormatException) { /* Preserve existing custom availability text. */ }
+                    catch (OverflowException) { /* Non-numeric XPath results are not purchase values. */ }
+                }
+
+
 				// Translate the Avail string.
 				strReturn = strReturn.Replace("R", LanguageManager.Instance.GetString("String_AvailRestricted"));
 				strReturn = strReturn.Replace("F", LanguageManager.Instance.GetString("String_AvailForbidden"));
