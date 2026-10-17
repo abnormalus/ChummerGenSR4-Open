@@ -8344,20 +8344,20 @@ namespace Chummer
 			Gear objGear = _objFunctions.FindGear(treGear.SelectedNode.Tag.ToString(), _objCharacter.Gear);
             ExpenseUndo objUndo = new ExpenseUndo();
 
-            frmSelectQuantity frmSelectQuantity = new frmSelectQuantity(frmSelectQuantity.Operation.Add, Int32.MaxValue);
+            using var quantityDialog = new frmSelectQuantity(frmSelectQuantity.Operation.Add, Int32.MaxValue);
 
-            if (frmSelectQuantity.ShowDialog() == DialogResult.Cancel)
+            if (quantityDialog.ShowDialog(this) != DialogResult.OK || quantityDialog.Quantity == 0)
                 return;
 
             int intCost = Convert.ToInt32(objGear.TotalCost / objGear.Quantity);
 
-            intCost *= frmSelectQuantity.Quantity;
+            intCost *= quantityDialog.Quantity;
 
             // Apply a markup if applicable.
-            if (frmSelectQuantity.Markup != 0)
+            if (quantityDialog.Markup != 0)
             {
                 double dblCost = Convert.ToDouble(intCost, GlobalOptions.Instance.CultureInfo);
-                dblCost *= 1 + (Convert.ToDouble(frmSelectQuantity.Markup, GlobalOptions.Instance.CultureInfo) / 100.0);
+                dblCost *= 1 + (Convert.ToDouble(quantityDialog.Markup, GlobalOptions.Instance.CultureInfo) / 100.0);
                 intCost = Convert.ToInt32(dblCost);
             }
 
@@ -8380,7 +8380,7 @@ namespace Chummer
             }
 
             // Check the item's Cost and make sure the character can afford it.
-            if (!frmSelectQuantity.FreeCost)
+            if (!quantityDialog.FreeCost)
             {
                 if (intCost > _objCharacter.Nuyen)
                 {
@@ -8402,7 +8402,7 @@ namespace Chummer
                 }
             }
 
-            objGear.Quantity += frmSelectQuantity.Quantity;
+            objGear.Quantity += quantityDialog.Quantity;
 
             UpdateCharacterInfo();
             RefreshSelectedGear();
@@ -8416,12 +8416,12 @@ namespace Chummer
             Gear objGear = _objFunctions.FindGear(treGear.SelectedNode.Tag.ToString(), _objCharacter.Gear);
             Gear objParent = _objFunctions.FindGear(treGear.SelectedNode.Parent.Tag.ToString(), _objCharacter.Gear);
 
-            frmSelectQuantity frmSelectQuantity = new frmSelectQuantity(frmSelectQuantity.Operation.Remove, objGear.Quantity);
+            using var quantityDialog = new frmSelectQuantity(frmSelectQuantity.Operation.Remove, objGear.Quantity);
 
-            if (frmSelectQuantity.ShowDialog() == DialogResult.Cancel)
+            if (quantityDialog.ShowDialog(this) != DialogResult.OK || quantityDialog.Quantity == 0)
                 return;
 
-            objGear.Quantity -= frmSelectQuantity.Quantity;
+            objGear.Quantity -= quantityDialog.Quantity;
 
             if (objGear.Quantity > 0)
             {
