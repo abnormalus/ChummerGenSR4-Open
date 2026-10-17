@@ -66,6 +66,49 @@ internal static class FoundryExportChecks
         var character = new Character { FileName = Path.Combine(output, "career.chum") };
         check(character.Load(), "Foundry fixture loads from a disposable character copy");
         character.Alias = "Foundry Export Regression";
+        character.Name = "Identity Regression";
+        character.MagicTradition = "Norse";
+        var modernIdentity = FoundryActorExporter.Export(character, FoundryActorExporter.Target.Version126);
+        check(modernIdentity["system"]!["descriptionAndNotes"]!["realName"]!.GetValue<string>() == character.Name &&
+            modernIdentity["name"]!.GetValue<string>() == character.Alias &&
+            modernIdentity["system"]!["magic"]!["tradition"]!.GetValue<string>() == "NORSE",
+            "Foundry modern export preserves separate alias real name and supported Norse tradition");
+        var legacyIdentity = FoundryActorExporter.Export(character, FoundryActorExporter.Target.Version16);
+        check(legacyIdentity["system"]!["descriptionAndNotes"]!["realName"] == null &&
+            legacyIdentity["system"]!["descriptionAndNotes"]!["notes"]!.GetValue<string>().Contains("Norse") &&
+            legacyIdentity["flags"]!["shadowrun4e"]!["chummerExport"]!["originalRealName"]!.GetValue<string>() == character.Name,
+            "Foundry legacy target preserves unsupported identity and tradition without invalid schema fields");
+        check(FoundryActorExporter.TraditionValue("Hermetic", FoundryActorExporter.Target.Version16) == "hermetic" &&
+            FoundryActorExporter.TraditionValue("Shamanic", FoundryActorExporter.Target.Version126) == "SHAMANIC" &&
+            FoundryActorExporter.TraditionValue("Chaos Magic", FoundryActorExporter.Target.Version126) == "CHAOS_MAGIC" &&
+            FoundryActorExporter.TraditionValue("Custom Norse", FoundryActorExporter.Target.Version126) == "",
+            "Foundry tradition choices follow version-specific upstream enums without guessing custom traditions");
+
+        // Reproduce a bonded Power Focus using the actual catalog bonus calculation.
+        // The effective rating carries the bonus; the exported focus must not add it again.
+        var focusCharacter = new Character();
+        var spellcasting = focusCharacter.Skills.Single(skill => skill.Name == "Spellcasting" && !skill.KnowledgeSkill);
+        spellcasting.Rating = 5;
+        var powerFocus = new Gear(focusCharacter);
+        var focusDefinition = XmlManager.Instance.Load("gear.xml").SelectSingleNode("/chummer/gears/gear[name='Power Focus']")!;
+        powerFocus.Create(focusDefinition, focusCharacter, new TreeNode(), 2, new List<Weapon>(), new List<TreeNode>(), blnAddImprovements: false);
+        focusCharacter.Gear.Add(powerFocus);
+        focusCharacter.Foci.Add(new Focus { Name = "Power Focus", GearId = powerFocus.InternalId, Rating = 2 });
+        var focusBonus = XmlManager.Instance.Load("gear.xml").SelectSingleNode("/chummer/gears/gear[name='Power Focus']/bonus")!;
+        new ImprovementManager(focusCharacter).CreateImprovements(Improvement.ImprovementSource.Gear, powerFocus.InternalId, focusBonus, false, 2, "Power Focus");
+        // Match an initialized editor: a fresh model lazily seeds its catalog skill groups.
+        _ = focusCharacter.SkillGroups.Count;
+        byte[] focusBefore = focusCharacter.CaptureSnapshot();
+        foreach (var target in new[] { FoundryActorExporter.Target.Version16, FoundryActorExporter.Target.Version126 })
+        {
+            var focusExport = FoundryActorExporter.Export(focusCharacter, target);
+            var focusItems = focusExport["items"]!.AsArray().OfType<JsonObject>().ToArray();
+            check(focusItems.Single(item => item["type"]!.GetValue<string>() == "Skill" && string.Equals(item["name"]!.GetValue<string>(), "spellcasting", StringComparison.OrdinalIgnoreCase))["system"]!["rating"]!.GetValue<int>() == 7 &&
+                focusItems.Single(item => item["type"]!.GetValue<string>() == "Focus")["effects"]!.AsArray().Count == 0 &&
+                focusItems.Single(item => item["type"]!.GetValue<string>() == "Focus")["system"]!["notes"]!.GetValue<string>().Contains("already included") &&
+                focusCharacter.CaptureSnapshot().SequenceEqual(focusBefore),
+                "Foundry bonded Power Focus contributes exactly once and retains manual activation guidance for " + target);
+        }
         character.Age = "unknown";
         character.REA.Value = 3;
         character.INT.Value = 3;
@@ -189,7 +232,7 @@ internal static class FoundryExportChecks
         }
         File.WriteAllText(Path.Combine(output, "foundry-actor.json"), mixed.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         using var dialog = new FoundryExportDialog(new[] { character });
-        check(dialog.Target == FoundryActorExporter.Target.Version16 && dialog.CharacterIndex == 0, "Foundry export defaults to the supplied sample version and permits explicit version choice");
+        check(dialog.Target == FoundryActorExporter.Target.Version126 && dialog.CharacterIndex == 0, "Foundry export defaults to the current supported system version and permits explicit version choice");
         dialog.Show();
         File.WriteAllBytes(Path.Combine(output, "foundry-export-options.png"), Majorsilence.Forms.Headless.HeadlessRenderer.CapturePng(dialog, 700, 360));
     }
