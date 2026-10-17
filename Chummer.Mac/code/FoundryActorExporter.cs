@@ -155,11 +155,15 @@ internal sealed class FoundryActorExporter
         systemData["descriptionAndNotes"] = Obj(("metatype", _character.Metatype), ("gender", _character.Sex), ("height", _character.Height),
             ("weight", _character.Weight), ("eyes", _character.Eyes), ("hair", _character.Hair), ("skin", _character.Skin),
             ("bio", _character.Description), ("notes", AddNotes(identityNotes, _warnings)));
-        string tradition = _character.MagicTradition.ToLowerInvariant();
+        if (_target == Target.Version126) ((JsonObject)systemData["descriptionAndNotes"]!)["realName"] = _character.Name;
+        else if (!string.IsNullOrWhiteSpace(_character.Name)) _warnings.Add("Real name: " + _character.Name + ". This target system has no real-name field.");
+        string tradition = TraditionValue(_character.MagicTradition, _target);
+        if (tradition.Length == 0 && !string.IsNullOrWhiteSpace(_character.MagicTradition))
+            _warnings.Add("Tradition: " + _character.MagicTradition + ". This target system does not support its tradition choice; drain attribute is exported separately.");
         string drainFormula = XmlManager.Instance.Load("traditions.xml").SelectNodes("/chummer/traditions/tradition")!.Cast<XmlNode>()
             .FirstOrDefault(node => node["name"]?.InnerText == _character.MagicTradition)?["drain"]?.InnerText ?? "LOG";
         systemData["magic"] = Obj(("magician", _character.MagicianEnabled), ("adept", _character.AdeptEnabled),
-            ("tradition", tradition.Contains("hermet") ? "HERMETIC" : tradition.Contains("shaman") ? "SHAMAN" : tradition.Contains("chaos") ? "CHAOS" : tradition.Contains("wicca") ? "WICCA" : ""), ("drainAttribute", drainFormula.Contains("CHA", StringComparison.Ordinal) ? "CHARISMA" : drainFormula.Contains("INT", StringComparison.Ordinal) ? "INTUITION" : "LOGIC"));
+            ("tradition", tradition), ("drainAttribute", drainFormula.Contains("CHA", StringComparison.Ordinal) ? "CHARISMA" : drainFormula.Contains("INT", StringComparison.Ordinal) ? "INTUITION" : "LOGIC"));
         if (_target == Target.Version126) {
             ((JsonObject)systemData["magic"]!)["spellpower"] = _character.MAGMagician;
             ((JsonObject)systemData["magic"]!)["powerPoints"] = _character.MAGAdept;
@@ -176,6 +180,7 @@ internal sealed class FoundryActorExporter
             equippedBallistic = ArmorStack(equipped, true); equippedImpact = ArmorStack(equipped, false);
         }
         systemData["armor"] = Obj(("ballistic", _character.TotalBallisticArmorRating - equippedBallistic), ("impact", _character.TotalImpactArmorRating - equippedImpact));
+        ((JsonObject)systemData["descriptionAndNotes"]!)["notes"] = AddNotes(identityNotes, _warnings);
         string name = !string.IsNullOrWhiteSpace(_character.Alias) ? _character.Alias.Trim() : !string.IsNullOrWhiteSpace(_character.Name) ? _character.Name.Trim() : "Chummer character";
         string image = "icons/svg/mystery-man.svg";
         if (!string.IsNullOrEmpty(_character.Mugshot)) {
@@ -186,10 +191,30 @@ internal sealed class FoundryActorExporter
         }
         return Obj(("name", name), ("type", "character"), ("img", image), ("system", systemData), ("items", _items),
             ("effects", new JsonArray()), ("folder", null), ("ownership", Obj(("default", 0))),
-            ("flags", Obj(("shadowrun4e", Obj(("chummerExport", Obj(("formatVersion", 1), ("targetSystemVersion", Version), ("originalAge", _character.Age))))))),
+            ("flags", Obj(("shadowrun4e", Obj(("chummerExport", Obj(("formatVersion", 1), ("targetSystemVersion", Version), ("originalAge", _character.Age), ("originalRealName", _character.Name), ("originalTradition", _character.MagicTradition))))))),
             ("_stats", Obj(("systemId", "shadowrun4e"), ("systemVersion", Version), ("coreVersion", "14.368"))));
     }
     private string Version => _target == Target.Version16 ? "1.6.0" : "1.26.1";
+    // Choices are schema values from the pinned upstream models, not display labels.
+    // Never collapse a custom tradition into a similar-sounding supported tradition.
+    internal static string TraditionValue(string tradition, Target target)
+    {
+        string key = tradition.Trim().ToUpperInvariant().Replace(' ', '_').Replace('-', '_');
+        if (target == Target.Version16) return key switch {
+            "HERMETIC" => "hermetic", "SHAMANIC" or "SHAMAN" => "shaman",
+            "GARDNERIAN_WICCA" or "GODDESS_WICCA" or "WICCA" => "wicca",
+            "CHAOS_MAGIC" or "CHAOS" => "chaos", _ => ""
+        };
+        return key switch {
+            "ABORIGINAL" or "AZTEC" or "BLACK_MAGIC" or "BUDDHIST" or "CHAOS_MAGIC" or
+            "CHRISTIAN_THEURGY" or "DRUIDIC" or "EGYPTIAN" or "GARDNERIAN_WICCA" or
+            "GODDESS_WICCA" or "HERMETIC" or "HINDU" or "INSECT" or "ISLAMIC" or
+            "NORSE" or "PATH_OF_THE_WHEEL" or "POISONER" or "PSIONIC" or "QABBALISTIC" or
+            "RASTAFARIAN" or "SHAMANIC" or "SHINTO" or "VOODOO" or "WITCHCRAFT" or
+            "WUXING" or "ZOROASTRIAN" => key, _ => ""
+        };
+    }
+
     private static string Stacking(Armor armor) => armor.Category is "Helmets" or "Shields" ? "accessory" : armor.Name.Contains("Form-Fitting", StringComparison.OrdinalIgnoreCase) ? "formFitting" : "standard";
     private static int ArmorStack(IEnumerable<Armor> armor, bool ballistic) => armor.Where(a => Stacking(a) == "standard").Select(a => ballistic ? a.TotalBallistic : a.TotalImpact).DefaultIfEmpty().Max() +
         armor.Where(a => Stacking(a) != "standard").Sum(a => ballistic ? a.TotalBallistic : a.TotalImpact);
@@ -241,6 +266,8 @@ internal sealed class FoundryActorExporter
             system["response"] = link.TotalResponse; system["signal"] = link.TotalSignal;
             system["firewall"] = link.TotalFirewall; system["os"] = link.TotalSystem;
         }
+        if (type == "Focus" && gear.Name == "Power Focus" && _character.Foci.Any(focus => focus.GearId == gear.InternalId))
+            Note(item, "This bonded Power Focus's current dice-pool bonus is already included in exported effective skill ratings. No second focus effect is added. Re-export or adjust affected skill ratings when changing its bonding or activation state.");
         if (type == "Ammo") Note(item, "Loaded ammunition bonuses are already included in the current exported weapon values. Recalculate the weapon when changing ammunition.");
         if (parent != null) Note(item, "Contained by another Chummer item (parent ID " + parent + "). Foundry displays this as a separate inventory entry.");
         foreach (var child in gear.Children) AddGear(child, Id(gear));

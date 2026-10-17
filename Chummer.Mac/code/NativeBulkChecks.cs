@@ -55,6 +55,22 @@ internal static class NativeBulkChecks
             byte[] originalFile = File.ReadAllBytes(path);
             var character = new Character { FileName = path };
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
+            // Exercise the actual export modal rather than only reading constructor state.
+            using (var foundryDialog = new FoundryExportDialog(new[] { character }))
+            {
+                bool currentDefault = false, legacyChoice = false;
+                byte[] beforeExportChoice = character.CaptureSnapshot();
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+                    currentDefault = foundryDialog.Target == FoundryActorExporter.Target.Version126;
+                    Field<ComboBox>(foundryDialog, "_version").SelectedIndex = 0;
+                    legacyChoice = foundryDialog.Target == FoundryActorExporter.Target.Version16;
+                    foundryDialog.DialogResult = DialogResult.Cancel;
+                });
+                var result = foundryDialog.ShowDialog(main);
+                Check(currentDefault && legacyChoice && result == DialogResult.Cancel &&
+                    character.CaptureSnapshot().AsSpan().SequenceEqual(beforeExportChoice),
+                    "Native Foundry export defaults current permits legacy and cancels without changing character");
+            }
             await NativePacksInteractionChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCharacterThemeChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeAmmunitionViewChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);

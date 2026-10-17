@@ -4,7 +4,7 @@ The character print preview includes **Foundry JSON**. This creates a single act
 
 ## Compatibility and reference implementation
 
-Choose the Shadowrun 4e **system** version, not the Foundry core version. Output currently targets Foundry core 14 and system 1.6.0 or 1.26.1. The default matches the user's 1.6.0 actor samples. No runtime dependency on Node, a running Foundry server, or online services is introduced.
+Choose the Shadowrun 4e **system** version, not the Foundry core version. Output currently targets Foundry core 14 and system 1.6.0 or 1.26.1. The dialog defaults to the current supported 1.26.1 system; select legacy 1.6 explicitly for older worlds. No runtime dependency on Node, a running Foundry server, or online services is introduced.
 
 Field mappings are adapted from the MIT-licensed [Shadowrun4-FoundryVTT](https://github.com/Tarislowatsch/Shadowrun4-FoundryVTT) importer, including its attribute, weapon attack-skill, implant grade, spell and character mappings. Reference revisions are v1.6.0 (`adeb69d0bb541d309f93893ca3be1c8edab98578`) and v1.26.1 (`3cc30f2`, inspected source). The MIT notice is bundled in `branding/licenses/Shadowrun4-FoundryVTT.txt`.
 
@@ -43,3 +43,13 @@ Portable regression checks exercise supported and inactive activation, nonadditi
 In the pinned 1.6.0 source, `derivedStats.finalStats` is declared with default fields but is not populated or consumed by the actor calculation. Chummer does not export `derivedStats`; Foundry owns preparation. Executing the actual pinned `computeDerivedStats` with synthetic nondefault inputs produces the expected initiative and monitors while `finalStats` remains default. Its defaults alone are therefore insufficient evidence of an import error.
 
 The user confirmed that the reported character's expected Body/Agility and 6 ballistic/5 impact armor display correctly in the live sheet, while the connector document read still contains default derived values and zero armor. Treat the visible/prepared values and the API representation separately. This does not verify initiative, all active effects, or every downstream consumer. Check the exact system version, supported prepared-data API and equipped/activation state before exporting guessed derived caches or changing input totals. See ISSUE_TRIAGE.md for remaining investigation.
+
+## Identity, traditions and the Willow comparison
+
+The live comparison world reports system 1.26.1; importing JSON targeted at 1.6 is not an equivalent version test. The export dialog now defaults to 1.26 while retaining an explicit legacy choice. Actor name remains the alias; `descriptionAndNotes.realName` receives the separate character name on 1.26. Version 1.6 has no such schema field, so the name is retained in notes and export metadata instead.
+
+Tradition values follow the pinned models: 1.6 uses lowercase `hermetic`, `shaman`, `wicca`, `chaos`; 1.26 uses its complete uppercase enumeration, including `NORSE`, `SHAMANIC` and `CHAOS_MAGIC`. Unsupported/custom traditions remain in metadata and a manual-handling note, with their independent drain attribute preserved. Do not guess a custom tradition from a substring.
+
+Willow's exported Spellcasting rating 7 includes a current +2 bonus above base 5, consistent with its bonded rating-2 Power Focus. The inspected 1.26 `getSkillDicePool` adds exported skill rating and effective Magic plus modifier tables; no Power Focus name/rating automation is present. Its imported focus has no transferred effects. Keep the effective rating instead of dropping the bonus or adding another effect. Bonded Power Focus notes explain this snapshot behavior and the need to re-export/adjust ratings after activation or bonding changes. This is source/payload evidence; a live roll chooser still needs user confirmation, and the XML importer remains an independent comparison path.
+
+The native export dialog check exercises the current default, selecting the legacy target and Cancel without character changes. Synthetic Power Focus checks use a catalog-created focus and its actual MAG-linked bonus, preserving the base5/effective7 distinction for both targets.
