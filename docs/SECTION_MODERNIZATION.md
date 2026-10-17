@@ -61,3 +61,5 @@ Cyberware deletion now removes actual nested rows, and stale selections clear sa
 Character attribute and BP-summary contrast now has actual-screen light/dark transition coverage. Shared system-color declarations retain their identity and resolve against the host theme instead of the drawing package's fixed classic palette. See [CHARACTER_THEME.md](CHARACTER_THEME.md).
 
 Daily GitHub issue review and current evidence are tracked in [ISSUE_TRIAGE.md](ISSUE_TRIAGE.md). Shared ammunition uses canonical reserve projections with command guards and actual reload/cancellation/magazine-switch acceptance; cross-platform release verification is tracked in [AMMUNITION_VIEWS.md](AMMUNITION_VIEWS.md).
+
+Direct native dialogs now follow their owner theme, including live changes and closure cleanup; see [NATIVE_DIALOG_THEME.md](NATIVE_DIALOG_THEME.md). This is independent of the legacy drawing palette bridge.
