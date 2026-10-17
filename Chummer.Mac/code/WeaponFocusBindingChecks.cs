@@ -33,6 +33,15 @@ internal static class WeaponFocusBindingChecks
     internal static void Run(Character source, Action<bool, string> check, Form? parent = null)
     {
         var (character, weapon, modification) = Sample(source);
+        check(modification.TotalCost == 20000 && modification.TotalAvail == "10R",
+            "new weapon focus modifications use the priced Gear focus catalog cost and restricted availability");
+        var legacy = new Character();
+        modification.Cost = "0"; modification.Avail = "0";
+        legacy.LoadSnapshot(character.CaptureSnapshot());
+        var legacyFocus = legacy.Weapons.Single(item => item.InternalId == weapon.InternalId).WeaponMods.Single(item => item.InternalId == modification.InternalId);
+        check(legacyFocus.TotalCost == 0 && legacyFocus.TotalAvail == "0" && legacy.Nuyen == character.Nuyen,
+            "legacy zero-priced weapon focus saves retain their original price availability and balance");
+        modification.Cost = "Rating * 10000"; modification.Avail = "(Rating * 5)R";
         int originalGearCount = character.Gear.Count;
         using var editor = new frmCreate(character) { MdiParent = parent }; editor.Show();
         try

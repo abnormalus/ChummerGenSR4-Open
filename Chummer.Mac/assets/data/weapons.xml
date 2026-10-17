@@ -18314,8 +18314,8 @@
 			<category>Weapon Mod</category>
 			<rating>18</rating>
 			<slots>0</slots>
-			<avail>0</avail>
-			<cost>0</cost>
+			<avail>(Rating * 5)R</avail>
+			<cost>Rating * 10000</cost>
 			<dicepool>Rating</dicepool>
 			<source>SR4</source>
 			<page>199</page>
