@@ -31,6 +31,8 @@ internal static class NativeGearQuantityChecks
             check(window.QuantityInput.Value == 4, "Native quantity keyboard decreases quantity");
             window.QuantityInput.Text = "20"; window.MarkupInput.Text = "-120"; await Task.Delay(50);
             check(window.QuantityInput.Value == 8 && window.MarkupInput.Value == -99, "Native quantity and markup preserve domain clipping");
+            // Range rejection is checked above; capture a normal accepted editing state.
+            window.QuantityInput.Text = "8"; window.MarkupInput.Text = "-99";
             var nativeOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
             var previousTheme = nativeOwner.RequestedThemeVariant;
             try
