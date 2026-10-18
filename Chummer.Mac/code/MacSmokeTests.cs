@@ -110,6 +110,7 @@ namespace Chummer
                 RenderingChecks.Run(output, Check);
                 CharacterTabChecks.Run(Check);
                 DropDownPlacementChecks.Run(Check);
+                CalendarStartChecks.Run(Check);
                 using (var repaintForm = new Form { Width = 300, Height = 120 })
                 {
                     var valueLabel = new Label { Text = "MMMM", AutoSize = false, Width = 120 };
@@ -932,15 +933,15 @@ namespace Chummer
                 using var main = new frmMain();
                 Capture(main, output, "main");
                 var karmaBuild = new Character();
-                using (var bp = new frmSelectBP(karmaBuild))
-                {
-                    bp.Show();
-                    Field<ComboBox>(bp, "cboBuildMethod").SelectedValue = "Karma";
-                    Field<NumericUpDown>(bp, "nudBP").Value = 750;
-                    Field<Button>(bp, "cmdOK").PerformClick();
-                    Check(karmaBuild.BuildMethod == CharacterBuildMethod.Karma && karmaBuild.BuildKarma == 750,
-                        "Karma creation method selection");
-                }
+                new BuildPointSelection(CharacterBuildMethod.Karma, 750, 12, false).ApplyTo(karmaBuild);
+                Check(karmaBuild.BuildMethod == CharacterBuildMethod.Karma && karmaBuild.BuildKarma == 750 && karmaBuild.BuildPoints == 0 && karmaBuild.NuyenMaximumBP == 100,
+                    "Karma creation method selection");
+                var currentBuild = new Character { BuildPoints = 450, IgnoreRules = true };
+                var currentLimits = new BuildPointConfiguration(currentBuild, true);
+                new BuildPointSelection(currentLimits.Method, currentLimits.Points, currentLimits.Availability, currentLimits.IgnoreRules).ApplyTo(currentBuild);
+                Check(currentBuild.IgnoreRules && currentBuild.BuildPoints == 450,
+                    "editing existing build limits preserves enabled Ignore Rules");
+                ExpensePromptChecks.Run(Check);
                 var character = new Character { Name = "Mac Smoke Test", BuildPoints = 400 };
                 using (var metatype = new frmMetatype(character))
                 {

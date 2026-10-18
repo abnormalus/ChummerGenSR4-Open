@@ -607,10 +607,10 @@ namespace Chummer
 			}
 			
 			// Show the BP selection window.
-			frmSelectBP frmBP = new frmSelectBP(objCharacter);
-			frmBP.ShowDialog();
+			using frmSelectBP frmBP = new frmSelectBP(objCharacter);
+			frmBP.ShowDialog(this);
 
-			if (frmBP.DialogResult == DialogResult.Cancel)
+			if (frmBP.DialogResult != DialogResult.OK)
 				return;
 
 			// Show the Metatype selection window.

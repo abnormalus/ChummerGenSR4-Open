@@ -75,6 +75,26 @@ internal static class NativeNumberPromptChecks
             var pending = prompt.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!; window.Input.Text = "-8"; await Task.Delay(30); window.Accept();
             check(await pending == Forms.DialogResult.OK && prompt.SelectedValue == -8, "Native mandatory number accepts configured negative integer ranges");
         }
+        using (var hits = new frmDiceHits { Dice = 4, Text = "Synthetic hit selection", Description = "Synthetic dice test" })
+        {
+            var pending = hits.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!;
+            check(window.Input.Minimum == 0 && window.Input.Maximum == 4 && hits.DialogResult == Forms.DialogResult.Cancel,
+                "Native hit selection preserves zero-to-dice range and unaccepted draft");
+            window.Input.Value = 3; window.Accept();
+            check(await pending == Forms.DialogResult.OK && hits.Result == 3, "Native hit selection returns explicitly accepted hits");
+        }
+        using (var hits = new frmDiceHits { Dice = 4 })
+        {
+            var pending = hits.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!;
+            window.Input.Value = 2; window.Close();
+            check(await pending == Forms.DialogResult.Cancel && hits.Result == 0, "Native hit selection cancellation discards edited hits");
+        }
+        using (var hits = new frmDiceHits { Dice = 0 })
+        {
+            var pending = hits.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!; window.Accept();
+            check(await pending == Forms.DialogResult.OK && hits.Result == 0 && window.Input.Maximum == 0,
+                "Native hit selection accepts zero-dice zero-hit boundary");
+        }
         using (var sale = new frmSellItem())
         {
             var pending = sale.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!;

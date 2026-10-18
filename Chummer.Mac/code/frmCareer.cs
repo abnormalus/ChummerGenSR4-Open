@@ -9169,10 +9169,10 @@ namespace Chummer
 			catch
 			{
 				objWeek = new CalendarWeek();
-				frmSelectCalendarStart frmPickStart = new frmSelectCalendarStart();
+				using frmSelectCalendarStart frmPickStart = new frmSelectCalendarStart();
 				frmPickStart.ShowDialog(this);
 
-				if (frmPickStart.DialogResult == DialogResult.Cancel)
+				if (frmPickStart.DialogResult != DialogResult.OK)
 					return;
 
 				objWeek.Year = frmPickStart.SelectedYear;
@@ -9241,10 +9241,10 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectCalendarStart frmPickStart = new frmSelectCalendarStart(objStart);
+			using frmSelectCalendarStart frmPickStart = new frmSelectCalendarStart(objStart);
 			frmPickStart.ShowDialog(this);
 
-			if (frmPickStart.DialogResult == DialogResult.Cancel)
+			if (frmPickStart.DialogResult != DialogResult.OK)
 				return;
 
 			// Determine the difference between the starting value and selected values for year and week.
