@@ -75,6 +75,31 @@ internal static class NativeNumberPromptChecks
             var pending = prompt.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!; window.Input.Text = "-8"; await Task.Delay(30); window.Accept();
             check(await pending == Forms.DialogResult.OK && prompt.SelectedValue == -8, "Native mandatory number accepts configured negative integer ranges");
         }
+        using (var sale = new frmSellItem())
+        {
+            var pending = sale.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!;
+            check(window.Input.Minimum == 0 && window.Input.Maximum == 9999 && window.Input.Value == 50 && sale.SellPercent == 0, "Native sale preserves historical percentage range and unaccepted default");
+            var saleOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner); var saleTheme = saleOwner.RequestedThemeVariant;
+            try
+            {
+                foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                {
+                    saleOwner.RequestedThemeVariant = theme; await Task.Delay(100);
+                    using var image = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width * 2, (int)window.ClientSize.Height * 2), new Vector(192, 192));
+                    image.Render(window); image.Save(Path.Combine(output, "native-sale-percentage-" + (theme == ThemeVariant.Dark ? "dark" : "light") + ".png"), PngBitmapEncoderOptions.Default);
+                }
+            }
+            finally { saleOwner.RequestedThemeVariant = saleTheme; }
+            window.Input.Value = 150; window.Accept();
+            check(await pending == Forms.DialogResult.OK && sale.SellPercent == 1.5, "Native sale returns accepted percentages above one hundred unchanged");
+        }
+        using (var sale = new frmSellItem())
+        {
+            var pending = sale.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!;
+            window.Input.Value = 75; window.Close();
+            check(await pending == Forms.DialogResult.Cancel && sale.SellPercent == 0, "Native sale cancellation discards percentage draft");
+        }
+        await CheckSaleCommandsAsync(owner, character, check);
         var stackCharacter = new Character(); var stackGear = new Gear(stackCharacter) { Name = "Synthetic stack", Cost = "100", Quantity = 2 };
         stackCharacter.Gear.Add(stackGear); stackCharacter.Nuyen = 1000;
         using (var tree = new Forms.TreeView())
@@ -98,4 +123,51 @@ internal static class NativeNumberPromptChecks
         var cancelled = new Gear(character); cancelled.Create(definition, character, new Forms.TreeNode(), 1, new List<Weapon>(), new List<Forms.TreeNode>(), blnAddImprovements: false);
         check(cancelled.InternalId == Guid.Empty.ToString() && character.Nuyen == money && character.Gear.Count == gearCount && character.ExpenseEntries.Count == expenseCount, "Native variable-price shutdown does not manufacture zero-cost inventory or payment");
     }
+    private static async Task CheckSaleCommandsAsync(Forms.Form owner, Character original, Action<bool, string> check)
+    {
+        var character = new Character(); character.LoadSnapshot(original.CaptureSnapshot()); character.Created = true; character.Nuyen = 1000;
+        using var editor = new frmCareer(character) { Loading = true }; editor.MdiParent = owner; editor.Show();
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        Forms.TreeView Tree(string name) => (Forms.TreeView)editor.GetType().GetField(name, flags)!.GetValue(editor)!;
+        void Sell(string command, int percent, bool accept)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+                var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!;
+                window.Input.Value = percent; if (accept) window.Accept(); else window.Close();
+            });
+            editor.GetType().GetMethod(command, flags)!.Invoke(editor, new object[] { editor, EventArgs.Empty });
+        }
+        try
+        {
+            // Uneven unit value exercises the caller's existing midpoint rounding.
+            foreach (int percent in new[] { 0, 50, 150 })
+            {
+                var gear = new Gear(character) { Name = "Synthetic sale", Cost = "101", Quantity = 2 };
+                character.Gear.Add(gear);
+                var node = new Forms.TreeNode(gear.DisplayName) { Tag = gear.InternalId };
+                var tree = Tree("treGear"); tree.Nodes[0].Nodes.Add(node); tree.SelectedNode = node;
+                int money = character.Nuyen, expenses = character.ExpenseEntries.Count;
+                Sell("sellItemToolStripMenuItem_Click", percent, false);
+                check(character.Gear.Contains(gear) && node.Parent != null && character.Nuyen == money && character.ExpenseEntries.Count == expenses,
+                    "Native gear sale cancellation preserves stock and money at percent " + percent);
+                Sell("sellItemToolStripMenuItem_Click", percent, true);
+                int proceeds = Convert.ToInt32(202 * (percent / 100.0));
+                check(!character.Gear.Contains(gear) && node.Parent == null && character.Nuyen == money + proceeds && character.ExpenseEntries.Count == expenses + 1 && character.ExpenseEntries.Last().Amount == proceeds,
+                    "Native gear sale records exact proceeds and removes canonical stock at percent " + percent);
+            }
+            var armor = new Armor(character); var armorNode = new Forms.TreeNode();
+            armor.Create(XmlManager.Instance.Load("armor.xml").SelectSingleNode("/chummer/armors/armor[name='Armor Jacket']")!, armorNode, null);
+            character.Armor.Add(armor); var armorTree = Tree("treArmor"); armorTree.Nodes[0].Nodes.Add(armorNode); armorTree.SelectedNode = armorNode;
+            int armorMoney = character.Nuyen, armorExpenses = character.ExpenseEntries.Count, armorValue = armor.TotalCost;
+            Sell("tsArmorSell_Click", 50, false);
+            check(character.Armor.Contains(armor) && armorNode.Parent != null && character.Nuyen == armorMoney && character.ExpenseEntries.Count == armorExpenses,
+                "Native armor sale cancellation preserves item and accounting");
+            Sell("tsArmorSell_Click", 50, true);
+            check(!character.Armor.Contains(armor) && armorNode.Parent == null && character.Nuyen == armorMoney + Convert.ToInt32(armorValue * 0.5) && character.ExpenseEntries.Count == armorExpenses + 1,
+                "Native armor sale uses shared percentage with existing accounting");
+            await Task.CompletedTask;
+        }
+        finally { editor.GetType().GetField("_blnIsDirty", flags)!.SetValue(editor, false); editor.Close(); }
+    }
+
 }

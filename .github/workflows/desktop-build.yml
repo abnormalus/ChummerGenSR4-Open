@@ -63,7 +63,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Native bulk-operation checks failed: $($process.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'Native bulk-operation report is missing.' }
           $result = Get-Content $report -Raw | ConvertFrom-Json
-          if (-not $result.passed -or $result.checks.Count -lt 288) { throw 'Native bulk-operation checks did not complete.' }
+          if (-not $result.passed -or $result.checks.Count -lt 299) { throw 'Native bulk-operation checks did not complete.' }
       - name: Ensure native Windows browser runtime
         if: runner.os == 'Windows'
         shell: pwsh
@@ -104,6 +104,8 @@ jobs:
             artifacts/checks/native-ammunition-career-dark.png
             artifacts/checks/native-number-prompt-dark.png
             artifacts/checks/native-number-prompt-light.png
+            artifacts/checks/native-sale-percentage-dark.png
+            artifacts/checks/native-sale-percentage-light.png
             artifacts/checks/native-gear-quantity-dark.png
             artifacts/checks/native-gear-quantity-light.png
             artifacts/checks/native-armor-owner-dark.png
