@@ -30,6 +30,11 @@ internal static class NativeNumberPromptChecks
             var inputEditor = window.Input.GetVisualDescendants().OfType<TextBox>().Single();
             decimal? beforeDown = window.Input.Value;
             inputEditor.Focus();
+            // The standard TextBox consumes Down while moving its caret. At the
+            // line boundary the event bubbles to ButtonSpinner for numeric stepping.
+            inputEditor.CaretIndex = inputEditor.Text?.Length ?? 0;
+            inputEditor.SelectionStart = inputEditor.CaretIndex;
+            inputEditor.SelectionEnd = inputEditor.CaretIndex;
             inputEditor.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
             await Task.Delay(30);
             // Synthetic numeric-only evidence distinguishes stepping from text/focus synchronization.
