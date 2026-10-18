@@ -63,3 +63,7 @@ Character attribute and BP-summary contrast now has actual-screen light/dark tra
 Daily GitHub issue review and current evidence are tracked in [ISSUE_TRIAGE.md](ISSUE_TRIAGE.md). Shared ammunition uses canonical reserve projections with command guards and actual reload/cancellation/magazine-switch acceptance; cross-platform release verification is tracked in [AMMUNITION_VIEWS.md](AMMUNITION_VIEWS.md).
 
 Direct native dialogs now follow their owner theme, including live changes and closure cleanup; see [NATIVE_DIALOG_THEME.md](NATIVE_DIALOG_THEME.md). This is independent of the legacy drawing palette bridge.
+
+## Publication cadence
+
+Batch related changes locally and push incremental GitHub updates no more often than every 4–6 hours of modernization progress, following the user's October 17 instruction. Local commits, builds, tests and documentation continue within that window. A finished small migration is not by itself a reason to push, merge or publish Nightly. Revalidate the combined exact source before publishing a batch, retain only the verified Stable/latest Nightly package sets, and keep Stable unchanged until full testing and user promotion.

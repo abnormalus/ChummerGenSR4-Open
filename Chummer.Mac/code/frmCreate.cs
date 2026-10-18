@@ -2107,7 +2107,7 @@ namespace Chummer
 				return;
 
 			// Get the player to roll Dice to make a WIL Test and record the result.
-			frmDiceHits frmWILHits = new frmDiceHits();
+			using frmDiceHits frmWILHits = new frmDiceHits();
 			frmWILHits.Text = LanguageManager.Instance.GetString("String_CyberzombieWILText");
 			frmWILHits.Description = LanguageManager.Instance.GetString("String_CyberzombieWILDescription");
 			int intDice = _objCharacter.WIL.TotalValue;
@@ -3792,11 +3792,11 @@ namespace Chummer
 
 		private void mnuSpecialBPAvailLimit_Click(object sender, EventArgs e)
 		{
-			frmSelectBP frmPickBP = new frmSelectBP(_objCharacter, true);
-			frmPickBP.ShowDialog(this);
-
-			if (frmPickBP.DialogResult == DialogResult.Cancel)
-				UpdateCharacterInfo();
+			using frmSelectBP frmPickBP = new frmSelectBP(_objCharacter, true);
+			if (frmPickBP.ShowDialog(this) != DialogResult.OK) return;
+			UpdateCharacterInfo();
+			_blnIsDirty = true;
+			UpdateWindowTitle();
 		}
 
 		private void mnuSpecialConvertToFreeSprite_Click(object sender, EventArgs e)
