@@ -17964,126 +17964,66 @@ namespace Chummer
 		/// <summary>
 		/// Save the Character.
 		/// </summary>
-		internal bool SaveCharacter()
-		{
-			bool blnSaved = false;
+        internal bool SaveCharacter()
+        {
+            return string.IsNullOrEmpty(_objCharacter.FileName)
+                ? SaveCharacterAs() : SaveCharacterToPath(_objCharacter.FileName, false);
+        }
 
-			// If the Character does not have a file name, trigger the Save As menu item instead.
-			if (_objCharacter.FileName == "")
-				blnSaved = SaveCharacterAs(true);
-			else
-			{
-				// If the Created is checked, make sure the user wants to actually save this character.
-				if (chkCharacterCreated.Checked)
-				{
-					if (!ConfirmSaveCreatedCharacter())
-					{
-						chkCharacterCreated.Checked = false;
-						return false;
-					}
-				}
-
-				if (!CharacterFileDialogs.TrySave(this, _objCharacter, _objCharacter.FileName)) return false;
-				_blnIsDirty = false;
-				blnSaved = true;
-				GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
-			}
-			if (blnSaved) UpdateWindowTitle(false);
-
-			// If this character has just been saved as Created, close this form and re-open the character which will open it in the Career window instead.
-			if (blnSaved && chkCharacterCreated.Checked)
-			{
-				SaveCharacterAsCreated();
-			}
-
-			return blnSaved;
-		}
-
-		/// <summary>
-		/// Save the Character using the Save As dialogue box.
-		/// </summary>
-		internal bool SaveCharacterAs(bool blnEscapeAfterSave = false, Func<string> chooseSavePath = null)
-		{
-			bool blnSaved = false;
-            // Choose a destination before creation confirmation can commit starting
-            // money, lifestyle, skill-group and Created state. Cancel leaves it unchanged.
+        internal bool SaveCharacterAs(bool blnEscapeAfterSave = false, Func<string> chooseSavePath = null)
+        {
             string path = chooseSavePath == null ? CharacterFileDialogs.ChooseSavePath(this, _objCharacter) : chooseSavePath();
-            if (path == null) return false;
+            return path != null && SaveCharacterToPath(path, blnEscapeAfterSave);
+        }
 
-			// If the Created is checked, make sure the user wants to actually save this character.
-			if (chkCharacterCreated.Checked)
-			{
-				if (!ConfirmSaveCreatedCharacter())
-				{
-					chkCharacterCreated.Checked = false;
-					return false;
-				}
-			}
-
-            if (!CharacterFileDialogs.TrySave(this, _objCharacter, path)) return false;
+        private bool SaveCharacterToPath(string path, bool escapeAfterSave)
+        {
+            if (chkCharacterCreated.Checked)
+            {
+                PreparedCreationSave prepared;
+                TreeNode lifestyleNode;
+                try
+                {
+                    if (MessageBox.Show(LanguageManager.Instance.GetString("Message_ConfirmCreate"),
+                        LanguageManager.Instance.GetString("MessageTitle_ConfirmCreate"), MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question) != DialogResult.Yes ||
+                        !ValidateCharacter(false, out var selection, out lifestyleNode))
+                    {
+                        chkCharacterCreated.Checked = false;
+                        return false;
+                    }
+                    prepared = new PreparedCreationSave(_objCharacter, selection, DateTime.Now);
+                }
+                catch (Exception error) when (error is IOException || error is UnauthorizedAccessException ||
+                    error is ArgumentException || error is NotSupportedException || error is InvalidOperationException)
+                {
+                    CharacterFileDialogs.ShowError(this, "Save Character", error);
+                    return false;
+                }
+                if (!CharacterFileDialogs.TrySave(this, prepared.Character, path)) return false;
+                // Preparation failures are recoverable before writing. Once durable,
+                // a UI follow-up error must not be reported as a rejected disk write.
+                prepared.CommitToOwner();
+                if (lifestyleNode != null)
+                {
+                    treLifestyles.Nodes[0].Nodes.Add(lifestyleNode);
+                    treLifestyles.Nodes[0].Expand();
+                }
+            }
+            else if (!CharacterFileDialogs.TrySave(this, _objCharacter, path)) return false;
             _blnIsDirty = false;
-            blnSaved = true;
             GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
-
-			if (blnEscapeAfterSave)
-				return blnSaved;
-			UpdateWindowTitle(false);
-
-			// If this character has just been saved as Created, close this form and re-open the character which will open it in the Career window instead.
-			if (blnSaved && chkCharacterCreated.Checked)
-			{
-				SaveCharacterAsCreated();
-			}
-
-			return blnSaved;
-		}
-
-		/// <summary>
-		/// Save the character as Created and re-open it in Career Mode.
-		/// </summary>
-		private void SaveCharacterAsCreated()
-		{
-			// If the character was built with Karma, record their staring Karma amount (if any).
-			if (_objCharacter.BuildMethod == CharacterBuildMethod.Karma)
-			{
-				if (_objCharacter.Karma > 0)
-				{
-					ExpenseLogEntry objKarma = new ExpenseLogEntry();
-					objKarma.Create(_objCharacter.Karma, "Starting Karma", ExpenseType.Karma, DateTime.Now);
-					_objCharacter.ExpenseEntries.Add(objKarma);
-
-					// Create an Undo entry so that the starting Karma amount can be modified if needed.
-					ExpenseUndo objKarmaUndo = new ExpenseUndo();
-					objKarmaUndo.CreateKarma(KarmaExpenseType.ManualAdd, "");
-					objKarma.Undo = objKarmaUndo;
-				}
-			}
-
-			// If the character has an Essence Penalty, this needs to be added as a positive value to the character's MAG/RES so that it's correctly shown in Career Mode.
-			if (_objCharacter.EssencePenalty > 0 && (_objCharacter.MAGEnabled || _objCharacter.RESEnabled))
-			{
-				if (_objCharacter.MAGEnabled)
-					_objCharacter.MAG.Value += _objCharacter.EssencePenalty;
-				if (_objCharacter.RESEnabled)
-					_objCharacter.RES.Value += _objCharacter.EssencePenalty;
-			}
-
-			// Create an Expense Entry for Starting Nuyen.
-			ExpenseLogEntry objNuyen = new ExpenseLogEntry();
-			objNuyen.Create(_objCharacter.Nuyen, "Starting Nuyen", ExpenseType.Nuyen, DateTime.Now);
-			_objCharacter.ExpenseEntries.Add(objNuyen);
-
-			// Create an Undo entry so that the Starting Nuyen amount can be modified if needed.
-			ExpenseUndo objNuyenUndo = new ExpenseUndo();
-			objNuyenUndo.CreateNuyen(NuyenExpenseType.ManualAdd, "");
-			objNuyen.Undo = objNuyenUndo;
-
-			_blnSkipToolStripRevert = true;
-			_objCharacter.Save();
-
-			GlobalOptions.Instance.MainForm.LoadCharacter(_objCharacter.FileName, false);
-			this.Close();
-		}
+            if (escapeAfterSave) return true;
+            UpdateWindowTitle(false);
+            if (chkCharacterCreated.Checked)
+            {
+                // The complete career payload is already durable; reopening performs no second write.
+                _blnSkipToolStripRevert = true;
+                GlobalOptions.Instance.MainForm.LoadCharacter(_objCharacter.FileName, false);
+                Close();
+            }
+            return true;
+        }
 
 		/// <summary>
 		/// Open the Select Cyberware window and handle adding to the Tree and Character.
@@ -19833,8 +19773,12 @@ namespace Chummer
 		/// <summary>
 		/// Check the character and determine if it has broken any of the rules.
 		/// </summary>
-		public bool ValidateCharacter()
-		{
+        public bool ValidateCharacter() => ValidateCharacter(true, out _, out _);
+
+        private bool ValidateCharacter(bool applyAccepted, out CreationFinalizationSelection acceptedSelection, out TreeNode acceptedLifestyleNode)
+        {
+            acceptedSelection = null;
+            acceptedLifestyleNode = null;
 			bool blnValid = true;
 			string strMessage = LanguageManager.Instance.GetString("Message_InvalidBeginning");
 
@@ -20462,34 +20406,17 @@ namespace Chummer
 					finally { _objCharacter.FileName = strFileName; }
 				}
 
-				if (_objCharacter.BuildMethod == CharacterBuildMethod.Karma && intBuildPoints > _objOptions.KarmaCarryover)
-					_objCharacter.Karma = _objOptions.KarmaCarryover;
-				if (pendingStreet != null)
-				{
-					_objCharacter.Lifestyles.Add(pendingStreet);
-					treLifestyles.Nodes[0].Nodes.Add(pendingStreetNode);
-					treLifestyles.Nodes[0].Expand();
-				}
+                var acceptedFinalization = new CreationFinalizationSelection(_objCharacter,
+                    intBuildPoints, _objOptions.KarmaCarryover, frmStartingNuyen.StartingNuyen, pendingStreet);
+                acceptedSelection = acceptedFinalization;
+                acceptedLifestyleNode = pendingStreetNode;
+                if (applyAccepted) acceptedFinalization.ApplyTo(_objCharacter);
+                if (applyAccepted && pendingStreet != null)
+                {
+                    treLifestyles.Nodes[0].Nodes.Add(pendingStreetNode);
+                    treLifestyles.Nodes[0].Expand();
+                }
 
-
-				// Assign the starting Nuyen amount.
-				int intStartingNuyen = frmStartingNuyen.StartingNuyen;
-				if (intStartingNuyen < 0)
-					intStartingNuyen = 0;
-				_objCharacter.Nuyen = intStartingNuyen;
-
-				// Break any Skill Groups if any of their associated Skills have a Rating while that does not match the Group's.
-				foreach (SkillGroup objGroup in _objCharacter.SkillGroups)
-				{
-					foreach (Skill objSkill in _objCharacter.Skills)
-					{
-						if (objSkill.Rating != objGroup.Rating && objSkill.SkillGroup == objGroup.Name)
-						{
-							objGroup.Broken = true;
-							break;
-						}
-					}
-				}
 			}
 
 			return blnValid;

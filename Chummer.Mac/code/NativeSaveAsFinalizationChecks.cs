@@ -10,12 +10,13 @@ internal static class NativeSaveAsFinalizationChecks
 {
     internal static async Task RunAsync(Forms.Form owner, Character original, string output, Action<bool,string> check)
     {
-        foreach(int scenario in new[]{0,1,2,3,4,5})
+        foreach(int scenario in new[]{0,1,2,3,4,5,6})
         {
             var character=new Character(); character.LoadSnapshot(original.CaptureSnapshot());
             character.Created=false; character.BuildMethod=CharacterBuildMethod.BP; character.IgnoreRules=true;
             character.Nuyen=123456; character.Lifestyles.Clear(); character.FileName=Path.Combine(output,"synthetic-save-source-"+scenario+".chum");
-            string destination=Path.Combine(output,"synthetic-save-result-"+scenario+".chum");
+            string destination=Path.Combine(output,"synthetic-save-result-"+scenario+(scenario==6?"-"+Guid.NewGuid().ToString("N"):"")+".chum");
+            var previousCareers=Forms.Application.OpenForms.OfType<frmCareer>().ToArray();
             if(scenario==4) Directory.CreateDirectory(destination);
             string originalPath=character.FileName;
             if(scenario==5) Directory.CreateDirectory(originalPath);
@@ -45,7 +46,7 @@ internal static class NativeSaveAsFinalizationChecks
             try
             {
                 bool saved=scenario==5 ? editor.SaveCharacter() :
-                    editor.SaveCharacterAs(blnEscapeAfterSave:scenario==1||scenario>=3,chooseSavePath:()=>scenario<2?null!:destination);
+                    editor.SaveCharacterAs(blnEscapeAfterSave:scenario==1||(scenario>=3&&scenario!=6),chooseSavePath:()=>scenario<2?null!:destination);
                 completed=true;await replies.Task;
                 if(scenario<2)
                     check(!saved&&!confirmationOpened&&character.CaptureSnapshot().AsSpan().SequenceEqual(before)&&!File.Exists(character.FileName),
@@ -53,10 +54,30 @@ internal static class NativeSaveAsFinalizationChecks
                 else if(scenario==2)
                     check(!saved&&confirmationOpened&&!character.Created&&character.Nuyen==123456&&character.Lifestyles.Count==0&&!File.Exists(destination),
                         "Native chosen save path followed by creation No preserves model and writes no character");
-                else if(scenario>=4)
+                else if(scenario==4||scenario==5)
                     check(!saved&&character.FileName==originalPath&&character.CaptureSnapshot().AsSpan().SequenceEqual(before)&&
                         ReferenceEquals(originalGear,character.Gear.FirstOrDefault()),
                         "Native failed creation "+(scenario==5?"Save":"Save As")+" preserves prefinalization model filename and inventory references");
+                else if(scenario==6)
+                {
+                    var career=Forms.Application.OpenForms.OfType<frmCareer>().FirstOrDefault(item=>!previousCareers.Contains(item));
+                    try
+                    {
+                        var reopened=new Character{FileName=destination};
+                        check(saved&&editor.IsDisposed&&career!=null&&reopened.Load(false)&&reopened.Created&&
+                            reopened.Nuyen==acceptedMoney&&reopened.ExpenseEntries.Count(entry=>entry.Reason=="Starting Nuyen")==1&&
+                            !File.Exists(destination+".bak"),
+                            "Native accepted creation save opens career with one durable starting-money ledger and no second write");
+                    }
+                    finally
+                    {
+                        if(career!=null)
+                        {
+                            career.GetType().GetField("_blnIsDirty",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(career,false);
+                            career.Close();
+                        }
+                    }
+                }
                 else
                 {
                     var reopened=new Character{FileName=destination};
