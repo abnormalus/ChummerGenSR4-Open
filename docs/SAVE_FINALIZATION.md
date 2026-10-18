@@ -1,0 +1,9 @@
+# Creation Save As cancellation
+
+A synthetic native baseline reproduced `Native Save As path cancellation preserves creation state money and lifestyles` failing. Creation confirmation called ValidateCharacter and set Created before asking for the destination. Canceling the subsequent file chooser returned false after starting money, fallback lifestyle and creation state could already have changed. Evidence: `/tmp/chummer-save-as-baseline/report.json`; the user’s original saves were not involved.
+
+SaveCharacterAs now chooses the destination first and returns immediately when it is canceled. Only then does it run existing explicit-Yes creation confirmation and validation, write through CharacterFileDialogs, update MRU/title and perform the existing career transition. The selected path is not assigned to the model before confirmation; backup timing and filename restoration remain in the existing validation/save helpers.
+
+The optional internal chooseSavePath dependency uses the standard native chooser by default. Native tests provide a canceled or temporary destination without operating an OS picker or introducing global test state. Coverage checks both supported return modes, a chosen destination followed by creation No, and an accepted destination/starting-money roll that reopens from the existing UTF16 file format. All four checks pass in /tmp/chummer-save-as-fixed/report.json with all 419 combined Mac native checks. The refreshed full compatibility run also passes all 399 saved-character fixtures and all 36 release/safeguard tests pass. Exact-head platform CI remains required before publication.
+
+This fixes destination cancellation. A failed write after accepted finalization remains a separate recovery audit: no full save-transaction rollback is claimed here. Existing starting-money confirmation, canceled rolls and Karma checks remain covered by their own native tests.

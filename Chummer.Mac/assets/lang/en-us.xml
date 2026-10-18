@@ -4412,6 +4412,18 @@ Only one attribute may be at its Maximum value during character creation.</text>
 			<key>Checkbox_Expense_RefundNuyen</key>
 			<text>Refund (does not count towards Total Career Nuyen)</text>
 		</string>
+		<string>
+			<key>Message_Expense_InvalidDate</key>
+			<text>Choose a date and time between {0:g} and {1:g}.</text>
+		</string>
+		<string>
+			<key>Message_Expense_InvalidAmount</key>
+			<text>The calculated amount is too large. Reduce the amount or percentage.</text>
+		</string>
+		<string>
+			<key>Message_Expense_IncompleteAmount</key>
+			<text>Enter a whole number within the displayed limits.</text>
+		</string>
 		<!-- History Window -->
 		<string>
 			<key>Title_History</key>

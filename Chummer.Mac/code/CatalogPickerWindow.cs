@@ -10,6 +10,7 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Styling;
 
 namespace Chummer;
@@ -25,6 +26,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
     internal TextBox SearchBox { get; }
     internal Button AcceptButton { get; }
     internal Button AddMoreButton { get; }
+    protected StackPanel DetailPanel { get; private set; } = null!;
     private static string T(string key) => LanguageManager.Instance.GetString(key)
         .Replace("&&", "\u0001").Replace("&", "").Replace("\u0001", "&");
     private static Binding Read(string property) => new(property);
@@ -94,6 +96,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         var splitter = new GridSplitter { Width = 6, ResizeDirection = GridResizeDirection.Columns, HorizontalAlignment = HorizontalAlignment.Center };
         Grid.SetColumn(splitter, 1); body.Children.Add(splitter);
         var details = new StackPanel { Spacing = 10, MinWidth = 260 };
+        DetailPanel = details;
         var name = new TextBlock { FontSize = 20, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
         name.Bind(TextBlock.TextProperty, Read("SelectedEntry.DisplayName")); details.Children.Add(name);
         if (model is IRatedCatalogPicker)
@@ -131,7 +134,8 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         var source = new Button { HorizontalAlignment = HorizontalAlignment.Left };
         source.Bind(ContentProperty, Read("Details.Source")); source.Bind(IsEnabledProperty, Read(nameof(model.CanAccept)));
         source.Bind(ToolTip.TipProperty, Read("Details.SourceTooltip")); details.Children.Add(source);
-        var sourceWarning = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap };
+        var sourceWarning = new TextBlock { Name = namePrefix + "SourceWarning", TextWrapping = TextWrapping.Wrap };
+        sourceWarning.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlErrorTextForegroundBrush"));
         details.Children.Add(sourceWarning);
         if (includedLabel != null)
         {
@@ -142,7 +146,9 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         var detailScroll = new ScrollViewer { Content = details, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Grid.SetColumn(detailScroll, 2); body.Children.Add(detailScroll);
 
-        var status = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap };
+        // Use the framework semantic error brush so live owner-theme changes retain contrast.
+        var status = new TextBlock { Name = namePrefix + "Status", TextWrapping = TextWrapping.Wrap };
+        status.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlErrorTextForegroundBrush"));
         status.Bind(TextBlock.TextProperty, Read(nameof(model.Error))); Grid.SetRow(status, 2); root.Children.Add(status);
         var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
         Grid.SetRow(footer, 3); root.Children.Add(footer);

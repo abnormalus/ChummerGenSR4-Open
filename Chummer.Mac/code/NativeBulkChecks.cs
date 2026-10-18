@@ -87,6 +87,11 @@ internal static class NativeBulkChecks
             await NativeStartingMoneyChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCalendarStartChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeBuildPointChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeExpenseChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeNaturalWeaponChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeVehiclePickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCatalogContrastChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeSaveAsFinalizationChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeInventoryEnhancementChecks.RunAsync(main, character, Check);
             await NativeGearEligibilityChecks.RunAsync(main, character, Check);
             var editor = new frmCreate(character) { Loading = true, MdiParent = main };

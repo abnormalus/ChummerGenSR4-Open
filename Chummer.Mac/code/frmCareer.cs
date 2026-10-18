@@ -6400,17 +6400,15 @@ namespace Chummer
 
 		private void cmdAddVehicle_Click(object sender, EventArgs e)
 		{
-			frmSelectVehicle frmPickVehicle = new frmSelectVehicle(_objCharacter, true);
+			using frmSelectVehicle frmPickVehicle = new frmSelectVehicle(_objCharacter, true);
 			frmPickVehicle.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicle.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicle.DialogResult != DialogResult.OK)
 				return;
 
-			// Open the Vehicles XML file and locate the selected piece.
-			XmlDocument objXmlDocument = XmlManager.Instance.Load("vehicles.xml");
-
-			XmlNode objXmlVehicle = objXmlDocument.SelectSingleNode("/chummer/vehicles/vehicle[name = \"" + frmPickVehicle.SelectedVehicle + "\"]");
+			// Resolve the accepted canonical identity against the current catalog.
+			XmlNode objXmlVehicle = frmPickVehicle.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			Vehicle objVehicle = new Vehicle(_objCharacter);
@@ -7307,10 +7305,10 @@ namespace Chummer
 
 		private void cmdKarmaGained_Click(object sender, EventArgs e)
 		{
-			frmExpense frmNewExpense = new frmExpense();
+			using frmExpense frmNewExpense = new frmExpense();
 			frmNewExpense.ShowDialog(this);
 
-			if (frmNewExpense.DialogResult == DialogResult.Cancel)
+			if (frmNewExpense.DialogResult != DialogResult.OK)
 				return;
 
 			// Create the Expense Log Entry.
@@ -7333,10 +7331,10 @@ namespace Chummer
 
 		private void cmdKarmaSpent_Click(object sender, EventArgs e)
 		{
-			frmExpense frmNewExpense = new frmExpense();
+			using frmExpense frmNewExpense = new frmExpense();
 			frmNewExpense.ShowDialog(this);
 
-			if (frmNewExpense.DialogResult == DialogResult.Cancel)
+			if (frmNewExpense.DialogResult != DialogResult.OK)
 				return;
 
 			// Make sure the Karma expense would not put the character's remaining Karma amount below 0.
@@ -7371,11 +7369,11 @@ namespace Chummer
 
 		private void cmdNuyenGained_Click(object sender, EventArgs e)
 		{
-			frmExpense frmNewExpense = new frmExpense();
+			using frmExpense frmNewExpense = new frmExpense();
 			frmNewExpense.Mode = ExpenseType.Nuyen;
 			frmNewExpense.ShowDialog(this);
 
-			if (frmNewExpense.DialogResult == DialogResult.Cancel)
+			if (frmNewExpense.DialogResult != DialogResult.OK)
 				return;
 
 			// Create the Expense Log Entry.
@@ -7399,11 +7397,11 @@ namespace Chummer
 
 		private void cmdNuyenSpent_Click(object sender, EventArgs e)
 		{
-			frmExpense frmNewExpense = new frmExpense();
+			using frmExpense frmNewExpense = new frmExpense();
 			frmNewExpense.Mode = ExpenseType.Nuyen;
 			frmNewExpense.ShowDialog(this);
 
-			if (frmNewExpense.DialogResult == DialogResult.Cancel)
+			if (frmNewExpense.DialogResult != DialogResult.OK)
 				return;
 
 			// Make sure the Nuyen expense would not put the character's remaining Nuyen amount below 0.
@@ -17137,10 +17135,10 @@ namespace Chummer
 
 		private void tsCreateNaturalWeapon_Click(object sender, EventArgs e)
 		{
-			frmNaturalWeapon frmCreateNaturalWeapon = new frmNaturalWeapon(_objCharacter);
+			using frmNaturalWeapon frmCreateNaturalWeapon = new frmNaturalWeapon(_objCharacter);
 			frmCreateNaturalWeapon.ShowDialog(this);
 
-			if (frmCreateNaturalWeapon.DialogResult == DialogResult.Cancel)
+			if (frmCreateNaturalWeapon.DialogResult != DialogResult.OK)
 				return;
 
 			Weapon objWeapon = frmCreateNaturalWeapon.SelectedWeapon;
@@ -20125,7 +20123,7 @@ namespace Chummer
 				return;
 			}
 
-			frmExpense frmEditExpense = new frmExpense();
+			using frmExpense frmEditExpense = new frmExpense();
 			frmEditExpense.strReason = objEntry.Reason;
 			frmEditExpense.Amount = objEntry.Amount;
 			frmEditExpense.Refund = objEntry.Refund;
@@ -20134,7 +20132,7 @@ namespace Chummer
 
 			frmEditExpense.ShowDialog(this);
 
-			if (frmEditExpense.DialogResult == DialogResult.Cancel)
+			if (frmEditExpense.DialogResult != DialogResult.OK)
 				return;
 
 			// If this is a manual entry, update the character's Karma total.
@@ -20193,7 +20191,7 @@ namespace Chummer
 				return;
 			}
 
-			frmExpense frmEditExpense = new frmExpense();
+			using frmExpense frmEditExpense = new frmExpense();
 			frmEditExpense.Mode = ExpenseType.Nuyen;
 			frmEditExpense.strReason = objEntry.Reason;
 			frmEditExpense.Amount = objEntry.Amount;
@@ -20203,7 +20201,7 @@ namespace Chummer
 
 			frmEditExpense.ShowDialog(this);
 
-			if (frmEditExpense.DialogResult == DialogResult.Cancel)
+			if (frmEditExpense.DialogResult != DialogResult.OK)
 				return;
 
 			// If this is a manual entry, update the character's Karma total.
