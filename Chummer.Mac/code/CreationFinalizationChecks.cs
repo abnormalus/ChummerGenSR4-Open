@@ -9,6 +9,8 @@ internal static class CreationFinalizationChecks
     {
         var character = new Character { BuildMethod = CharacterBuildMethod.Karma, Karma = 45, Nuyen = 1234 };
         var groups = character.SkillGroups;
+        // Match a live editor toggled to Ignore Rules after its group limits were built.
+        character.IgnoreRules = true;
         var broken = groups.First(group => character.Skills.Any(item => item.SkillGroup == group.Name));
         var intact = groups.First(group => group != broken && character.Skills.Any(item => item.SkillGroup == group.Name));
         broken.Rating = 2; intact.Rating = 2;
@@ -22,6 +24,7 @@ internal static class CreationFinalizationChecks
         var staged = selection.PrepareCharacterCopy();
         check(staged.Karma == 20 && staged.Nuyen == 900 && staged.SkillGroups.First(g => g.Name == broken.Name).Broken &&
               !ReferenceEquals(staged.SkillGroups.First(g => g.Name == broken.Name), broken) &&
+              staged.SkillGroups.All(group => group.RatingMaximum == groups.Single(original => original.Name == group.Name).RatingMaximum) &&
               staged.Lifestyles.Any(item => item.InternalId == fallback.InternalId) &&
               character.Karma == 45 && character.Nuyen == 1234 && !broken.Broken && character.Lifestyles.Count == 0,
             "staged finalization copy preserves serialized identity without changing live references or money");

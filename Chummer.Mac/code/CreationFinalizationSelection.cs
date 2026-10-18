@@ -42,6 +42,15 @@ internal sealed class CreationFinalizationSelection
         byte[] snapshot = owner.CaptureSnapshot();
         if (!prepared.LoadSnapshot(snapshot))
             throw new InvalidOperationException("Unable to prepare creation save copy.");
+        // Ordinary loading raises cached group maxima to six for Ignore Rules or
+        // career mode. A live editor can still hold its prior serialized limits.
+        // Preserve those exact fields on the isolated copy; do not change loader
+        // rules or relax the complete serialized-equivalence check below.
+        foreach (var originalGroup in owner.SkillGroups)
+        {
+            var matches = prepared.SkillGroups.Where(group => group.Name == originalGroup.Name).ToArray();
+            if (matches.Length == 1) matches[0].RatingMaximum = originalGroup.RatingMaximum;
+        }
         using (var before = new MemoryStream(snapshot, false))
         using (var after = new MemoryStream(prepared.CaptureSnapshot(), false))
             if (!XNode.DeepEquals(XDocument.Load(before), XDocument.Load(after)))
