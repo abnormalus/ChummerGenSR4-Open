@@ -38,7 +38,8 @@ namespace Chummer
                 var expense = new ExpenseLogEntry();
                 expense.Create(-cost, LanguageManager.Instance.GetString("String_ExpensePurchaseGear") + " " + gear.DisplayNameShort, ExpenseType.Nuyen, DateTime.Now);
                 var undo = new ExpenseUndo();
-                undo.CreateNuyen(NuyenExpenseType.AddGear, gear.InternalId, previous);
+                // Expense undo subtracts purchased units; existing stock must remain owned.
+                undo.CreateNuyen(NuyenExpenseType.AddGear, gear.InternalId, additional);
                 expense.Undo = undo;
                 character.ExpenseEntries.Add(expense);
                 character.Nuyen -= cost;

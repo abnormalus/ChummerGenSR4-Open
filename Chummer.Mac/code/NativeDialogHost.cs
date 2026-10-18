@@ -56,6 +56,14 @@ internal static class NativeDialogHost
     }
     internal static void CancelAll()
     {
-        foreach (var window in windows.ToArray().Reverse()) window.Close();
+        foreach (var window in windows.ToArray().Reverse())
+            if (window is INativeDialogCancellation cancellable) cancellable.CancelForShutdown();
+            else window.Close();
     }
+}
+
+// Required-choice windows distinguish ordinary user dismissal from application shutdown.
+internal interface INativeDialogCancellation
+{
+    void CancelForShutdown();
 }

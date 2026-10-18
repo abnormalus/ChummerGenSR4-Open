@@ -332,6 +332,7 @@ namespace Chummer
                 GearStacks.Apply(stackCharacter, stackGear, 3, true);
                 Check(stackCharacter.Nuyen == 2000 - unitCost * 2 && stackCharacter.ExpenseEntries.Count == 1 &&
                     stackCharacter.ExpenseEntries[0].Undo != null, "career stacks charge additional configured units and retain expense undo");
+                Check(stackCharacter.ExpenseEntries[0].Undo.Qty == 2, "career stack expense undo records additional units rather than previous stock");
                 stackCharacter.Nuyen = 0;
                 try { GearStacks.Apply(stackCharacter, stackGear, 4, true); throw new Exception("expected insufficient funds"); }
                 catch (InvalidOperationException) { Check(stackGear.Quantity == 3 && stackCharacter.ExpenseEntries.Count == 1, "unaffordable stacks preserve quantity and ledger"); }
