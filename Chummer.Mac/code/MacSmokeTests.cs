@@ -111,6 +111,7 @@ namespace Chummer
                 CharacterTabChecks.Run(Check);
                 DropDownPlacementChecks.Run(Check);
                 CalendarStartChecks.Run(Check);
+                CreationFinalizationChecks.Run(output, Check);
                 using (var repaintForm = new Form { Width = 300, Height = 120 })
                 {
                     var valueLabel = new Label { Text = "MMMM", AutoSize = false, Width = 120 };
