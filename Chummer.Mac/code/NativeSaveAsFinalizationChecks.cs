@@ -86,7 +86,17 @@ internal static class NativeSaveAsFinalizationChecks
                         "Native accepted Save As retains finalization destination and legacy UTF16 saved state");
                 }
             }
-            finally {completed=true;editor.GetType().GetField("_blnIsDirty",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(editor,false);editor.Close();}
+            finally
+            {
+                completed=true;
+                // Accepted finalization already retires this editor. Closing the
+                // disposed instance again would rerun its legacy closing handler.
+                if(!editor.IsDisposed)
+                {
+                    editor.GetType().GetField("_blnIsDirty",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(editor,false);
+                    editor.Close();
+                }
+            }
         }
     }
 }
