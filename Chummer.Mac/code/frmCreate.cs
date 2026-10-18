@@ -20384,6 +20384,58 @@ namespace Chummer
 
 			if (blnValid)
 			{
+
+				// See if the character has any Karma remaining.
+				if (_objCharacter.BuildMethod == CharacterBuildMethod.Karma)
+				{
+					if (intBuildPoints > _objOptions.KarmaCarryover)
+					{
+						if (MessageBox.Show(LanguageManager.Instance.GetString("Message_ExtraKarma").Replace("{0}", intBuildPoints.ToString()).Replace("{1}", _objOptions.KarmaCarryover.ToString()), LanguageManager.Instance.GetString("MessageTitle_ExtraKarma"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+							return false;
+					}
+				}
+
+				// Determine the highest Lifestyle the character has.
+				Lifestyle objLifestyle = new Lifestyle(_objCharacter);
+				foreach (Lifestyle objCharacterLifestyle in _objCharacter.Lifestyles)
+				{
+					if (objCharacterLifestyle.Multiplier > objLifestyle.Multiplier)
+						objLifestyle = objCharacterLifestyle;
+				}
+
+				// Prepare the fallback without attaching it until the roll is accepted.
+				Lifestyle pendingStreet = null;
+				TreeNode pendingStreetNode = null;
+				// If the character does not have any Lifestyles, prepare Street.
+				if (_objCharacter.Lifestyles.Count == 0)
+				{
+					Lifestyle objStreet = new Lifestyle(_objCharacter);
+					XmlDocument objXmlDocument = XmlManager.Instance.Load("lifestyles.xml");
+					XmlNode objXmlLifestyle = objXmlDocument.SelectSingleNode("/chummer/lifestyles/lifestyle[name = \"Street\"]");
+					TreeNode objNode = new TreeNode();
+
+					objStreet.Create(objXmlLifestyle, objNode);
+					pendingStreet = objStreet;
+					pendingStreetNode = objNode;
+					
+					objLifestyle = objStreet;
+				}
+
+				int intNuyenDice = objLifestyle.Dice;
+
+				// Characters get a +1 bonus to the roll for every 100 Nueyn they have left over, up to a maximum of 3X the number of dice rolled for the Lifestyle.
+				int intNuyenBonus = Convert.ToInt32(Math.Floor((Convert.ToDouble(intNuyen, GlobalOptions.Instance.CultureInfo)) / 100.0));
+				if (intNuyenBonus > intNuyenDice * 3)
+					intNuyenBonus = intNuyenDice * 3;
+
+				using frmLifestyleNuyen frmStartingNuyen = new frmLifestyleNuyen();
+				frmStartingNuyen.Dice = intNuyenDice;
+				frmStartingNuyen.Multiplier = objLifestyle.Multiplier;
+				frmStartingNuyen.Extra = intNuyenBonus;
+
+				if (frmStartingNuyen.ShowDialog(this) != DialogResult.OK) return false;
+
+				// Back up the original creation state only after the creation prompts are accepted.
 				if (_objOptions.CreateBackupOnCareer && chkCharacterCreated.Checked)
 				{
 					// Create a pre-Career Mode backup of the character.
@@ -20403,64 +20455,22 @@ namespace Chummer
 							strNewName = Guid.NewGuid().ToString().Substring(0, 13).Replace("-", string.Empty);
 						strNewName += " (" + LanguageManager.Instance.GetString("Title_CreateMode") + ").chum";
 					}
-					
+
 					strNewName = Path.Combine(MacPaths.BackupsDirectory, strNewName);
 
-					_objCharacter.FileName = strNewName;
-					_objCharacter.Save();
-					_objCharacter.FileName = strFileName;
+					try { _objCharacter.FileName = strNewName; _objCharacter.Save(); }
+					finally { _objCharacter.FileName = strFileName; }
 				}
 
-				// See if the character has any Karma remaining.
-				if (_objCharacter.BuildMethod == CharacterBuildMethod.Karma)
+				if (_objCharacter.BuildMethod == CharacterBuildMethod.Karma && intBuildPoints > _objOptions.KarmaCarryover)
+					_objCharacter.Karma = _objOptions.KarmaCarryover;
+				if (pendingStreet != null)
 				{
-					if (intBuildPoints > _objOptions.KarmaCarryover)
-					{
-						if (MessageBox.Show(LanguageManager.Instance.GetString("Message_ExtraKarma").Replace("{0}", intBuildPoints.ToString()).Replace("{1}", _objOptions.KarmaCarryover.ToString()), LanguageManager.Instance.GetString("MessageTitle_ExtraKarma"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
-							blnValid = false;
-						else
-							_objCharacter.Karma = _objOptions.KarmaCarryover;
-					}
-				}
-
-				// Determine the highest Lifestyle the character has.
-				Lifestyle objLifestyle = new Lifestyle(_objCharacter);
-				foreach (Lifestyle objCharacterLifestyle in _objCharacter.Lifestyles)
-				{
-					if (objCharacterLifestyle.Multiplier > objLifestyle.Multiplier)
-						objLifestyle = objCharacterLifestyle;
-				}
-
-				// If the character does not have any Lifestyles, give them the Street Lifestyle.
-				if (_objCharacter.Lifestyles.Count == 0)
-				{
-					Lifestyle objStreet = new Lifestyle(_objCharacter);
-					XmlDocument objXmlDocument = XmlManager.Instance.Load("lifestyles.xml");
-					XmlNode objXmlLifestyle = objXmlDocument.SelectSingleNode("/chummer/lifestyles/lifestyle[name = \"Street\"]");
-					TreeNode objNode = new TreeNode();
-
-					objStreet.Create(objXmlLifestyle, objNode);
-					treLifestyles.Nodes[0].Nodes.Add(objNode);
+					_objCharacter.Lifestyles.Add(pendingStreet);
+					treLifestyles.Nodes[0].Nodes.Add(pendingStreetNode);
 					treLifestyles.Nodes[0].Expand();
-
-					_objCharacter.Lifestyles.Add(objStreet);
-					
-					objLifestyle = objStreet;
 				}
 
-				int intNuyenDice = objLifestyle.Dice;
-
-				// Characters get a +1 bonus to the roll for every 100 Nueyn they have left over, up to a maximum of 3X the number of dice rolled for the Lifestyle.
-				int intNuyenBonus = Convert.ToInt32(Math.Floor((Convert.ToDouble(intNuyen, GlobalOptions.Instance.CultureInfo)) / 100.0));
-				if (intNuyenBonus > intNuyenDice * 3)
-					intNuyenBonus = intNuyenDice * 3;
-
-				frmLifestyleNuyen frmStartingNuyen = new frmLifestyleNuyen();
-				frmStartingNuyen.Dice = intNuyenDice;
-				frmStartingNuyen.Multiplier = objLifestyle.Multiplier;
-				frmStartingNuyen.Extra = intNuyenBonus;
-
-				frmStartingNuyen.ShowDialog(this);
 
 				// Assign the starting Nuyen amount.
 				int intStartingNuyen = frmStartingNuyen.StartingNuyen;
@@ -20490,7 +20500,7 @@ namespace Chummer
 		/// </summary>
 		public bool ConfirmSaveCreatedCharacter()
 		{
-			if (MessageBox.Show(LanguageManager.Instance.GetString("Message_ConfirmCreate"), LanguageManager.Instance.GetString("MessageTitle_ConfirmCreate"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
+			if (MessageBox.Show(LanguageManager.Instance.GetString("Message_ConfirmCreate"), LanguageManager.Instance.GetString("MessageTitle_ConfirmCreate"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 				return false;
 
 			if (!ValidateCharacter())
