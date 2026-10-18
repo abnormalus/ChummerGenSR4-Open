@@ -27,7 +27,7 @@ public sealed class frmLifestyleNuyen : IDisposable
     {
         if (window != null) throw new InvalidOperationException("Starting-money prompt is already open.");
         StartingNuyen = 0; DialogResult = Forms.DialogResult.Cancel;
-        window = new StartingMoneyWindow(Dice, Extra, Multiplier);
+        window = new StartingMoneyWindow(new StartingMoneyRoll(Dice, Extra, Multiplier));
         try
         {
             var accepted = await NativeDialogHost.ShowAsync<StartingMoneySelection>(window, owner);
@@ -38,26 +38,33 @@ public sealed class frmLifestyleNuyen : IDisposable
     }
     public void Dispose() => window?.Close();
 }
+// The existing monetary formula is independent of controls and formatting.
+internal sealed record StartingMoneyRoll(int Dice, int Extra, int Multiplier)
+{
+    internal int Minimum => Dice;
+    internal int Maximum => checked(Dice * 6);
+    internal int Total(int roll) => Convert.ToInt32(((decimal)roll + Extra) * Multiplier);
+}
 internal sealed record StartingMoneySelection(int Amount);
 internal sealed class StartingMoneyWindow : Window
 {
     internal NumericUpDown RollInput { get; }
     internal TextBlock ResultText { get; } = new();
-    private readonly int extra, multiplier;
-    internal int Amount => Convert.ToInt32(((RollInput.Value ?? RollInput.Minimum) + extra) * multiplier);
-    internal StartingMoneyWindow(int dice, int extra, int multiplier)
+    private readonly StartingMoneyRoll roll;
+    internal int Amount => roll.Total((int)(RollInput.Value ?? RollInput.Minimum));
+    internal StartingMoneyWindow(StartingMoneyRoll roll)
     {
-        this.extra = extra; this.multiplier = multiplier;
+        this.roll = roll;
         Title = LanguageManager.Instance.GetString("Title_LifestyleNuyen");
         Width = 500; MinWidth = 360; SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
-        RollInput = NativeIntegerInput.Create("startingMoneyRoll", dice, checked(dice * 6));
-        RollInput.Value = dice; RollInput.HorizontalAlignment = HorizontalAlignment.Left;
+        RollInput = NativeIntegerInput.Create("startingMoneyRoll", roll.Minimum, roll.Maximum);
+        RollInput.Value = roll.Minimum; RollInput.HorizontalAlignment = HorizontalAlignment.Left;
         RollInput.ValueChanged += (_, _) => RefreshResult();
         var layout = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
         layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_LifestyleNuyen_Description"), TextWrapping = Avalonia.Media.TextWrapping.Wrap });
-        layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_LifestyleNuyen_ResultOf") + " " + dice + "D6:" });
+        layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_LifestyleNuyen_ResultOf") + " " + roll.Dice + "D6:" });
         layout.Children.Add(RollInput); layout.Children.Add(ResultText);
         ResultText.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
         var cancel = new Button { Content = LanguageManager.Instance.GetString("String_Cancel"), IsCancel = true };
@@ -68,6 +75,6 @@ internal sealed class StartingMoneyWindow : Window
         buttons.Children.Add(cancel); buttons.Children.Add(accept); layout.Children.Add(buttons); Content = layout;
         Opened += (_, _) => RollInput.Focus(); RefreshResult();
     }
-    private void RefreshResult() => ResultText.Text = "(" + (RollInput.Value ?? RollInput.Minimum) + " + " + extra + ") × " + multiplier + " = " + string.Format(GlobalOptions.Instance.CultureInfo, "{0:###,###,##0¥}", Amount);
+    private void RefreshResult() => ResultText.Text = "(" + (RollInput.Value ?? RollInput.Minimum) + " + " + roll.Extra + ") × " + roll.Multiplier + " = " + string.Format(GlobalOptions.Instance.CultureInfo, "{0:###,###,##0¥}", Amount);
     internal void Accept() => Close(new StartingMoneySelection(Amount));
 }

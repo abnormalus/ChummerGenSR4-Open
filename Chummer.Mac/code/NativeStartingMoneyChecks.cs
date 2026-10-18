@@ -66,7 +66,8 @@ internal static class NativeStartingMoneyChecks
                 var deadline = DateTime.UtcNow.AddSeconds(20);
                 while (!ready()) { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Creation confirmation did not open."); await Task.Delay(10); }
             }
-            Task Reply(Forms.DialogResult answer, bool cancelMoney = false)
+            int acceptedMoney = 0;
+            Task Reply(Forms.DialogResult answer, bool cancelMoney = false, bool acceptMoney = false)
             {
                 var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 Avalonia.Threading.Dispatcher.UIThread.Post(async () => {
@@ -74,7 +75,13 @@ internal static class NativeStartingMoneyChecks
                     {
                         await WaitForAsync(() => Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Any());
                         var message = Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Last(); message.DialogResult = answer; message.Close();
-                        if (cancelMoney) { await WaitForAsync(() => NativeDialogHost.ActiveWindow is StartingMoneyWindow); NativeDialogHost.ActiveWindow!.Close(); }
+                        if (cancelMoney || acceptMoney)
+                        {
+                            await WaitForAsync(() => NativeDialogHost.ActiveWindow is StartingMoneyWindow);
+                            var moneyPrompt = (StartingMoneyWindow)NativeDialogHost.ActiveWindow!;
+                            if (acceptMoney) { moneyPrompt.RollInput.Value = moneyPrompt.RollInput.Maximum; acceptedMoney = Math.Max(0, moneyPrompt.Amount); moneyPrompt.Accept(); }
+                            else moneyPrompt.Close();
+                        }
                         completion.TrySetResult();
                     }
                     catch (Exception error) { NativeDialogHost.CancelAll(); completion.TrySetException(error); }
@@ -106,6 +113,14 @@ internal static class NativeStartingMoneyChecks
             bool accepted = editor.ValidateCharacter();
             check(accepted && character.Lifestyles.Count == 1 && character.Lifestyles[0].Name == "Street" && character.Nuyen == expectedMoney && !character.Created,
                 "Native starting-money retry commits one fallback lifestyle and accepted catalog roll");
+            character.BuildMethod = CharacterBuildMethod.Karma;
+            var carryoverReply = Reply(Forms.DialogResult.Yes, acceptMoney: true); bool carryoverAccepted = editor.ValidateCharacter(); await carryoverReply;
+            check(carryoverAccepted && character.Karma == character.Options.KarmaCarryover && character.Nuyen == acceptedMoney && character.Lifestyles.Count == 1,
+                "Native accepted starting-money commits Karma carryover without duplicating existing lifestyle");
+            character.BuildMethod = CharacterBuildMethod.BP;
+            var finalReply = Reply(Forms.DialogResult.Yes, acceptMoney: true); bool created = editor.ConfirmSaveCreatedCharacter(); await finalReply;
+            check(created && character.Created && character.Nuyen == acceptedMoney && character.Lifestyles.Count == 1,
+                "Native explicit creation and starting-money acceptance finalize once");
         }
         finally { editor.GetType().GetField("_blnIsDirty", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(editor, false); editor.Close(); }
     }
