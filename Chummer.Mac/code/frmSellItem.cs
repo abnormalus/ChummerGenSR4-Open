@@ -1,47 +1,26 @@
+#nullable enable
 using System;
-using Majorsilence.Forms;
+using System.Threading.Tasks;
+using Forms = Majorsilence.Forms;
 
+namespace Chummer;
 
-namespace Chummer
+// Sale rules retain their existing fractional-price boundary. The shared prompt
+// owns editing, modality and theme; no inventory changes occur before acceptance.
+public sealed class frmSellItem : IDisposable
 {
-	public partial class frmSellItem : Form
-	{
-		#region Control Events
-		public frmSellItem()
-		{
-			InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-			MoveControls();
-		}
+    private readonly frmSelectNumber percentage = new()
+    {
+        Minimum = 0,
+        Maximum = 9999,
+        SelectedValue = 50,
+        Text = LanguageManager.Instance.GetString("Title_SellItem"),
+        Description = LanguageManager.Instance.GetString("Label_SellItem_SellItemFor") + " (%)"
+    };
 
-		private void cmdOK_Click(object sender, EventArgs e)
-		{
-			this.DialogResult = DialogResult.OK;
-		}
-
-		private void cmdCancel_Click(object sender, EventArgs e)
-		{
-			this.DialogResult = DialogResult.Cancel;
-		}
-		#endregion
-
-		#region Methods
-		private void MoveControls()
-		{
-			nudPercent.Left = lblSellForLabel.Left + lblSellForLabel.Width + 6;
-			lblPercentLabel.Left = nudPercent.Left + nudPercent.Width + 6;
-			this.Width = lblPercentLabel.Left + lblPercentLabel.Width + 19;
-			if (this.Width < 185)
-				this.Width = 185;
-		}
-		#endregion
-
-		#region Properties
-		/// <summary>
-		/// The percentage the item will be sold at.
-		/// </summary>
-		public double SellPercent => Convert.ToDouble(nudPercent.Value / 100, GlobalOptions.Instance.CultureInfo);
-
-        #endregion
-	}
+    public Forms.DialogResult DialogResult => percentage.DialogResult;
+    public double SellPercent => percentage.SelectedValue / 100.0;
+    public Forms.DialogResult ShowDialog(Forms.Form? owner = null) => percentage.ShowDialog(owner);
+    internal Task<Forms.DialogResult> ShowDialogAsync(Forms.Form owner) => percentage.ShowDialogAsync(owner);
+    public void Dispose() => percentage.Dispose();
 }

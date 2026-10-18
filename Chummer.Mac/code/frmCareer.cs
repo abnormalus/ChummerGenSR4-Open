@@ -11874,10 +11874,10 @@ namespace Chummer
 							return;
 						}
 
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Create the Expense Log Entry for the sale.
@@ -11957,10 +11957,10 @@ namespace Chummer
 						// Locate the selected piece of Gear.
 						Gear objGear = _objFunctions.FindCyberwareGear(treCyberware.SelectedNode.Tag.ToString(), _objCharacter.Cyberware, out objCyberware);
 
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Create the Expense Log Entry for the sale.
@@ -12002,10 +12002,10 @@ namespace Chummer
 					// Locate the piece of Armor that is selected in the tree.
 					Armor objArmor = _objFunctions.FindArmor(treArmor.SelectedNode.Tag.ToString(), _objCharacter.Armor);
 
-					frmSellItem frmSell = new frmSellItem();
+					using frmSellItem frmSell = new frmSellItem();
 					frmSell.ShowDialog(this);
 
-					if (frmSell.DialogResult == DialogResult.Cancel)
+					if (frmSell.DialogResult != DialogResult.OK)
 						return;
 
 					// Create the Expense Log Entry for the sale.
@@ -12060,10 +12060,10 @@ namespace Chummer
 						// Record the cost of the Armor with the ArmorMod.
 						int intOriginal = objMod.Parent.TotalCost;
 
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Remove the Cyberweapon created by the Mod if applicable.
@@ -12109,10 +12109,10 @@ namespace Chummer
 						// Record the cost of the Armor with the ArmorMod.
 						int intOriginal = objArmor.TotalCost;
 
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Remove any Improvements created by the Gear.
@@ -12142,10 +12142,10 @@ namespace Chummer
 					// Record the cost of the Armor with the ArmorMod.
 					int intOriginal = objArmor.TotalCost;
 
-					frmSellItem frmSell = new frmSellItem();
+					using frmSellItem frmSell = new frmSellItem();
 					frmSell.ShowDialog(this);
 
-					if (frmSell.DialogResult == DialogResult.Cancel)
+					if (frmSell.DialogResult != DialogResult.OK)
 						return;
 
 					// Remove any Improvements created by the Gear.
@@ -12210,10 +12210,10 @@ namespace Chummer
 						return;
 					}
 
-					frmSellItem frmSell = new frmSellItem();
+					using frmSellItem frmSell = new frmSellItem();
 					frmSell.ShowDialog(this);
 
-					if (frmSell.DialogResult == DialogResult.Cancel)
+					if (frmSell.DialogResult != DialogResult.OK)
 						return;
 
 					// Create the Expense Log Entry for the sale.
@@ -12252,10 +12252,10 @@ namespace Chummer
 
 					if (objAccessory.Name != "")
 					{
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Record the Weapon's original cost.
@@ -12284,10 +12284,10 @@ namespace Chummer
 
 					if (objMod.Name != "")
 					{
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Record the Weapon's original cost.
@@ -12304,10 +12304,10 @@ namespace Chummer
 					}
 					else
 					{
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Find the selected Gear.
@@ -12365,10 +12365,10 @@ namespace Chummer
 						}
 					}
 
-					frmSellItem frmSell = new frmSellItem();
+					using frmSellItem frmSell = new frmSellItem();
 					frmSell.ShowDialog(this);
 
-					if (frmSell.DialogResult == DialogResult.Cancel)
+					if (frmSell.DialogResult != DialogResult.OK)
 						return;
 
 					// Create the Expense Log Entry for the sale.
@@ -12417,10 +12417,10 @@ namespace Chummer
 						}
 					}
 
-					frmSellItem frmSell = new frmSellItem();
+					using frmSellItem frmSell = new frmSellItem();
 					frmSell.ShowDialog(this);
 
-					if (frmSell.DialogResult == DialogResult.Cancel)
+					if (frmSell.DialogResult != DialogResult.OK)
 						return;
 
 					// Create the Expense Log Entry for the sale.
@@ -12450,10 +12450,10 @@ namespace Chummer
 								}
 								else
 								{
-									frmSellItem frmSell = new frmSellItem();
+									using frmSellItem frmSell = new frmSellItem();
 									frmSell.ShowDialog(this);
 
-									if (frmSell.DialogResult == DialogResult.Cancel)
+									if (frmSell.DialogResult != DialogResult.OK)
 										return;
 
 									// Record the original value of the Vehicle.
@@ -12490,10 +12490,10 @@ namespace Chummer
 						{
 							if (objGear.InternalId == treVehicles.SelectedNode.Tag.ToString())
 							{
-								frmSellItem frmSell = new frmSellItem();
+								using frmSellItem frmSell = new frmSellItem();
 								frmSell.ShowDialog(this);
 
-								if (frmSell.DialogResult == DialogResult.Cancel)
+								if (frmSell.DialogResult != DialogResult.OK)
 									return;
 
 								// Record the original value of the vehicle.
@@ -12561,10 +12561,10 @@ namespace Chummer
 							{
 								if (objWeapon.InternalId == treVehicles.SelectedNode.Tag.ToString())
 								{
-									frmSellItem frmSell = new frmSellItem();
+									using frmSellItem frmSell = new frmSellItem();
 									frmSell.ShowDialog(this);
 
-									if (frmSell.DialogResult == DialogResult.Cancel)
+									if (frmSell.DialogResult != DialogResult.OK)
 										return;
 
 									// Record the original value of the Vehicle.
@@ -12592,10 +12592,10 @@ namespace Chummer
 					Gear objGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objFoundVehicle);
 					if (objGear != null)
 					{
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Record the original value of the Vehicle.
@@ -12621,10 +12621,10 @@ namespace Chummer
 							{
 								if (objCyberware.InternalId == treVehicles.SelectedNode.Tag.ToString())
 								{
-									frmSellItem frmSell = new frmSellItem();
+									using frmSellItem frmSell = new frmSellItem();
 									frmSell.ShowDialog(this);
 
-									if (frmSell.DialogResult == DialogResult.Cancel)
+									if (frmSell.DialogResult != DialogResult.OK)
 										return;
 
 									// Record the original value of the Vehicle.
@@ -12659,10 +12659,10 @@ namespace Chummer
 								{
 									if (objAccessory.InternalId == treVehicles.SelectedNode.Tag.ToString())
 									{
-										frmSellItem frmSell = new frmSellItem();
+										using frmSellItem frmSell = new frmSellItem();
 										frmSell.ShowDialog(this);
 
-										if (frmSell.DialogResult == DialogResult.Cancel)
+										if (frmSell.DialogResult != DialogResult.OK)
 											return;
 
 										// Record the original value of the Vehicle.
@@ -12685,10 +12685,10 @@ namespace Chummer
 								{
 									if (objWeaponMod.InternalId == treVehicles.SelectedNode.Tag.ToString())
 									{
-										frmSellItem frmSell = new frmSellItem();
+										using frmSellItem frmSell = new frmSellItem();
 										frmSell.ShowDialog(this);
 
-										if (frmSell.DialogResult == DialogResult.Cancel)
+										if (frmSell.DialogResult != DialogResult.OK)
 											return;
 
 										// Record tthe original value of the Vehicle.
@@ -12713,10 +12713,10 @@ namespace Chummer
 									{
 										if (objUnderbarrelWeapon.InternalId == treVehicles.SelectedNode.Tag.ToString())
 										{
-											frmSellItem frmSell = new frmSellItem();
+											using frmSellItem frmSell = new frmSellItem();
 											frmSell.ShowDialog(this);
 
-											if (frmSell.DialogResult == DialogResult.Cancel)
+											if (frmSell.DialogResult != DialogResult.OK)
 												return;
 
 											// Record the original value of the Vehicle.
@@ -12746,10 +12746,10 @@ namespace Chummer
 					Gear objGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objFoundVehicle);
 					if (objGear != null)
 					{
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Record the original value of the Vehicle.
@@ -12784,10 +12784,10 @@ namespace Chummer
 										{
 											if (objAccessory.InternalId == treVehicles.SelectedNode.Tag.ToString())
 											{
-												frmSellItem frmSell = new frmSellItem();
+												using frmSellItem frmSell = new frmSellItem();
 												frmSell.ShowDialog(this);
 
-												if (frmSell.DialogResult == DialogResult.Cancel)
+												if (frmSell.DialogResult != DialogResult.OK)
 													return;
 
 												// Record the original value of the Vehicle.
@@ -12810,10 +12810,10 @@ namespace Chummer
 										{
 											if (objWeaponMod.InternalId == treVehicles.SelectedNode.Tag.ToString())
 											{
-												frmSellItem frmSell = new frmSellItem();
+												using frmSellItem frmSell = new frmSellItem();
 												frmSell.ShowDialog(this);
 
-												if (frmSell.DialogResult == DialogResult.Cancel)
+												if (frmSell.DialogResult != DialogResult.OK)
 													return;
 
 												// Record tthe original value of the Vehicle.
@@ -12844,10 +12844,10 @@ namespace Chummer
 					Gear objGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objFoundVehicle);
 					if (objGear != null)
 					{
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Record the original value of the Vehicle.
@@ -12873,10 +12873,10 @@ namespace Chummer
 					Gear objGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objFoundVehicle);
 					if (objGear != null)
 					{
-						frmSellItem frmSell = new frmSellItem();
+						using frmSellItem frmSell = new frmSellItem();
 						frmSell.ShowDialog(this);
 
-						if (frmSell.DialogResult == DialogResult.Cancel)
+						if (frmSell.DialogResult != DialogResult.OK)
 							return;
 
 						// Record the original value of the Vehicle.
