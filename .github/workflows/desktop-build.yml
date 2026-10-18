@@ -56,7 +56,9 @@ jobs:
           $appName = if ($IsWindows) { 'ChummerMac.exe' } else { 'ChummerMac' }
           $exe = (Resolve-Path "Chummer.Mac/bin/Release/net10.0/$appName").Path
           $process = Start-Process -FilePath $exe -ArgumentList @('--check-bulk', "`"$character`"", "`"$report`"") -PassThru
-          if (-not $process.WaitForExit(120000)) {
+          # More than 400 real UI transitions now exceed two minutes on Mac.
+          # Per-operation deadlines remain in the tests; bound the whole suite too.
+          if (-not $process.WaitForExit(180000)) {
             $process.Kill($true)
             throw 'Native bulk-operation checks timed out.'
           }
