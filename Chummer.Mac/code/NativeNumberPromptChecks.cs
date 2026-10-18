@@ -27,7 +27,13 @@ internal static class NativeNumberPromptChecks
             window.Input.Text = "20"; await Task.Delay(30);
             window.Input.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "PART_IncreaseButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check(window.Input.Value == 21, "Native number spinner increases configured draft");
-            window.Input.GetVisualDescendants().OfType<TextBox>().Single().RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
+            var inputEditor = window.Input.GetVisualDescendants().OfType<TextBox>().Single();
+            decimal? beforeDown = window.Input.Value;
+            inputEditor.Focus();
+            inputEditor.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
+            await Task.Delay(30);
+            // Synthetic numeric-only evidence distinguishes stepping from text/focus synchronization.
+            File.WriteAllText(Path.Combine(output, "native-number-input-probe.json"), System.Text.Json.JsonSerializer.Serialize(new { beforeDown, afterDown = window.Input.Value, text = window.Input.Text, editorFocused = inputEditor.IsFocused }));
             check(window.Input.Value == 20, "Native number keyboard decreases configured draft");
             window.Input.Text = "1"; await Task.Delay(30);
             check(window.Input.Value == 10, "Native number clips typed input at configured minimum");
