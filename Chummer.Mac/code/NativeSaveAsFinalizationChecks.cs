@@ -10,12 +10,16 @@ internal static class NativeSaveAsFinalizationChecks
 {
     internal static async Task RunAsync(Forms.Form owner, Character original, string output, Action<bool,string> check)
     {
-        foreach(int scenario in new[]{0,1,2,3})
+        foreach(int scenario in new[]{0,1,2,3,4,5})
         {
             var character=new Character(); character.LoadSnapshot(original.CaptureSnapshot());
             character.Created=false; character.BuildMethod=CharacterBuildMethod.BP; character.IgnoreRules=true;
             character.Nuyen=123456; character.Lifestyles.Clear(); character.FileName=Path.Combine(output,"synthetic-save-source-"+scenario+".chum");
             string destination=Path.Combine(output,"synthetic-save-result-"+scenario+".chum");
+            if(scenario==4) Directory.CreateDirectory(destination);
+            string originalPath=character.FileName;
+            if(scenario==5) Directory.CreateDirectory(originalPath);
+            var originalGear=character.Gear.FirstOrDefault();
             using var editor=new frmCreate(character){Loading=true,MdiParent=owner}; editor.Show();
             var checkbox=(Forms.CheckBox)editor.GetType().GetField("chkCharacterCreated",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(editor)!;
             checkbox.Checked=true; var before=character.CaptureSnapshot();
@@ -40,7 +44,8 @@ internal static class NativeSaveAsFinalizationChecks
             });
             try
             {
-                bool saved=editor.SaveCharacterAs(blnEscapeAfterSave:scenario==1||scenario==3,chooseSavePath:()=>scenario<2?null!:destination);
+                bool saved=scenario==5 ? editor.SaveCharacter() :
+                    editor.SaveCharacterAs(blnEscapeAfterSave:scenario==1||scenario>=3,chooseSavePath:()=>scenario<2?null!:destination);
                 completed=true;await replies.Task;
                 if(scenario<2)
                     check(!saved&&!confirmationOpened&&character.CaptureSnapshot().AsSpan().SequenceEqual(before)&&!File.Exists(character.FileName),
@@ -48,6 +53,10 @@ internal static class NativeSaveAsFinalizationChecks
                 else if(scenario==2)
                     check(!saved&&confirmationOpened&&!character.Created&&character.Nuyen==123456&&character.Lifestyles.Count==0&&!File.Exists(destination),
                         "Native chosen save path followed by creation No preserves model and writes no character");
+                else if(scenario>=4)
+                    check(!saved&&character.FileName==originalPath&&character.CaptureSnapshot().AsSpan().SequenceEqual(before)&&
+                        ReferenceEquals(originalGear,character.Gear.FirstOrDefault()),
+                        "Native failed creation "+(scenario==5?"Save":"Save As")+" preserves prefinalization model filename and inventory references");
                 else
                 {
                     var reopened=new Character{FileName=destination};
