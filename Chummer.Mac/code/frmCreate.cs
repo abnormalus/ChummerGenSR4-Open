@@ -6754,17 +6754,15 @@ namespace Chummer
 
 		private void cmdAddVehicle_Click(object sender, EventArgs e)
 		{
-			frmSelectVehicle frmPickVehicle = new frmSelectVehicle(_objCharacter);
+			using frmSelectVehicle frmPickVehicle = new frmSelectVehicle(_objCharacter);
 			frmPickVehicle.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicle.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicle.DialogResult != DialogResult.OK)
 				return;
 
-			// Open the Vehicles XML file and locate the selected piece.
-			XmlDocument objXmlDocument = XmlManager.Instance.Load("vehicles.xml");
-
-			XmlNode objXmlVehicle = objXmlDocument.SelectSingleNode("/chummer/vehicles/vehicle[name = \"" + frmPickVehicle.SelectedVehicle + "\"]");
+			// Resolve the accepted canonical identity against the current catalog.
+			XmlNode objXmlVehicle = frmPickVehicle.SelectedDefinition;
 
 			TreeNode objNode = new TreeNode();
 			Vehicle objVehicle = new Vehicle(_objCharacter);
@@ -12222,10 +12220,10 @@ namespace Chummer
 
 		private void tsCreateNaturalWeapon_Click(object sender, EventArgs e)
 		{
-			frmNaturalWeapon frmCreateNaturalWeapon = new frmNaturalWeapon(_objCharacter);
+			using frmNaturalWeapon frmCreateNaturalWeapon = new frmNaturalWeapon(_objCharacter);
 			frmCreateNaturalWeapon.ShowDialog(this);
 
-			if (frmCreateNaturalWeapon.DialogResult == DialogResult.Cancel)
+			if (frmCreateNaturalWeapon.DialogResult != DialogResult.OK)
 				return;
 
 			Weapon objWeapon = frmCreateNaturalWeapon.SelectedWeapon;
@@ -18004,9 +18002,13 @@ namespace Chummer
 		/// <summary>
 		/// Save the Character using the Save As dialogue box.
 		/// </summary>
-		internal bool SaveCharacterAs(bool blnEscapeAfterSave = false)
+		internal bool SaveCharacterAs(bool blnEscapeAfterSave = false, Func<string> chooseSavePath = null)
 		{
 			bool blnSaved = false;
+            // Choose a destination before creation confirmation can commit starting
+            // money, lifestyle, skill-group and Created state. Cancel leaves it unchanged.
+            string path = chooseSavePath == null ? CharacterFileDialogs.ChooseSavePath(this, _objCharacter) : chooseSavePath();
+            if (path == null) return false;
 
 			// If the Created is checked, make sure the user wants to actually save this character.
 			if (chkCharacterCreated.Checked)
@@ -18018,8 +18020,6 @@ namespace Chummer
 				}
 			}
 
-            string path = CharacterFileDialogs.ChooseSavePath(this, _objCharacter);
-            if (path == null) return false;
             if (!CharacterFileDialogs.TrySave(this, _objCharacter, path)) return false;
             _blnIsDirty = false;
             blnSaved = true;

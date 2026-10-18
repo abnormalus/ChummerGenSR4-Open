@@ -1,180 +1,96 @@
+#nullable enable
 using System;
-using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using Majorsilence.Forms;
+using System.Threading.Tasks;
 using System.Xml;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Forms = Majorsilence.Forms;
+namespace Chummer;
 
-
-
-
-
-namespace Chummer
+// Keep catalog identities and legacy damage/AP notation independent of layout.
+internal sealed record NaturalWeaponSelection(string Name, string Skill, string DamageBase, int Modifier, string DamageType, int AP, int Reach)
 {
-	public partial class frmNaturalWeapon : Form
-	{
-		private readonly XmlDocument _objXmlPowersDocument = new XmlDocument();
-		private readonly XmlDocument _objXmlSkillsDocument = new XmlDocument();
-
-		private readonly Character _objCharacter;
-		private Weapon _objWeapon;
-
-		#region Control Events
-		public frmNaturalWeapon(Character objCharacter)
-		{
-			InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-			_objCharacter = objCharacter;
-			_objXmlPowersDocument = XmlManager.Instance.Load("critterpowers.xml");
-			_objXmlSkillsDocument = XmlManager.Instance.Load("skills.xml");
-			MoveControls();
-		}
-
-		private void frmNaturalWeapon_Load(object sender, EventArgs e)
-		{
-			// Load the list of Combat Active Skills and populate the Skills list.
-			List<ListItem> lstSkills = new List<ListItem>();
-			foreach (XmlNode objXmlSkill in _objXmlSkillsDocument.SelectNodes("/chummer/skills/skill[category = \"Combat Active\"]"))
-			{
-				ListItem objItem = new ListItem();
-				objItem.Value = objXmlSkill["name"].InnerText;
-				if (objXmlSkill.Attributes != null)
-				{
-					if (objXmlSkill["translate"] != null)
-						objItem.Name = objXmlSkill["translate"].InnerText;
-					else
-						objItem.Name = objXmlSkill["name"].InnerText;
-				}
-				else
-					objItem.Name = objXmlSkill["name"].InnerXml;
-				lstSkills.Add(objItem);
-			}
-
-			List<ListItem> lstDVBase = new List<ListItem>();
-			ListItem objStrength = new ListItem();
-			objStrength.Value = "(STR/2)";
-			objStrength.Name = "(" + LanguageManager.Instance.GetString("String_AttributeSTRShort") + "/2)";
-			lstDVBase.Add(objStrength);
-			for (int i = 1; i <= 20; i++)
-			{
-				ListItem objItem = new ListItem();
-				objItem.Value = i.ToString();
-				objItem.Name = i.ToString();
-				lstDVBase.Add(objItem);
-			}
-
-			List<ListItem> lstDVType = new List<ListItem>();
-			ListItem objDVPhysical = new ListItem();
-			objDVPhysical.Value = "P";
-			objDVPhysical.Name = LanguageManager.Instance.GetString("String_DamagePhysical");
-			lstDVType.Add(objDVPhysical);
-
-			ListItem objDVStun = new ListItem();
-			objDVStun.Value = "S";
-			objDVStun.Name = LanguageManager.Instance.GetString("String_DamageStun");
-			lstDVType.Add(objDVStun);
-
-			// Bind the Lists to the ComboBoxes.
-			cboSkill.ValueMember = "Value";
-			cboSkill.DisplayMember = "Name";
-			cboSkill.DataSource = lstSkills;
-			cboSkill.SelectedIndex = 0;
-
-			cboDVBase.ValueMember = "Value";
-			cboDVBase.DisplayMember = "Name";
-			cboDVBase.DataSource = lstDVBase;
-			cboDVBase.SelectedIndex = 0;
-
-			cboDVType.ValueMember = "Value";
-			cboDVType.DisplayMember = "Name";
-			cboDVType.DataSource = lstDVType;
-			cboDVType.SelectedIndex = 0;
-		}
-
-		private void cmdCancel_Click(object sender, EventArgs e)
-		{
-			this.DialogResult = DialogResult.Cancel;
-		}
-
-		private void cmdOK_Click(object sender, EventArgs e)
-		{
-			AcceptForm();
-		}
-		#endregion
-
-		#region Methods
-		private void MoveControls()
-		{
-			int intWidth = Math.Max(lblName.Width, lblDV.Width);
-			intWidth = Math.Max(intWidth, lblAP.Width);
-			intWidth = Math.Max(intWidth, lblActiveSkill.Width);
-			intWidth = Math.Max(intWidth, lblReach.Width);
-			txtName.Left = lblName.Left + intWidth + 6;
-			cboSkill.Left = lblActiveSkill.Left + intWidth + 6;
-			cboDVBase.Left = lblDV.Left + intWidth + 6;
-			lblDVPlus.Left = cboDVBase.Left + cboDVBase.Width + 6;
-			nudDVMod.Left = lblDVPlus.Left + lblDVPlus.Width + 6;
-			cboDVType.Left = nudDVMod.Left + nudDVMod.Width + 6;
-			nudAP.Left = lblAP.Left + intWidth + 6;
-			nudReach.Left = lblReach.Left + intWidth + 6;
-		}
-
-		private void AcceptForm()
-		{
-			// Assemble the DV from the fields.
-			string strDamage = cboDVBase.SelectedValue.ToString();
-			if (Convert.ToInt32(nudDVMod.Value) != 0)
-			{
-				if (nudDVMod.Value < 0)
-					strDamage += nudDVMod.Value.ToString();
-				else
-					strDamage += "+" + nudDVMod.Value.ToString();
-			}
-			strDamage += cboDVType.SelectedValue.ToString();
-
-			// Create the AP value.
-			string strAP = "";
-			if (nudAP.Value == 0)
-				strAP = "0";
-			else if (nudAP.Value > 0)
-				strAP = "+" + nudAP.Value.ToString();
-			else
-				strAP = nudAP.Value.ToString();
-
-			// Get the information for the Natural Weapon Critter Power.
-			XmlNode objPower = _objXmlPowersDocument.SelectSingleNode("/chummer/powers/power[name = \"Natural Weapon\"]");
-
-			// Create the Weapon.
-			_objWeapon = new Weapon(_objCharacter);
-			_objWeapon.Name = txtName.Text;
-			_objWeapon.Category = LanguageManager.Instance.GetString("Tab_Critter");
-			_objWeapon.WeaponType = "Melee";
-			_objWeapon.Reach = Convert.ToInt32(nudReach.Value);
-			_objWeapon.Damage = strDamage;
-			_objWeapon.AP = strAP;
-			_objWeapon.Mode = "0";
-			_objWeapon.RC = "0";
-			_objWeapon.Concealability = 0;
-			_objWeapon.Avail = "0";
-			_objWeapon.Cost = 0;
-			_objWeapon.UseSkill = cboSkill.SelectedValue.ToString();
-			_objWeapon.Source = objPower["source"].InnerText;
-			_objWeapon.Page = objPower["page"].InnerText;
-
-			this.DialogResult = DialogResult.OK;
-		}
-		#endregion
-
-		#region Properties
-		/// <summary>
-		/// Weapon that was created as a result of the dialogue.
-		/// </summary>
-		public Weapon SelectedWeapon
-		{
-			get
-			{
-				return _objWeapon;
-			}
-		}
-		#endregion
-	}
+    internal string Damage => DamageBase + (Modifier == 0 ? "" : Modifier.ToString("+0;-0", CultureInfo.InvariantCulture)) + DamageType;
+    internal string ArmorPenetration => AP == 0 ? "0" : AP.ToString("+0;-0", CultureInfo.InvariantCulture);
+    internal Weapon Create(Character character)
+    {
+        var power = XmlManager.Instance.Load("critterpowers.xml").SelectSingleNode("/chummer/powers/power[name = 'Natural Weapon']")
+            ?? throw new InvalidOperationException("Natural Weapon catalog definition is missing.");
+        return new Weapon(character) { Name = Name, Category = LanguageManager.Instance.GetString("Tab_Critter"), WeaponType = "Melee",
+            Reach = Reach, Damage = Damage, AP = ArmorPenetration, Mode = "0", RC = "0", Concealability = 0, Avail = "0", Cost = 0,
+            UseSkill = Skill, Source = power["source"]!.InnerText, Page = power["page"]!.InnerText };
+    }
+}
+public sealed class frmNaturalWeapon : IDisposable
+{
+    private readonly Character character;
+    private NaturalWeaponWindow? window;
+    private Weapon? selectedWeapon;
+    public frmNaturalWeapon(Character objCharacter) => character = objCharacter;
+    public Forms.DialogResult DialogResult { get; private set; } = Forms.DialogResult.Cancel;
+    public Weapon SelectedWeapon => selectedWeapon ?? throw new InvalidOperationException("No natural weapon was accepted.");
+    public Forms.DialogResult ShowDialog(Forms.Form owner)
+    {
+        var pending = ShowDialogAsync(owner); Forms.Backends.Platform.Backend.RunModalLoop(pending); return pending.GetAwaiter().GetResult();
+    }
+    internal async Task<Forms.DialogResult> ShowDialogAsync(Forms.Form owner)
+    {
+        if (window != null) throw new InvalidOperationException("Natural weapon editor is already open.");
+        DialogResult = Forms.DialogResult.Cancel; selectedWeapon = null; window = new NaturalWeaponWindow();
+        try
+        {
+            var selection = await NativeDialogHost.ShowAsync<NaturalWeaponSelection>(window, owner);
+            // Preparation creates an unattached weapon. Only the accepted caller
+            // inserts it into inventory and marks its character dirty.
+            if (selection != null) { selectedWeapon = selection.Create(character); DialogResult = Forms.DialogResult.OK; }
+            return DialogResult;
+        }
+        finally { window = null; }
+    }
+    public void Dispose() => window?.Close();
+}
+internal sealed class NaturalWeaponWindow : Window
+{
+    private sealed record Choice(string Value, string Label) { public override string ToString() => Label; }
+    internal TextBox NameInput { get; } = new();
+    internal ComboBox SkillInput { get; }
+    internal ComboBox DamageBaseInput { get; }
+    internal ComboBox DamageTypeInput { get; }
+    internal NumericUpDown ModifierInput { get; } = NativeIntegerInput.Create("naturalDamageModifier", -10, 10);
+    internal NumericUpDown APInput { get; } = NativeIntegerInput.Create("naturalArmorPenetration", -10, 10);
+    internal NumericUpDown ReachInput { get; } = NativeIntegerInput.Create("naturalReach", -3, 3);
+    internal Button AcceptButton { get; }
+    internal NaturalWeaponWindow()
+    {
+        string Text(string key) => LanguageManager.Instance.GetString(key);
+        ModifierInput.Value = 0; APInput.Value = 0; ReachInput.Value = 0;
+        APInput.HorizontalAlignment = HorizontalAlignment.Left; ReachInput.HorizontalAlignment = HorizontalAlignment.Left;
+        Title = Text("Title_CreateNaturalWeapon"); Width = 560; MinWidth = 440; SizeToContent = SizeToContent.Height;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner; Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        var skills = XmlManager.Instance.Load("skills.xml").SelectNodes("/chummer/skills/skill[category = 'Combat Active']")!.Cast<XmlNode>()
+            .Select(node => new Choice(node["name"]!.InnerText, node["translate"]?.InnerText ?? node["name"]!.InnerText)).ToArray();
+        SkillInput = new ComboBox { ItemsSource = skills, SelectedIndex = skills.Length == 0 ? -1 : 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+        DamageBaseInput = new ComboBox { ItemsSource = new[] { new Choice("(STR/2)", "(" + Text("String_AttributeSTRShort") + "/2)") }
+            .Concat(Enumerable.Range(1, 20).Select(n => new Choice(n.ToString(CultureInfo.InvariantCulture), n.ToString(CultureInfo.CurrentCulture)))).ToArray(), SelectedIndex = 0, MinWidth = 110 };
+        DamageTypeInput = new ComboBox { ItemsSource = new[] { new Choice("P", Text("String_DamagePhysical")), new Choice("S", Text("String_DamageStun")) }, SelectedIndex = 0, MinWidth = 110 };
+        var layout = new StackPanel { Margin = new Avalonia.Thickness(20), Spacing = 12 };
+        void Add(string label, Control input) { layout.Children.Add(new TextBlock { Text = Text(label) }); layout.Children.Add(input); }
+        Add("Label_Name", NameInput); Add("Label_ActiveSkill", SkillInput);
+        var damage = new WrapPanel();
+        foreach (var input in new Control[] { DamageBaseInput, ModifierInput, DamageTypeInput }) { input.Margin = new Avalonia.Thickness(0, 0, 10, 8); damage.Children.Add(input); }
+        Add("Label_DV", damage); Add("Label_AP", APInput); Add("Label_Reach", ReachInput);
+        var cancel = new Button { Content = Text("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
+        AcceptButton = new Button { Content = Text("String_OK"), IsDefault = true, IsEnabled = skills.Length != 0 }; AcceptButton.Click += (_, _) => Accept();
+        SkillInput.SelectionChanged += (_, _) => AcceptButton.IsEnabled = SkillInput.SelectedItem is Choice;
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 };
+        buttons.Children.Add(cancel); buttons.Children.Add(AcceptButton); layout.Children.Add(buttons); Content = layout;
+        Opened += (_, _) => NameInput.Focus();
+    }
+    internal void Accept()
+    {
+        if (SkillInput.SelectedItem is not Choice skill || DamageBaseInput.SelectedItem is not Choice damageBase || DamageTypeInput.SelectedItem is not Choice damageType) return;
+        Close(new NaturalWeaponSelection(NameInput.Text ?? "", skill.Value, damageBase.Value, (int)(ModifierInput.Value ?? 0), damageType.Value, (int)(APInput.Value ?? 0), (int)(ReachInput.Value ?? 0)));
+    }
 }

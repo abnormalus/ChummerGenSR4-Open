@@ -1010,6 +1010,7 @@ namespace Chummer
                 AccessoryBatchChecks.Run(character, Check);
                 WeaponAmmunitionChecks.Run(character, Check);
                 ArmorPickerChecks.Run(character, Check);
+                VehiclePickerChecks.Run(character, Check);
                 ArmorModPickerChecks.Run(character, Check);
                 AccessoryPickerChecks.Run(character, Check);
                 InventoryEnhancementChecks.Run(character, Check);
