@@ -47,7 +47,13 @@ internal static class NativeContactNotesChecks
                                 while (!Forms.Application.OpenForms.OfType<frmNotes>().Any())
                                 { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Contact notes did not open."); await Task.Delay(10); }
                                 closedDialog = Forms.Application.OpenForms.OfType<frmNotes>().Last();
-                                loaded = closedDialog.Notes == expected;
+                                var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(closedDialog);
+                                while (!window.IsVisible || window.Bounds.Width <= 0 || window.Bounds.Height <= 0)
+                                { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Contact notes did not become visible."); await Task.Delay(10); }
+                                // Opening/closing within one dispatcher turn can avoid the
+                                // paint/focus path implicated by an opening-time crash.
+                                await Task.Delay(100);
+                                loaded = closedDialog.Notes == expected && window.IsVisible;
                                 closedDialog.Notes = expected + "\nSynthetic edit";
                                 closedDialog.Close(); reply.TrySetResult();
                             }

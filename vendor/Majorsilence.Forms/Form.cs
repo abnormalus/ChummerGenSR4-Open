@@ -14,6 +14,7 @@ namespace Majorsilence.Forms
 
         private WindowBase? dialog_parent;
         private DialogResult dialog_result = DialogResult.None;
+        private bool evaluating_closing;
         internal TaskCompletionSource<DialogResult>? dialog_task;
         private System.Drawing.Size minimum_size;
         private System.Drawing.Size maximum_size;
@@ -760,7 +761,10 @@ namespace Majorsilence.Forms
                 // `dialog_parent is not null` test left an ownerless ShowDialog -- the first dialog of
                 // an application, before Application.Run -- unable to close itself by setting
                 // DialogResult, which is how every OK button does it.
-                if (dialog_result != DialogResult.None && (dialog_task is not null || dialog_parent is not null))
+                // FormClosing may choose the result of the close already in progress.
+                // Starting another close there recursively raises FormClosing until
+                // the process stack overflows (for example the notes dialog).
+                if (!evaluating_closing && dialog_result != DialogResult.None && (dialog_task is not null || dialog_parent is not null))
                     Close ();
             }
         }
@@ -978,13 +982,17 @@ namespace Majorsilence.Forms
         protected virtual void OnClosing (CancelEventArgs e)
         {
             if (ExitCloseApproved) return;
-            Closing?.Invoke (this, e);
-
-            var form_closing_args = new FormClosingEventArgs (PendingCloseReason, e.Cancel);
-            OnFormClosing (form_closing_args);
-
-            if (form_closing_args.Cancel)
-                e.Cancel = true;
+            bool previous = evaluating_closing;
+            evaluating_closing = true;
+            try {
+                Closing?.Invoke (this, e);
+                var form_closing_args = new FormClosingEventArgs (PendingCloseReason, e.Cancel);
+                OnFormClosing (form_closing_args);
+                if (form_closing_args.Cancel)
+                    e.Cancel = true;
+            } finally {
+                evaluating_closing = previous;
+            }
         }
 
         /// <summary>Raises the <see cref="FormClosing"/> event.</summary>
