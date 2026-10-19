@@ -1,6 +1,10 @@
 #nullable enable
 using System;
 using System.Linq;
+using System.IO;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Styling;
 using System.Reflection;
 using System.Threading.Tasks;
 using Forms = Majorsilence.Forms;
@@ -9,11 +13,29 @@ namespace Chummer;
 internal static class NativeCreationInputChecks
 {
     private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
-    internal static async Task RunAsync(Forms.Form owner, Character source, Action<bool, string> check)
+    private static async Task WithRuleNotice(Action change)
+    {
+        var dismissed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(20);
+                while (!Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Any())
+                { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Creation rule notice did not open."); await Task.Delay(10); }
+                var notice = Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Last();
+                notice.DialogResult = Forms.DialogResult.OK; notice.Close(); dismissed.TrySetResult();
+            }
+            catch (Exception error) { dismissed.TrySetException(error); }
+        });
+        change(); await dismissed.Task;
+    }
+    internal static async Task RunAsync(Forms.Form owner, Character source, string output, Action<bool, string> check)
     {
         var character = new Character(); character.LoadSnapshot(source.CaptureSnapshot()); character.Created = false; character.IgnoreRules = true;
         using var editor = new frmCreate(character) { MdiParent = owner, Loading = true };
         editor.Show(); await Task.Delay(20);
+        bool previousBudgetOption = character.Options.AllowExceedAttributeBP;
         try
         {
             var section = Field<CreationInputSection>(editor, "creationInputSection");
@@ -21,6 +43,24 @@ internal static class NativeCreationInputChecks
                 "Native creation batch exposes eleven attribute inputs and one money allocation input");
             check(section.Inputs.Keys.All(name => Field<Forms.NumericUpDown>(editor, name).Parent == null),
                 "Native creation inputs retain detached controller state without drawing legacy spinners");
+            var application = Avalonia.Application.Current!;
+            var originalTheme = application.RequestedThemeVariant;
+            try
+            {
+                foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                {
+                    application.RequestedThemeVariant = theme;
+                    await Task.Delay(120);
+                    var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
+                    using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
+                        (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
+                    image.Render(window);
+                    image.Save(Path.Combine(output, "native-creation-inputs-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
+                    check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input => input.Bounds.Width > 0 && input.Bounds.Height >= 20),
+                        "Native creation input batch has measured controls in " + theme.Key);
+                }
+            }
+            finally { application.RequestedThemeVariant = originalTheme; }
             var body = Field<Forms.NumericUpDown>(editor, "nudBOD"); var input = section.Inputs["nudBOD"];
             editor.Loading = true; body.Minimum = 1; body.Maximum = 10; body.Value = 2;
             check(input.Minimum == 1 && input.Maximum == 10 && input.Value == 2,
@@ -42,7 +82,37 @@ internal static class NativeCreationInputChecks
             var reopened = new Character(); reopened.LoadSnapshot(character.CaptureSnapshot());
             check(reopened.BOD.Value == character.BOD.Value && reopened.NuyenBP == character.NuyenBP,
                 "Native creation attribute and money edits retain the unchanged character serialization contract");
+            character.BuildMethod = CharacterBuildMethod.BP;
+            character.BuildPoints = 2000; character.IgnoreRules = false; character.Options.AllowExceedAttributeBP = false;
+            typeof(frmCreate).GetField("_blnFreestyle", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor, false);
+            void ResetPrimary()
+            {
+                editor.Loading = true;
+                foreach (string name in new[] { "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL" })
+                { var state = Field<Forms.NumericUpDown>(editor, "nud" + name); state.Value = state.Minimum; }
+                editor.Loading = false;
+            }
+            ResetPrimary(); editor.Loading = true;
+            var agility = Field<Forms.NumericUpDown>(editor, "nudAGI"); agility.Value = agility.Maximum;
+            editor.Loading = false;
+            await WithRuleNotice(() => input.Value = body.Maximum);
+            check(body.Value == body.Maximum - 1 && input.Value == body.Value,
+                "Native creation edit retains the one-primary-attribute-at-maximum rule");
+            character.IgnoreRules = true; input.Value = body.Maximum;
+            check(input.Value == body.Value && body.Value == body.Maximum,
+                "Native creation Ignore Rules permits an otherwise rejected maximum");
+            character.IgnoreRules = false; ResetPrimary();
+            character.BuildPoints = character.Options.BPAttribute * 2;
+            decimal firstPaidStep = body.Minimum + 1;
+            await WithRuleNotice(() => input.Value = body.Minimum + 2);
+            check(body.Value == firstPaidStep && input.Value == firstPaidStep,
+                "Native creation edit retains the half-BP primary attribute budget and controller correction");
+            character.IgnoreRules = true; character.BuildMethod = CharacterBuildMethod.Karma; money.Value = 3.5m;
+            int expectedMoney = Convert.ToInt32(3.5m) * character.Options.KarmaNuyenPer +
+                Convert.ToInt32(new ImprovementManager(character).ValueOf(Improvement.ImprovementType.Nuyen));
+            check(character.NuyenBP == 3.5m && Field<Forms.Label>(editor, "lblNuyenTotal").Text == string.Format("= {0:###,###,##0¥}", expectedMoney),
+                "Native Karma money allocation follows existing conversion and improvement accounting");
         }
-        finally { typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor, false); editor.Close(); }
+        finally { character.Options.AllowExceedAttributeBP = previousBudgetOption; typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor, false); editor.Close(); }
     }
 }

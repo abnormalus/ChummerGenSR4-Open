@@ -17824,6 +17824,9 @@ namespace Chummer
 				treLifestyles.SelectedNode.Text = objLifestyle.DisplayName;
 				RefreshSelectedLifestyle();
 				UpdateCharacterInfo();
+                // Only the accepted replacement changes owned character data.
+                _blnIsDirty = true;
+                UpdateWindowTitle();
 			}
 		}
 
