@@ -1006,6 +1006,8 @@ namespace Chummer
                     Check(licensePrompt.SelectedItem == PromptDetails.Placeholder, "blank license detail accepts placeholder");
                 }
                 CritterPowerPromptChecks.Run(character, Check);
+                CreationInputLifecycleChecks.Run(Check);
+                CreationSkillInputChecks.Run(character, Check);
                 ModalCloseChecks.Run(Check);
                 MenuOrderChecks.Run(Check);
                 BuildIdentityChecks.Run(Check);

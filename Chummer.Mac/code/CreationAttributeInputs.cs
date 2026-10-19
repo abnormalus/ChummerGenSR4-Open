@@ -9,8 +9,8 @@ public partial class frmCreate
     private CreationInputSection? creationInputSection;
     private void InitializeCreationInputSection()
     {
-        if (Avalonia.Application.Current == null) return;
-        creationInputSection = new CreationInputSection(panAttributes, tabCommon, new[] {
+        if (Avalonia.Application.Current == null || creationInputSection != null) return;
+        creationInputSection = new CreationInputSection(this, panAttributes, tabCommon, new[] {
             (nudBOD, lblBODLabel, lblBODMetatype, lblBODAug),
             (nudAGI, lblAGILabel, lblAGIMetatype, lblAGIAug),
             (nudREA, lblREALabel, lblREAMetatype, lblREAAug),
@@ -22,7 +22,7 @@ public partial class frmCreate
             (nudEDG, lblEDGLabel, lblEDGMetatype, lblEDGAug),
             (nudMAG, lblMAGLabel, lblMAGMetatype, lblMAGAug),
             (nudRES, lblRESLabel, lblRESMetatype, lblRESAug),
-        }, nudNuyen, lblNuyen, lblNuyenTotal, tipTooltip);
+        }, nudNuyen, lblNuyen, lblNuyenTotal, tipTooltip, (lblAttributesBase, lblAttributesAug, lblAttributesMetatype));
         Disposed += (_, _) => creationInputSection?.Dispose();
     }
 

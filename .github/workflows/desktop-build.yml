@@ -65,7 +65,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Native bulk-operation checks failed: $($process.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'Native bulk-operation report is missing.' }
           $result = Get-Content $report -Raw | ConvertFrom-Json
-          if (-not $result.passed -or $result.checks.Count -lt 561) { throw 'Native bulk-operation checks did not complete.' }
+          if (-not $result.passed -or $result.checks.Count -lt 569) { throw 'Native bulk-operation checks did not complete.' }
       - name: Ensure native Windows browser runtime
         if: runner.os == 'Windows'
         shell: pwsh

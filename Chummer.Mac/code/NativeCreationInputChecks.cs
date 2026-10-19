@@ -5,6 +5,8 @@ using System.IO;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using System.Reflection;
 using System.Threading.Tasks;
 using Forms = Majorsilence.Forms;
@@ -69,9 +71,41 @@ internal static class NativeCreationInputChecks
             int before = character.BOD.Value; input.Value = null;
             check(character.BOD.Value == before && body.Value == 2,
                 "Cleared inline creation input does not commit a fallback value");
-            input.Value = 3;
+            var textEditor = input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Single();
+            textEditor.Focus();
+            section.Inputs["nudNuyen"].Focus(); await Task.Delay(20);
+            check(input.Value == body.Value && character.BOD.Value == before,
+                "Leaving an incomplete creation input restores controller state without committing a fallback");
+            byte[] beforeFractionalEdit = character.CaptureSnapshot();
+            decimal approvedAttribute = body.Value;
+            bool dirtyBeforeFractionalEdit = Field<bool>(editor, "_blnIsDirty");
+            input.Value = approvedAttribute + 0.5m;
+            check(input.ParsingNumberStyle == System.Globalization.NumberStyles.Integer &&
+                input.Value == approvedAttribute && body.Value == approvedAttribute &&
+                character.CaptureSnapshot().SequenceEqual(beforeFractionalEdit) &&
+                Field<bool>(editor, "_blnIsDirty") == dirtyBeforeFractionalEdit,
+                "Native fractional creation attribute edit preserves character and dirty state");
+            input.Text = "3"; await Task.Delay(30);
             check(body.Value == 3 && character.BOD.Value == 3 && Field<bool>(editor, "_blnIsDirty"),
                 "Native creation attribute edit uses the existing controller and dirty-state path");
+            textEditor.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Up }); await Task.Delay(20);
+            check(input.Value == 4 && body.Value == 4 && character.BOD.Value == 4,
+                "Native creation keyboard step follows existing attribute rules and model updates");
+            var infoTabs = Field<Forms.TabControl>(editor, "tabInfo"); var common = Field<Forms.TabPage>(editor, "tabCommon");
+            infoTabs.SelectedTab = Field<Forms.TabPage>(editor, "tabCharacterInfo"); await Task.Delay(20);
+            bool hidden = !input.IsEffectivelyVisible;
+            infoTabs.SelectedTab = common; await Task.Delay(20);
+            check(hidden && input.IsEffectivelyVisible,
+                "Native creation input section hides and restores with its Common tab");
+            using (var prompt = new frmSelectNumber { Minimum = 0, Maximum = 10, Description = "Synthetic creation ownership check" })
+            {
+                var pending = prompt.ShowDialogAsync(editor); await Task.Delay(20);
+                check(!input.IsEffectivelyEnabled,
+                    "Native creation inputs respect modal owner blocking");
+                NativeDialogHost.ActiveWindow!.Close(); await pending;
+                check(input.IsEffectivelyEnabled,
+                    "Native creation inputs resume after modal cancellation");
+            }
             var money = section.Inputs["nudNuyen"]; money.Value = 2.5m;
             check(character.NuyenBP == 2.5m && Field<Forms.NumericUpDown>(editor, "nudNuyen").Value == 2.5m,
                 "Native money allocation preserves decimal model values through existing accounting");
@@ -82,6 +116,12 @@ internal static class NativeCreationInputChecks
             var reopened = new Character(); reopened.LoadSnapshot(character.CaptureSnapshot());
             check(reopened.BOD.Value == character.BOD.Value && reopened.NuyenBP == character.NuyenBP,
                 "Native creation attribute and money edits retain the unchanged character serialization contract");
+            body.Enabled = false;
+            decimal disabledValue = body.Value; int disabledModel = character.BOD.Value;
+            input.Value = disabledValue == body.Minimum ? disabledValue + 1 : disabledValue - 1;
+            check(body.Value == disabledValue && character.BOD.Value == disabledModel && input.Value == disabledValue,
+                "Native disabled creation attribute rejects queued edits without changing the character");
+            body.Enabled = true;
             character.BuildMethod = CharacterBuildMethod.BP;
             character.BuildPoints = 2000; character.IgnoreRules = false; character.Options.AllowExceedAttributeBP = false;
             typeof(frmCreate).GetField("_blnFreestyle", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor, false);
@@ -114,5 +154,9 @@ internal static class NativeCreationInputChecks
                 "Native Karma money allocation follows existing conversion and improvement accounting");
         }
         finally { character.Options.AllowExceedAttributeBP = previousBudgetOption; typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor, false); editor.Close(); }
+        var closedSection = Field<CreationInputSection>(editor, "creationInputSection"); decimal savedMoney = character.NuyenBP;
+        closedSection.Inputs["nudNuyen"].Value = savedMoney == 1 ? 2 : 1;
+        check(character.NuyenBP == savedMoney,
+            "Closed creation editor rejects queued native input changes");
     }
 }

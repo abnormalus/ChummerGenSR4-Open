@@ -125,7 +125,7 @@ namespace Chummer
 
 			SetTooltips();
 			MoveControls();
-            InitializeCreationInputSection();
+            Load += (_, _) => InitializeCreationInputSection();
 		}
 
 		/// <summary>
