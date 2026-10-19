@@ -93,10 +93,9 @@ internal static class NativeInventoryEnhancementChecks
                 {
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
-                        var picker = Forms.Application.OpenForms.OfType<frmSelectVehicleMod>().Last();
-                        Field<Forms.TextBox>(picker, "txtSearch").Text = "Personalized Grip";
-                        Field<Forms.ListBox>(picker, "lstMod").SelectedIndex = 0;
-                        Field<Forms.Button>(picker, "cmdOK").PerformClick();
+                        var picker = (VehicleModPickerWindow)NativeDialogHost.ActiveWindow!;
+                        picker.SearchBox.Text = "Personalized Grip";
+                        picker.Accept(false);
                     });
                     Invoke(editor, "tsWeaponAddModification_Click");
                 }

@@ -70,12 +70,16 @@ internal static class NativeCharacterSwitchChecks
                     "Native repeated character switch keeps tab, toolbar and commands aligned " + iteration);
                 check(menus.Items.Contains(Field<ToolStripMenuItem>(first, "mnuCreateSpecial")) &&
                     menus.Items.Contains(Field<ToolStripMenuItem>(first, "mnuCreateEdit")) &&
-                    !menus.Items.Contains(Field<ToolStripMenuItem>(second, "mnuCreateSpecial")),
+                    !menus.Items.Contains(Field<ToolStripMenuItem>(second, "mnuCreateSpecial")) &&
+                    menus.Items.IndexOf(Field<ToolStripMenuItem>(main, "fileMenu")) <
+                        menus.Items.IndexOf(Field<ToolStripMenuItem>(first, "mnuCreateEdit")),
                     "Native creation menu ownership follows active character " + iteration);
                 if (System.OperatingSystem.IsMacOS())
                 {
                     var nativeMenu = Avalonia.Controls.NativeMenu.GetMenu(main.ToAvaloniaWindow())!;
-                    check(nativeMenu.Items.OfType<Avalonia.Controls.NativeMenuItem>().Any(item => item.Header == "Special" &&
+                    check(nativeMenu.Items.OfType<Avalonia.Controls.NativeMenuItem>().Take(2).Select(item => item.Header)
+                        .SequenceEqual(new[] { "File", "Edit" }) &&
+                        nativeMenu.Items.OfType<Avalonia.Controls.NativeMenuItem>().Any(item => item.Header == "Special" &&
                         item.Menu!.Items.OfType<Avalonia.Controls.NativeMenuItem>().Any(command => command.Header == "Add PACKS Kit")),
                         "Mac native Special menu exposes PACKS after character switch " + iteration);
                 }
@@ -86,7 +90,9 @@ internal static class NativeCharacterSwitchChecks
             typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(first, false);
             first.Close();
             check(main.ActiveMdiChild == second && tabs.SelectedTab == second.Tag &&
-                toolbar.Items.Contains(Field<ToolStripButton>(second, "tsbSave")) && save.Enabled,
+                toolbar.Items.Contains(Field<ToolStripButton>(second, "tsbSave")) && save.Enabled &&
+                menus.Items.IndexOf(Field<ToolStripMenuItem>(main, "fileMenu")) <
+                    menus.Items.IndexOf(Field<ToolStripMenuItem>(second, "mnuCreateEdit")),
                 "Native inactive character close retains the active save toolbar and menu");
             // Invoke the shared Close Character command, rather than closing the form directly.
             typeof(frmCareer).GetField("_blnIsDirty", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(second, false);

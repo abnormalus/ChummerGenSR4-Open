@@ -125,6 +125,7 @@ namespace Chummer
 
 			SetTooltips();
 			MoveControls();
+            InitializeCreationInputSection();
 		}
 
 		/// <summary>
@@ -6620,11 +6621,11 @@ namespace Chummer
 		private void cmdAddLifestyle_Click(object sender, EventArgs e)
 		{
 			Lifestyle objLifestyle = new Lifestyle(_objCharacter);
-			frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objLifestyle, _objCharacter);
+			using frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objLifestyle, _objCharacter);
 			frmPickLifestyle.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickLifestyle.DialogResult == DialogResult.Cancel)
+			if (frmPickLifestyle.DialogResult != DialogResult.OK)
 				return;
 
 			_objCharacter.Lifestyles.Add(objLifestyle);
@@ -8836,7 +8837,7 @@ namespace Chummer
                 return;
             }
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter);
 
 			// Make sure the Weapon allows Modifications to be added to it.
 			// Open the Weapons XML file and locate the selected Weapon.
@@ -8863,7 +8864,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Locate the selected piece.
@@ -9018,7 +9019,7 @@ namespace Chummer
 
 			Vehicle objSelectedVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter);
 			// Set the Vehicle properties for the window.
 			frmPickVehicleMod.VehicleCost = Convert.ToInt32(objSelectedVehicle.Cost);
 			frmPickVehicleMod.Body = objSelectedVehicle.Body;
@@ -9031,7 +9032,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Vehicles XML file and locate the selected piece.
@@ -9231,7 +9232,7 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter);
 
 			// Make sure the Weapon allows Modifications to be added to it.
 			// Open the Weapons XML file and locate the selected Weapon.
@@ -9263,7 +9264,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Locate the selected piece.
@@ -10082,10 +10083,10 @@ namespace Chummer
 		{
 			treGear.SelectedNode = treGear.Nodes[0];
 
-			frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
+			using frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
 			frmPickNexus.ShowDialog(this);
 
-			if (frmPickNexus.DialogResult == DialogResult.Cancel)
+			if (frmPickNexus.DialogResult != DialogResult.OK)
 				return;
 
 			Gear objGear = new Gear(_objCharacter);
@@ -10143,10 +10144,10 @@ namespace Chummer
 			// Attempt to locate the selected Vehicle.
 			Vehicle objSelectedVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-			frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
+			using frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
 			frmPickNexus.ShowDialog(this);
 
-			if (frmPickNexus.DialogResult == DialogResult.Cancel)
+			if (frmPickNexus.DialogResult != DialogResult.OK)
 				return;
 
 			Gear objGear = new Gear(_objCharacter);
@@ -12933,11 +12934,11 @@ namespace Chummer
 			else
 			{
 				// Edit Basic Lifestyle.
-				frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objNewLifestyle, _objCharacter);
+				using frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objNewLifestyle, _objCharacter);
 				frmPickLifestyle.SetLifestyle(objLifestyle);
 				frmPickLifestyle.ShowDialog(this);
 
-				if (frmPickLifestyle.DialogResult == DialogResult.Cancel)
+				if (frmPickLifestyle.DialogResult != DialogResult.OK)
 					return;
 
 				// Update the selected Lifestyle and refresh the list.
@@ -15111,7 +15112,7 @@ namespace Chummer
 		private bool CanImproveAttribute(string strAttribute)
 		{
 			bool blnAtMaximum = false;
-			foreach (Control objControl in panAttributes.Controls)
+			foreach (Control objControl in CreationAttributeInputs)
 			{
 				if (objControl is NumericUpDown && objControl.Enabled)
 				{
@@ -15184,7 +15185,7 @@ namespace Chummer
 			string strLOG = "";
 			string strWIL = "";
 
-			foreach (NumericUpDown objControl in panAttributes.Controls.OfType<NumericUpDown>())
+			foreach (NumericUpDown objControl in CreationAttributeInputs)
 			{
 				int intThisBP = 0;
 				if (objControl.Name != nudEDG.Name && objControl.Name != nudMAG.Name && objControl.Name != nudRES.Name)
@@ -15289,7 +15290,7 @@ namespace Chummer
 			if (!_objOptions.ESSLossReducesMaximumOnly)
 				intEssenceLoss = _objCharacter.EssencePenalty;
 
-			foreach (NumericUpDown objControl in panAttributes.Controls.OfType<NumericUpDown>())
+			foreach (NumericUpDown objControl in CreationAttributeInputs)
 			{
 				int intThisBP = 0;
 				// Don't apply the ESS loss penalty to EDG.

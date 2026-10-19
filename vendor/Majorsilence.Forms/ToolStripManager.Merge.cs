@@ -101,7 +101,14 @@ namespace Majorsilence.Forms
                     var from = sourceItems.IndexOf (item);
                     sourceItems.Remove (item);
 
-                    var at = merge_index < 0 ? targetItems.Count : Math.Min (merge_index, targetItems.Count);
+                    // MergeIndex addresses application commands. Maximized MDI chrome
+                    // occupies physical slots but must not shift File behind Edit.
+                    var commands = targetItems.Where (entry => entry is not MdiControlItem).ToArray ();
+                    var at = merge_index < 0 ? targetItems.Count
+                        : merge_index < commands.Length ? targetItems.IndexOf (commands[merge_index])
+                        : commands.Length > 0 ? targetItems.IndexOf (commands[^1]) + 1
+                        : targetItems.TakeWhile (entry => entry is MdiControlItem chrome &&
+                            chrome.Alignment == ToolStripItemAlignment.Left).Count ();
                     targetItems.Insert (at, item);
                     records.Add (new MergeRecord (source, sourceItems, item, from, targetItems, null, at));
                     break;

@@ -13,6 +13,10 @@ internal sealed record CatalogCategory(string Code, string DisplayName)
 }
 internal sealed record CatalogEntry(string Name, string Category, string DisplayName, XmlNode Definition);
 internal sealed record CatalogSelection(string Name, string Category, bool FreeCost, int Markup, bool AddAgain, int Rating = 0, int Quantity = 1);
+internal interface ILabeledRatingCatalogPicker
+{
+    string RatingLabel { get; }
+}
 internal interface IQuantityCatalogPicker
 {
     int Quantity { get; set; }
@@ -49,7 +53,8 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
     public string Error => error;
     public bool HasError => error.Length > 0;
     public bool IsEmpty => Items.Count == 0;
-    public bool CanAccept => selectedEntry != null && details != null && !HasError;
+    protected virtual bool HasCompleteInput => true;
+    public bool CanAccept => selectedEntry != null && details != null && !HasError && HasCompleteInput;
     public CatalogCategory? Category
     {
         get => category;
@@ -86,6 +91,8 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
         category = Categories.FirstOrDefault(item => item.Code == lastCategory) ?? Categories.FirstOrDefault();
         // Derived constructors call Refresh after their own initialization is complete.
     }
+    protected virtual string DisplayName(XmlNode definition) => definition["translate"]?.InnerText ?? definition["name"]!.InnerText;
+    protected virtual bool MatchesSearch(XmlNode definition, string text) => CatalogSearch.MatchesDisplayName(definition, text);
     protected virtual bool IncludeInSearch(XmlNode definition) => true;
     protected virtual bool IncludeEntry(XmlNode definition) => true;
     protected abstract TDetails CalculateDetails(CatalogEntry entry);
@@ -101,11 +108,11 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
             .Where(IncludeEntry)
             .Where(node => searching
                 ? IncludeInSearch(node) &&
-                  CatalogSearch.MatchesDisplayName(node, searchText)
+                  MatchesSearch(node, searchText)
                 : Categories.Count == 0 || node["category"]?.InnerText == category?.Code)
             .Where(node => Categories.Count == 0 || categoryNames.ContainsKey(node["category"]?.InnerText ?? ""))
             .Select(node => new CatalogEntry(node["name"]!.InnerText, node["category"]?.InnerText ?? "",
-                (node["translate"]?.InnerText ?? node["name"]!.InnerText) +
+                DisplayName(node) +
                 (searching && Categories.Count > 0 ? " [" + categoryNames[node["category"]!.InnerText] + "]" : ""), node))
             .OrderBy(item => item.DisplayName, StringComparer.CurrentCulture);
     }

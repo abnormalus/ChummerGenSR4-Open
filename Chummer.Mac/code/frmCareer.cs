@@ -6263,11 +6263,11 @@ namespace Chummer
 		private void cmdAddLifestyle_Click(object sender, EventArgs e)
 		{
 			Lifestyle objLifestyle = new Lifestyle(_objCharacter);
-			frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objLifestyle, _objCharacter);
+			using frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objLifestyle, _objCharacter);
 			frmPickLifestyle.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickLifestyle.DialogResult == DialogResult.Cancel)
+			if (frmPickLifestyle.DialogResult != DialogResult.OK)
 				return;
 
 			objLifestyle.Months = 0;
@@ -9987,7 +9987,7 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
 
 			// Make sure the Weapon allows Modifications to be added to it.
 			// Open the Weapons XML file and locate the selected Weapon.
@@ -10019,7 +10019,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Locate the selected piece.
@@ -10283,7 +10283,7 @@ namespace Chummer
 
 			Vehicle objSelectedVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
 			// Set the Vehicle properties for the window.
 			frmPickVehicleMod.VehicleCost = Convert.ToInt32(objSelectedVehicle.Cost);
 			frmPickVehicleMod.Body = objSelectedVehicle.Body;
@@ -10296,7 +10296,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Vehicles XML file and locate the selected piece.
@@ -10594,7 +10594,7 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
 
 			// Make sure the Weapon allows Modifications to be added to it.
 			// Open the Weapons XML file and locate the selected Weapon.
@@ -10626,7 +10626,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Locate the selected piece.
@@ -13346,10 +13346,10 @@ namespace Chummer
 		{
 			treGear.SelectedNode = treGear.Nodes[0];
 
-			frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
+			using frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
 			frmPickNexus.ShowDialog(this);
 
-			if (frmPickNexus.DialogResult == DialogResult.Cancel)
+			if (frmPickNexus.DialogResult != DialogResult.OK)
 				return;
 
 			Gear objGear = new Gear(_objCharacter);
@@ -13440,10 +13440,10 @@ namespace Chummer
 			// Attempt to locate the selected Vehicle.
 			Vehicle objSelectedVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-			frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter, true);
+			using frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter, true);
 			frmPickNexus.ShowDialog(this);
 
-			if (frmPickNexus.DialogResult == DialogResult.Cancel)
+			if (frmPickNexus.DialogResult != DialogResult.OK)
 				return;
 
 			Gear objGear = new Gear(_objCharacter);
@@ -17809,11 +17809,11 @@ namespace Chummer
 			else
 			{
 				// Edit Basic Lifestyle.
-				frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objNewLifestyle, _objCharacter);
+				using frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objNewLifestyle, _objCharacter);
 				frmPickLifestyle.SetLifestyle(objLifestyle);
 				frmPickLifestyle.ShowDialog(this);
 
-				if (frmPickLifestyle.DialogResult == DialogResult.Cancel)
+				if (frmPickLifestyle.DialogResult != DialogResult.OK)
 					return;
 
 				// Update the selected Lifestyle and refresh the list.
