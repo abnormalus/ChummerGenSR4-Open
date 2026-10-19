@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -18,14 +19,19 @@ internal sealed class CreationInputSection : IDisposable
     private readonly List<Action> cleanup = new();
     private readonly List<Forms.Control> detached = new();
     internal Dictionary<string, NumericUpDown> Inputs { get; } = new();
-    private static TextBlock Caption() => new() { VerticalAlignment = VerticalAlignment.Center, FontSize = 12,
-        TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+    private static TextBlock Caption()
+    {
+        var caption = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontSize = 12,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        caption.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlForegroundBaseHighBrush"));
+        return caption;
+    }
     internal CreationInputSection(Forms.Form? editor, Forms.Panel attributes, Forms.Control moneyParent,
         IEnumerable<(Forms.NumericUpDown Input, Forms.Label Label, Forms.Label Metatype, Forms.Label Augmented)> rows,
         Forms.NumericUpDown money, Forms.Label moneyLabel, Forms.Label moneyTotal, Forms.ToolTip tips,
         (Forms.Label Base, Forms.Label Augmented, Forms.Label Metatype)? headers = null)
     {
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,74,48,76"), RowSpacing = 2 };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,120,40,76"), RowSpacing = 2 };
         grid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         int row = 0;
         if (headers is { } heading)
@@ -46,7 +52,7 @@ internal sealed class CreationInputSection : IDisposable
         }
         var scroller = new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
         var attributeHost = new Forms.NativeControlHost { Name = "nativeCreationAttributes", NativeControl = scroller };
-        var moneyGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,74,*"), ColumnSpacing = 4 };
+        var moneyGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,120,*"), ColumnSpacing = 4 };
         moneyGrid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         int left = moneyLabel.Left, top = Math.Min(moneyLabel.Top, money.Top);
         Add(moneyGrid, Mirror(moneyLabel), 0, 0); Add(moneyGrid, Bind(money, tips), 0, 1); Add(moneyGrid, Mirror(moneyTotal), 0, 2);
@@ -102,7 +108,7 @@ internal sealed class CreationInputSection : IDisposable
     }
     private NumericUpDown Bind(Forms.NumericUpDown source, Forms.ToolTip tips, bool wholeNumbers = false)
     {
-        var input = new NumericUpDown { Name = "native" + source.Name, Width = 74, MinHeight = 24, FontSize = 12,
+        var input = new NumericUpDown { Name = "native" + source.Name, Width = 120, MinHeight = 32, FontSize = 12,
             Padding = new Thickness(2), ClipValueToMinMax = true, ParsingNumberStyle = wholeNumbers ? NumberStyles.Integer : NumberStyles.Number };
         Inputs.Add(source.Name, input);
         bool syncing = false;

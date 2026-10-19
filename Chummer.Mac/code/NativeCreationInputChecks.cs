@@ -58,7 +58,8 @@ internal static class NativeCreationInputChecks
                         (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
                     image.Render(window);
                     image.Save(Path.Combine(output, "native-creation-inputs-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
-                    check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input => input.Bounds.Width > 0 && input.Bounds.Height >= 20),
+                    check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input => input.Bounds.Width > 0 && input.Bounds.Height >= 20 &&
+                        input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
                         "Native creation input batch has measured controls in " + theme.Key);
                 }
             }
@@ -91,11 +92,11 @@ internal static class NativeCreationInputChecks
             textEditor.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Up }); await Task.Delay(20);
             check(input.Value == 4 && body.Value == 4 && character.BOD.Value == 4,
                 "Native creation keyboard step follows existing attribute rules and model updates");
-            var infoTabs = Field<Forms.TabControl>(editor, "tabInfo"); var common = Field<Forms.TabPage>(editor, "tabCommon");
+            var infoTabs = Field<Forms.TabControl>(editor, "tabCharacterTabs"); var common = Field<Forms.TabPage>(editor, "tabCommon");
             infoTabs.SelectedTab = Field<Forms.TabPage>(editor, "tabCharacterInfo"); await Task.Delay(20);
-            bool hidden = !input.IsEffectivelyVisible;
+            bool hidden = infoTabs.SelectedTab == Field<Forms.TabPage>(editor, "tabCharacterInfo") && !input.IsEffectivelyVisible;
             infoTabs.SelectedTab = common; await Task.Delay(20);
-            check(hidden && input.IsEffectivelyVisible,
+            check(common.Parent == infoTabs && infoTabs.SelectedTab == common && hidden && input.IsEffectivelyVisible,
                 "Native creation input section hides and restores with its Common tab");
             using (var prompt = new frmSelectNumber { Minimum = 0, Maximum = 10, Description = "Synthetic creation ownership check" })
             {
