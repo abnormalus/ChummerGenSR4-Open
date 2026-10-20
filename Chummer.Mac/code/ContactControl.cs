@@ -204,12 +204,25 @@ namespace Chummer
 
 		private void imgNotes_Click(object sender, EventArgs e)
 		{
-			frmNotes frmContactNotes = new frmNotes();
-			frmContactNotes.Notes = _objContact.Notes;
-			frmContactNotes.ShowDialog(this);
-
-			if (frmContactNotes.DialogResult == DialogResult.OK)
-				_objContact.Notes = frmContactNotes.Notes;
+            // Fixed action identifiers locate this modal transition without logging
+            // contact identity or private notes. Preserve the existing close/OK policy.
+            AppDiagnostics.Action("contact.notes.open");
+            try
+            {
+                using var frmContactNotes = new frmNotes();
+                frmContactNotes.Shown += (_, _) => AppDiagnostics.Record("contact.notes.opened");
+                frmContactNotes.Notes = _objContact.Notes;
+                frmContactNotes.ShowDialog(this);
+                if (frmContactNotes.DialogResult == DialogResult.OK)
+                    _objContact.Notes = frmContactNotes.Notes;
+                AppDiagnostics.Record("contact.notes.closed");
+            }
+            catch (Exception error)
+            {
+                AppDiagnostics.Record("contact.notes.failed", error);
+                throw;
+            }
+            finally { AppDiagnostics.Record("contact.notes.cleaned-up"); }
 
 			string strTooltip = "";
 			if (_objContact.EntityType == ContactType.Enemy)

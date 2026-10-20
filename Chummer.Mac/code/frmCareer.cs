@@ -6263,11 +6263,11 @@ namespace Chummer
 		private void cmdAddLifestyle_Click(object sender, EventArgs e)
 		{
 			Lifestyle objLifestyle = new Lifestyle(_objCharacter);
-			frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objLifestyle, _objCharacter);
+			using frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objLifestyle, _objCharacter);
 			frmPickLifestyle.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickLifestyle.DialogResult == DialogResult.Cancel)
+			if (frmPickLifestyle.DialogResult != DialogResult.OK)
 				return;
 
 			objLifestyle.Months = 0;
@@ -9987,7 +9987,7 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
 
 			// Make sure the Weapon allows Modifications to be added to it.
 			// Open the Weapons XML file and locate the selected Weapon.
@@ -10019,7 +10019,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Locate the selected piece.
@@ -10283,7 +10283,7 @@ namespace Chummer
 
 			Vehicle objSelectedVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
 			// Set the Vehicle properties for the window.
 			frmPickVehicleMod.VehicleCost = Convert.ToInt32(objSelectedVehicle.Cost);
 			frmPickVehicleMod.Body = objSelectedVehicle.Body;
@@ -10296,7 +10296,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Vehicles XML file and locate the selected piece.
@@ -10307,6 +10307,9 @@ namespace Chummer
 			TreeNode objNode = new TreeNode();
 			VehicleMod objMod = new VehicleMod(_objCharacter);
 			objMod.Create(objXmlMod, objNode, frmPickVehicleMod.SelectedRating);
+            // A required price prompt can cancel creation before ownership or
+            // accounting starts. Match the existing canceled-item contract.
+            if (objMod.InternalId == Guid.Empty.ToString()) return;
 
 			// Make sure that the Armor Rating does not exceed the maximum allowed by the Vehicle.
 			if (objMod.Name.StartsWith("Armor"))
@@ -10594,7 +10597,7 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
+			using frmSelectVehicleMod frmPickVehicleMod = new frmSelectVehicleMod(_objCharacter, true);
 
 			// Make sure the Weapon allows Modifications to be added to it.
 			// Open the Weapons XML file and locate the selected Weapon.
@@ -10626,7 +10629,7 @@ namespace Chummer
 			frmPickVehicleMod.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickVehicleMod.DialogResult == DialogResult.Cancel)
+			if (frmPickVehicleMod.DialogResult != DialogResult.OK)
 				return;
 
 			// Locate the selected piece.
@@ -13346,10 +13349,10 @@ namespace Chummer
 		{
 			treGear.SelectedNode = treGear.Nodes[0];
 
-			frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
+			using frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter);
 			frmPickNexus.ShowDialog(this);
 
-			if (frmPickNexus.DialogResult == DialogResult.Cancel)
+			if (frmPickNexus.DialogResult != DialogResult.OK)
 				return;
 
 			Gear objGear = new Gear(_objCharacter);
@@ -13440,10 +13443,10 @@ namespace Chummer
 			// Attempt to locate the selected Vehicle.
 			Vehicle objSelectedVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-			frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter, true);
+			using frmSelectNexus frmPickNexus = new frmSelectNexus(_objCharacter, true);
 			frmPickNexus.ShowDialog(this);
 
-			if (frmPickNexus.DialogResult == DialogResult.Cancel)
+			if (frmPickNexus.DialogResult != DialogResult.OK)
 				return;
 
 			Gear objGear = new Gear(_objCharacter);
@@ -14537,83 +14540,10 @@ namespace Chummer
                     }
                     WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
                     break;
-				case NuyenExpenseType.AddVehicleWeaponMod:
-					// Locate the Weapon Mod that was added.
-					foreach (Vehicle objVehicle in _objCharacter.Vehicles)
-					{
-						foreach (VehicleMod objMod in objVehicle.Mods)
-						{
-							foreach (Weapon objWeapon in objMod.Weapons)
-							{
-								foreach (WeaponMod objWMod in objWeapon.WeaponMods)
-								{
-									if (objMod.InternalId == objEntry.Undo.ObjectId)
-									{
-										// Remove the Weapon Mod.
-										objWeapon.WeaponMods.Remove(objWMod);
-
-										// Remove the Weapon Mod from the Tree.
-										foreach (TreeNode objVNode in treVehicles.Nodes[0].Nodes)
-										{
-											foreach (TreeNode objNode in objVNode.Nodes)
-											{
-												foreach (TreeNode objWNode in objNode.Nodes)
-												{
-													foreach (TreeNode objChild in objWNode.Nodes)
-													{
-														if (objChild.Tag.ToString() == objEntry.Undo.ObjectId)
-														{
-															objChild.Remove();
-															break;
-														}
-													}
-												}
-											}
-										}
-										break;
-									}
-								}
-								if (objWeapon.UnderbarrelWeapons.Count > 0)
-								{
-									foreach (Weapon objUnderbarrelWeapon in objWeapon.UnderbarrelWeapons)
-									{
-										foreach (WeaponMod objWMod in objUnderbarrelWeapon.WeaponMods)
-										{
-											if (objWMod.InternalId == objEntry.Undo.ObjectId)
-											{
-												// Remove the Weapon Mod.
-												objUnderbarrelWeapon.WeaponMods.Remove(objWMod);
-
-												// Remove the Weapon Mod from the Tree.
-												foreach (TreeNode objVNode in treVehicles.Nodes[0].Nodes)
-												{
-													foreach (TreeNode objNode in objVNode.Nodes)
-													{
-														foreach (TreeNode objWNode in objNode.Nodes)
-														{
-															foreach (TreeNode objChild in objWNode.Nodes)
-															{
-																foreach (TreeNode objSubChild in objChild.Nodes)
-																{
-																	if (objSubChild.Tag.ToString() == objEntry.Undo.ObjectId)
-																	{
-																		objSubChild.Remove();
-																		break;
-																	}
-																}
-															}
-														}
-													}
-												}
-												break;
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-					break;
+                case NuyenExpenseType.AddVehicleWeaponMod:
+                    if (WeaponModificationUndo.RemoveMounted(_objCharacter, objEntry.Undo.ObjectId))
+                        objCommon.FindNode(objEntry.Undo.ObjectId, treVehicles)?.Remove();
+                    break;
 				case NuyenExpenseType.AddArmor:
 					// Locate the Armor that was added.
 					Armor objArmor = objCommon.FindArmor(objEntry.Undo.ObjectId, _objCharacter.Armor);
@@ -17809,11 +17739,11 @@ namespace Chummer
 			else
 			{
 				// Edit Basic Lifestyle.
-				frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objNewLifestyle, _objCharacter);
+				using frmSelectLifestyle frmPickLifestyle = new frmSelectLifestyle(objNewLifestyle, _objCharacter);
 				frmPickLifestyle.SetLifestyle(objLifestyle);
 				frmPickLifestyle.ShowDialog(this);
 
-				if (frmPickLifestyle.DialogResult == DialogResult.Cancel)
+				if (frmPickLifestyle.DialogResult != DialogResult.OK)
 					return;
 
 				// Update the selected Lifestyle and refresh the list.
@@ -17824,6 +17754,9 @@ namespace Chummer
 				treLifestyles.SelectedNode.Text = objLifestyle.DisplayName;
 				RefreshSelectedLifestyle();
 				UpdateCharacterInfo();
+                // Only the accepted replacement changes owned character data.
+                _blnIsDirty = true;
+                UpdateWindowTitle();
 			}
 		}
 

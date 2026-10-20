@@ -102,7 +102,9 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         if (model is IRatedCatalogPicker)
         {
             var ratingRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            ratingRow.Children.Add(new TextBlock { Text = T("Label_Rating"), VerticalAlignment = VerticalAlignment.Center });
+            var ratingLabel = new TextBlock { Text = T("Label_Rating"), VerticalAlignment = VerticalAlignment.Center };
+            if (model is ILabeledRatingCatalogPicker) ratingLabel.Bind(TextBlock.TextProperty, Read(nameof(ILabeledRatingCatalogPicker.RatingLabel)));
+            ratingRow.Children.Add(ratingLabel);
             var rating = NativeIntegerInput.Create(namePrefix + "Rating", 1, 1);
             rating.Bind(NumericUpDown.MinimumProperty, Read(nameof(IRatedCatalogPicker.MinimumRating)));
             rating.Bind(NumericUpDown.MaximumProperty, Read(nameof(IRatedCatalogPicker.MaximumRating)));

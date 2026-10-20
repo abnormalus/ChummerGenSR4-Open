@@ -1005,6 +1005,17 @@ namespace Chummer
                     Field<Button>(licensePrompt, "cmdOK").PerformClick();
                     Check(licensePrompt.SelectedItem == PromptDetails.Placeholder, "blank license detail accepts placeholder");
                 }
+                CritterPowerPromptChecks.Run(character, Check);
+                CreationInputLifecycleChecks.Run(Check);
+                CreationSkillInputChecks.Run(character, Check);
+                CreationSkillGroupSectionChecks.Run(character, Check);
+                CreationActiveSkillChecks.Run(character, Check);
+                CreationActiveSkillChecks.Run(character, Check, useNativeViewport: true);
+                CreationActiveSkillMetaChecks.Run(character, Check);
+                CreationKnowledgeSkillChecks.Run(character, Check);
+                WeaponModificationUndoChecks.Run(Check);
+                ModalCloseChecks.Run(Check);
+                MenuOrderChecks.Run(Check);
                 BuildIdentityChecks.Run(Check);
                 BuildPointPersistenceChecks.Run(character, Check);
                 WeaponFocusBindingChecks.Run(character, Check);
@@ -1012,6 +1023,10 @@ namespace Chummer
                 WeaponAmmunitionChecks.Run(character, Check);
                 ArmorPickerChecks.Run(character, Check);
                 VehiclePickerChecks.Run(character, Check);
+                VehicleModPreviewChecks.Run(Check);
+                VehicleModPickerChecks.Run(character, Check);
+                BasicLifestylePromptChecks.Run(character, Check);
+                NexusPromptChecks.Run(character, Check);
                 ArmorModPickerChecks.Run(character, Check);
                 AccessoryPickerChecks.Run(character, Check);
                 InventoryEnhancementChecks.Run(character, Check);

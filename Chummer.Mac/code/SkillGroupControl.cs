@@ -78,6 +78,12 @@ namespace Chummer
 		}
 		#endregion
 
+        // Adapters for the creation-owned native section; career keeps its
+        // existing improvement button and rating presentation.
+        internal NumericUpDown CreationRatingInput => nudSkill;
+        internal TextBox CreationNameInput => txtGroupName;
+        internal ToolTip CreationToolTips => tipTooltip;
+
 		#region Properties
 		/// <summary>
 		/// Skill Group object that this control is linked to.

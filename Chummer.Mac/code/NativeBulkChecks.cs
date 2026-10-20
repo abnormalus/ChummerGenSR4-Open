@@ -77,6 +77,7 @@ internal static class NativeBulkChecks
             await NativeCyberwareRemovalChecks.RunAsync(main, character, Check);
             await NativeWeaponFocusChecks.RunAsync(main, character, Check);
             await NativeCharacterSwitchChecks.RunAsync(main, character, Check);
+            await NativeContactNotesChecks.RunAsync(main, character, Check);
             await NativeCharacterDetailsChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeWeaponPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeArmorPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
@@ -90,6 +91,15 @@ internal static class NativeBulkChecks
             await NativeExpenseChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeNaturalWeaponChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeVehiclePickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeVehicleModPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeBasicLifestyleChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCreationInputChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCreationSkillGroupChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCreationActiveSkillChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCreationKnowledgeNameChecks.RunAsync(main, character, Check);
+            await NativeNexusChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeVehicleModPurchaseChecks.RunAsync(main, character, Check);
+            await NativeVehicleModPurchaseChecks.RunVariableCancellationAsync(main, character, Check);
             await NativeCatalogContrastChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeSaveAsFinalizationChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeInventoryEnhancementChecks.RunAsync(main, character, Check);

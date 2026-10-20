@@ -51,3 +51,9 @@ The reported intermittent unresponsive inventory buttons recovered after saving,
 Fixed Add Armor/Add Gear command IDs are logged in creation and career editors. Diagnostic UI snapshots include main Form enabled state, native main-window enabled state, editor type/enabled/focus state and dialog count. Native dialogs record opening, opened, failed and cleanup transitions; cleanup captures state after restoring ownership. The two enabled states are deliberately separate because native modality can block input while the compatibility Form still reports enabled.
 
 Snapshots run on the UI thread. Logs exclude titles, input text and character identities. Initial coverage does not imply that every blocked command or duration is instrumented. Use the lifecycle events and structural state to identify missing coverage for the next confirmed defect.
+
+## File and Edit order with maximized documents
+
+The compatibility menu contains leading/trailing MDI window controls, which the Mac system menu omits. Insert merge positions now count application commands rather than those chrome slots, retaining File, Edit, Tools, Special, Window, Help order. `MenuOrderChecks` reproduced the previous File/Edit swap with real MDI control items and verifies repeated merge/revert cycles and item identity. Platform native acceptance remains part of the next combined batch.
+
+The local failing baseline is `/tmp/chummer-menu-order-baseline.log` (File-before-Edit assertion, exit1). The correction passes `/tmp/chummer-menu-order-fixed.log`; extended maximized/restored cycle coverage passes `/tmp/chummer-menu-transitions.log` (full headless suite without repeating the unchanged399 fixture loop). Existing native character-switch assertions now require shared File/Edit order for both editor types and File/Edit order in the Mac projection. These platform assertions have compiled but await the next combined exact-head CI.

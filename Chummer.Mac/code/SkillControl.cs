@@ -86,6 +86,8 @@ namespace Chummer
 		public event DiceRollerHandler DiceRollerClicked;
 		public event BreakGroupHandler BreakGroupClicked;
 
+        // Editable knowledge names change saved data independently of rating.
+        public event EventHandler KnowledgeNameChanged;
         public List<SkillControl> MetaTalents = new List<SkillControl>();
 
 		private string _strOldSpec = "";
@@ -298,8 +300,9 @@ namespace Chummer
 
 		private void cboSkillName_TextChanged(object sender, EventArgs e)
 		{
-            if (knowledgeSearch?.IsFiltering != true)
-                _objSkill.Name = cboSkillName.Text;
+            if (knowledgeSearch?.IsFiltering == true || _objSkill.Name == cboSkillName.Text) return;
+            _objSkill.Name = cboSkillName.Text;
+            if (KnowledgeSkill && !_blnSkipRefresh) KnowledgeNameChanged?.Invoke(this, EventArgs.Empty);
 		}
 
 		private void cmdImproveSkill_Click(object sender, EventArgs e)
@@ -335,6 +338,17 @@ namespace Chummer
 			BreakGroupClicked(this);
 		}
 		#endregion
+
+        // Creation viewport adapters preserve the existing shared controller;
+        // career and knowledge presentation remain on their established paths.
+        internal NumericUpDown CreationRatingInput => nudSkill;
+        internal ComboBox CreationSpecializationInput => cboSpec;
+        internal Label CreationNameLabel => lblSkillName;
+        internal Label CreationAttributeLabel => lblAttribute;
+        internal Label CreationPoolLabel => lblModifiedRating;
+        internal Button CreationBreakButton => cmdBreakGroup;
+        internal Button CreationDeleteButton => cmdDelete;
+        internal ToolTip CreationToolTips => tipTooltip;
 
 		#region Properties
 		/// <summary>
