@@ -91,7 +91,7 @@ namespace Chummer
 				tsContactOpen.Visible = false;
 				tsRemoveCharacter.Visible = false;
 			}
-			cmsContact.Show(imgLink, imgLink.Left - 490, imgLink.Top);
+			cmsContact.Show(imgLink, creationCompactContact ? 0 : imgLink.Left - 490, creationCompactContact ? imgLink.Height : imgLink.Top);
 		}
 
 		private void tsContactOpen_Click(object sender, EventArgs e)

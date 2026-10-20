@@ -45,11 +45,13 @@ public partial class frmCreate
                     value.Left = right + 90;
                 int contactTop = lblRatingLabel.Visible ? 238 : 104;
                 splitContacts.Bounds = new Rectangle(right, contactTop, Math.Max(180, width - right - 6), Math.Max(120, height - contactTop - 8));
+                splitContacts.SplitterDistance = splitContacts.Height / 2;
             }
             finally { arranging = false; }
         }
         tabCommon.SizeChanged += Arrange;
         Disposed += (_, _) => tabCommon.SizeChanged -= Arrange;
         Arrange(this, EventArgs.Empty);
+        InitializeCreationContactLayout();
     }
 }

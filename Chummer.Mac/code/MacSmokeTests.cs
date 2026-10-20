@@ -1013,6 +1013,7 @@ namespace Chummer
                 CreationActiveSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationActiveSkillMetaChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check);
+                CreationCommonLayoutChecks.Run(character, Check);
                 WeaponModificationUndoChecks.Run(Check);
                 ModalCloseChecks.Run(Check);
                 MenuOrderChecks.Run(Check);

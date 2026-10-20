@@ -35,6 +35,9 @@ internal static class NativeCreationInputChecks
     internal static async Task RunAsync(Forms.Form owner, Character source, string output, Action<bool, string> check)
     {
         var character = new Character(); character.LoadSnapshot(source.CaptureSnapshot()); character.Created = false; character.IgnoreRules = true;
+        character.Contacts.Clear();
+        character.Contacts.Add(new Contact(character) { Name = "Synthetic layout contact", EntityType = ContactType.Contact, Connection = 2, Loyalty = 1 });
+        character.Contacts.Add(new Contact(character) { Name = "Synthetic layout enemy", EntityType = ContactType.Enemy, Connection = 2, Loyalty = 1 });
         using var editor = new frmCreate(character) { MdiParent = owner, Loading = true };
         editor.Show(); await Task.Delay(20);
         bool previousBudgetOption = character.Options.AllowExceedAttributeBP;
@@ -85,6 +88,15 @@ internal static class NativeCreationInputChecks
                         string.Join(";", attributeInputs.Select(input => input.Name + ":" + string.Join(",", input.GetVisualDescendants()
                             .OfType<Avalonia.Controls.Presenters.TextPresenter>().Select(text =>
                                 FormattableString.Invariant($"{text.TranslatePoint(default, input)}/{text.TextLayout.Height}"))))) + "]");
+                    bool ContactsFit() => new[] { "panContacts", "panEnemies" }.All(name =>
+                    {
+                        var panel = Field<Forms.Panel>(editor, name);
+                        var rows = panel.Controls.OfType<ContactControl>().ToArray();
+                        return rows.Length == 1 && rows.All(row => row.Right <= panel.ClientSize.Width && row.Bottom <= panel.ClientSize.Height &&
+                            row.Controls.Cast<Forms.Control>().Where(child => child.Visible).All(child => child.Left >= 0 &&
+                                child.Right <= row.ClientSize.Width && child.Bottom <= row.ClientSize.Height));
+                    });
+                    check(ContactsFit(), "Native normal creation column exposes populated contact and enemy fields and commands in " + theme.Key);
                     byte[] beforeResize = character.CaptureSnapshot();
                     bool dirtyBeforeResize = Field<bool>(editor, "_blnIsDirty");
                     var originalState = window.WindowState;
@@ -97,6 +109,7 @@ internal static class NativeCreationInputChecks
                     var contacts = Field<Forms.SplitContainer>(editor, "splitContacts");
                     check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
                         "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
+                    check(ContactsFit(), "Native full-screen creation column exposes populated contact and enemy fields and commands in " + theme.Key);
                     window.WindowState = originalState;
                     await Task.Delay(120);
                     check(AllAttributesFit() && character.CaptureSnapshot().SequenceEqual(beforeResize) &&
