@@ -62,29 +62,31 @@ internal static class NativeCreationInputChecks
                         input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
                         "Native creation input batch has measured controls in " + theme.Key);
                     var attributeInputs = section.Inputs.Where(pair => pair.Key != "nudNuyen").Select(pair => pair.Value).ToArray();
-                    var scroller = attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Single();
-                    var lastAttribute = attributeInputs.Last(item => item.IsVisible);
-                    byte[] beforeScroll = character.CaptureSnapshot();
-                    bool dirtyBeforeScroll = Field<bool>(editor, "_blnIsDirty");
-                    Avalonia.Controls.ControlExtensions.BringIntoView(lastAttribute);
-                    await Task.Delay(60);
-                    var lastPosition = lastAttribute.TranslatePoint(default, scroller);
-                    using var bottomImage = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
+                    var root = (Avalonia.Controls.Grid)attributeInputs[0].Parent!;
+                    bool AllAttributesFit() => attributeInputs.All(input => input.IsEffectivelyVisible &&
+                        input.TranslatePoint(default, root) is { } point && point.Y >= -1 &&
+                        point.Y + input.Bounds.Height <= root.Bounds.Height + 1 && input.Bounds.Height >= 20 &&
+                        input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24));
+                    check(AllAttributesFit() && !attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Any(),
+                        "Native creation shows all eleven attribute rows simultaneously without scrolling in " + theme.Key);
+                    byte[] beforeResize = character.CaptureSnapshot();
+                    bool dirtyBeforeResize = Field<bool>(editor, "_blnIsDirty");
+                    var originalState = window.WindowState;
+                    window.WindowState = Avalonia.Controls.WindowState.FullScreen;
+                    await Task.Delay(120);
+                    using var fullImage = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
                         (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
-                    bottomImage.Render(window);
-                    bottomImage.Save(Path.Combine(output, "native-creation-inputs-bottom-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
-                    // Preserve the failed frame and numeric layout state before
-                    // asserting, so CI can distinguish clipping from no scrolling.
-                    check(scroller.Extent.Height > scroller.Viewport.Height && scroller.Offset.Y > 0 &&
-                        lastPosition.HasValue && lastPosition.Value.Y >= -1 &&
-                        lastPosition.Value.Y + lastAttribute.Bounds.Height <= scroller.Viewport.Height + 1,
-                        "Native creation attribute scrolling fully exposes the final special-attribute row in " + theme.Key +
-                        FormattableString.Invariant($" [target={lastAttribute.Name}; extent={scroller.Extent}; viewport={scroller.Viewport}; offset={scroller.Offset}; scroller={scroller.Bounds}; input={lastAttribute.Bounds}; position={lastPosition}; effectiveVisible={lastAttribute.IsEffectivelyVisible}; enabled={lastAttribute.IsEnabled}]"));
-                    scroller.Offset = default;
-                    await Task.Delay(30);
-                    check(scroller.Offset.Y == 0 && character.CaptureSnapshot().SequenceEqual(beforeScroll) &&
-                        Field<bool>(editor, "_blnIsDirty") == dirtyBeforeScroll,
-                        "Native creation scrolling restores the first rows without changing character or dirty state in " + theme.Key);
+                    fullImage.Render(window);
+                    fullImage.Save(Path.Combine(output, "native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
+                    var attributesPanel = Field<Forms.Panel>(editor, "panAttributes");
+                    var contacts = Field<Forms.SplitContainer>(editor, "splitContacts");
+                    check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
+                        "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
+                    window.WindowState = originalState;
+                    await Task.Delay(120);
+                    check(AllAttributesFit() && character.CaptureSnapshot().SequenceEqual(beforeResize) &&
+                        Field<bool>(editor, "_blnIsDirty") == dirtyBeforeResize,
+                        "Native creation resizing preserves character and dirty state in " + theme.Key);
                 }
             }
             finally { application.RequestedThemeVariant = originalTheme; }

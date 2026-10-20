@@ -623,7 +623,7 @@ namespace Chummer
 					objSkillControl.SkillSpec = objSkill.Specialization;
 					objSkillControl.Top = i * objSkillControl.Height;
 					objSkillControl.AutoScroll = false;
-					panKnowledgeSkills.Controls.Add(objSkillControl);
+					AddCreationKnowledgeSkill(objSkillControl);
 				}
 			}
 
@@ -1395,7 +1395,7 @@ namespace Chummer
 					objGroupControl.GroupRatingChanged -= objGroup_RatingChanged;
 				}
 
-				foreach (SkillControl objSkillControl in panKnowledgeSkills.Controls.OfType<SkillControl>())
+				foreach (SkillControl objSkillControl in creationKnowledgeSkills)
 				{
 					objSkillControl.RatingChanged -= objKnowledgeSkill_RatingChanged;
 					objSkillControl.SpecializationChanged -= objSkill_SpecializationChanged;
@@ -4723,9 +4723,8 @@ namespace Chummer
 
 			// Handle the DeleteSkill event for the SkillControl object.
 			SkillControl objSender = (SkillControl)sender;
-            objSender.KnowledgeNameChanged -= objKnowledgeSkill_NameChanged;
 			bool blnFound = false;
-			foreach (SkillControl objSkillControl in panKnowledgeSkills.Controls)
+			foreach (SkillControl objSkillControl in creationKnowledgeSkills)
 			{
 				// Set the flag to show that we have found the Skill.
 				if (objSkillControl == objSender)
@@ -4739,7 +4738,7 @@ namespace Chummer
 					objSkillControl.Top -= 23;
 			}
 			// Remove the SkillControl that raised the Event.
-			panKnowledgeSkills.Controls.Remove(objSender);
+			RemoveCreationKnowledgeSkill(objSender);
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -5566,7 +5565,7 @@ namespace Chummer
 		#region Button Events
 		private void cmdAddKnowledgeSkill_Click(object sender, EventArgs e)
 		{
-			int i = panKnowledgeSkills.Controls.Count;
+			int i = creationKnowledgeSkills.Count;
 			Skill objSkill = new Skill(_objCharacter);
 			objSkill.Attribute = "LOG";
 			objSkill.SkillCategory = "Academic";
@@ -5587,7 +5586,7 @@ namespace Chummer
 			objSkillControl.SkillRatingMaximum = 6;
 			// Set the SkillControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objSkillControl.Location = new Point(0, objSkillControl.Height * i + panKnowledgeSkills.AutoScrollPosition.Y);
-			panKnowledgeSkills.Controls.Add(objSkillControl);
+			AddCreationKnowledgeSkill(objSkillControl);
 
 			_objCharacter.Skills.Add(objSkill);
 
@@ -15877,7 +15876,7 @@ namespace Chummer
 			int intPointsInKnowledgeSkills = 0;
 			intPointsUsed = 0;
 			int intSpecCount = 0;
-			foreach (SkillControl objSkillControl in panKnowledgeSkills.Controls)
+			foreach (SkillControl objSkillControl in creationKnowledgeSkills)
 			{
 				// Add the current Skill's SkillRating to the counter.
 				intPointsInKnowledgeSkills += objSkillControl.SkillRating;
@@ -15916,7 +15915,7 @@ namespace Chummer
 				else
 				{
 					// Working with Karma is different. Go through all of the Knowledge Skills and calculate their costs individually.
-					foreach (SkillControl objSkillControl in panKnowledgeSkills.Controls)
+					foreach (SkillControl objSkillControl in creationKnowledgeSkills)
 					{
 						// The first point in a Knowledge Skill costs KarmaNewKnowledgeSkill.
 						// Each additional beyond 1 costs i x KarmaImproveKnowledgeSkill.
@@ -15953,7 +15952,7 @@ namespace Chummer
 						do
 						{
 							intRating++;
-							foreach (SkillControl objSkillControl in panKnowledgeSkills.Controls)
+							foreach (SkillControl objSkillControl in creationKnowledgeSkills)
 							{
 								if (intRating <= objSkillControl.SkillRating)
 								{
@@ -16391,7 +16390,7 @@ namespace Chummer
 				}
 
 				// Update the character's Knowledge Skill information.
-				foreach (SkillControl objSkillControl in panKnowledgeSkills.Controls)
+				foreach (SkillControl objSkillControl in creationKnowledgeSkills)
 				{
 					objSkillControl.SkillRatingMaximum = objSkillControl.SkillObject.RatingMaximum;
 					objSkillControl.RefreshControl();

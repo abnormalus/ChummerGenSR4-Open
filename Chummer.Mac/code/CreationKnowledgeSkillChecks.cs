@@ -28,7 +28,17 @@ internal static class CreationKnowledgeSkillChecks
             check(panel.Controls.Count == previous + 1 && character.Skills.Contains(row.SkillObject)
                 && row.KnowledgeSkill && row.SkillCategory == "Academic" && row.SkillObject.Attribute == "LOG",
                 "Creation Add Knowledge Skill retains its canonical model and Academic LOG defaults");
+            var owned = Field<System.Collections.Generic.List<SkillControl>>(editor, "creationKnowledgeSkills");
+            check(owned.SequenceEqual(panel.Controls.OfType<SkillControl>()) && owned.Select(item => item.SkillObject).SequenceEqual(character.Skills.Where(skill => skill.KnowledgeSkill)),
+                "Creation knowledge ownership preserves canonical row identities and order");
             row.SkillRating = 2;
+            panel.Controls.Remove(row);
+            row.SkillObject.RatingMaximum = 4;
+            editor.UpdateCharacterInfo();
+            check(row.SkillRatingMaximum == 4 && owned.Contains(row) && character.Skills.Contains(row.SkillObject),
+                "Creation knowledge refresh retains owned detached rows and their model-defined rating limits");
+            row.SkillObject.RatingMaximum = 6;
+            editor.UpdateCharacterInfo();
             typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(editor, false);
             Field<Forms.ComboBox>(row, "cboSkillName").Text = "Synthetic [literal] knowledge O'Brien";
             check(row.SkillObject.Name == "Synthetic [literal] knowledge O'Brien" && Field<bool>(editor, "_blnIsDirty"),
@@ -45,9 +55,14 @@ internal static class CreationKnowledgeSkillChecks
             character.Options.ConfirmDelete = false;
             row.CreationDeleteButton.PerformClick();
             var deletedHandlers = notification.GetValue(row) as Delegate;
-            check(!character.Skills.Contains(row.SkillObject) && !panel.Controls.Contains(row) && Field<bool>(editor, "_blnIsDirty")
+            check(!character.Skills.Contains(row.SkillObject) && !panel.Controls.Contains(row) && !owned.Contains(row) && Field<bool>(editor, "_blnIsDirty")
                 && (deletedHandlers == null || !deletedHandlers.GetInvocationList().Any(handler => ReferenceEquals(handler.Target, editor))),
                 "Creation knowledge deletion removes the canonical row and releases its rename notification");
+            var ratingHandlers = typeof(SkillControl).GetField("RatingChanged", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(row) as Delegate;
+            var specializationHandlers = typeof(SkillControl).GetField("SpecializationChanged", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(row) as Delegate;
+            check((ratingHandlers == null || !ratingHandlers.GetInvocationList().Any(handler => ReferenceEquals(handler.Target, editor)))
+                && (specializationHandlers == null || !specializationHandlers.GetInvocationList().Any(handler => ReferenceEquals(handler.Target, editor))),
+                "Creation accepted knowledge deletion releases rating and specialization owner notifications");
             character.Options.ConfirmDelete = confirmDelete;
             Field<Forms.Button>(editor, "cmdAddKnowledgeSkill").PerformClick();
             row = panel.Controls.OfType<SkillControl>().Last();

@@ -17,13 +17,15 @@ public partial class frmCreate
         else creationActiveSkillSection.Add(controller, reveal: true);
     }
     private IEnumerable<SkillControl> SkillControllersFor(Majorsilence.Forms.Panel panel) =>
-        ReferenceEquals(panel, panActiveSkills) ? creationActiveSkills : panel.Controls.Cast<SkillControl>();
+        ReferenceEquals(panel, panActiveSkills) ? creationActiveSkills :
+        ReferenceEquals(panel, panKnowledgeSkills) ? creationKnowledgeSkills : panel.Controls.Cast<SkillControl>();
     private CreationActiveSkillSection? creationActiveSkillSection;
     private bool creationActiveSkillEventsAttached;
     private void InitializeCreationActiveSkills()
     {
         if (Avalonia.Application.Current == null || creationActiveSkillEventsAttached) return;
         creationActiveSkillEventsAttached = true;
+        InitializeCreationSkillFilterBar();
         void ShowSkills(object? sender, EventArgs args)
         {
             if (IsDisposed || creationActiveSkillSection != null || !tabSkills.Visible) return;

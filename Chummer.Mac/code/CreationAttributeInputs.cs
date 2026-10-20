@@ -10,6 +10,7 @@ public partial class frmCreate
     private void InitializeCreationInputSection()
     {
         if (Avalonia.Application.Current == null || creationInputSection != null) return;
+        InitializeCreationCommonLayout();
         creationInputSection = new CreationInputSection(this, panAttributes, tabCommon, new[] {
             (nudBOD, lblBODLabel, lblBODMetatype, lblBODAug),
             (nudAGI, lblAGILabel, lblAGIMetatype, lblAGIAug),
