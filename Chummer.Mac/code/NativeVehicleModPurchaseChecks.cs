@@ -166,7 +166,9 @@ internal static class NativeVehicleModPurchaseChecks
                 check(restoredMod.Cost == "1234" && restoredMod.Extra == "Synthetic compartment",
                     "Native accepted variable vehicle price and detail survive the existing character format");
                 tree.SelectedNode = node;
+                editor.GetType().GetField("_blnIsDirty", Flags)!.SetValue(editor, false);
                 byte[] before = character.CaptureSnapshot(); var existing = vehicle.Mods.ToArray();
+                int beforeNodes = node.Nodes.Count;
                 var cancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
                 {
@@ -188,7 +190,8 @@ internal static class NativeVehicleModPurchaseChecks
                 try { Invoke(editor, "tsVehicleAddMod_Click"); }
                 catch (TargetInvocationException error) { failure = error.InnerException ?? error; }
                 await cancellation.Task;
-                check(failure == null && character.CaptureSnapshot().AsSpan().SequenceEqual(before) && vehicle.Mods.SequenceEqual(existing),
+                check(failure == null && character.CaptureSnapshot().AsSpan().SequenceEqual(before) && vehicle.Mods.SequenceEqual(existing)
+                    && node.Nodes.Count == beforeNodes && !(bool)editor.GetType().GetField("_blnIsDirty", Flags)!.GetValue(editor)!,
                     "Native " + (career ? "career" : "creation") + " canceled required vehicle modification price preserves model and inventory references");
             }
             finally

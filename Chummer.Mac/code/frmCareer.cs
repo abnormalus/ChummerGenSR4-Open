@@ -10307,6 +10307,9 @@ namespace Chummer
 			TreeNode objNode = new TreeNode();
 			VehicleMod objMod = new VehicleMod(_objCharacter);
 			objMod.Create(objXmlMod, objNode, frmPickVehicleMod.SelectedRating);
+            // A required price prompt can cancel creation before ownership or
+            // accounting starts. Match the existing canceled-item contract.
+            if (objMod.InternalId == Guid.Empty.ToString()) return;
 
 			// Make sure that the Armor Rating does not exceed the maximum allowed by the Vehicle.
 			if (objMod.Name.StartsWith("Armor"))
