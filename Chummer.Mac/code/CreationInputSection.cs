@@ -30,7 +30,6 @@ internal sealed class CreationInputSection : IDisposable
         (Forms.Label Base, Forms.Label Augmented, Forms.Label Metatype)? headers = null)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,120,40,76"), RowSpacing = 2 };
-        grid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         int row = 0;
         if (headers is { } heading)
         {
@@ -49,6 +48,9 @@ internal sealed class CreationInputSection : IDisposable
             Add(grid, label, row, 0); Add(grid, input, row, 1); Add(grid, augmented, row, 2); Add(grid, metatype, row++, 3);
         }
         var scroller = new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        // Theme the viewport itself, not only its content. Otherwise its fallback
+        // ContentPresenter draws rows without ScrollContentPresenter/scrollbars.
+        scroller.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         var moneyGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,120,*"), ColumnSpacing = 4 };
         moneyGrid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         int left = moneyLabel.Left, top = Math.Min(moneyLabel.Top, money.Top);

@@ -130,9 +130,9 @@ internal sealed class CreationActiveSkillSection : IDisposable
     internal CreationActiveSkillSection(Forms.Form? editor, Forms.Panel source, IReadOnlyList<SkillControl> controllers)
     {
         this.source = source;
-        rows.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         Viewport = new ScrollViewer { Content = rows,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        Viewport.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         foreach (var controller in controllers) Add(controller);
         source.AutoScroll = false;
         if (editor != null) presenter = new CreationRegionPresenter(editor, source, Viewport, "nativeCreationActiveSkills");

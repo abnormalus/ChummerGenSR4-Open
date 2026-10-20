@@ -21,9 +21,9 @@ internal sealed class CreationSkillGroupSection : IDisposable
     {
         this.controllers = controllers;
         var rows = new StackPanel { Spacing = 2 };
-        rows.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         Viewport = new ScrollViewer { Content = rows,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        Viewport.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         int index = 0;
         foreach (var controller in controllers)
         {
