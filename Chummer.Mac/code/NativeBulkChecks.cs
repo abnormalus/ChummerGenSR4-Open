@@ -94,6 +94,9 @@ internal static class NativeBulkChecks
             await NativeVehicleModPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeBasicLifestyleChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCreationInputChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCreationSkillGroupChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCreationActiveSkillChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeCreationKnowledgeNameChecks.RunAsync(main, character, Check);
             await NativeNexusChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeVehicleModPurchaseChecks.RunAsync(main, character, Check);
             await NativeVehicleModPurchaseChecks.RunVariableCancellationAsync(main, character, Check);

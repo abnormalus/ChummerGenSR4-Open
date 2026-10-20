@@ -89,6 +89,7 @@ internal static class NativeVehicleModPurchaseChecks
                     check(purchase.Amount == -expected && purchase.Undo.NuyenType == (mounted ? NuyenExpenseType.AddVehicleWeaponMod : NuyenExpenseType.AddVehicleMod), description + " records one expense with matching canonical undo identity");
                     int paid = character.Nuyen;
                     Buy(true, true);
+                    object freePurchase = mounted ? weapon.WeaponMods.Last() : vehicle.Mods.Last();
                     check(Count() == count + 2 && character.Nuyen == paid && character.ExpenseEntries.Count == entries + 1, description + " free purchase preserves funds and expense count");
                     void SelectExpense()
                     {
@@ -98,7 +99,10 @@ internal static class NativeVehicleModPurchaseChecks
                     SelectExpense(); var reply = Reply(Forms.DialogResult.Cancel); Invoke(editor, "tsUndoNuyenExpense_Click"); await reply;
                     check(Count() == count + 2 && character.Nuyen == paid && character.ExpenseEntries.Contains(purchase), description + " canceled undo preserves purchase");
                     SelectExpense(); reply = Reply(Forms.DialogResult.Yes); Invoke(editor, "tsUndoNuyenExpense_Click"); await reply;
-                    check(Count() == count + 1 && character.Nuyen == money && !character.ExpenseEntries.Contains(purchase), description + " accepted undo refunds only the paid purchase");
+                    check(Count() == count + 1 && character.Nuyen == money && !character.ExpenseEntries.Contains(purchase) &&
+                        (mounted ? weapon.WeaponMods.Any(item => ReferenceEquals(item, freePurchase)) && !weapon.WeaponMods.Any(item => item.InternalId == id)
+                            : vehicle.Mods.Any(item => ReferenceEquals(item, freePurchase)) && !vehicle.Mods.Any(item => item.InternalId == id)),
+                        description + " accepted undo refunds only the paid purchase");
                     character.Nuyen = 0; int remaining = Count(); entries = character.ExpenseEntries.Count;
                     reply = Reply(Forms.DialogResult.OK); Buy(true); await reply;
                     check(Count() == remaining && character.Nuyen == 0 && character.ExpenseEntries.Count == entries, description + " unaffordable purchase preserves owned inventory funds and ledger");

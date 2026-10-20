@@ -53,5 +53,26 @@ internal static class CreationSkillInputChecks
         skillControl.SkillRatingMaximum = 1;
         check(skill.Rating == 1 && skillInput.Value == 1 && observedSkill == 1,
             "Legacy creation skill maximum refresh clips the existing model rating");
+        CheckEditorCleanup(source, check);
+    }
+
+    private static void CheckEditorCleanup(Character source, Action<bool, string> check)
+    {
+        var character = new Character(); character.LoadSnapshot(source.CaptureSnapshot()); character.Created = false;
+        using var editor = new frmCreate(character) { Loading = true };
+        editor.Show();
+        Panel Panel(string name) => (Panel)typeof(frmCreate).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(editor)!;
+        var active = Panel("panActiveSkills").Controls.OfType<SkillControl>().First();
+        var groups = Panel("panSkillGroups").Controls.OfType<SkillGroupControl>().ToArray();
+        bool HasEditorHandler(object row, string name) =>
+            (row.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(row) as Delegate)?
+            .GetInvocationList().Any(handler => ReferenceEquals(handler.Target, editor)) == true;
+        check(HasEditorHandler(active, "RatingChanged") && groups.Any(row => HasEditorHandler(row, "GroupRatingChanged")),
+            "Creation skill cleanup baseline exercises real editor-owned rating subscriptions");
+        typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor, false);
+        editor.Close();
+        check(!HasEditorHandler(active, "RatingChanged") && !HasEditorHandler(active, "SpecializationChanged") &&
+            !HasEditorHandler(active, "BreakGroupClicked") && groups.All(row => !HasEditorHandler(row, "GroupRatingChanged")),
+            "Closed creation editor releases retained skill and group row subscriptions");
     }
 }

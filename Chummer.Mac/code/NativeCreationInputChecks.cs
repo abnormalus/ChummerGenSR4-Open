@@ -61,9 +61,45 @@ internal static class NativeCreationInputChecks
                     check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input => input.Bounds.Width > 0 && input.Bounds.Height >= 20 &&
                         input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
                         "Native creation input batch has measured controls in " + theme.Key);
+                    var attributeInputs = section.Inputs.Where(pair => pair.Key != "nudNuyen").Select(pair => pair.Value).ToArray();
+                    var scroller = attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Single();
+                    var lastAttribute = attributeInputs.Last(item => item.IsVisible);
+                    byte[] beforeScroll = character.CaptureSnapshot();
+                    bool dirtyBeforeScroll = Field<bool>(editor, "_blnIsDirty");
+                    Avalonia.Controls.ControlExtensions.BringIntoView(lastAttribute);
+                    await Task.Delay(60);
+                    var lastPosition = lastAttribute.TranslatePoint(default, scroller);
+                    check(scroller.Extent.Height > scroller.Viewport.Height && scroller.Offset.Y > 0 &&
+                        lastPosition.HasValue && lastPosition.Value.Y >= -1 &&
+                        lastPosition.Value.Y + lastAttribute.Bounds.Height <= scroller.Viewport.Height + 1,
+                        "Native creation attribute scrolling fully exposes the final special-attribute row in " + theme.Key);
+                    using var bottomImage = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
+                        (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
+                    bottomImage.Render(window);
+                    bottomImage.Save(Path.Combine(output, "native-creation-inputs-bottom-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
+                    scroller.Offset = default;
+                    await Task.Delay(30);
+                    check(scroller.Offset.Y == 0 && character.CaptureSnapshot().SequenceEqual(beforeScroll) &&
+                        Field<bool>(editor, "_blnIsDirty") == dirtyBeforeScroll,
+                        "Native creation scrolling restores the first rows without changing character or dirty state in " + theme.Key);
                 }
             }
             finally { application.RequestedThemeVariant = originalTheme; }
+            bool originalMagic = character.MAGEnabled, originalResonance = character.RESEnabled;
+            try
+            {
+                character.MAGEnabled = true; character.RESEnabled = false;
+                check(section.Inputs["nudMAG"].IsEnabled && !section.Inputs["nudRES"].IsEnabled &&
+                    section.Inputs["nudMAG"].Minimum == Field<Forms.NumericUpDown>(editor, "nudMAG").Minimum &&
+                    section.Inputs["nudMAG"].Maximum == Field<Forms.NumericUpDown>(editor, "nudMAG").Maximum,
+                    "Native creation Magic availability and limits follow actual character enable events");
+                character.MAGEnabled = false; character.RESEnabled = true;
+                check(!section.Inputs["nudMAG"].IsEnabled && section.Inputs["nudRES"].IsEnabled &&
+                    section.Inputs["nudRES"].Minimum == Field<Forms.NumericUpDown>(editor, "nudRES").Minimum &&
+                    section.Inputs["nudRES"].Maximum == Field<Forms.NumericUpDown>(editor, "nudRES").Maximum,
+                    "Native creation Resonance availability and limits follow actual character enable events");
+            }
+            finally { character.MAGEnabled = originalMagic; character.RESEnabled = originalResonance; }
             var body = Field<Forms.NumericUpDown>(editor, "nudBOD"); var input = section.Inputs["nudBOD"];
             editor.Loading = true; body.Minimum = 1; body.Maximum = 10; body.Value = 2;
             check(input.Minimum == 1 && input.Maximum == 10 && input.Value == 2,

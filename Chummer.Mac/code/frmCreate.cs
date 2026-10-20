@@ -125,7 +125,7 @@ namespace Chummer
 
 			SetTooltips();
 			MoveControls();
-            Load += (_, _) => InitializeCreationInputSection();
+            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); };
 		}
 
 		/// <summary>
@@ -473,15 +473,15 @@ namespace Chummer
                     objSkillControl.Top = i * objSkillControl.Height;
                     objSkillControl.Width = 510;
                     objSkillControl.AutoScroll = false;
-                    panActiveSkills.Controls.Add(objSkillControl);
+                    AddCreationActiveSkill(objSkillControl);
                 }
             }
 
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
             {
                 if (objSkillControl.SkillObject.IsMeta)
                 {
-                    foreach (SkillControl skillControlMetaBase in panActiveSkills.Controls)
+                    foreach (SkillControl skillControlMetaBase in creationActiveSkills)
                     {
 
                         if (skillControlMetaBase.Name == objSkillControl.SkillObject.MetaBase)
@@ -541,7 +541,7 @@ namespace Chummer
 					objSkillControl.Top = i * objSkillControl.Height;
 					objSkillControl.Width = 510;
 					objSkillControl.AutoScroll = false;
-					panActiveSkills.Controls.Add(objSkillControl);
+					AddCreationActiveSkill(objSkillControl);
 				}
 			}
 
@@ -568,7 +568,7 @@ namespace Chummer
 				// Loop through all of the Active Skills the character has and set their maximums if needed.
 				if (objGroup.RatingMaximum > 6)
 				{
-					foreach (SkillControl objSkill in panActiveSkills.Controls)
+					foreach (SkillControl objSkill in creationActiveSkills)
 					{
 						if (objSkill.IsGrouped && objSkill.SkillGroup == objGroup.Name)
 						{
@@ -594,7 +594,7 @@ namespace Chummer
 					objGroupControl.IsEnabled = !objGroup.HasPhysicalSkills;
 				}
 
-				panSkillGroups.Controls.Add(objGroupControl);
+				AddCreationSkillGroup(objGroupControl);
 			}
 
 			// Populate Knowledge Skills.
@@ -611,6 +611,7 @@ namespace Chummer
 					objSkillControl.RatingChanged += objKnowledgeSkill_RatingChanged;
 					objSkillControl.SpecializationChanged += objSkill_SpecializationChanged;
 					objSkillControl.DeleteSkill += objKnowledgeSkill_DeleteSkill;
+                    objSkillControl.KnowledgeNameChanged += objKnowledgeSkill_NameChanged;
 					objSkillControl.BreakGroupClicked += objSkill_BreakGroupClicked;
 
 					objSkillControl.KnowledgeSkill = true;
@@ -1148,7 +1149,7 @@ namespace Chummer
 			mnuSpecialConvertToFreeSprite.Visible = _objCharacter.IsSprite;
 
 			// Run through all of the Skills and Enable/Disable them as needed.
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
 			{
 				if (objSkillControl.Attribute == "MAG")
 					objSkillControl.Enabled = _objCharacter.MAGEnabled;
@@ -1156,7 +1157,7 @@ namespace Chummer
 					objSkillControl.Enabled = _objCharacter.RESEnabled;
 			}
 			// Run through all of the Skill Groups and Disable them if all of their Skills are currently inaccessible.
-			foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+			foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 			{
 				bool blnEnabled = false;
 				foreach (Skill objSkill in _objCharacter.Skills)
@@ -1382,14 +1383,14 @@ namespace Chummer
 				treVehicles.DragDrop -= treVehicles_DragDrop;
 
 				// Remove events from all UserControls.
-				foreach (SkillControl objSkillControl in panSkillGroups.Controls.OfType<SkillControl>())
+				foreach (SkillControl objSkillControl in creationActiveSkills)
 				{
 					objSkillControl.RatingChanged -= objActiveSkill_RatingChanged;
 					objSkillControl.SpecializationChanged -= objSkill_SpecializationChanged;
 					objSkillControl.BreakGroupClicked -= objSkill_BreakGroupClicked;
 				}
 
-				foreach (SkillGroupControl objGroupControl in panSkillGroups.Controls.OfType<SkillGroupControl>())
+				foreach (SkillGroupControl objGroupControl in creationSkillGroups)
 				{
 					objGroupControl.GroupRatingChanged -= objGroup_RatingChanged;
 				}
@@ -1399,6 +1400,7 @@ namespace Chummer
 					objSkillControl.RatingChanged -= objKnowledgeSkill_RatingChanged;
 					objSkillControl.SpecializationChanged -= objSkill_SpecializationChanged;
 					objSkillControl.DeleteSkill -= objKnowledgeSkill_DeleteSkill;
+                    objSkillControl.KnowledgeNameChanged -= objKnowledgeSkill_NameChanged;
 					objSkillControl.BreakGroupClicked -= objSkill_BreakGroupClicked;
 				}
 
@@ -1616,7 +1618,7 @@ namespace Chummer
 			}
 
 			// Run through all of the Skills and Enable/Disable them as needed.
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
 			{
 				if (objSkillControl.Attribute == "MAG")
 				{
@@ -1626,7 +1628,7 @@ namespace Chummer
 				}
 			}
 			// Run through all of the Skill Groups and Disable them if all of their Skills are currently inaccessible.
-			foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+			foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 			{
 				bool blnEnabled = false;
 				foreach (Skill objSkill in _objCharacter.Skills)
@@ -1692,7 +1694,7 @@ namespace Chummer
 			}
 
 			// Run through all of the Skills and Enable/Disable them as needed.
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
 			{
 				if (objSkillControl.Attribute == "RES")
 				{
@@ -1702,7 +1704,7 @@ namespace Chummer
 				}
 			}
 			// Run through all of the Skill Groups and Disable them if all of their Skills are currently inaccessible.
-			foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+			foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 			{
 				bool blnEnabled = false;
 				foreach (Skill objSkill in _objCharacter.Skills)
@@ -1895,7 +1897,7 @@ namespace Chummer
 			{
 				// If Uneducated is being added, run through all of the Technical Active Skills and disable them.
 				// Do not break SkillGroups as these will be used if this is ever removed.
-				foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+				foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 				{
 					if (objSkillGroupControl.HasTechnicalSkills)
 					{
@@ -1908,7 +1910,7 @@ namespace Chummer
 			{
 				// If Uneducated is being removed, run through all of the Technical Active Skills and re-enable them.
 				// If they were a part of a SkillGroup, set their Rating back.
-				foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+				foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 				{
 					if (objSkillGroupControl.HasTechnicalSkills)
 					{
@@ -1928,7 +1930,7 @@ namespace Chummer
 			{
 				// If Uncouth is being added, run through all of the Social Active Skills and disable them.
 				// Do not break SkillGroups as these will be used if this is ever removed.
-				foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+				foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 				{
 					if (objSkillGroupControl.HasSocialSkills)
 					{
@@ -1941,7 +1943,7 @@ namespace Chummer
 			{
 				// If Uncouth is being removed, run through all of the Social Active Skills and re-enable them.
 				// If they were a part of a SkillGroup, set their Rating back.
-				foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+				foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 				{
 					if (objSkillGroupControl.HasSocialSkills)
 					{
@@ -1961,7 +1963,7 @@ namespace Chummer
 			{
 				// If Infirm is being added, run through all of the Physical Active Skills and disable them.
 				// Do not break SkillGroups as these will be used if this is ever removed.
-				foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+				foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 				{
 					if (objSkillGroupControl.HasPhysicalSkills)
 					{
@@ -1974,7 +1976,7 @@ namespace Chummer
 			{
 				// If Infirm is being removed, run through all of the Physical Active Skills and re-enable them.
 				// If they were a part of a SkillGroup, set their Rating back.
-				foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+				foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 				{
 					if (objSkillGroupControl.HasPhysicalSkills)
 					{
@@ -4680,6 +4682,14 @@ namespace Chummer
 			UpdateWindowTitle();
 		}
 
+        private void objKnowledgeSkill_NameChanged(object sender, EventArgs args)
+        {
+            if (_blnLoading) return;
+            // Reuse the existing refresh/dirty transition; renaming is not a
+            // rating increase and must not run the high-rating correction.
+            objSkill_SpecializationChanged(sender);
+        }
+
 		private void objKnowledgeSkill_RatingChanged(Object sender)
 		{
 			// Handle the RatingChanged even for the Knowledge SkillControl object.
@@ -4713,6 +4723,7 @@ namespace Chummer
 
 			// Handle the DeleteSkill event for the SkillControl object.
 			SkillControl objSender = (SkillControl)sender;
+            objSender.KnowledgeNameChanged -= objKnowledgeSkill_NameChanged;
 			bool blnFound = false;
 			foreach (SkillControl objSkillControl in panKnowledgeSkills.Controls)
 			{
@@ -4740,7 +4751,7 @@ namespace Chummer
 			SkillControl objSkillControl = (SkillControl)sender;
 
 			SkillGroup objSkillGroup = new SkillGroup();
-			foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+			foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 			{
 				if (objSkillGroupControl.GroupName == objSkillControl.SkillGroup)
 				{
@@ -4758,7 +4769,7 @@ namespace Chummer
 				int intRating = 0;
 
 				// Break the Skill Group itself.
-				foreach (SkillGroupControl objSkillGroupControl in panSkillGroups.Controls)
+				foreach (SkillGroupControl objSkillGroupControl in creationSkillGroups)
 				{
 					if (objSkillGroupControl.GroupName == strSkillGroup)
 					{
@@ -4770,7 +4781,7 @@ namespace Chummer
 
 				// Remove all of the Active Skills from the Skill Group being broken.
 				string strGroup = objSkillControl.SkillGroup;
-				foreach (SkillControl objActiveSkilll in panActiveSkills.Controls)
+				foreach (SkillControl objActiveSkilll in creationActiveSkills)
 				{
 					if (objActiveSkilll.SkillGroup == strGroup)
 					{
@@ -4793,7 +4804,7 @@ namespace Chummer
 			foreach (XmlNode objXmlSkill in objXmlSkillList)
 			{
 				// Run through all of the Skills in the Active Skill Panel and update the ones that match the Skills in the Skill Group.
-				foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+				foreach (SkillControl objSkillControl in creationActiveSkills)
 				{
 					if (objSkillControl.SkillName == objXmlSkill["name"].InnerText)
 					{
@@ -5209,7 +5220,7 @@ namespace Chummer
 			int intSkillValue = 0;
 
 			// Retrieve the character's Summoning Skill Rating.
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
 			{
 				if (objSkillControl.SkillName == "Summoning")
 					intSkillValue = objSkillControl.SkillRating;
@@ -5287,7 +5298,7 @@ namespace Chummer
 			int intSkillValue = 0;
 
 			// Retrieve the character's Compiling Skill Rating.
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
 			{
 				if (objSkillControl.SkillName == "Compiling")
 					intSkillValue = objSkillControl.SkillRating;
@@ -5569,6 +5580,7 @@ namespace Chummer
 			objSkillControl.RatingChanged += objKnowledgeSkill_RatingChanged;
 			objSkillControl.SpecializationChanged += objSkill_SpecializationChanged;
 			objSkillControl.DeleteSkill += objKnowledgeSkill_DeleteSkill;
+                    objSkillControl.KnowledgeNameChanged += objKnowledgeSkill_NameChanged;
 
 			objSkillControl.KnowledgeSkill = true;
 			objSkillControl.AllowDelete = true;
@@ -5711,7 +5723,7 @@ namespace Chummer
 
 			// Run through the list of Active Skills and pick out the two applicable ones.
 			int intSkillValue = 0;
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
 			{
 				if ((objSkillControl.SkillName == "Spellcasting" || objSkillControl.SkillName == "Ritual Spellcasting") && objSkillControl.SkillRating > intSkillValue)
 					intSkillValue = objSkillControl.SkillRating + objSkillControl.SkillObject.RatingModifiers;
@@ -7598,7 +7610,7 @@ namespace Chummer
 
 			XmlNode nodSkill = objXmlDocument.SelectSingleNode("/chummer/skills/skill[name = \"" + frmPickExoticSkill.SelectedExoticSkill + "\"]");
 
-			int i = panActiveSkills.Controls.Count;
+			int i = creationActiveSkills.Count;
 			Skill objSkill = new Skill(_objCharacter);
 			objSkill.Attribute = nodSkill["attribute"].InnerText;
 			if (_objCharacter.MaxSkillRating > 0)
@@ -7645,7 +7657,7 @@ namespace Chummer
 			objSkillControl.SkillRatingMaximum = 6;
 			// Set the SkillControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objSkillControl.Location = new Point(0, objSkillControl.Height * i + panActiveSkills.AutoScrollPosition.Y);
-			panActiveSkills.Controls.Add(objSkillControl);
+			AddCreationActiveSkill(objSkillControl);
 
 			_blnIsDirty = true;
 			UpdateWindowTitle();
@@ -11312,7 +11324,7 @@ namespace Chummer
 
 			// Run through the list of Active Skills and pick out the two applicable ones.
 			int intSkillValue = 0;
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
 			{
 				if ((objSkillControl.SkillName == "Spellcasting" || objSkillControl.SkillName == "Ritual Spellcasting") && objSkillControl.SkillRating > intSkillValue)
 					intSkillValue = objSkillControl.SkillRating;
@@ -14697,13 +14709,13 @@ namespace Chummer
 			switch (cboSkillFilter.SelectedValue.ToString())
 			{
 				case "0":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						objSkillControl.Visible = true;
 					}
 					break;
 				case "1":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Rating > 0)
 							objSkillControl.Visible = true;
@@ -14712,7 +14724,7 @@ namespace Chummer
 					}
 					break;
 				case "2":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.TotalRating > 0)
 							objSkillControl.Visible = true;
@@ -14721,7 +14733,7 @@ namespace Chummer
 					}
 					break;
 				case "3":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Rating == 0)
 							objSkillControl.Visible = true;
@@ -14730,7 +14742,7 @@ namespace Chummer
 					}
 					break;
 				case "BOD":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "BOD")
 							objSkillControl.Visible = true;
@@ -14739,7 +14751,7 @@ namespace Chummer
 					}
 					break;
 				case "AGI":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "AGI")
 							objSkillControl.Visible = true;
@@ -14748,7 +14760,7 @@ namespace Chummer
 					}
 					break;
 				case "REA":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "REA")
 							objSkillControl.Visible = true;
@@ -14757,7 +14769,7 @@ namespace Chummer
 					}
 					break;
 				case "STR":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "STR")
 							objSkillControl.Visible = true;
@@ -14766,7 +14778,7 @@ namespace Chummer
 					}
 					break;
 				case "CHA":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "CHA")
 							objSkillControl.Visible = true;
@@ -14775,7 +14787,7 @@ namespace Chummer
 					}
 					break;
 				case "INT":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "INT")
 							objSkillControl.Visible = true;
@@ -14784,7 +14796,7 @@ namespace Chummer
 					}
 					break;
 				case "LOG":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "LOG")
 							objSkillControl.Visible = true;
@@ -14793,7 +14805,7 @@ namespace Chummer
 					}
 					break;
 				case "WIL":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "WIL")
 							objSkillControl.Visible = true;
@@ -14802,7 +14814,7 @@ namespace Chummer
 					}
 					break;
 				case "MAG":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "MAG")
 							objSkillControl.Visible = true;
@@ -14811,7 +14823,7 @@ namespace Chummer
 					}
 					break;
 				case "RES":
-					foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{
 						if (objSkillControl.SkillObject.Attribute == "RES")
 							objSkillControl.Visible = true;
@@ -14823,7 +14835,7 @@ namespace Chummer
 					if (cboSkillFilter.SelectedValue.ToString().StartsWith("GROUP:"))
 					{
 						string strGroup = cboSkillFilter.SelectedValue.ToString().Replace("GROUP:", string.Empty);
-						foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+						foreach (SkillControl objSkillControl in creationActiveSkills)
 						{
 							if (objSkillControl.SkillGroup == strGroup)
 								objSkillControl.Visible = true;
@@ -14833,7 +14845,7 @@ namespace Chummer
 					}
 					else
 					{
-						foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+						foreach (SkillControl objSkillControl in creationActiveSkills)
 						{
 							if (objSkillControl.SkillCategory == cboSkillFilter.SelectedValue.ToString())
 								objSkillControl.Visible = true;
@@ -15138,7 +15150,7 @@ namespace Chummer
 			int intSkillsAtFive = 0;
 			int intSkillsAtSix = 0;
 
-			foreach (SkillControl objSkillControl in panSkillPanel.Controls)
+			foreach (SkillControl objSkillControl in SkillControllersFor(panSkillPanel))
 			{
 				if (objSkillControl.SkillName != strSkill)
 				{
@@ -15151,7 +15163,7 @@ namespace Chummer
 			}
 
 			// Check the current Skill's Rating and make sure it isn't trying to become 6 if at least one 5 already exists.
-			foreach (SkillControl objSkillControl in panSkillPanel.Controls)
+			foreach (SkillControl objSkillControl in SkillControllersFor(panSkillPanel))
 			{
 				if (objSkillControl.SkillName == strSkill)
 				{
@@ -15622,7 +15634,7 @@ namespace Chummer
 
 			// Calculate the BP used by Skill Groups.
 			intPointsUsed = 0;
-			foreach (SkillGroupControl objGroupControl in panSkillGroups.Controls)
+			foreach (SkillGroupControl objGroupControl in creationSkillGroups)
 			{
 				if (objGroupControl.GroupRating > 0)
 				{
@@ -15681,7 +15693,7 @@ namespace Chummer
 
 			// Calculate the BP used by Active Skills.
 			intPointsUsed = 0;
-			foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+			foreach (SkillControl objSkillControl in creationActiveSkills)
             {
                 if (objSkillControl.SkillIsMeta)
                 {continue;}
@@ -16369,7 +16381,7 @@ namespace Chummer
 				lblKnowledgeSkillPoints.Text = String.Format("{0} " + LanguageManager.Instance.GetString("String_Of") + " {1}", _objCharacter.KnowledgeSkillPoints.ToString(), _objCharacter.KnowledgeSkillPoints.ToString());
 
 				// Update the character's Skill information.
-				foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+				foreach (SkillControl objSkillControl in creationActiveSkills)
 				{
 					objSkillControl.SkillRatingMaximum = objSkillControl.SkillObject.RatingMaximum;
 					objSkillControl.RefreshControl();
@@ -18238,7 +18250,7 @@ namespace Chummer
 
         private void UpdateMetaSkills()
         {
-            foreach (SkillControl objSkillControl in panActiveSkills.Controls)
+            foreach (SkillControl objSkillControl in creationActiveSkills)
             {
                 objSkillControl.UpdateMetas();
             }

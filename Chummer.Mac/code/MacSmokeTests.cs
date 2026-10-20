@@ -1008,6 +1008,12 @@ namespace Chummer
                 CritterPowerPromptChecks.Run(character, Check);
                 CreationInputLifecycleChecks.Run(Check);
                 CreationSkillInputChecks.Run(character, Check);
+                CreationSkillGroupSectionChecks.Run(character, Check);
+                CreationActiveSkillChecks.Run(character, Check);
+                CreationActiveSkillChecks.Run(character, Check, useNativeViewport: true);
+                CreationActiveSkillMetaChecks.Run(character, Check);
+                CreationKnowledgeSkillChecks.Run(character, Check);
+                WeaponModificationUndoChecks.Run(Check);
                 ModalCloseChecks.Run(Check);
                 MenuOrderChecks.Run(Check);
                 BuildIdentityChecks.Run(Check);

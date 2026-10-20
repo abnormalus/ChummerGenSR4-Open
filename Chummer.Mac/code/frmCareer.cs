@@ -14537,83 +14537,10 @@ namespace Chummer
                     }
                     WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
                     break;
-				case NuyenExpenseType.AddVehicleWeaponMod:
-					// Locate the Weapon Mod that was added.
-					foreach (Vehicle objVehicle in _objCharacter.Vehicles)
-					{
-						foreach (VehicleMod objMod in objVehicle.Mods)
-						{
-							foreach (Weapon objWeapon in objMod.Weapons)
-							{
-								foreach (WeaponMod objWMod in objWeapon.WeaponMods)
-								{
-									if (objMod.InternalId == objEntry.Undo.ObjectId)
-									{
-										// Remove the Weapon Mod.
-										objWeapon.WeaponMods.Remove(objWMod);
-
-										// Remove the Weapon Mod from the Tree.
-										foreach (TreeNode objVNode in treVehicles.Nodes[0].Nodes)
-										{
-											foreach (TreeNode objNode in objVNode.Nodes)
-											{
-												foreach (TreeNode objWNode in objNode.Nodes)
-												{
-													foreach (TreeNode objChild in objWNode.Nodes)
-													{
-														if (objChild.Tag.ToString() == objEntry.Undo.ObjectId)
-														{
-															objChild.Remove();
-															break;
-														}
-													}
-												}
-											}
-										}
-										break;
-									}
-								}
-								if (objWeapon.UnderbarrelWeapons.Count > 0)
-								{
-									foreach (Weapon objUnderbarrelWeapon in objWeapon.UnderbarrelWeapons)
-									{
-										foreach (WeaponMod objWMod in objUnderbarrelWeapon.WeaponMods)
-										{
-											if (objWMod.InternalId == objEntry.Undo.ObjectId)
-											{
-												// Remove the Weapon Mod.
-												objUnderbarrelWeapon.WeaponMods.Remove(objWMod);
-
-												// Remove the Weapon Mod from the Tree.
-												foreach (TreeNode objVNode in treVehicles.Nodes[0].Nodes)
-												{
-													foreach (TreeNode objNode in objVNode.Nodes)
-													{
-														foreach (TreeNode objWNode in objNode.Nodes)
-														{
-															foreach (TreeNode objChild in objWNode.Nodes)
-															{
-																foreach (TreeNode objSubChild in objChild.Nodes)
-																{
-																	if (objSubChild.Tag.ToString() == objEntry.Undo.ObjectId)
-																	{
-																		objSubChild.Remove();
-																		break;
-																	}
-																}
-															}
-														}
-													}
-												}
-												break;
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-					break;
+                case NuyenExpenseType.AddVehicleWeaponMod:
+                    if (WeaponModificationUndo.RemoveMounted(_objCharacter, objEntry.Undo.ObjectId))
+                        objCommon.FindNode(objEntry.Undo.ObjectId, treVehicles)?.Remove();
+                    break;
 				case NuyenExpenseType.AddArmor:
 					// Locate the Armor that was added.
 					Armor objArmor = objCommon.FindArmor(objEntry.Undo.ObjectId, _objCharacter.Armor);
