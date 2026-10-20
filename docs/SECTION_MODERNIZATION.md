@@ -67,3 +67,6 @@ Direct native dialogs now follow their owner theme, including live changes and c
 ## Publication cadence
 
 Batch related changes locally and push incremental GitHub updates no more often than every 4–6 hours of modernization progress, following the user's October 17 instruction. Local commits, builds, tests and documentation continue within that window. A finished small migration is not by itself a reason to push, merge or publish Nightly. Revalidate the combined exact source before publishing a batch, retain only the verified Stable/latest Nightly package sets, and keep Stable unchanged until full testing and user promotion.
+
+
+The human subsequently authorized same-draft CI fixes between batches: “Allow same-draft CI fixes; keep releases 4–6 hours apart.” This supersedes the source-update cadence above for coherent corrections within a draft. Releases retain the cadence and exact-source validation/visual gates; Stable still requires explicit promotion.

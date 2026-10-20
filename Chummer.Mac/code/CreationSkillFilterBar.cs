@@ -27,14 +27,14 @@ public partial class frmCreate
             child.Top += height;
             if ((child.Anchor & Forms.AnchorStyles.Bottom) != 0) child.Height = Math.Max(0, child.Height - height);
         }
-        var bar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*,*,*,*,*,*,*,*,*") };
+        var bar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*,*,*,*,*,*,*,*,*,*") };
         bar.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
-        var values = new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "MAG", "RES", "1" };
+        var values = new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "MAG", "RES", "1" };
         for (int index = 0; index < values.Length; index++)
         {
             string value = values[index];
-            string label = value == "0" ? LanguageManager.Instance.GetString("String_SkillFilterAll") :
-                value == "1" ? "Ranked" : LanguageManager.Instance.GetString("String_Attribute" + value + "Short");
+            string label = value == "0" ? LanguageManager.Instance.GetString("String_SkillFilterAllShort") :
+                value == "1" ? LanguageManager.Instance.GetString("String_SkillFilterRankedShort") : LanguageManager.Instance.GetString("String_Attribute" + value + "Short");
             var button = new ToggleButton { Content = label, Padding = new Thickness(3, 2), MinHeight = 28,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
             button.Click += (_, _) => { SelectCreationSkillFilter(value); RefreshButtons(); };

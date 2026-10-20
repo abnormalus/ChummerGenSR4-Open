@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Styling;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Forms = Majorsilence.Forms;
 
@@ -49,6 +50,17 @@ internal sealed class CreationInputSection : IDisposable
             Add(grid, label, row, 0); Add(grid, input, row, 1); Add(grid, augmented, row, 2); Add(grid, metatype, row++, 3);
         }
         grid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        // Compact the framework editor as well as its outer spinner. Keeping
+        // the default TextBox minimum would clip digits inside a shorter row.
+        grid.Styles.Add(new Style(selector => selector.OfType<NumericUpDown>().Template().OfType<TextBox>())
+        {
+            Setters = {
+                new Setter(TextBox.MinHeightProperty, 0d),
+                new Setter(TextBox.HeightProperty, 26d),
+                new Setter(TextBox.PaddingProperty, new Thickness(2, 0)),
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
+            }
+        });
         var moneyGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,120,*"), ColumnSpacing = 4 };
         moneyGrid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         Add(moneyGrid, Mirror(moneyLabel), 0, 0); Add(moneyGrid, Bind(money, tips), 0, 1); Add(moneyGrid, Mirror(moneyTotal), 0, 2);

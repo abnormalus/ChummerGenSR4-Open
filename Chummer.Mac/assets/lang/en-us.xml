@@ -1953,6 +1953,14 @@
 			<key>String_AttributeFirewall</key>
 			<text>Firewall</text>
 		</string>
+        <string>
+            <key>String_SkillFilterAllShort</key>
+            <text>All</text>
+        </string>
+        <string>
+            <key>String_SkillFilterRankedShort</key>
+            <text>Ranked</text>
+        </string>
 		<string>
 			<key>String_SkillFilterAll</key>
 			<text>Show All Active Skills</text>

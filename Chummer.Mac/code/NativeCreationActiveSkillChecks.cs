@@ -50,7 +50,7 @@ internal static class NativeCreationActiveSkillChecks
                 && controllers.All(row => Avalonia.Automation.AutomationProperties.GetName(section.Rows[row].Rating) == row.CreationNameLabel.Text),
                 "Native active skill fields have unique identities and localized accessible names");
             var quickFilters = Field<Dictionary<string, Avalonia.Controls.Primitives.ToggleButton>>(editor, "creationSkillFilterButtons");
-            check(quickFilters.Keys.SequenceEqual(new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "MAG", "RES", "1" }),
+            check(quickFilters.Keys.SequenceEqual(new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "MAG", "RES", "1" }),
                 "Native skill quick filters put All first, attributes in order and Ranked last");
             foreach (var pair in quickFilters)
             {

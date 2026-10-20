@@ -1251,6 +1251,7 @@ namespace Chummer
 			lstFilter.Add(itmINT);
 			lstFilter.Add(itmLOG);
 			lstFilter.Add(itmWIL);
+            lstFilter.Add(new ListItem { Value = "EDG", Name = LanguageManager.Instance.GetString("String_ExpenseAttribute") + ": " + LanguageManager.Instance.GetString("String_AttributeEDGShort") });
 			lstFilter.Add(itmMAG);
 			lstFilter.Add(itmRES);
 
@@ -14815,6 +14816,10 @@ namespace Chummer
 							objSkillControl.Visible = false;
 					}
 					break;
+                case "EDG":
+                    foreach (SkillControl row in creationActiveSkills)
+                        row.Visible = row.SkillObject.Attribute == "EDG";
+                    break;
 				case "MAG":
 					foreach (SkillControl objSkillControl in creationActiveSkills)
 					{

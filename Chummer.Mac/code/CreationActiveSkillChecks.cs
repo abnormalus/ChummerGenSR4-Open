@@ -49,7 +49,7 @@ internal static class CreationActiveSkillChecks
             var filterMethod = typeof(frmCreate).GetMethod("SelectCreationSkillFilter", BindingFlags.Instance | BindingFlags.NonPublic)!;
             var filterSnapshot = character.CaptureSnapshot();
             bool filterDirty = Field<bool>(editor, "_blnIsDirty");
-            foreach (string value in new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "MAG", "RES", "1", "GROUP:Firearms" })
+            foreach (string value in new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "MAG", "RES", "1", "GROUP:Firearms" })
             {
                 filterMethod.Invoke(editor, new object[] { value });
                 check(rows.All(row => row.Visible == (value == "0" ||

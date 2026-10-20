@@ -47,13 +47,17 @@ internal static class NativeCreationInputChecks
                 "Native creation inputs retain detached controller state without drawing legacy spinners");
             var application = Avalonia.Application.Current!;
             var originalTheme = application.RequestedThemeVariant;
+            var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
+            var originalWindowState = window.WindowState;
+            double originalWidth = window.Width, originalHeight = window.Height;
             try
             {
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
+                    window.WindowState = Avalonia.Controls.WindowState.Normal;
+                    window.Width = 932; window.Height = 545;
                     application.RequestedThemeVariant = theme;
                     await Task.Delay(120);
-                    var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
                     using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
                         (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
                     image.Render(window);
@@ -66,9 +70,21 @@ internal static class NativeCreationInputChecks
                     bool AllAttributesFit() => attributeInputs.All(input => input.IsEffectivelyVisible &&
                         input.TranslatePoint(default, root) is { } point && point.Y >= -1 &&
                         point.Y + input.Bounds.Height <= root.Bounds.Height + 1 && input.Bounds.Height >= 20 &&
-                        input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24));
-                    check(AllAttributesFit() && !attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Any(),
-                        "Native creation shows all eleven attribute rows simultaneously without scrolling in " + theme.Key);
+                        input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24) &&
+                        input.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.TextPresenter>().Any(text =>
+                            text.TranslatePoint(default, input) is { } position && position.Y >= -1 &&
+                            position.Y + text.TextLayout.Height <= input.Bounds.Height + 1));
+                    var commonPage = Field<Forms.TabPage>(editor, "tabCommon");
+                    var attributesPanel = Field<Forms.Panel>(editor, "panAttributes");
+                    check(AllAttributesFit() && attributesPanel.Bottom <= commonPage.ClientSize.Height &&
+                        attributeInputs.All(input => input.TranslatePoint(default, window) is { } point && point.Y >= 0 &&
+                            point.Y + input.Bounds.Height <= window.ClientSize.Height) &&
+                        !attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Any(),
+                        "Native creation shows all eleven attribute rows simultaneously without scrolling in " + theme.Key +
+                        FormattableString.Invariant($" [window={window.ClientSize}; common={commonPage.ClientSize}; attributes={attributesPanel.Bounds}; root={root.Bounds}; text=" ) +
+                        string.Join(";", attributeInputs.Select(input => input.Name + ":" + string.Join(",", input.GetVisualDescendants()
+                            .OfType<Avalonia.Controls.Presenters.TextPresenter>().Select(text =>
+                                FormattableString.Invariant($"{text.TranslatePoint(default, input)}/{text.TextLayout.Height}"))))) + "]");
                     byte[] beforeResize = character.CaptureSnapshot();
                     bool dirtyBeforeResize = Field<bool>(editor, "_blnIsDirty");
                     var originalState = window.WindowState;
@@ -78,7 +94,6 @@ internal static class NativeCreationInputChecks
                         (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
                     fullImage.Render(window);
                     fullImage.Save(Path.Combine(output, "native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
-                    var attributesPanel = Field<Forms.Panel>(editor, "panAttributes");
                     var contacts = Field<Forms.SplitContainer>(editor, "splitContacts");
                     check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
                         "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
@@ -89,7 +104,13 @@ internal static class NativeCreationInputChecks
                         "Native creation resizing preserves character and dirty state in " + theme.Key);
                 }
             }
-            finally { application.RequestedThemeVariant = originalTheme; }
+            finally
+            {
+                application.RequestedThemeVariant = originalTheme;
+                window.WindowState = Avalonia.Controls.WindowState.Normal;
+                window.Width = originalWidth; window.Height = originalHeight; window.WindowState = originalWindowState;
+                await Task.Delay(120);
+            }
             bool originalMagic = character.MAGEnabled, originalResonance = character.RESEnabled;
             try
             {
