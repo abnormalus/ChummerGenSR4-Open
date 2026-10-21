@@ -14,6 +14,10 @@ internal static class NativeControlPresentation
         styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
         styles.Add(new Style(s => s.OfType<TextBox>().PropertyEquals(TextBox.AcceptsReturnProperty, false))
         { Setters = { new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center) } });
+        styles.Add(new Style(s => s.OfType<Button>())
+        { Setters = { new Setter(Button.VerticalContentAlignmentProperty, VerticalAlignment.Center) } });
+        styles.Add(new Style(s => s.OfType<Avalonia.Controls.Primitives.ToggleButton>())
+        { Setters = { new Setter(Button.VerticalContentAlignmentProperty, VerticalAlignment.Center) } });
         styles.Add(new Style(s => s.OfType<ComboBox>())
         { Setters = { new Setter(ComboBox.VerticalContentAlignmentProperty, VerticalAlignment.Center) } });
         styles.Add(new Style(s => s.OfType<NumericUpDown>())

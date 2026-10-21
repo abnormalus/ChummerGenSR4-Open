@@ -45,7 +45,8 @@ internal static class NativeCreationKnowledgeViewportChecks
                 && row.Rating.GetType() == typeof(NumericUpDown) && row.Specialization.GetType() == typeof(AutoCompleteBox))
                 && section.Rows.Values.Select(row => row.Name.Name).Distinct().Count() == 12,
                 "Native knowledge rows expose standard controls and unique identities");
-            check(section.Rows.Values.All(row => !row.SpecializationDisclosure.Expanded),
+            check(section.Rows.Values.All(row => !row.SpecializationDisclosure.Expanded &&
+                row.SpecializationDisclosure.Toggle.VerticalContentAlignment == Avalonia.Layout.VerticalAlignment.Center),
                 "Native knowledge specialization lines start collapsed for every row");
             foreach (var disclosureRow in new[] { section.Rows.Values.First(), section.Rows.Values.Last() })
                 disclosureRow.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));

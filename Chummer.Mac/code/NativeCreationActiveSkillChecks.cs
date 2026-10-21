@@ -51,7 +51,8 @@ internal static class NativeCreationActiveSkillChecks
                 && section.Rows.Values.Select(row => row.Specialization.Name).Distinct().Count() == controllers.Count
                 && controllers.All(row => Avalonia.Automation.AutomationProperties.GetName(section.Rows[row].Rating) == row.CreationNameLabel.Text),
                 "Native active skill fields have unique identities and localized accessible names");
-            check(section.Rows.Values.All(row => !row.SpecializationDisclosure.Expanded),
+            check(section.Rows.Values.All(row => !row.SpecializationDisclosure.Expanded &&
+                row.SpecializationDisclosure.Toggle.VerticalContentAlignment == Avalonia.Layout.VerticalAlignment.Center),
                 "Native skill specialization lines start collapsed for every row");
             var perception = controllers.Single(controller => controller.SkillName == "Perception" && !controller.SkillIsMeta);
             var perceptionRows = controllers.Where(controller => controller.SkillIsMeta && controller.SkillMetaBase == "Perception").ToArray();
