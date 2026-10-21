@@ -78,13 +78,22 @@ internal static class NativeCreationInputChecks
             {
                 if (window.WindowState == Avalonia.Controls.WindowState.Normal) return;
                 bool resized = false;
-                EventHandler<Avalonia.Controls.WindowResizedEventArgs> changed = (_, _) => resized = true;
+                bool changingState = true;
+                EventHandler<Avalonia.Controls.WindowResizedEventArgs> changed = (_, _) =>
+                {
+                    // Mac reports intermediate sizes inside SetWindowState, then
+                    // delivers its restored size through the native run loop.
+                    // Await that queued notification before requesting a new size.
+                    if (!System.OperatingSystem.IsMacOS() || !changingState) resized = true;
+                };
                 window.Resized += changed;
                 try
                 {
                     window.WindowState = Avalonia.Controls.WindowState.Normal;
+                    changingState = false;
                     var deadline = DateTime.UtcNow.AddSeconds(20);
                     while (!resized && DateTime.UtcNow < deadline) await Task.Delay(10);
+                    if (!resized) throw new TimeoutException("Normal window restoration did not report its native resize.");
                 }
                 finally { window.Resized -= changed; }
             }
