@@ -133,10 +133,10 @@ internal static class NativeCreationInputChecks
             {
                 // Capture both themes in the same measured mode, then transition
                 // once. A fullscreen exit is not a prerequisite for a theme swap.
-                SetNormalClientSize(new System.Drawing.Size(932, 545));
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
                     application.RequestedThemeVariant = theme;
+                    SetNormalClientSize(new System.Drawing.Size(932, 545));
                     bool ready = await WaitForGeometry(Avalonia.Controls.WindowState.Normal, new Size(932, 545));
                     Capture("native-creation-inputs-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
                     check(ready && GeometryMatches(Avalonia.Controls.WindowState.Normal, new Size(932, 545)),
