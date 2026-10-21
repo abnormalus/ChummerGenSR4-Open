@@ -53,12 +53,21 @@ internal static class NativeCreationKnowledgeViewportChecks
                     Application.Current.RequestedThemeVariant = theme; await Task.Delay(80);
                     var last = section.Rows.Values.Last(); ControlExtensions.BringIntoView(last.Layout); await Task.Delay(30);
                     var point = last.Layout.TranslatePoint(default, section.Viewport);
+                    // Retain the exact final-row frame even if strict fit fails.
+                    var diagnosticWindow = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
+                    using (var diagnostic = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(diagnosticWindow.ClientSize.Width * 2),
+                        (int)Math.Ceiling(diagnosticWindow.ClientSize.Height * 2)), new Vector(192, 192)))
+                    {
+                        diagnostic.Render(diagnosticWindow);
+                        diagnostic.Save(Path.Combine(output, "native-creation-knowledge-skills-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
+                    }
                     check(last.Layout.IsEffectivelyVisible && point.HasValue && point.Value.Y >= -1 &&
                         point.Value.Y + last.Layout.Bounds.Height <= section.Viewport.Viewport.Height + 1 &&
                         last.Layout.Bounds.Width <= section.Viewport.Viewport.Width + 1 &&
                         new Control[] { last.Type, last.Name, last.Rating, last.Specialization, last.Delete, last.AddSpecialty }.All(control =>
                             control.TranslatePoint(default, last.Layout) is { } p && p.X >= -1 && p.X + control.Bounds.Width <= last.Layout.Bounds.Width + 1 && control.Bounds.Height >= 20),
-                        "Native knowledge scrolling exposes the final complete row in " + theme.Key);
+                        "Native knowledge scrolling exposes the final complete row in " + theme.Key +
+                        FormattableString.Invariant($" [row={last.Layout.Bounds}; point={point}; viewport={section.Viewport.Viewport}; extent={section.Viewport.Extent}; offset={section.Viewport.Offset}; fields={string.Join("|", new Control[] { last.Type, last.Name, last.Rating, last.Specialization, last.Delete, last.AddSpecialty }.Select(control => control.GetType().Name + ":" + control.Bounds + ":" + control.TranslatePoint(default, last.Layout)))}]"));
                     section.Viewport.Offset = default; await Task.Delay(30);
                     var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
                     using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2), (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
