@@ -39,10 +39,16 @@ internal static class NativeBulkChecks
         bool passed = false;
         string? failedCheck = null;
         int uiThread = Environment.CurrentManagedThreadId;
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))!);
+        // Test-mode checkpoint only: preserve the same fixed labels as the final
+        // report if a native process exits before managed cleanup can write it.
+        // The final passed report and assertion minimum remain mandatory.
+        using var nativeProgressLog = new StreamWriter(report + ".progress.jsonl", append: false) { AutoFlush = true };
         void Check(bool valid, string name)
         {
             // Only fixed check labels enter the report: exception messages may
             // contain local paths or character data and remain excluded.
+            nativeProgressLog.WriteLine(JsonSerializer.Serialize(new { utc = DateTime.UtcNow, completed = checks.Count, valid, check = name }));
             if (!valid) { failedCheck = name; throw new InvalidOperationException(name); }
             checks.Add(name); AppDiagnostics.Record("bulk.native-check");
         }

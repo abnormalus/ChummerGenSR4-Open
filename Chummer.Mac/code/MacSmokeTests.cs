@@ -1009,10 +1009,25 @@ namespace Chummer
                 CreationInputLifecycleChecks.Run(Check);
                 CreationSkillInputChecks.Run(character, Check);
                 CreationSkillGroupSectionChecks.Run(character, Check);
+                var portraitEditorCharacter = new Character();
+                portraitEditorCharacter.LoadSnapshot(character.CaptureSnapshot());
+                var savedPortrait = new Character { FileName = Path.Combine(output, "portrait-roundtrip.chum") };
+                Check(savedPortrait.Load(), "Portrait reopen fixture loads from its saved file");
+                portraitEditorCharacter.Mugshot = savedPortrait.Mugshot;
+                portraitEditorCharacter.Created = false;
+                using (var portraitEditor = new frmCreate(portraitEditorCharacter) { Loading = true })
+                {
+                    portraitEditor.Show();
+                    var restoredPreview = Field<PictureBox>(portraitEditor, "picMugshot").Image;
+                    Check(restoredPreview != null && restoredPreview.Width == 50 && restoredPreview.Height == 50,
+                        "Reopened creation editor decodes the saved portrait into a nonempty preview");
+                    portraitEditor.Close();
+                }
                 CreationActiveSkillChecks.Run(character, Check);
                 CreationActiveSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationActiveSkillMetaChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check);
+                CreationCommonLayoutChecks.Run(character, Check);
                 WeaponModificationUndoChecks.Run(Check);
                 ModalCloseChecks.Run(Check);
                 MenuOrderChecks.Run(Check);
@@ -1155,6 +1170,24 @@ namespace Chummer
                 Check(careerCharacter.Load(), "career character reloads");
                 Check(careerCharacter.Created && careerCharacter.Karma == 8 && careerCharacter.Nuyen == 5000
                     && careerCharacter.ExpenseEntries.Count == 2, "career balances and ledger survive save");
+                var portraitCareerCharacter = new Character();
+                portraitCareerCharacter.LoadSnapshot(careerCharacter.CaptureSnapshot());
+                portraitCareerCharacter.Mugshot = savedPortrait.Mugshot;
+                portraitCareerCharacter.FileName = Path.Combine(output, "portrait-career-roundtrip.chum");
+                portraitCareerCharacter.Save();
+                var portraitCareerReload = new Character { FileName = portraitCareerCharacter.FileName };
+                Check(portraitCareerReload.Load() && portraitCareerReload.Mugshot == savedPortrait.Mugshot,
+                    "Career portrait retains exact embedded bytes through file save and reload");
+                var beforePortraitCareerOpen = portraitCareerReload.CaptureSnapshot();
+                using (var portraitCareerEditor = new frmCareer(portraitCareerReload))
+                {
+                    portraitCareerEditor.Show();
+                    var restoredPortrait = Field<PictureBox>(portraitCareerEditor, "picMugshot").Image;
+                    Check(restoredPortrait != null && restoredPortrait.Width == 50 && restoredPortrait.Height == 50 &&
+                        portraitCareerReload.CaptureSnapshot().SequenceEqual(beforePortraitCareerOpen),
+                        "Reopened career editor displays the saved portrait without changing the character");
+                    portraitCareerEditor.Close();
+                }
                 using (var career = new frmCareer(careerCharacter))
                 {
                     Check(!Field<TreeView>(career, "treQualities").ShowLines, "career quality list does not draw connector lines");

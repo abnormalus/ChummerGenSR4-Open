@@ -16,8 +16,9 @@ internal sealed class CreationSkillGroupSection : IDisposable
     private bool disposed;
     internal Dictionary<SkillGroupControl, NumericUpDown> Inputs { get; } = new();
     internal ScrollViewer Viewport { get; }
+    internal Dictionary<SkillGroupControl, Button> GroupButtons { get; } = new();
 
-    internal CreationSkillGroupSection(Forms.Form? editor, Forms.Panel source, IReadOnlyList<SkillGroupControl> controllers)
+    internal CreationSkillGroupSection(Forms.Form? editor, Forms.Panel source, IReadOnlyList<SkillGroupControl> controllers, Action<string>? selectGroup = null)
     {
         this.controllers = controllers;
         var rows = new StackPanel { Spacing = 2 };
@@ -50,8 +51,14 @@ internal sealed class CreationSkillGroupSection : IDisposable
             controller.CreationRatingInput.EnabledChanged += changed;
             cleanup.Add(() => { controller.CreationNameInput.TextChanged -= changed;
                 controller.CreationRatingInput.EnabledChanged -= changed; });
+            var groupButton = new Button { Content = label, HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(2), MinHeight = 28 };
+            EventHandler<Avalonia.Interactivity.RoutedEventArgs> select = (_, _) => selectGroup?.Invoke(controller.GroupName);
+            groupButton.Click += select;
+            GroupButtons.Add(controller, groupButton);
+            cleanup.Add(() => groupButton.Click -= select);
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,120"), MinHeight = 32 };
-            row.Children.Add(label); Grid.SetColumn(binding.Input, 1); row.Children.Add(binding.Input);
+            row.Children.Add(groupButton); Grid.SetColumn(binding.Input, 1); row.Children.Add(binding.Input);
             rows.Children.Add(row); Refresh();
         }
         source.AutoScroll = false; // The native viewport owns all scrolling now.
@@ -87,7 +94,7 @@ public partial class frmCreate
         void ShowGroups(object? sender, EventArgs args)
         {
             if (IsDisposed || creationSkillGroupSection != null || !tabSkills.Visible) return;
-            creationSkillGroupSection = new CreationSkillGroupSection(this, panSkillGroups, creationSkillGroups);
+            creationSkillGroupSection = new CreationSkillGroupSection(this, panSkillGroups, creationSkillGroups, group => SelectCreationSkillFilter("GROUP:" + group));
         }
         tabSkills.VisibleChanged += ShowGroups;
         Shown += ShowGroups;

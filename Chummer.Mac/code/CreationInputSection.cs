@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Styling;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Forms = Majorsilence.Forms;
 
@@ -29,7 +30,7 @@ internal sealed class CreationInputSection : IDisposable
         Forms.NumericUpDown money, Forms.Label moneyLabel, Forms.Label moneyTotal, Forms.ToolTip tips,
         (Forms.Label Base, Forms.Label Augmented, Forms.Label Metatype)? headers = null)
     {
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,120,40,76"), RowSpacing = 2 };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,104,36,76"), RowSpacing = 1 };
         int row = 0;
         if (headers is { } heading)
         {
@@ -45,20 +46,28 @@ internal sealed class CreationInputSection : IDisposable
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             var label = Mirror(item.Label); var metatype = Mirror(item.Metatype); var augmented = Mirror(item.Augmented);
             var input = Bind(item.Input, tips, wholeNumbers: true);
+            input.Width = 104; input.MinHeight = 26; input.Height = 26; input.Padding = new Thickness(2, 0);
             Add(grid, label, row, 0); Add(grid, input, row, 1); Add(grid, augmented, row, 2); Add(grid, metatype, row++, 3);
         }
-        var scroller = new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
-        // Theme the viewport itself, not only its content. Otherwise its fallback
-        // ContentPresenter draws rows without ScrollContentPresenter/scrollbars.
-        scroller.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        grid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        // Compact the framework editor as well as its outer spinner. Keeping
+        // the default TextBox minimum would clip digits inside a shorter row.
+        grid.Styles.Add(new Style(selector => selector.OfType<NumericUpDown>().Template().OfType<TextBox>())
+        {
+            Setters = {
+                new Setter(TextBox.MinHeightProperty, 0d),
+                new Setter(TextBox.HeightProperty, 26d),
+                new Setter(TextBox.PaddingProperty, new Thickness(2, 0)),
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
+            }
+        });
         var moneyGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,120,*"), ColumnSpacing = 4 };
         moneyGrid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
-        int left = moneyLabel.Left, top = Math.Min(moneyLabel.Top, money.Top);
         Add(moneyGrid, Mirror(moneyLabel), 0, 0); Add(moneyGrid, Bind(money, tips), 0, 1); Add(moneyGrid, Mirror(moneyTotal), 0, 2);
         if (editor == null) return; // Headless binding checks need no presenter.
-        var attributesPresenter = new CreationRegionPresenter(editor, attributes, scroller, "nativeCreationAttributes");
+        var attributesPresenter = new CreationRegionPresenter(editor, attributes, grid, "nativeCreationAttributes");
         var moneyPresenter = new CreationRegionPresenter(editor, moneyParent, moneyGrid, "nativeCreationMoney",
-            () => new System.Drawing.Rectangle(left, top, Math.Max(200, moneyParent.ClientSize.Width - left - 6), 34));
+            () => new System.Drawing.Rectangle(moneyLabel.Left, moneyLabel.Top, Math.Max(200, moneyParent.ClientSize.Width - moneyLabel.Left - 6), 34));
         cleanup.Add(attributesPresenter.Dispose); cleanup.Add(moneyPresenter.Dispose);
     }
 

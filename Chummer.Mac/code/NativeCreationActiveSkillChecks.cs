@@ -49,6 +49,36 @@ internal static class NativeCreationActiveSkillChecks
                 && section.Rows.Values.Select(row => row.Specialization.Name).Distinct().Count() == controllers.Count
                 && controllers.All(row => Avalonia.Automation.AutomationProperties.GetName(section.Rows[row].Rating) == row.CreationNameLabel.Text),
                 "Native active skill fields have unique identities and localized accessible names");
+            var quickFilters = Field<Dictionary<string, Avalonia.Controls.Primitives.ToggleButton>>(editor, "creationSkillFilterButtons");
+            check(quickFilters.Keys.SequenceEqual(new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "MAG", "RES", "1" }),
+                "Native skill quick filters put All first, attributes in order and Ranked last");
+            foreach (var pair in quickFilters)
+            {
+                pair.Value.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                check(controllers.All(controller => section.Rows[controller].Layout.IsVisible ==
+                    (pair.Key == "0" || (pair.Key == "1" ? controller.SkillObject.Rating > 0 : controller.SkillObject.Attribute == pair.Key))) &&
+                    pair.Value.IsChecked == true && quickFilters.Count(button => button.Value.IsChecked == true) == 1 &&
+                    character.CaptureSnapshot().SequenceEqual(before) && Field<bool>(editor, "_blnIsDirty") == dirty,
+                    "Native skill quick-filter click preserves character and filters visible rows: " + pair.Key);
+            }
+            var groupSection = Field<CreationSkillGroupSection>(editor, "creationSkillGroupSection");
+            var clickedGroup = groupSection.GroupButtons.Single(pair => pair.Key.GroupName == "Firearms");
+            clickedGroup.Value.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            check(controllers.All(controller => section.Rows[controller].Layout.IsVisible == (controller.SkillObject.SkillGroup == "Firearms")) &&
+                quickFilters.All(pair => pair.Value.IsChecked == false) && character.CaptureSnapshot().SequenceEqual(before),
+                "Native skill-group click filters its members without changing character");
+            quickFilters["0"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            var rankedController = controllers.First(controller => controller.SkillName == "Pistols" && !controller.SkillIsMeta);
+            section.Rows[rankedController].Rating.Value = 1;
+            quickFilters["1"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            section.Rows[rankedController].Rating.Value = 0;
+            var beforeRankedRefresh = character.CaptureSnapshot();
+            bool dirtyBeforeRankedRefresh = Field<bool>(editor, "_blnIsDirty");
+            quickFilters["1"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            check(!section.Rows[rankedController].Layout.IsVisible &&
+                character.CaptureSnapshot().SequenceEqual(beforeRankedRefresh) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeRankedRefresh,
+                "Native clicking selected Ranked refreshes edited ranks without changing character or dirty state");
+            quickFilters["0"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             // Keep a trained row visible in the synthetic theme captures so
             // source-driven bold text and themed row emphasis can be reviewed.
             controllers.First(controller => !controller.SkillIsMeta && controller.CreationRatingInput.Visible).SkillRating = 1;
