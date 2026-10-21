@@ -77,25 +77,17 @@ internal static class NativeCreationInputChecks
             async Task RestoreNormalBeforeSizing()
             {
                 if (window.WindowState == Avalonia.Controls.WindowState.Normal) return;
-                bool resized = false;
-                bool changingState = true;
-                EventHandler<Avalonia.Controls.WindowResizedEventArgs> changed = (_, _) =>
-                {
-                    // Mac reports intermediate sizes inside SetWindowState, then
-                    // delivers its restored size through the native run loop.
-                    // Await that queued notification before requesting a new size.
-                    if (!System.OperatingSystem.IsMacOS() || !changingState) resized = true;
-                };
-                window.Resized += changed;
-                try
-                {
-                    window.WindowState = Avalonia.Controls.WindowState.Normal;
-                    changingState = false;
-                    var deadline = DateTime.UtcNow.AddSeconds(20);
-                    while (!resized && DateTime.UtcNow < deadline) await Task.Delay(10);
-                    if (!resized) throw new TimeoutException("Normal window restoration did not report its native resize.");
-                }
-                finally { window.Resized -= changed; }
+                window.WindowState = Avalonia.Controls.WindowState.Normal;
+                // The state setter reports intermediate sizes synchronously, but
+                // waiting for another resize can deadlock when no resize is pending.
+                // Yield to the next actual frame before issuing the capture size.
+                var frame = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                window.RequestAnimationFrame(_ => frame.TrySetResult());
+                var completed = await Task.WhenAny(frame.Task, Task.Delay(TimeSpan.FromSeconds(20)));
+                if (completed != frame.Task)
+                    check(false, "Native normal restoration reaches a frame before capture sizing" +
+                        FormattableString.Invariant($" [actual={window.ClientSize}; state={window.WindowState}; resizeEvents={string.Join("|", geometryEvents)}]"));
+
             }
             bool GeometryMatches(Avalonia.Controls.WindowState state, Size size) => window.WindowState == state &&
                 Math.Abs(window.ClientSize.Width - size.Width) <= 1 && Math.Abs(window.ClientSize.Height - size.Height) <= 1;
