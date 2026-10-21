@@ -51,7 +51,7 @@ internal sealed class NexusWindow : Window
     {
         Model = model; DataContext = model; Title = LanguageManager.Instance.GetString("Title_SelectNexus");
         Width = 600; MinWidth = 480; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         var root = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
         var fields = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), ColumnSpacing = 14, RowSpacing = 10 };
         fields.RowDefinitions.Add(new RowDefinition(GridLength.Auto));

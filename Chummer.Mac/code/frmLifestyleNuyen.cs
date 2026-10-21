@@ -58,7 +58,7 @@ internal sealed class StartingMoneyWindow : Window
         Title = LanguageManager.Instance.GetString("Title_LifestyleNuyen");
         Width = 500; MinWidth = 360; SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         RollInput = NativeIntegerInput.Create("startingMoneyRoll", roll.Minimum, roll.Maximum);
         RollInput.Value = roll.Minimum; RollInput.HorizontalAlignment = HorizontalAlignment.Left;
         RollInput.ValueChanged += (_, _) => RefreshResult();

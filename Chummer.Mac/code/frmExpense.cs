@@ -102,7 +102,7 @@ internal sealed class ExpenseWindow : Window
         bool nuyen = original.Mode == ExpenseType.Nuyen;
         Title = LanguageManager.Instance.GetString(nuyen ? "Title_Expense_Nuyen" : "Title_Expense_Karma");
         Width = 560; MinWidth = 400; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         AmountInput = NativeIntegerInput.Create("expenseAmount", settings.Minimum, 9999999);
         AmountInput.Value = original.RawAmount; AmountInput.IsEnabled = settings.AmountEditable;
         PercentInput.Value = original.Percent; PercentInput.IsEnabled = settings.PercentEditable;

@@ -340,7 +340,7 @@ namespace Chummer
 		#endregion
 
         // Creation viewport adapters preserve the existing shared controller;
-        // career and knowledge presentation remain on their established paths.
+        // career presentation remains on its established path.
         internal NumericUpDown CreationRatingInput => nudSkill;
         internal ComboBox CreationSpecializationInput => cboSpec;
         internal Label CreationNameLabel => lblSkillName;
@@ -349,6 +349,10 @@ namespace Chummer
         internal Button CreationBreakButton => cmdBreakGroup;
         internal Button CreationDeleteButton => cmdDelete;
         internal ToolTip CreationToolTips => tipTooltip;
+        internal Form CreationViewportOwner { get; set; }
+        internal ComboBox CreationKnowledgeTypeInput => cboKnowledgeSkillCategory;
+        internal ComboBox CreationKnowledgeNameInput => cboSkillName;
+        internal Button CreationKnowledgeSpecialtyButton => addKnowledgeSpecialty;
 
 		#region Properties
 		/// <summary>
@@ -496,7 +500,7 @@ namespace Chummer
                         SelectedValue = cboSpec.Text,
                         Description = LanguageManager.Instance.GetString("Label_KnowledgeSpecialty") };
                     _strOldSpec = cboSpec.Text;
-                    if (prompt.ShowDialog(FindForm()) != DialogResult.OK) return;
+                    if (prompt.ShowDialog(CreationViewportOwner ?? FindForm()) != DialogResult.OK) return;
                     cboSpec.Text = prompt.SelectedValue;
                     if (_objSkill.CharacterObject.Created && cboSpec.Text != _strOldSpec)
                         SpecializationLeave?.Invoke(this);

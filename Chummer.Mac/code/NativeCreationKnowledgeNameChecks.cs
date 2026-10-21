@@ -6,8 +6,7 @@ using Forms = Majorsilence.Forms;
 
 namespace Chummer;
 
-// Save-state acceptance for the existing knowledge UI; this does not claim a
-// native knowledge viewport migration or new knowledge rendering behavior.
+// Save-state acceptance through the native knowledge name editor.
 internal static class NativeCreationKnowledgeNameChecks
 {
     private static T Field<T>(object owner, string name) => (T)owner.GetType()
@@ -23,11 +22,11 @@ internal static class NativeCreationKnowledgeNameChecks
             Field<Forms.TabControl>(editor, "tabCharacterTabs").SelectedTab = Field<Forms.TabPage>(editor, "tabSkills");
             await Task.Delay(30); editor.Loading = false;
             Field<Forms.Button>(editor, "cmdAddKnowledgeSkill").PerformClick();
-            var row = Field<Forms.Panel>(editor, "panKnowledgeSkills").Controls.OfType<SkillControl>().Last();
+            var row = Field<System.Collections.Generic.List<SkillControl>>(editor, "creationKnowledgeSkills").Last();
             row.SkillRating = 2;
             var dirty = typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.Instance | BindingFlags.NonPublic);
             dirty.SetValue(editor, false);
-            var name = Field<Forms.ComboBox>(row, "cboSkillName");
+            var name = Field<CreationKnowledgeSkillSection>(editor, "creationKnowledgeSkillSection").Rows[row].Name;
             const string custom = "Synthetic [literal] knowledge O'Brien";
             name.Text = custom; await Task.Delay(20);
             check(row.SkillObject.Name == custom && (bool)dirty.GetValue(editor),

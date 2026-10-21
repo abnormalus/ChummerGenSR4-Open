@@ -1026,7 +1026,9 @@ namespace Chummer
                 CreationActiveSkillChecks.Run(character, Check);
                 CreationActiveSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationActiveSkillMetaChecks.Run(character, Check);
+                SkillDisclosureChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check);
+                CreationKnowledgeSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationCommonLayoutChecks.Run(character, Check);
                 WeaponModificationUndoChecks.Run(Check);
                 ModalCloseChecks.Run(Check);

@@ -81,7 +81,7 @@ internal sealed class BuildPointWindow : Window
     {
         this.configuration = configuration;
         Title = LanguageManager.Instance.GetString("Title_SelectBP"); Width = 520; MinWidth = 380; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         MethodInput = new ComboBox { ItemsSource = new[] { LanguageManager.Instance.GetString("String_BP"), LanguageManager.Instance.GetString("String_Karma") }, SelectedIndex = configuration.Method == CharacterBuildMethod.Karma ? 1 : 0, IsEnabled = !configuration.MethodLocked, HorizontalAlignment = HorizontalAlignment.Stretch };
         PointsInput.Value = configuration.Points; AvailabilityInput.Value = configuration.Availability;
         IgnoreRulesInput = new CheckBox { Content = LanguageManager.Instance.GetString("Checkbox_SelectBP_IgnoreRules"), IsChecked = configuration.IgnoreRules };

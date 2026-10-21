@@ -54,7 +54,7 @@ internal sealed class NumberPromptWindow : Window, INativeDialogCancellation
     {
         Title = title; Width = 440; MinWidth = 340; SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         Input = NativeIntegerInput.Create("selectedNumber", minimum, maximum);
         Input.Value = initialValue; Input.HorizontalAlignment = HorizontalAlignment.Left;
         CancelButton = new Button { Content = LanguageManager.Instance.GetString("String_Cancel"), IsEnabled = allowCancel, IsCancel = allowCancel };

@@ -25,6 +25,8 @@ internal sealed class CreationActiveSkillRow : IDisposable
     internal NumericUpDown Rating => rating.Input;
     internal AutoCompleteBox Specialization => specialization.Input;
     internal Button BreakGroup { get; }
+    internal SkillSpecializationDisclosure SpecializationDisclosure { get; }
+    internal Button? PerceptionDisclosure { get; }
     private readonly TextBlock name = Caption(), attribute = Caption(), pool = Caption();
     private static TextBlock Caption()
     {
@@ -50,12 +52,29 @@ internal sealed class CreationActiveSkillRow : IDisposable
         {
             Setters = { new Setter(Panel.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush")) }
         });
-        Layout.Children.Add(name); Grid.SetColumn(attribute, 1); Layout.Children.Add(attribute);
+        var heading = new StackPanel { Orientation = Orientation.Horizontal };
+        if (!controller.SkillIsMeta && controller.SkillName == "Perception")
+        {
+            PerceptionDisclosure = new Button { MinHeight = 32, Padding = new Thickness(5, 2) };
+            Avalonia.Automation.AutomationProperties.SetName(PerceptionDisclosure, "Expand or collapse Perception subcategories");
+            EventHandler<RoutedEventArgs> disclose = (_, _) =>
+            {
+                if (!disposed && controller.Visible && controller.Enabled && PerceptionDisclosure.IsEffectivelyEnabled)
+                    SkillDisplayPreferences.PerceptionExpanded = !SkillDisplayPreferences.PerceptionExpanded;
+            };
+            PerceptionDisclosure.Click += disclose; cleanup.Add(() => PerceptionDisclosure.Click -= disclose);
+            heading.Children.Add(PerceptionDisclosure);
+        }
+        heading.Children.Add(name); Layout.Children.Add(heading); Grid.SetColumn(attribute, 1); Layout.Children.Add(attribute);
         Grid.SetColumn(Rating, 2); Layout.Children.Add(Rating); Grid.SetColumn(pool, 3); Layout.Children.Add(pool);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
         BreakGroup = Command(controller.CreationBreakButton); actions.Children.Add(BreakGroup);
         actions.Children.Add(Command(controller.CreationDeleteButton)); Grid.SetColumn(actions, 4); Layout.Children.Add(actions);
-        Grid.SetRow(Specialization, 1); Grid.SetColumnSpan(Specialization, 5); Layout.Children.Add(Specialization);
+        var specializationLine = new Grid(); specializationLine.Children.Add(Specialization);
+        Grid.SetRow(specializationLine, 1); Grid.SetColumnSpan(specializationLine, 5); Layout.Children.Add(specializationLine);
+        SpecializationDisclosure = new SkillSpecializationDisclosure(specializationLine, "Show or hide skill specialization",
+            () => controller.Visible && controller.Enabled && controller.CreationSpecializationInput.Visible);
+        actions.Children.Add(SpecializationDisclosure.Toggle);
         var sources = new Forms.Control[] { controller, controller.CreationNameLabel, controller.CreationAttributeLabel,
             controller.CreationPoolLabel, controller.CreationRatingInput, controller.CreationSpecializationInput };
         EventHandler changed = (_, _) => Refresh();
@@ -88,14 +107,16 @@ internal sealed class CreationActiveSkillRow : IDisposable
             source.EnabledChanged -= changed; target.Click -= click; });
         Sync(); return target;
     }
-    private void Refresh()
+    internal void Refresh()
     {
         if (disposed || refreshing) return;
         refreshing = true;
         try
         {
             if (controller.Visible && !controller.Created) controller.CreateControl();
-            Layout.IsVisible = controller.Visible;
+            Layout.IsVisible = controller.Visible && (!controller.SkillIsMeta || controller.SkillMetaBase != "Perception" || SkillDisplayPreferences.PerceptionExpanded);
+            if (PerceptionDisclosure != null) PerceptionDisclosure.Content = SkillDisplayPreferences.PerceptionExpanded ? "⌄" : ">";
+            if (controller.SkillIsMeta && controller.SkillMetaBase == "Perception") name.Margin = new Thickness(16, 2, 3, 2);
             name.Text = controller.CreationNameLabel.Text; name.Opacity = controller.CreationRatingInput.Enabled ? 1 : 0.5;
             attribute.Text = controller.CreationAttributeLabel.Text; pool.Text = controller.CreationPoolLabel.Text;
             pool.FontWeight = controller.CreationPoolLabel.Font.Bold ? FontWeight.Bold : FontWeight.Normal;
@@ -107,14 +128,14 @@ internal sealed class CreationActiveSkillRow : IDisposable
             ToolTip.SetTip(pool, controller.CreationToolTips.GetToolTip(controller.CreationPoolLabel));
             Avalonia.Automation.AutomationProperties.SetName(Rating, name.Text);
             Avalonia.Automation.AutomationProperties.SetName(Specialization, name.Text + " " + Specialization.PlaceholderText);
-            rating.Refresh(); specialization.Refresh();
+            rating.Refresh(); specialization.Refresh(); SpecializationDisclosure.Refresh();
         }
         finally { refreshing = false; }
     }
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; rating.Dispose(); specialization.Dispose();
+        disposed = true; SpecializationDisclosure.Dispose(); rating.Dispose(); specialization.Dispose();
         foreach (var action in cleanup) action(); cleanup.Clear(); controller.Dispose();
     }
 }
@@ -132,11 +153,13 @@ internal sealed class CreationActiveSkillSection : IDisposable
         this.source = source;
         Viewport = new ScrollViewer { Content = rows,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
-        Viewport.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Viewport.Styles);
         foreach (var controller in controllers) Add(controller);
+        SkillDisplayPreferences.Changed += RefreshDisclosure;
         source.AutoScroll = false;
         if (editor != null) presenter = new CreationRegionPresenter(editor, source, Viewport, "nativeCreationActiveSkills");
     }
+    private void RefreshDisclosure() { foreach (var row in Rows.Values) row.Refresh(); }
     internal void Add(SkillControl controller, bool reveal = false)
     {
         if (disposed) throw new ObjectDisposedException(nameof(CreationActiveSkillSection));
@@ -148,7 +171,7 @@ internal sealed class CreationActiveSkillSection : IDisposable
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; presenter?.Dispose();
+        disposed = true; SkillDisplayPreferences.Changed -= RefreshDisclosure; presenter?.Dispose();
         foreach (var row in Rows.Values) row.Dispose();
     }
 }

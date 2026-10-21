@@ -105,7 +105,7 @@ namespace Chummer
             var window = new Window { Title = Text("Portrait_Title"), Width = 820, Height = 760, MinWidth = 650, MinHeight = 600,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Icon = new WindowIcon(Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico")) };
-            window.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+            NativeControlPresentation.AddTheme(window.Styles);
             var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"), Margin = new Thickness(20), RowSpacing = 12 };
             var instruction = new TextBlock { Text = Text("Portrait_Instructions"), TextWrapping = TextWrapping.Wrap };
             layout.Children.Add(instruction);

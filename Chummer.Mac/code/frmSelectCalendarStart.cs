@@ -57,7 +57,7 @@ internal sealed class CalendarStartWindow : Window
     {
         Title = LanguageManager.Instance.GetString("Title_CalendarStart");
         Width = 480; MinWidth = 350; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         YearInput.Value = Math.Clamp(year, 2000, 9000); MonthInput.Value = Math.Clamp(month, 1, 12);
         // Set the limit before the draft so a quarter's fifth week survives loading.
         UpdateWeekLimit(); WeekInput.Value = Math.Clamp(week, 1, (int)WeekInput.Maximum);

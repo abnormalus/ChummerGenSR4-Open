@@ -24,7 +24,7 @@ internal sealed class CreationSkillGroupSection : IDisposable
         var rows = new StackPanel { Spacing = 2 };
         Viewport = new ScrollViewer { Content = rows,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
-        Viewport.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Viewport.Styles);
         int index = 0;
         foreach (var controller in controllers)
         {

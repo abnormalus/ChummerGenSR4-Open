@@ -68,7 +68,7 @@ internal sealed class NaturalWeaponWindow : Window
         ModifierInput.Value = 0; APInput.Value = 0; ReachInput.Value = 0;
         APInput.HorizontalAlignment = HorizontalAlignment.Left; ReachInput.HorizontalAlignment = HorizontalAlignment.Left;
         Title = Text("Title_CreateNaturalWeapon"); Width = 560; MinWidth = 440; SizeToContent = SizeToContent.Height;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner; Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        WindowStartupLocation = WindowStartupLocation.CenterOwner; NativeControlPresentation.AddTheme(Styles);
         var skills = XmlManager.Instance.Load("skills.xml").SelectNodes("/chummer/skills/skill[category = 'Combat Active']")!.Cast<XmlNode>()
             .Select(node => new Choice(node["name"]!.InnerText, node["translate"]?.InnerText ?? node["name"]!.InnerText)).ToArray();
         SkillInput = new ComboBox { ItemsSource = skills, SelectedIndex = skills.Length == 0 ? -1 : 0, HorizontalAlignment = HorizontalAlignment.Stretch };
