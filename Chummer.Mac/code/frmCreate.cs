@@ -125,7 +125,7 @@ namespace Chummer
 
 			SetTooltips();
 			MoveControls();
-            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); };
+            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); };
 		}
 
 		/// <summary>
