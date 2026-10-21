@@ -55,12 +55,15 @@ internal static class NativeBulkChecks
         try
         {
             Check(SynchronizationContext.Current != null, "Native UI synchronization context is installed");
-            await NativeControlChecks.RunAsync(Check);
-            await NativeRenderingChecks.RunAsync(Check);
-            await NativeDropDownChecks.RunAsync(Check);
             byte[] originalFile = File.ReadAllBytes(path);
             var character = new Character { FileName = path };
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
+            // Measure creation on the real main window's initial normal geometry,
+            // before other checks exercise fullscreen/restore transitions on it.
+            await NativeCreationInputChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeControlChecks.RunAsync(Check);
+            await NativeRenderingChecks.RunAsync(Check);
+            await NativeDropDownChecks.RunAsync(Check);
             // Exercise the actual export modal rather than only reading constructor state.
             using (var foundryDialog = new FoundryExportDialog(new[] { character }))
             {
@@ -99,7 +102,6 @@ internal static class NativeBulkChecks
             await NativeVehiclePickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeVehicleModPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeBasicLifestyleChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
-            await NativeCreationInputChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCreationSkillGroupChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCreationActiveSkillChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCreationKnowledgeNameChecks.RunAsync(main, character, Check);
