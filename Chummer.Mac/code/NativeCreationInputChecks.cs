@@ -60,6 +60,19 @@ internal static class NativeCreationInputChecks
                     geometryEvents.Add(FormattableString.Invariant($"{window.WindowState}:{window.ClientSize}:requested={window.Width}x{window.Height}"));
             };
             window.Resized += traceResize;
+            var geometryPropertyChanges = new System.Collections.Generic.List<string>();
+            EventHandler<AvaloniaPropertyChangedEventArgs> traceGeometryProperty = (_, change) =>
+            {
+                if (geometryPropertyChanges.Count >= 16 ||
+                    (change.Property != Avalonia.Controls.Window.WidthProperty && change.Property != Avalonia.Controls.Window.HeightProperty)) return;
+                // Method names only: no file paths, arguments, image bytes or character content.
+                var methods = new System.Diagnostics.StackTrace().GetFrames().Take(14)
+                    .Select(frame => frame.GetMethod()).Where(method => method != null)
+                    .Select(method => method!.DeclaringType?.FullName + "." + method.Name);
+                geometryPropertyChanges.Add(FormattableString.Invariant($"{change.Property.Name}:{window.Width}x{window.Height}:via={string.Join(">", methods)}"));
+            };
+            window.PropertyChanged += traceGeometryProperty;
+
 
             async Task RestoreNormalBeforeSizing()
             {
@@ -134,7 +147,7 @@ internal static class NativeCreationInputChecks
                     Capture("native-creation-inputs-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
                     check(ready && GeometryMatches(Avalonia.Controls.WindowState.Normal, new Size(932, 545)),
                         "Native creation normal capture uses requested932x545 client geometry in " + theme.Key +
-                        FormattableString.Invariant($" [actual={window.ClientSize}; state={window.WindowState}; requested={window.Width}x{window.Height}; min={window.MinWidth}x{window.MinHeight}; max={window.MaxWidth}x{window.MaxHeight}; sizing={window.SizeToContent}; owner={owner.Size}; resizeEvents={string.Join("|", geometryEvents)}]"));
+                        FormattableString.Invariant($" [actual={window.ClientSize}; state={window.WindowState}; requested={window.Width}x{window.Height}; min={window.MinWidth}x{window.MinHeight}; max={window.MaxWidth}x{window.MaxHeight}; sizing={window.SizeToContent}; owner={owner.Size}; resizeEvents={string.Join("|", geometryEvents)}; propertyChanges={string.Join("|", geometryPropertyChanges)}]"));
                     check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input =>
                         input.Bounds.Width > 0 && input.Bounds.Height >= 20 && input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
                         "Native creation input batch has measured controls in " + theme.Key);
@@ -167,6 +180,7 @@ internal static class NativeCreationInputChecks
             finally
             {
                 window.Resized -= traceResize;
+                window.PropertyChanged -= traceGeometryProperty;
                 application.RequestedThemeVariant = originalTheme;
                 await RestoreNormalBeforeSizing(); owner.Size = originalOwnerSize;
                 window.WindowState = originalWindowState; await Task.Delay(120);
