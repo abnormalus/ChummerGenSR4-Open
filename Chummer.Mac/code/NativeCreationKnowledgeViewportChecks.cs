@@ -75,6 +75,56 @@ internal static class NativeCreationKnowledgeViewportChecks
                 }
             }
             finally { Application.Current.RequestedThemeVariant = originalTheme; }
+            var nativeWindow = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
+            var previousState = nativeWindow.WindowState; var previousSize = owner.Size;
+            var beforeWide = character.CaptureSnapshot(); bool dirtyBeforeWide = Field<bool>(editor, "_blnIsDirty");
+            var screen = nativeWindow.Screens.ScreenFromWindow(nativeWindow);
+            Size expectedWide = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : default;
+            try
+            {
+                nativeWindow.WindowState = WindowState.FullScreen;
+                foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                {
+                    Application.Current.RequestedThemeVariant = theme;
+                    var deadline = DateTime.UtcNow.AddSeconds(20); DateTime? matchedSince = null; bool ready = false;
+                    while (DateTime.UtcNow < deadline)
+                    {
+                        bool matches = nativeWindow.WindowState == WindowState.FullScreen &&
+                            Math.Abs(nativeWindow.ClientSize.Width - expectedWide.Width) <= 1 && Math.Abs(nativeWindow.ClientSize.Height - expectedWide.Height) <= 1;
+                        if (matches)
+                        {
+                            matchedSince ??= DateTime.UtcNow;
+                            if (DateTime.UtcNow - matchedSince.Value >= TimeSpan.FromMilliseconds(120)) { ready = true; break; }
+                        }
+                        else matchedSince = null;
+                        await Task.Delay(10);
+                    }
+                    var last = section.Rows.Values.Last(); ControlExtensions.BringIntoView(last.Layout); await Task.Delay(30);
+                    var point = last.Layout.TranslatePoint(default, section.Viewport);
+                    bool complete = last.Layout.IsEffectivelyVisible && point.HasValue && point.Value.Y >= -1 &&
+                        point.Value.Y + last.Layout.Bounds.Height <= section.Viewport.Viewport.Height + 1 &&
+                        new Control[] { last.Type, last.Name, last.Rating, last.Specialization, last.Delete, last.AddSpecialty }.All(control =>
+                            control.TranslatePoint(default, last.Layout) is { } p && p.X >= -1 && p.X + control.Bounds.Width <= last.Layout.Bounds.Width + 1 && control.Bounds.Height >= 20);
+                    using (var frame = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(nativeWindow.ClientSize.Width * 2),
+                        (int)Math.Ceiling(nativeWindow.ClientSize.Height * 2)), new Vector(192, 192)))
+                    {
+                        frame.Render(nativeWindow);
+                        frame.Save(Path.Combine(output, "native-creation-knowledge-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
+                    }
+                    check(screen != null && ready && nativeWindow.WindowState == WindowState.FullScreen &&
+                        Math.Abs(nativeWindow.ClientSize.Width - expectedWide.Width) <= 1 && Math.Abs(nativeWindow.ClientSize.Height - expectedWide.Height) <= 1 && complete,
+                        "Native fullscreen knowledge exposes its complete final row at actual screen geometry in " + theme.Key +
+                        FormattableString.Invariant($" [expected={expectedWide}; actual={nativeWindow.ClientSize}; row={last.Layout.Bounds}; point={point}; viewport={section.Viewport.Viewport}]"));
+                }
+            }
+            finally
+            {
+                Application.Current.RequestedThemeVariant = originalTheme;
+                nativeWindow.WindowState = WindowState.Normal; owner.Size = previousSize; nativeWindow.UpdateLayout();
+                nativeWindow.WindowState = previousState; await Task.Delay(120);
+            }
+            check(character.CaptureSnapshot().SequenceEqual(beforeWide) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeWide,
+                "Native knowledge fullscreen themes and restoration preserve snapshot and dirty state");
             editor.Loading = false;
             var controller = controllers.First(); var row = section.Rows[controller]; held = row;
             ControlExtensions.BringIntoView(row.Layout); await Task.Delay(20);
