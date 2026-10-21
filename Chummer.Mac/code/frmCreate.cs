@@ -238,8 +238,7 @@ namespace Chummer
             if (_objCharacter.Mugshot != "")
             {
                 byte[] bytImage = Convert.FromBase64String(_objCharacter.Mugshot);
-                MemoryStream objStream = new MemoryStream(bytImage, 0, bytImage.Length);
-                objStream.Write(bytImage, 0, bytImage.Length);
+                using var objStream = new MemoryStream(bytImage, writable: false);
                 Image imgMugshot = Image.FromStream(objStream, true);
                 picMugshot.Image = imgMugshot;
             }

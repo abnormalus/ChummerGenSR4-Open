@@ -59,6 +59,16 @@ internal static class CreationActiveSkillChecks
                     "Creation quick filter preserves character and shows exactly matching skills: " + value);
             }
             filterMethod.Invoke(editor, new object[] { "0" });
+            Set(pistols, 1);
+            filterMethod.Invoke(editor, new object[] { "1" });
+            Set(pistols, 0);
+            var beforeRankedRefresh = character.CaptureSnapshot();
+            bool dirtyBeforeRankedRefresh = Field<bool>(editor, "_blnIsDirty");
+            filterMethod.Invoke(editor, new object[] { "1" });
+            check(!pistols.Visible && character.CaptureSnapshot().SequenceEqual(beforeRankedRefresh) &&
+                Field<bool>(editor, "_blnIsDirty") == dirtyBeforeRankedRefresh,
+                "Creation clicking an already selected Ranked filter refreshes edited ranks without changing character or dirty state");
+            filterMethod.Invoke(editor, new object[] { "0" });
             character.IgnoreRules = false;
             Set(pistols, 6);
             check(pistols.SkillRating == 6, "Creation owner permits one ordinary active skill at six");

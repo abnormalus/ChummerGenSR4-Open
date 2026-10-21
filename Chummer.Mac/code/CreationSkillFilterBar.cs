@@ -16,7 +16,10 @@ public partial class frmCreate
         if (IsDisposed) return;
         // Reuse the original filter handler and its canonical values. Filtering
         // changes presentation only, including controller visibility/edit guards.
-        cboSkillFilter.SelectedValue = value;
+        if (cboSkillFilter.SelectedValue?.ToString() == value)
+            cboSkillFilter_SelectedIndexChanged(cboSkillFilter, EventArgs.Empty);
+        else
+            cboSkillFilter.SelectedValue = value;
     }
     private void InitializeCreationSkillFilterBar()
     {

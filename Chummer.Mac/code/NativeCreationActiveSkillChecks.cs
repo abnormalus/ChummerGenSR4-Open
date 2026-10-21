@@ -68,6 +68,17 @@ internal static class NativeCreationActiveSkillChecks
                 quickFilters.All(pair => pair.Value.IsChecked == false) && character.CaptureSnapshot().SequenceEqual(before),
                 "Native skill-group click filters its members without changing character");
             quickFilters["0"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            var rankedController = controllers.First(controller => controller.SkillName == "Pistols" && !controller.SkillIsMeta);
+            section.Rows[rankedController].Rating.Value = 1;
+            quickFilters["1"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            section.Rows[rankedController].Rating.Value = 0;
+            var beforeRankedRefresh = character.CaptureSnapshot();
+            bool dirtyBeforeRankedRefresh = Field<bool>(editor, "_blnIsDirty");
+            quickFilters["1"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            check(!section.Rows[rankedController].Layout.IsVisible &&
+                character.CaptureSnapshot().SequenceEqual(beforeRankedRefresh) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeRankedRefresh,
+                "Native clicking selected Ranked refreshes edited ranks without changing character or dirty state");
+            quickFilters["0"].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             // Keep a trained row visible in the synthetic theme captures so
             // source-driven bold text and themed row emphasis can be reviewed.
             controllers.First(controller => !controller.SkillIsMeta && controller.CreationRatingInput.Visible).SkillRating = 1;

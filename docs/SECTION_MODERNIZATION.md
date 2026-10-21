@@ -70,3 +70,8 @@ Batch related changes locally and push incremental GitHub updates no more often 
 
 
 The human subsequently authorized same-draft CI fixes between batches: “Allow same-draft CI fixes; keep releases 4–6 hours apart.” This supersedes the source-update cadence above for coherent corrections within a draft. Releases retain the cadence and exact-source validation/visual gates; Stable still requires explicit promotion.
+
+
+## Deferred portrait library
+
+The human requests a large bundled portrait library after the current modernization updates are complete. They explicitly permit sharing the supplied diaz.png portrait. Do not spend agent resources researching, generating, collecting or implementing the library until everything else is done. This is a later deliverable, not scope for the current layout and portrait-reopen correction. Preserve the existing ability to import individual portraits.
