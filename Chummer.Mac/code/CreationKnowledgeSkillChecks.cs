@@ -30,6 +30,18 @@ internal static class CreationKnowledgeSkillChecks
                 typeof(frmCreate).GetField("creationKnowledgeSkillSection", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(editor,
                     new CreationKnowledgeSkillSection(null, panel, owned));
             var native = Field<CreationKnowledgeSkillSection>(editor, "creationKnowledgeSkillSection");
+            if (useNativeViewport)
+            {
+                var originalSize = editor.Size;
+                byte[] beforeResize = character.CaptureSnapshot(); bool resizeDirty = Field<bool>(editor, "_blnIsDirty");
+                foreach (var size in new[] { new System.Drawing.Size(932, 545), new System.Drawing.Size(1200, 800) })
+                {
+                    editor.Size = size;
+                    check(panel.Height >= 73 && character.CaptureSnapshot().SequenceEqual(beforeResize) && Field<bool>(editor, "_blnIsDirty") == resizeDirty,
+                        "Creation knowledge resizing reserves a complete two-line native row without changing the character at " + size);
+                }
+                editor.Size = originalSize;
+            }
             int previous = owned.Count;
             Field<Forms.Button>(editor, "cmdAddKnowledgeSkill").PerformClick();
             var row = owned.Last();

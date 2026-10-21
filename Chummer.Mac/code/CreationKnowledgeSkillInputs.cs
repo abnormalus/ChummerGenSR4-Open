@@ -7,12 +7,16 @@ namespace Chummer;
 public partial class frmCreate
 {
     // Knowledge rules and lifetime belong to the creation editor, independently
-    // of the scrolling panel that currently presents the legacy row controls.
+    // of the panel used to anchor its scrolling presentation.
     private readonly List<SkillControl> creationKnowledgeSkills = new();
     private CreationKnowledgeSkillSection? creationKnowledgeSkillSection;
     private bool creationKnowledgeSkillEventsAttached;
     private void InitializeCreationKnowledgeSkills()
     {
+        // The native row has two readable 32px lines. Keep its complete
+        // fields available even when the initial Skills split shrinks; the
+        // existing splitter still permits users to give knowledge more space.
+        splitSkills.Panel2MinSize = Math.Max(splitSkills.Panel2MinSize, panKnowledgeSkills.Top + 80);
         if (Avalonia.Application.Current == null || creationKnowledgeSkillEventsAttached) return;
         creationKnowledgeSkillEventsAttached = true;
         void ShowSkills(object? sender, EventArgs args)
