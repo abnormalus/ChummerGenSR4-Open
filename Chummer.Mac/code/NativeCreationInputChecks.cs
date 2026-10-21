@@ -38,7 +38,7 @@ internal static class NativeCreationInputChecks
         character.Contacts.Clear();
         character.Contacts.Add(new Contact(character) { Name = "Synthetic layout contact", EntityType = ContactType.Contact, Connection = 2, Loyalty = 1 });
         character.Contacts.Add(new Contact(character) { Name = "Synthetic layout enemy", EntityType = ContactType.Enemy, Connection = 2, Loyalty = 1 });
-        using var editor = new frmCreate(character) { MdiParent = owner, Loading = true };
+        using var editor = new frmCreate(character) { MdiParent = owner, Loading = true, WindowState = Forms.FormWindowState.Maximized };
         editor.Show(); await Task.Delay(20);
         bool previousBudgetOption = character.Options.AllowExceedAttributeBP;
         try
@@ -52,7 +52,7 @@ internal static class NativeCreationInputChecks
             var originalTheme = application.RequestedThemeVariant;
             var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
             var originalWindowState = window.WindowState;
-            double originalWidth = window.Width, originalHeight = window.Height;
+            var originalOwnerSize = owner.Size;
             async Task RestoreNormalBeforeSizing()
             {
                 if (window.WindowState == Avalonia.Controls.WindowState.Normal) return;
@@ -67,28 +67,39 @@ internal static class NativeCreationInputChecks
                 }
                 finally { window.Resized -= changed; }
             }
+            bool GeometryMatches(Avalonia.Controls.WindowState state, Size size) => window.WindowState == state &&
+                Math.Abs(window.ClientSize.Width - size.Width) <= 1 && Math.Abs(window.ClientSize.Height - size.Height) <= 1;
             async Task<bool> WaitForGeometry(Avalonia.Controls.WindowState state, Size size)
             {
                 var deadline = DateTime.UtcNow.AddSeconds(20);
-                bool Matches() => window.WindowState == state && Math.Abs(window.ClientSize.Width - size.Width) <= 1 &&
-                    Math.Abs(window.ClientSize.Height - size.Height) <= 1;
-                while (!Matches() && DateTime.UtcNow < deadline) await Task.Delay(10);
-                return Matches();
+                DateTime? matchedSince = null;
+                while (DateTime.UtcNow < deadline)
+                {
+                    if (GeometryMatches(state, size))
+                    {
+                        matchedSince ??= DateTime.UtcNow;
+                        if (DateTime.UtcNow - matchedSince.Value >= TimeSpan.FromMilliseconds(120)) return true;
+                    }
+                    else matchedSince = null;
+                    await Task.Delay(10);
+                }
+                return false;
             }
             try
             {
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
                     await RestoreNormalBeforeSizing();
-                    window.Width = 932; window.Height = 545;
+                    // Exercise the Forms resize/layout/restore-bounds path, as
+                    // the normal maximized character workspace does.
+                    owner.Size = new System.Drawing.Size(932, 545);
                     application.RequestedThemeVariant = theme;
                     bool normalGeometry = await WaitForGeometry(Avalonia.Controls.WindowState.Normal, new Size(932, 545));
-                    await Task.Delay(120);
                     using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
                         (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
                     image.Render(window);
                     image.Save(Path.Combine(output, "native-creation-inputs-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
-                    check(normalGeometry, "Native creation normal capture uses requested932x545 client geometry in " + theme.Key +
+                    check(normalGeometry && GeometryMatches(Avalonia.Controls.WindowState.Normal, new Size(932, 545)), "Native creation normal capture uses requested932x545 client geometry in " + theme.Key +
                         FormattableString.Invariant($" [actual={window.ClientSize}; state={window.WindowState}]"));
                     check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input => input.Bounds.Width > 0 && input.Bounds.Height >= 20 &&
                         input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
@@ -117,7 +128,8 @@ internal static class NativeCreationInputChecks
                     {
                         var panel = Field<Forms.Panel>(editor, name);
                         var rows = panel.Controls.OfType<ContactControl>().ToArray();
-                        return rows.Length == 1 && rows.All(row => row.Right <= panel.ClientSize.Width && row.Bottom <= panel.ClientSize.Height &&
+                        return Field<Forms.SplitContainer>(editor, "splitContacts").Right <= commonPage.ClientSize.Width &&
+                            rows.Length == 1 && rows.All(row => row.Right <= panel.ClientSize.Width && row.Bottom <= panel.ClientSize.Height &&
                             row.Controls.Cast<Forms.Control>().Where(child => child.Visible).All(child => child.Left >= 0 &&
                                 child.Right <= row.ClientSize.Width && child.Bottom <= row.ClientSize.Height));
                     });
@@ -129,19 +141,19 @@ internal static class NativeCreationInputChecks
                     Size fullscreenSize = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : window.ClientSize;
                     window.WindowState = Avalonia.Controls.WindowState.FullScreen;
                     bool fullscreenGeometry = await WaitForGeometry(Avalonia.Controls.WindowState.FullScreen, fullscreenSize);
-                    await Task.Delay(120);
                     using var fullImage = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
                         (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
                     fullImage.Render(window);
                     fullImage.Save(Path.Combine(output, "native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
-                    check(fullscreenGeometry, "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
+                    check(fullscreenGeometry && GeometryMatches(Avalonia.Controls.WindowState.FullScreen, fullscreenSize), "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
                         FormattableString.Invariant($" [expected={fullscreenSize}; actual={window.ClientSize}; state={window.WindowState}]"));
                     var contacts = Field<Forms.SplitContainer>(editor, "splitContacts");
-                    check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
+                    check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Right <= commonPage.ClientSize.Width && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
                         "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
                     check(ContactsFit(), "Native full-screen creation column exposes populated contact and enemy fields and commands in " + theme.Key);
-                    window.WindowState = originalState;
-                    await Task.Delay(120);
+                    await RestoreNormalBeforeSizing();
+                    owner.Size = new System.Drawing.Size(932, 545);
+                    await WaitForGeometry(originalState, new Size(932, 545));
                     check(AllAttributesFit() && character.CaptureSnapshot().SequenceEqual(beforeResize) &&
                         Field<bool>(editor, "_blnIsDirty") == dirtyBeforeResize,
                         "Native creation resizing preserves character and dirty state in " + theme.Key);
@@ -150,8 +162,9 @@ internal static class NativeCreationInputChecks
             finally
             {
                 application.RequestedThemeVariant = originalTheme;
-                window.WindowState = Avalonia.Controls.WindowState.Normal;
-                window.Width = originalWidth; window.Height = originalHeight; window.WindowState = originalWindowState;
+                await RestoreNormalBeforeSizing();
+                owner.Size = originalOwnerSize;
+                window.WindowState = originalWindowState;
                 await Task.Delay(120);
             }
             bool originalMagic = character.MAGEnabled, originalResonance = character.RESEnabled;
