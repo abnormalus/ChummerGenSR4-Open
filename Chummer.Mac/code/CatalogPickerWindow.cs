@@ -39,7 +39,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         Title = T(titleKey); Width = 940; Height = 650; MinWidth = 740; MinHeight = 460;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Icon = new WindowIcon(Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico"));
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         var root = new Grid { Margin = new Thickness(18), RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"), RowSpacing = 12 };
         var filters = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,2*,Auto,3*"), ColumnSpacing = 10 };
         filters.Children.Add(new TextBlock { Text = T("Label_Category"), VerticalAlignment = VerticalAlignment.Center, IsVisible = model.Categories.Count > 0 });

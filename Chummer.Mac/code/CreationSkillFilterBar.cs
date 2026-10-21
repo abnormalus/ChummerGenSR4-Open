@@ -31,7 +31,7 @@ public partial class frmCreate
             if ((child.Anchor & Forms.AnchorStyles.Bottom) != 0) child.Height = Math.Max(0, child.Height - height);
         }
         var bar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*,*,*,*,*,*,*,*,*,*") };
-        bar.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(bar.Styles);
         var values = new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "MAG", "RES", "1" };
         for (int index = 0; index < values.Length; index++)
         {

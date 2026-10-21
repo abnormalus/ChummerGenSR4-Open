@@ -406,3 +406,12 @@ Fixed grouped verification: /tmp/chummer-knowledge-pane-fixed.log passes the ful
 
 
 Knowledge wide native acceptance now explicitly enters full screen and requires actual screen client dimensions continuously through120ms (bounded20seconds), then checks all final-row fields in both themes and captures those exact frames. Cleanup restores theme/window state and checks complete character snapshot/dirty invariance. These three additional assertions raise minimum671 to674. Only two exact synthetic fullscreen knowledge names are added to the success whitelist: combined current batch20 PNGs per OS. This strengthens native wide coverage beyond the existing headless1200x800 pane-space test; it is not a production correction. Native execution and SHA plus visual review remain pending.
+
+
+## User-requested skill disclosures and modern field alignment
+
+Creation active and knowledge specialization lines now start collapsed. Each skill has a trailing + disclosure; opening or closing it only changes presentation, never clears an existing specialty or changes character accounting. Knowledge Add Specialty remains on the revealed line. Perception has its own > disclosure for derived meta rows; the ordinary canonical filter still applies independently. The expansion setting is stored in the existing application preferences.xml store as perceptionsubcategoriesexpanded, defaults false and applies across launches/documents. No character XML field or rule was added. Preference event handlers and disclosure clicks are detached when their section is disposed.
+
+Every direct native Fluent surface now installs the same single-line TextBox, editable suggestion, numeric editor and ComboBox vertical-centering styles through NativeControlPresentation. Multiline editors retain their existing alignment; compact attribute height and local padding remain authoritative. Legacy compatibility rendering and vendor host code are unchanged.
+
+Grouped /tmp/chummer-skill-disclosure-checks.log passes the full headless suite, including existing controller fidelity and nine new disclosure/value/snapshot/preference/filter/disposal checks. The native driver adds eight actual-click assertions (minimum674->682) and explicitly reveals specialty lines before the existing field/keyboard/modal/complete-row checks. Individual20second and whole300second bounds, final report/passed/exit gates remain unchanged. Both-platform current-source execution and visual field-alignment review are still required before release.

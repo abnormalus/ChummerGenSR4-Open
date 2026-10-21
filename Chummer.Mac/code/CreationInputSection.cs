@@ -49,7 +49,7 @@ internal sealed class CreationInputSection : IDisposable
             input.Width = 104; input.MinHeight = 26; input.Height = 26; input.Padding = new Thickness(2, 0);
             Add(grid, label, row, 0); Add(grid, input, row, 1); Add(grid, augmented, row, 2); Add(grid, metatype, row++, 3);
         }
-        grid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(grid.Styles);
         // Compact the framework editor as well as its outer spinner. Keeping
         // the default TextBox minimum would clip digits inside a shorter row.
         grid.Styles.Add(new Style(selector => selector.OfType<NumericUpDown>().Template().OfType<TextBox>())
@@ -62,7 +62,7 @@ internal sealed class CreationInputSection : IDisposable
             }
         });
         var moneyGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,120,*"), ColumnSpacing = 4 };
-        moneyGrid.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(moneyGrid.Styles);
         Add(moneyGrid, Mirror(moneyLabel), 0, 0); Add(moneyGrid, Bind(money, tips), 0, 1); Add(moneyGrid, Mirror(moneyTotal), 0, 2);
         if (editor == null) return; // Headless binding checks need no presenter.
         var attributesPresenter = new CreationRegionPresenter(editor, attributes, grid, "nativeCreationAttributes");

@@ -55,7 +55,7 @@ internal sealed class GearQuantityWindow : Window
         Title = T("Title_AddRemoveQuantity"); Width = 410; MinWidth = 360;
         SizeToContent = SizeToContent.Height; CanResize = true;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         QuantityInput = NativeIntegerInput.Create("gearQuantity", 0, maximum); QuantityInput.Value = 0; QuantityInput.HorizontalAlignment = HorizontalAlignment.Left;
         MarkupInput = NativeIntegerInput.Create("gearQuantityMarkup", -99, 1000); MarkupInput.Value = 0; MarkupInput.HorizontalAlignment = HorizontalAlignment.Left; MarkupInput.IsEnabled = adding;
         FreeInput = new CheckBox { Content = T("Checkbox_Free"), IsEnabled = adding };

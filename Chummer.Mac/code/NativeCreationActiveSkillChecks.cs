@@ -23,6 +23,8 @@ internal static class NativeCreationActiveSkillChecks
         .GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
     internal static async Task RunAsync(Forms.Form owner, Character source, string output, Action<bool, string> check)
     {
+        var previousPerception = SkillDisplayPreferences.PerceptionExpanded;
+        SkillDisplayPreferences.PerceptionExpanded = false;
         var character = new Character(); character.LoadSnapshot(source.CaptureSnapshot());
         character.Created = false; character.IgnoreRules = true; character.BuildMethod = CharacterBuildMethod.BP;
         foreach (var group in character.SkillGroups) { group.Rating = 0; group.Broken = false; }
@@ -49,6 +51,18 @@ internal static class NativeCreationActiveSkillChecks
                 && section.Rows.Values.Select(row => row.Specialization.Name).Distinct().Count() == controllers.Count
                 && controllers.All(row => Avalonia.Automation.AutomationProperties.GetName(section.Rows[row].Rating) == row.CreationNameLabel.Text),
                 "Native active skill fields have unique identities and localized accessible names");
+            check(section.Rows.Values.All(row => !row.SpecializationDisclosure.Expanded),
+                "Native skill specialization lines start collapsed for every row");
+            var perception = controllers.Single(controller => controller.SkillName == "Perception" && !controller.SkillIsMeta);
+            var perceptionRows = controllers.Where(controller => controller.SkillIsMeta && controller.SkillMetaBase == "Perception").ToArray();
+            section.Rows[perception].PerceptionDisclosure!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            check(perceptionRows.Length > 0 && perceptionRows.All(controller => section.Rows[controller].Layout.IsVisible) &&
+                SkillDisplayPreferences.PerceptionExpanded && character.CaptureSnapshot().SequenceEqual(before) && Field<bool>(editor, "_blnIsDirty") == dirty,
+                "Native Perception arrow expands derived rows and persists view preference without editing character");
+            section.Rows[perception].PerceptionDisclosure!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            check(perceptionRows.All(controller => !section.Rows[controller].Layout.IsVisible) && !SkillDisplayPreferences.PerceptionExpanded &&
+                character.CaptureSnapshot().SequenceEqual(before) && Field<bool>(editor, "_blnIsDirty") == dirty,
+                "Native Perception arrow collapses derived rows without editing character");
             var quickFilters = Field<Dictionary<string, Avalonia.Controls.Primitives.ToggleButton>>(editor, "creationSkillFilterButtons");
             check(quickFilters.Keys.SequenceEqual(new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "MAG", "RES", "1" }),
                 "Native skill quick filters put All first, attributes in order and Ranked last");
@@ -56,7 +70,8 @@ internal static class NativeCreationActiveSkillChecks
             {
                 pair.Value.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
                 check(controllers.All(controller => section.Rows[controller].Layout.IsVisible ==
-                    (pair.Key == "0" || (pair.Key == "1" ? controller.SkillObject.Rating > 0 : controller.SkillObject.Attribute == pair.Key))) &&
+                    ((pair.Key == "0" || (pair.Key == "1" ? controller.SkillObject.Rating > 0 : controller.SkillObject.Attribute == pair.Key)) &&
+                    (!controller.SkillIsMeta || controller.SkillMetaBase != "Perception"))) &&
                     pair.Value.IsChecked == true && quickFilters.Count(button => button.Value.IsChecked == true) == 1 &&
                     character.CaptureSnapshot().SequenceEqual(before) && Field<bool>(editor, "_blnIsDirty") == dirty,
                     "Native skill quick-filter click preserves character and filters visible rows: " + pair.Key);
@@ -93,7 +108,7 @@ internal static class NativeCreationActiveSkillChecks
                     var point = last.Layout.TranslatePoint(default, section.Viewport);
                     check(last.Layout.IsEffectivelyVisible && point.HasValue && point.Value.Y >= -1
                         && point.Value.Y + last.Layout.Bounds.Height <= section.Viewport.Viewport.Height + 1
-                        && section.Viewport.Offset.Y > 0 && last.Rating.GetVisualDescendants().OfType<TextBox>().Any(text => text.Bounds.Width >= 24),
+                        && section.Viewport.Offset.Y > 0 && last.Rating.GetVisualDescendants().OfType<TextBox>().Any(text => text.Bounds.Width >= 24 && text.VerticalContentAlignment == Avalonia.Layout.VerticalAlignment.Center),
                         "Native active skill scrolling exposes its final readable editable row in " + theme.Key);
                     section.Viewport.Offset = default; await Task.Delay(30);
                     var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
@@ -121,6 +136,9 @@ internal static class NativeCreationActiveSkillChecks
                 "Native active fractional rating restores the full approved character snapshot");
             row.Rating.Value = null;
             check(character.CaptureSnapshot().SequenceEqual(approved), "Native active incomplete rating does not commit a fallback");
+            row.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)); await Task.Delay(30);
+            check(row.SpecializationDisclosure.Expanded && row.Specialization.IsEffectivelyVisible,
+                "Native skill plus reveals the selected specialization line");
             textEditor.Focus(); row.Specialization.GetVisualDescendants().OfType<TextBox>().Single().Focus(); await Task.Delay(20);
             check(row.Rating.Value == 3, "Native active skill leaving incomplete input restores its approved rating");
             string literal = "Synthetic [literal] O'Brien";
@@ -134,6 +152,11 @@ internal static class NativeCreationActiveSkillChecks
                 && pistols.SkillObject.Specialization == pistols.CreationSpecializationInput.Text,
                 "Native active suggestion selection uses the existing source text and model transition");
             row.Specialization.Text = literal;
+            var beforeCollapse = character.CaptureSnapshot();
+            row.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)); await Task.Delay(20);
+            check(!row.Specialization.IsEffectivelyVisible && character.CaptureSnapshot().SequenceEqual(beforeCollapse),
+                "Native skill collapsing specialization preserves its saved text and character snapshot");
+            row.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)); await Task.Delay(20);
             var filter = Field<Forms.ComboBox>(editor, "cboSkillFilter");
             filter.SelectedValue = "3"; await Task.Delay(20);
             approved = character.CaptureSnapshot(); dirty = Field<bool>(editor, "_blnIsDirty");
@@ -192,6 +215,7 @@ internal static class NativeCreationActiveSkillChecks
                 "Native exotic-skill picker cancellation preserves the character and owned viewport rows");
             string selectedExotic = await PickExoticAsync(true); await Task.Delay(40);
             var exotic = controllers.Last(); var exoticRow = section.Rows[exotic];
+            exoticRow.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)); await Task.Delay(20);
             check(controllers.Count == previousRows + 1 && section.Rows.Count == controllers.Count && exotic.SkillObject.ExoticSkill
                 && exotic.SkillName == selectedExotic && ReferenceEquals(character.Skills.Last(), exotic.SkillObject)
                 && exotic.Parent == null && exoticRow.Layout.IsEffectivelyVisible && Field<bool>(editor, "_blnIsDirty"),
@@ -210,6 +234,7 @@ internal static class NativeCreationActiveSkillChecks
         {
             typeof(frmCreate).GetField("_blnIsDirty", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor, false);
             editor.Close();
+            SkillDisplayPreferences.PerceptionExpanded = previousPerception;
         }
         if (section != null)
         {

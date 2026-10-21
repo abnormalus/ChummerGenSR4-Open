@@ -31,6 +31,7 @@ internal sealed class CreationKnowledgeSkillRow : IDisposable
     internal NumericUpDown Rating => rating.Input;
     internal Button Delete { get; }
     internal Button AddSpecialty { get; }
+    internal SkillSpecializationDisclosure SpecializationDisclosure { get; }
     private static TextBlock Caption()
     {
         var text = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
@@ -59,11 +60,18 @@ internal sealed class CreationKnowledgeSkillRow : IDisposable
         { Setters = { new Setter(Panel.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush")) } });
         Layout.Children.Add(Type); Grid.SetColumn(Name, 1); Layout.Children.Add(Name);
         Grid.SetColumn(Rating, 2); Layout.Children.Add(Rating); Grid.SetColumn(pool, 3); Layout.Children.Add(pool);
-        Delete = Command(controller.CreationDeleteButton); Grid.SetColumn(Delete, 4); Layout.Children.Add(Delete);
-        Grid.SetRow(Specialization, 1); Grid.SetColumnSpan(Specialization, 3); Layout.Children.Add(Specialization);
-        Grid.SetRow(attribute, 1); Grid.SetColumn(attribute, 3); Layout.Children.Add(attribute);
+        Delete = Command(controller.CreationDeleteButton);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        actions.Children.Add(Delete); Grid.SetColumn(actions, 4); Layout.Children.Add(actions);
+        var specializationLine = new Grid { ColumnDefinitions = new ColumnDefinitions("*,40,Auto"), ColumnSpacing = 4 };
+        Grid.SetRow(specializationLine, 1); Grid.SetColumnSpan(specializationLine, 5); Layout.Children.Add(specializationLine);
+        specializationLine.Children.Add(Specialization);
+        Grid.SetColumn(attribute, 1); specializationLine.Children.Add(attribute);
         AddSpecialty = Command(controller.CreationKnowledgeSpecialtyButton);
-        Grid.SetRow(AddSpecialty, 1); Grid.SetColumn(AddSpecialty, 4); Layout.Children.Add(AddSpecialty);
+        Grid.SetColumn(AddSpecialty, 2); specializationLine.Children.Add(AddSpecialty);
+        SpecializationDisclosure = new SkillSpecializationDisclosure(specializationLine, "Show or hide knowledge skill specialization",
+            () => controller.Visible && controller.Enabled && controller.CreationSpecializationInput.Visible);
+        actions.Children.Add(SpecializationDisclosure.Toggle);
         Avalonia.Automation.AutomationProperties.SetName(Type, "Knowledge skill type");
         Avalonia.Automation.AutomationProperties.SetName(Name, "Knowledge skill name");
         Avalonia.Automation.AutomationProperties.SetName(Rating, "Knowledge skill rating");
@@ -121,14 +129,14 @@ internal sealed class CreationKnowledgeSkillRow : IDisposable
             Layout.Classes.Set("trained", controller.CreationPoolLabel.Font.Bold);
             pool.Text = controller.CreationPoolLabel.Text; attribute.Text = controller.CreationAttributeLabel.Text;
             ToolTip.SetTip(pool, controller.CreationToolTips.GetToolTip(controller.CreationPoolLabel));
-            rating.Refresh(); name.Refresh(); specialization.Refresh();
+            rating.Refresh(); name.Refresh(); specialization.Refresh(); SpecializationDisclosure.Refresh();
         }
         finally { syncing = false; }
     }
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; rating.Dispose(); name.Dispose(); specialization.Dispose();
+        disposed = true; SpecializationDisclosure.Dispose(); rating.Dispose(); name.Dispose(); specialization.Dispose();
         foreach (var action in cleanup) action(); cleanup.Clear(); controller.CreationViewportOwner = null; controller.Dispose();
     }
 }
@@ -147,7 +155,7 @@ internal sealed class CreationKnowledgeSkillSection : IDisposable
     {
         this.source = source; this.editor = editor;
         Viewport = new ScrollViewer { Content = rows, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
-        Viewport.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Viewport.Styles);
         foreach (var controller in controllers) Add(controller);
         source.AutoScroll = false;
         if (editor != null) presenter = new CreationRegionPresenter(editor, source, Viewport, "nativeCreationKnowledgeSkills");

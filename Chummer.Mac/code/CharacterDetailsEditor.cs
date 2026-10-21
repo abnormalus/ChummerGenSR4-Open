@@ -27,7 +27,7 @@ internal sealed class CharacterDetailsWindow : Window
     {
         Title = T("Details_Editor"); Width = 960; Height = 740; MinWidth = 560; MinHeight = 420;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+        NativeControlPresentation.AddTheme(Styles);
         Icon = new WindowIcon(Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico"));
         var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(16), RowSpacing = 12 };
         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };

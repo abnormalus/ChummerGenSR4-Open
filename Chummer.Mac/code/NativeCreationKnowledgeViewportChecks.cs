@@ -45,6 +45,14 @@ internal static class NativeCreationKnowledgeViewportChecks
                 && row.Rating.GetType() == typeof(NumericUpDown) && row.Specialization.GetType() == typeof(AutoCompleteBox))
                 && section.Rows.Values.Select(row => row.Name.Name).Distinct().Count() == 12,
                 "Native knowledge rows expose standard controls and unique identities");
+            check(section.Rows.Values.All(row => !row.SpecializationDisclosure.Expanded),
+                "Native knowledge specialization lines start collapsed for every row");
+            foreach (var disclosureRow in new[] { section.Rows.Values.First(), section.Rows.Values.Last() })
+                disclosureRow.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            await Task.Delay(30);
+            check(section.Rows.Values.First().Specialization.IsEffectivelyVisible && section.Rows.Values.Last().Specialization.IsEffectivelyVisible &&
+                character.CaptureSnapshot().SequenceEqual(before) && Field<bool>(editor, "_blnIsDirty") == dirtyBefore,
+                "Native knowledge plus opens independent specialization rows without editing character");
             var originalTheme = Application.Current!.RequestedThemeVariant;
             try
             {
@@ -153,6 +161,11 @@ internal static class NativeCreationKnowledgeViewportChecks
             check(row.Rating.Value == 3 && character.CaptureSnapshot().SequenceEqual(approved), "Native knowledge incomplete rating restores on focus change");
             row.Specialization.Text = "Synthetic specialty [O'Brien]";
             check(controller.SkillObject.Specialization == row.Specialization.Text, "Native knowledge specialization preserves literal custom text");
+            var beforeSpecializationCollapse = character.CaptureSnapshot();
+            row.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)); await Task.Delay(20);
+            check(!row.Specialization.IsEffectivelyVisible && character.CaptureSnapshot().SequenceEqual(beforeSpecializationCollapse),
+                "Native knowledge collapsing specialization retains literal text and complete snapshot");
+            row.SpecializationDisclosure.Toggle.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)); await Task.Delay(20);
             approved = character.CaptureSnapshot();
             controller.CreationKnowledgeTypeInput.Enabled = false; controller.CreationKnowledgeNameInput.Enabled = false;
             controller.CreationRatingInput.Enabled = false; controller.CreationSpecializationInput.Enabled = false;

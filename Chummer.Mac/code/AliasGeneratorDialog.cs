@@ -24,7 +24,7 @@ namespace Chummer
             var window = new Window { Title = T("Alias_Title"), Width = 780, Height = 790, MinWidth = 650, MinHeight = 600,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Icon = new WindowIcon(Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico")) };
-            window.Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
+            NativeControlPresentation.AddTheme(window.Styles);
             var root = new Grid { Margin = new Thickness(20), RowDefinitions = new RowDefinitions("Auto,*,Auto"), RowSpacing = 12 };
             root.Children.Add(new TextBlock { Text = T("Alias_Instructions"), TextWrapping = TextWrapping.Wrap });
             var panel = new StackPanel { Spacing = 10 };
