@@ -74,20 +74,14 @@ internal static class NativeCreationInputChecks
             window.PropertyChanged += traceGeometryProperty;
 
 
-            async Task RestoreNormalBeforeSizing()
+            void SetNormalClientSize(System.Drawing.Size size)
             {
-                if (window.WindowState == Avalonia.Controls.WindowState.Normal) return;
                 window.WindowState = Avalonia.Controls.WindowState.Normal;
-                // The state setter reports intermediate sizes synchronously, but
-                // waiting for another resize can deadlock when no resize is pending.
-                // Yield to the next actual frame before issuing the capture size.
-                var frame = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                window.RequestAnimationFrame(_ => frame.TrySetResult());
-                var completed = await Task.WhenAny(frame.Task, Task.Delay(TimeSpan.FromSeconds(20)));
-                if (completed != frame.Task)
-                    check(false, "Native normal restoration reaches a frame before capture sizing" +
-                        FormattableString.Invariant($" [actual={window.ClientSize}; state={window.WindowState}; resizeEvents={string.Join("|", geometryEvents)}]"));
-
+                owner.Size = size;
+                // Form.Size writes layout Width/Height. Complete that public
+                // layout pass before native resize notifications can replace the
+                // pending dimensions; actual client size is still checked below.
+                window.UpdateLayout();
             }
             bool GeometryMatches(Avalonia.Controls.WindowState state, Size size) => window.WindowState == state &&
                 Math.Abs(window.ClientSize.Width - size.Width) <= 1 && Math.Abs(window.ClientSize.Height - size.Height) <= 1;
@@ -139,8 +133,7 @@ internal static class NativeCreationInputChecks
             {
                 // Capture both themes in the same measured mode, then transition
                 // once. A fullscreen exit is not a prerequisite for a theme swap.
-                await RestoreNormalBeforeSizing();
-                owner.Size = new System.Drawing.Size(932, 545);
+                SetNormalClientSize(new System.Drawing.Size(932, 545));
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
                     application.RequestedThemeVariant = theme;
@@ -183,7 +176,7 @@ internal static class NativeCreationInputChecks
                 window.Resized -= traceResize;
                 window.PropertyChanged -= traceGeometryProperty;
                 application.RequestedThemeVariant = originalTheme;
-                await RestoreNormalBeforeSizing(); owner.Size = originalOwnerSize;
+                SetNormalClientSize(originalOwnerSize);
                 window.WindowState = originalWindowState; await Task.Delay(120);
             }
             check(character.CaptureSnapshot().SequenceEqual(beforeLayout) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeLayout,
