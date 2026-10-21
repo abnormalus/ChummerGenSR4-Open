@@ -37,7 +37,11 @@ namespace Chummer
             try
             {
                 MacPaths.Initialize();
-                if (args.Length >= 3 && args[0] == "--check-bulk") GlobalOptions.Instance.AutomaticUpdate = false;
+                if (args.Length >= 3 && args[0] == "--check-bulk")
+                {
+                    GlobalOptions.Instance.AutomaticUpdate = false;
+                    GlobalOptions.Instance.StartupFullscreen = false;
+                }
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 LanguageManager.Instance.Load(GlobalOptions.Instance.Language, null);
@@ -49,6 +53,9 @@ namespace Chummer
                     using var watchdog = AppDiagnostics.StartWatchdog();
                     if (args.Length >= 3 && args[0] == "--check-bulk")
                     {
+                        // Establish the capture fixture before the native window opens.
+                        // Later fullscreen tests must not supply its initial restore bounds.
+                        main.Size = new System.Drawing.Size(932, 545);
                         main.Shown += async (_, _) => {
                             try { await NativeBulkChecks.RunAsync(main, args[1], args[2]); }
                             catch (Exception error) { AppDiagnostics.Record("bulk.native-checks-failed", error); Environment.ExitCode = 1; }
