@@ -85,88 +85,85 @@ internal static class NativeCreationInputChecks
                 }
                 return false;
             }
+            var attributeInputs = section.Inputs.Where(pair => pair.Key != "nudNuyen").Select(pair => pair.Value).ToArray();
+            var root = (Avalonia.Controls.Grid)attributeInputs[0].Parent!;
+            var commonPage = Field<Forms.TabPage>(editor, "tabCommon");
+            var attributesPanel = Field<Forms.Panel>(editor, "panAttributes");
+            var contacts = Field<Forms.SplitContainer>(editor, "splitContacts");
+            bool AllAttributesFit() => attributeInputs.All(input => input.IsEffectivelyVisible &&
+                input.TranslatePoint(default, root) is { } point && point.Y >= -1 &&
+                point.Y + input.Bounds.Height <= root.Bounds.Height + 1 && input.Bounds.Height >= 20 &&
+                input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24) &&
+                input.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.TextPresenter>().Any(text =>
+                    text.TranslatePoint(default, input) is { } position && position.Y >= -1 &&
+                    position.Y + text.TextLayout.Height <= input.Bounds.Height + 1));
+            bool ContactsFit() => contacts.Right <= commonPage.ClientSize.Width && new[] { "panContacts", "panEnemies" }.All(name =>
+            {
+                var panel = Field<Forms.Panel>(editor, name);
+                var rows = panel.Controls.OfType<ContactControl>().ToArray();
+                return rows.Length == 1 && rows.All(row => row.Right <= panel.ClientSize.Width && row.Bottom <= panel.ClientSize.Height &&
+                    row.Controls.Cast<Forms.Control>().Where(child => child.Visible).All(child => child.Left >= 0 &&
+                        child.Right <= row.ClientSize.Width && child.Bottom <= row.ClientSize.Height));
+            });
+            void Capture(string name)
+            {
+                using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
+                    (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
+                image.Render(window); image.Save(Path.Combine(output, name), PngBitmapEncoderOptions.Default);
+            }
+            byte[] beforeLayout = character.CaptureSnapshot();
+            bool dirtyBeforeLayout = Field<bool>(editor, "_blnIsDirty");
             try
             {
+                // Capture both themes in the same measured mode, then transition
+                // once. A fullscreen exit is not a prerequisite for a theme swap.
+                await RestoreNormalBeforeSizing();
+                owner.Size = new System.Drawing.Size(932, 545);
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
-                    await RestoreNormalBeforeSizing();
-                    // Exercise the Forms resize/layout/restore-bounds path, as
-                    // the normal maximized character workspace does.
-                    owner.Size = new System.Drawing.Size(932, 545);
                     application.RequestedThemeVariant = theme;
-                    bool normalGeometry = await WaitForGeometry(Avalonia.Controls.WindowState.Normal, new Size(932, 545));
-                    using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
-                        (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
-                    image.Render(window);
-                    image.Save(Path.Combine(output, "native-creation-inputs-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
-                    check(normalGeometry && GeometryMatches(Avalonia.Controls.WindowState.Normal, new Size(932, 545)), "Native creation normal capture uses requested932x545 client geometry in " + theme.Key +
+                    bool ready = await WaitForGeometry(Avalonia.Controls.WindowState.Normal, new Size(932, 545));
+                    Capture("native-creation-inputs-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
+                    check(ready && GeometryMatches(Avalonia.Controls.WindowState.Normal, new Size(932, 545)),
+                        "Native creation normal capture uses requested932x545 client geometry in " + theme.Key +
                         FormattableString.Invariant($" [actual={window.ClientSize}; state={window.WindowState}]"));
-                    check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input => input.Bounds.Width > 0 && input.Bounds.Height >= 20 &&
-                        input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
+                    check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input =>
+                        input.Bounds.Width > 0 && input.Bounds.Height >= 20 && input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
                         "Native creation input batch has measured controls in " + theme.Key);
-                    var attributeInputs = section.Inputs.Where(pair => pair.Key != "nudNuyen").Select(pair => pair.Value).ToArray();
-                    var root = (Avalonia.Controls.Grid)attributeInputs[0].Parent!;
-                    bool AllAttributesFit() => attributeInputs.All(input => input.IsEffectivelyVisible &&
-                        input.TranslatePoint(default, root) is { } point && point.Y >= -1 &&
-                        point.Y + input.Bounds.Height <= root.Bounds.Height + 1 && input.Bounds.Height >= 20 &&
-                        input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24) &&
-                        input.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.TextPresenter>().Any(text =>
-                            text.TranslatePoint(default, input) is { } position && position.Y >= -1 &&
-                            position.Y + text.TextLayout.Height <= input.Bounds.Height + 1));
-                    var commonPage = Field<Forms.TabPage>(editor, "tabCommon");
-                    var attributesPanel = Field<Forms.Panel>(editor, "panAttributes");
                     check(AllAttributesFit() && attributesPanel.Bottom <= commonPage.ClientSize.Height &&
                         attributeInputs.All(input => input.TranslatePoint(default, window) is { } point && point.Y >= 0 &&
                             point.Y + input.Bounds.Height <= window.ClientSize.Height) &&
                         !attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Any(),
                         "Native creation shows all eleven attribute rows simultaneously without scrolling in " + theme.Key +
-                        FormattableString.Invariant($" [window={window.ClientSize}; common={commonPage.ClientSize}; attributes={attributesPanel.Bounds}; root={root.Bounds}; text=" ) +
-                        string.Join(";", attributeInputs.Select(input => input.Name + ":" + string.Join(",", input.GetVisualDescendants()
-                            .OfType<Avalonia.Controls.Presenters.TextPresenter>().Select(text =>
-                                FormattableString.Invariant($"{text.TranslatePoint(default, input)}/{text.TextLayout.Height}"))))) + "]");
-                    bool ContactsFit() => new[] { "panContacts", "panEnemies" }.All(name =>
-                    {
-                        var panel = Field<Forms.Panel>(editor, name);
-                        var rows = panel.Controls.OfType<ContactControl>().ToArray();
-                        return Field<Forms.SplitContainer>(editor, "splitContacts").Right <= commonPage.ClientSize.Width &&
-                            rows.Length == 1 && rows.All(row => row.Right <= panel.ClientSize.Width && row.Bottom <= panel.ClientSize.Height &&
-                            row.Controls.Cast<Forms.Control>().Where(child => child.Visible).All(child => child.Left >= 0 &&
-                                child.Right <= row.ClientSize.Width && child.Bottom <= row.ClientSize.Height));
-                    });
+                        FormattableString.Invariant($" [window={window.ClientSize}; common={commonPage.ClientSize}; attributes={attributesPanel.Bounds}; root={root.Bounds}]"));
                     check(ContactsFit(), "Native normal creation column exposes populated contact and enemy fields and commands in " + theme.Key);
-                    byte[] beforeResize = character.CaptureSnapshot();
-                    bool dirtyBeforeResize = Field<bool>(editor, "_blnIsDirty");
-                    var originalState = window.WindowState;
-                    var screen = window.Screens.ScreenFromWindow(window);
-                    Size fullscreenSize = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : window.ClientSize;
-                    window.WindowState = Avalonia.Controls.WindowState.FullScreen;
-                    bool fullscreenGeometry = await WaitForGeometry(Avalonia.Controls.WindowState.FullScreen, fullscreenSize);
-                    using var fullImage = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
-                        (int)Math.Ceiling(window.ClientSize.Height * 2)), new Vector(192, 192));
-                    fullImage.Render(window);
-                    fullImage.Save(Path.Combine(output, "native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
-                    check(fullscreenGeometry && GeometryMatches(Avalonia.Controls.WindowState.FullScreen, fullscreenSize), "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
+                }
+                var screen = window.Screens.ScreenFromWindow(window);
+                Size fullscreenSize = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : window.ClientSize;
+                window.WindowState = Avalonia.Controls.WindowState.FullScreen;
+                foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                {
+                    application.RequestedThemeVariant = theme;
+                    bool ready = await WaitForGeometry(Avalonia.Controls.WindowState.FullScreen, fullscreenSize);
+                    Capture("native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
+                    check(screen != null && ready && GeometryMatches(Avalonia.Controls.WindowState.FullScreen, fullscreenSize),
+                        "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
                         FormattableString.Invariant($" [expected={fullscreenSize}; actual={window.ClientSize}; state={window.WindowState}]"));
-                    var contacts = Field<Forms.SplitContainer>(editor, "splitContacts");
                     check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Right <= commonPage.ClientSize.Width && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
                         "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
                     check(ContactsFit(), "Native full-screen creation column exposes populated contact and enemy fields and commands in " + theme.Key);
-                    await RestoreNormalBeforeSizing();
-                    owner.Size = new System.Drawing.Size(932, 545);
-                    await WaitForGeometry(originalState, new Size(932, 545));
-                    check(AllAttributesFit() && character.CaptureSnapshot().SequenceEqual(beforeResize) &&
-                        Field<bool>(editor, "_blnIsDirty") == dirtyBeforeResize,
+                    check(character.CaptureSnapshot().SequenceEqual(beforeLayout) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeLayout,
                         "Native creation resizing preserves character and dirty state in " + theme.Key);
                 }
             }
             finally
             {
                 application.RequestedThemeVariant = originalTheme;
-                await RestoreNormalBeforeSizing();
-                owner.Size = originalOwnerSize;
-                window.WindowState = originalWindowState;
-                await Task.Delay(120);
+                await RestoreNormalBeforeSizing(); owner.Size = originalOwnerSize;
+                window.WindowState = originalWindowState; await Task.Delay(120);
             }
+            check(character.CaptureSnapshot().SequenceEqual(beforeLayout) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeLayout,
+                "Native creation returning to the original window mode preserves character and dirty state");
             bool originalMagic = character.MAGEnabled, originalResonance = character.RESEnabled;
             try
             {
