@@ -641,6 +641,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged += objContact_LoyaltyRatingChanged;
 					objContactControl.DeleteContact += objContact_DeleteContact;
 					objContactControl.FileNameChanged += objContact_FileNameChanged;
+            objContactControl.ContactNameChanged += objContact_NameChanged;
 					
 					objContactControl.ContactObject = objContact;
 					objContactControl.ContactName = objContact.Name;
@@ -662,6 +663,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged += objEnemy_LoyaltyRatingChanged;
 					objContactControl.DeleteContact += objEnemy_DeleteContact;
 					objContactControl.FileNameChanged += objEnemy_FileNameChanged;
+            objContactControl.ContactNameChanged += objEnemy_NameChanged;
 
 					objContactControl.ContactObject = objContact;
 					objContactControl.ContactName = objContact.Name;
@@ -1411,6 +1413,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged -= objContact_LoyaltyRatingChanged;
 					objContactControl.DeleteContact -= objContact_DeleteContact;
 					objContactControl.FileNameChanged -= objContact_FileNameChanged;
+            objContactControl.ContactNameChanged -= objContact_NameChanged;
 				}
 
 				foreach (ContactControl objContactControl in panEnemies.Controls.OfType<ContactControl>())
@@ -1420,6 +1423,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged -= objEnemy_LoyaltyRatingChanged;
 					objContactControl.DeleteContact -= objEnemy_DeleteContact;
 					objContactControl.FileNameChanged -= objEnemy_FileNameChanged;
+            objContactControl.ContactNameChanged -= objEnemy_NameChanged;
 				}
 
 				foreach (PetControl objContactControl in panPets.Controls.OfType<PetControl>())
@@ -4872,22 +4876,38 @@ namespace Chummer
 			{
 				// Set the flag to show that we have found the Contact.
 				if (objContactControl == objSender)
+				{
 					blnFound = true;
+                    // Delete exactly the selected record; later rows only move.
+                    _objCharacter.Contacts.Remove(objContactControl.ContactObject);
+				}
 
 				// Once the Contact has been found, all of the other ContactControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
 				if (blnFound)
 				{
-					_objCharacter.Contacts.Remove(objContactControl.ContactObject);
 					objContactControl.Top -= 25;
 				}
 			}
 			// Remove the ContactControl that raised the Event.
 			panContacts.Controls.Remove(objSender);
+            objSender.ConnectionRatingChanged -= objContact_ConnectionRatingChanged;
+            objSender.ConnectionGroupRatingChanged -= objContact_ConnectionGroupRatingChanged;
+            objSender.LoyaltyRatingChanged -= objContact_LoyaltyRatingChanged;
+            objSender.DeleteContact -= objContact_DeleteContact;
+            objSender.FileNameChanged -= objContact_FileNameChanged;
+            objSender.ContactNameChanged -= objContact_NameChanged;
+            objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
 			UpdateWindowTitle();
 		}
+
+        private void objContact_NameChanged(object sender, EventArgs args)
+        {
+            if (_blnLoading) return;
+            objContact_FileNameChanged(sender);
+        }
 
 		private void objContact_FileNameChanged(Object sender)
 		{
@@ -5134,22 +5154,38 @@ namespace Chummer
 			{
 				// Set the flag to show that we have found the contact.
 				if (objContactControl == objSender)
+				{
 					blnFound = true;
+                    // Delete exactly the selected record; later rows only move.
+                    _objCharacter.Contacts.Remove(objContactControl.ContactObject);
+				}
 
 				// Once the Enemy has been found, all of the other ContactControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
 				if (blnFound)
 				{
-					_objCharacter.Contacts.Remove(objContactControl.ContactObject);
 					objContactControl.Top -= 25;
 				}
 			}
 			// Remove the ContactControl that raised the Event.
 			panEnemies.Controls.Remove(objSender);
+            objSender.ConnectionRatingChanged -= objEnemy_ConnectionRatingChanged;
+            objSender.ConnectionGroupRatingChanged -= objEnemy_ConnectionGroupRatingChanged;
+            objSender.LoyaltyRatingChanged -= objEnemy_LoyaltyRatingChanged;
+            objSender.DeleteContact -= objEnemy_DeleteContact;
+            objSender.FileNameChanged -= objEnemy_FileNameChanged;
+            objSender.ContactNameChanged -= objEnemy_NameChanged;
+            objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
 			UpdateWindowTitle();
 		}
+
+        private void objEnemy_NameChanged(object sender, EventArgs args)
+        {
+            if (_blnLoading) return;
+            objEnemy_FileNameChanged(sender);
+        }
 
 		private void objEnemy_FileNameChanged(Object sender)
 		{
@@ -5610,6 +5646,7 @@ namespace Chummer
 			objContactControl.LoyaltyRatingChanged += objContact_LoyaltyRatingChanged;
 			objContactControl.DeleteContact += objContact_DeleteContact;
 			objContactControl.FileNameChanged += objContact_FileNameChanged;
+            objContactControl.ContactNameChanged += objContact_NameChanged;
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panContacts.AutoScrollPosition.Y);
@@ -5696,6 +5733,7 @@ namespace Chummer
 			objContactControl.LoyaltyRatingChanged += objEnemy_LoyaltyRatingChanged;
 			objContactControl.DeleteContact += objEnemy_DeleteContact;
 			objContactControl.FileNameChanged += objEnemy_FileNameChanged;
+            objContactControl.ContactNameChanged += objEnemy_NameChanged;
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panEnemies.AutoScrollPosition.Y);

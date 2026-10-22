@@ -87,6 +87,7 @@ internal static class NativeBulkChecks
             await NativeWeaponFocusChecks.RunAsync(main, character, Check);
             await NativeCharacterSwitchChecks.RunAsync(main, character, Check);
             await NativeContactNotesChecks.RunAsync(main, character, Check);
+            await NativeContactRemovalChecks.RunAsync(main, character, Check);
             await NativeCharacterDetailsChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeWeaponPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeArmorPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
