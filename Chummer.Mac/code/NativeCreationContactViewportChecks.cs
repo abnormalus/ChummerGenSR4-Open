@@ -237,14 +237,7 @@ internal static class NativeCreationContactViewportChecks
         foreach (var method in new[] { CharacterBuildMethod.BP, CharacterBuildMethod.Karma })
         foreach (bool qualityLimit in new[] { false, true })
         {
-            var fixture = new Character(); fixture.LoadSnapshot(source.CaptureSnapshot());
-            fixture.Created = false; fixture.IgnoreRules = false; fixture.BuildMethod = method;
-            fixture.Contacts.Clear(); fixture.Qualities.Clear(); fixture.Improvements.Clear();
-            for (int i = 0; i < (qualityLimit ? 3 : 5); i++) fixture.Contacts.Add(new Contact(fixture)
-            { Name = "Synthetic enemy boundary " + i, EntityType = ContactType.Enemy, Connection = 4, Loyalty = 1 });
-            if (qualityLimit) fixture.Qualities.Add(new Quality(fixture)
-            { Name = "Synthetic negative boundary", Type = QualityType.Negative, BP = -20, ContributeToLimit = true });
-            var bytes = fixture.CaptureSnapshot();
+            var bytes = CreationContactRuleFixture.Create(source, method, qualityLimit);
             var originalModel = new Character(); originalModel.LoadSnapshot(bytes);
             var nativeModel = new Character(); nativeModel.LoadSnapshot(bytes);
             bool exceed = nativeModel.Options.ExceedNegativeQualities;

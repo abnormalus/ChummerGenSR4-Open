@@ -1025,6 +1025,7 @@ namespace Chummer
                 }
                 CreationContactOwnershipChecks.Run(character, Check);
                 CreationContactViewportChecks.Run(character, Check);
+                CreationContactRuleChecks.Run(character, Check);
                 ContactEditChecks.Run(character, Check);
                 ContactRemovalChecks.Run(character, Check);
                 CreationActiveSkillChecks.Run(character, Check);
