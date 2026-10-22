@@ -1340,10 +1340,9 @@ namespace Chummer
 				return true;
 			else
 			{
-				if (MessageBox.Show(strMessage, LanguageManager.Instance.GetString("MessageTitle_Delete"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
-					return false;
-				else
-					return true;
+                // Closing or canceling the prompt does not authorize deletion.
+                return MessageBox.Show(strMessage, LanguageManager.Instance.GetString("MessageTitle_Delete"),
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
 			}
 		}
 	}

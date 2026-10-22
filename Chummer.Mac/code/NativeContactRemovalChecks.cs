@@ -13,6 +13,28 @@ internal static class NativeContactRemovalChecks
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
     private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, Flags)!.GetValue(owner)!;
+    private static Task ReplyToConfirmation(Forms.DialogResult? answer)
+    {
+        var reply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(20);
+                while (!Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Any())
+                { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Contact deletion confirmation did not open."); await Task.Delay(10); }
+                var message = Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Last();
+                if (answer.HasValue) message.DialogResult = answer.Value;
+                message.Close(); reply.TrySetResult();
+            }
+            catch (Exception error)
+            {
+                Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().LastOrDefault()?.Close();
+                reply.TrySetException(error);
+            }
+        });
+        return reply.Task;
+    }
     internal static async Task RunAsync(Forms.Form owner, Character source, Action<bool, string> check)
     {
         foreach (bool career in new[] { false, true })
@@ -47,25 +69,12 @@ internal static class NativeContactRemovalChecks
                 character.Options.ConfirmKarmaExpense = false;
                 foreach (bool closeWindow in new[] { false, true })
                 {
-                byte[] before = character.CaptureSnapshot();
-                var reply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                Dispatcher.UIThread.Post(async () =>
-                {
-                    try
-                    {
-                        var deadline = DateTime.UtcNow.AddSeconds(20);
-                        while (!Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Any())
-                        { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Contact deletion confirmation did not open."); await Task.Delay(10); }
-                        var message = Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Last();
-                        if (!closeWindow) message.DialogResult = Forms.DialogResult.No;
-                        message.Close(); reply.TrySetResult();
-                    }
-                    catch (Exception error) { reply.TrySetException(error); }
-                });
-                Field<Forms.Button>(middle, "cmdDelete").PerformClick(); await reply.Task;
-                check(before.SequenceEqual(character.CaptureSnapshot()) && panel.Controls.Contains(middle) && !middle.IsDisposed
-                    && !(bool)dirty.GetValue(editor)! && editor.Enabled,
-                    "Native canceled contact deletion preserves model rows clean state and editor availability" + label + " closeWindow=" + closeWindow);
+                    byte[] before = character.CaptureSnapshot();
+                    var reply = ReplyToConfirmation(closeWindow ? null : Forms.DialogResult.No);
+                    Field<Forms.Button>(middle, "cmdDelete").PerformClick(); await reply;
+                    check(before.SequenceEqual(character.CaptureSnapshot()) && panel.Controls.Contains(middle) && !middle.IsDisposed
+                        && !(bool)dirty.GetValue(editor)! && editor.Enabled,
+                        "Native canceled contact deletion preserves model rows clean state and editor availability" + label + " closeWindow=" + closeWindow);
                 }
                 character.Options.ConfirmDelete = false; character.Options.ConfirmKarmaExpense = false;
                 foreach (int index in new[] { 1, 0, 2 })
@@ -73,7 +82,9 @@ internal static class NativeContactRemovalChecks
                     var row = rows.Single(r => ReferenceEquals(r.ContactObject, contacts[index]));
                     int karma = character.Karma, expenses = character.ExpenseEntries.Count;
                     var expected = character.Contacts.Where(c => !ReferenceEquals(c, contacts[index])).ToArray();
-                    Field<Forms.Button>(row, "cmdDelete").PerformClick(); await Task.Delay(10);
+                    character.Options.ConfirmDelete = index == 1;
+                    var consent = index == 1 ? ReplyToConfirmation(Forms.DialogResult.Yes) : Task.CompletedTask;
+                    Field<Forms.Button>(row, "cmdDelete").PerformClick(); await consent; await Task.Delay(10);
                     int cost = career && enemy ? 2 * character.Options.KarmaQuality : 0;
                     check(character.Contacts.SequenceEqual(expected) && panel.Controls.OfType<ContactControl>()
                         .Select(r => r.ContactObject).SequenceEqual(expected) && row.IsDisposed && (bool)dirty.GetValue(editor)!
