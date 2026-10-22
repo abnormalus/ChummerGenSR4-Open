@@ -34,6 +34,7 @@ namespace Chummer
         public event LoyaltyRatingChangedHandler LoyaltyRatingChanged;
         public event DeleteContactHandler DeleteContact;
 		public event FileNameChangedHandler FileNameChanged;
+        public event EventHandler ContactNameChanged;
 
 		#region Control Events
         public ContactControl()
@@ -73,7 +74,10 @@ namespace Chummer
 
 		private void txtContactName_TextChanged(object sender, EventArgs e)
 		{
-			_objContact.Name = txtContactName.Text;
+			// Loading and unchanged assignments must not create an edit notification.
+            if (_objContact.Name == txtContactName.Text) return;
+            _objContact.Name = txtContactName.Text;
+            ContactNameChanged?.Invoke(this, EventArgs.Empty);
 		}
 
 		private void imgLink_Click(object sender, EventArgs e)

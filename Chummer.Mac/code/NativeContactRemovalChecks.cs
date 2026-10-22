@@ -35,6 +35,14 @@ internal static class NativeContactRemovalChecks
                 var rows = panel.Controls.OfType<ContactControl>().ToArray();
                 var middle = rows.Single(r => ReferenceEquals(r.ContactObject, contacts[1]));
                 var dirty = editor.GetType().GetField("_blnIsDirty", Flags)!; dirty.SetValue(editor, false);
+                editor.GetType().GetProperty("Loading")!.SetValue(editor, false);
+                var nameInput = Field<Forms.TextBox>(middle, "txtContactName");
+                const string editedName = "Synthetic literal [O'Brien]";
+                nameInput.Text = editedName;
+                check(middle.ContactObject.Name == editedName && (bool)dirty.GetValue(editor)!,
+                    "Native contact name edit updates model and marks the actual owner dirty" + label);
+                dirty.SetValue(editor, false); nameInput.Text = editedName;
+                check(!(bool)dirty.GetValue(editor)!, "Native unchanged contact name retains clean owner state" + label);
                 character.Options.ConfirmDelete = true;
                 byte[] before = character.CaptureSnapshot();
                 var reply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

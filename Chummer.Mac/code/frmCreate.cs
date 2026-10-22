@@ -641,6 +641,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged += objContact_LoyaltyRatingChanged;
 					objContactControl.DeleteContact += objContact_DeleteContact;
 					objContactControl.FileNameChanged += objContact_FileNameChanged;
+            objContactControl.ContactNameChanged += objContact_NameChanged;
 					
 					objContactControl.ContactObject = objContact;
 					objContactControl.ContactName = objContact.Name;
@@ -662,6 +663,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged += objEnemy_LoyaltyRatingChanged;
 					objContactControl.DeleteContact += objEnemy_DeleteContact;
 					objContactControl.FileNameChanged += objEnemy_FileNameChanged;
+            objContactControl.ContactNameChanged += objEnemy_NameChanged;
 
 					objContactControl.ContactObject = objContact;
 					objContactControl.ContactName = objContact.Name;
@@ -1411,6 +1413,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged -= objContact_LoyaltyRatingChanged;
 					objContactControl.DeleteContact -= objContact_DeleteContact;
 					objContactControl.FileNameChanged -= objContact_FileNameChanged;
+            objContactControl.ContactNameChanged -= objContact_NameChanged;
 				}
 
 				foreach (ContactControl objContactControl in panEnemies.Controls.OfType<ContactControl>())
@@ -1420,6 +1423,7 @@ namespace Chummer
 					objContactControl.LoyaltyRatingChanged -= objEnemy_LoyaltyRatingChanged;
 					objContactControl.DeleteContact -= objEnemy_DeleteContact;
 					objContactControl.FileNameChanged -= objEnemy_FileNameChanged;
+            objContactControl.ContactNameChanged -= objEnemy_NameChanged;
 				}
 
 				foreach (PetControl objContactControl in panPets.Controls.OfType<PetControl>())
@@ -4891,12 +4895,19 @@ namespace Chummer
             objSender.LoyaltyRatingChanged -= objContact_LoyaltyRatingChanged;
             objSender.DeleteContact -= objContact_DeleteContact;
             objSender.FileNameChanged -= objContact_FileNameChanged;
+            objSender.ContactNameChanged -= objContact_NameChanged;
             objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
 			UpdateWindowTitle();
 		}
+
+        private void objContact_NameChanged(object sender, EventArgs args)
+        {
+            if (_blnLoading) return;
+            objContact_FileNameChanged(sender);
+        }
 
 		private void objContact_FileNameChanged(Object sender)
 		{
@@ -5162,12 +5173,19 @@ namespace Chummer
             objSender.LoyaltyRatingChanged -= objEnemy_LoyaltyRatingChanged;
             objSender.DeleteContact -= objEnemy_DeleteContact;
             objSender.FileNameChanged -= objEnemy_FileNameChanged;
+            objSender.ContactNameChanged -= objEnemy_NameChanged;
             objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
 			UpdateWindowTitle();
 		}
+
+        private void objEnemy_NameChanged(object sender, EventArgs args)
+        {
+            if (_blnLoading) return;
+            objEnemy_FileNameChanged(sender);
+        }
 
 		private void objEnemy_FileNameChanged(Object sender)
 		{
@@ -5628,6 +5646,7 @@ namespace Chummer
 			objContactControl.LoyaltyRatingChanged += objContact_LoyaltyRatingChanged;
 			objContactControl.DeleteContact += objContact_DeleteContact;
 			objContactControl.FileNameChanged += objContact_FileNameChanged;
+            objContactControl.ContactNameChanged += objContact_NameChanged;
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panContacts.AutoScrollPosition.Y);
@@ -5714,6 +5733,7 @@ namespace Chummer
 			objContactControl.LoyaltyRatingChanged += objEnemy_LoyaltyRatingChanged;
 			objContactControl.DeleteContact += objEnemy_DeleteContact;
 			objContactControl.FileNameChanged += objEnemy_FileNameChanged;
+            objContactControl.ContactNameChanged += objEnemy_NameChanged;
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panEnemies.AutoScrollPosition.Y);

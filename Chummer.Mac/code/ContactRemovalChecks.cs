@@ -37,7 +37,7 @@ internal static class ContactRemovalChecks
                 check(character.Contacts.SequenceEqual(expected) && panel.Controls.OfType<ContactControl>()
                     .Select(r => r.ContactObject).SequenceEqual(expected),
                     "Contact deletion removes only the selected model and row" + label);
-                check(deleted.IsDisposed && new[] { "ConnectionRatingChanged", "ConnectionGroupRatingChanged", "LoyaltyRatingChanged", "DeleteContact", "FileNameChanged" }
+                check(deleted.IsDisposed && new[] { "ConnectionRatingChanged", "ConnectionGroupRatingChanged", "LoyaltyRatingChanged", "DeleteContact", "FileNameChanged", "ContactNameChanged" }
                     .All(name => !(typeof(ContactControl).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
                         .GetValue(deleted) is Delegate handlers) || !handlers.GetInvocationList().Any(h => ReferenceEquals(h.Target, editor))),
                     "Contact deletion disposes the removed row and releases owner callbacks" + label);
