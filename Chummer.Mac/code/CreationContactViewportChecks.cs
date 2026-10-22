@@ -14,6 +14,24 @@ internal static class CreationContactViewportChecks
     private static bool Dirty(frmCreate editor) => Field<bool>(editor, "_blnIsDirty");
     internal static void Run(Character source, Action<bool, string> check)
     {
+        using (var owner = new Forms.Form { IsMdiContainer = true })
+        using (var editor = new Forms.Form { MdiParent = owner })
+        using (var other = new Forms.Form { MdiParent = owner })
+        using (var controller = new ContactControl { ContactObject = new Contact(source) { Name = "Synthetic lifecycle contact", Connection = 2, Loyalty = 1 } })
+        {
+            var panel = new Forms.Panel(); editor.Controls.Add(panel); panel.Controls.Add(controller);
+            using var section = new CreationContactSection(editor, panel, new[] { controller }, "nativeContactLifecycle", attachPresenter: false);
+            var row = section.Rows[controller]; owner.Show(); editor.Show();
+            // Shown is posted by the framework. Exercise the synchronous MDI
+            // activation boundary here; initial shown availability is verified
+            // by the native Notes command checks after the dispatcher yields.
+            other.Show();
+            check(!row.Notes.IsEnabled && !row.Connection.IsEnabled && !row.Name.IsEnabled,
+                "Contact viewport disables commands and inputs when another character becomes active");
+            editor.Activate();
+            check(row.Notes.IsEnabled && row.Connection.IsEnabled && row.Name.IsEnabled,
+                "Contact viewport restores commands and inputs when its character becomes active again");
+        }
         foreach (var method in new[] { CharacterBuildMethod.BP, CharacterBuildMethod.Karma })
         {
             var baseline = new Character(); baseline.LoadSnapshot(source.CaptureSnapshot());

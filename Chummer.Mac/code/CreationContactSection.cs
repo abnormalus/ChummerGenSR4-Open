@@ -193,8 +193,16 @@ internal sealed class CreationContactSection : IDisposable
         cleanup.Add(() => { source.VisibleChanged -= changed; source.EnabledChanged -= changed; });
         if (editor != null)
         {
-            editor.EnabledChanged += changed; editor.VisibleChanged += changed;
-            cleanup.Add(() => { editor.EnabledChanged -= changed; editor.VisibleChanged -= changed; });
+            // Rows are created during Load, before the editor becomes the active
+            // MDI child. Refresh the native availability after that transition,
+            // and on later character switches; execution still checks Available.
+            editor.EnabledChanged += changed; editor.VisibleChanged += changed; editor.Shown += changed;
+            cleanup.Add(() => { editor.EnabledChanged -= changed; editor.VisibleChanged -= changed; editor.Shown -= changed; });
+            if (editor.MdiParent is { } container)
+            {
+                container.MdiChildActivate += changed;
+                cleanup.Add(() => container.MdiChildActivate -= changed);
+            }
             if (attachPresenter) presenter = new CreationRegionPresenter(editor, source, Viewport, name);
         }
     }
