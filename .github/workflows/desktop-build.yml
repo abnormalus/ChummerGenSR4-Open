@@ -56,7 +56,7 @@ jobs:
           $appName = if ($IsWindows) { 'ChummerMac.exe' } else { 'ChummerMac' }
           $exe = (Resolve-Path "Chummer.Mac/bin/Release/net10.0/$appName").Path
           $process = Start-Process -FilePath $exe -ArgumentList @('--check-bulk', "`"$character`"", "`"$report`"") -PassThru
-          # The 718+ real UI assertions can exceed three minutes on hosted Mac runners.
+          # The 772+ real UI assertions can exceed three minutes on hosted Mac runners.
           # Keep individual operation deadlines and the required report/count checks;
           # this five-minute outer bound allows the complete suite to finish.
           if (-not $process.WaitForExit(300000)) {
@@ -66,7 +66,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Native bulk-operation checks failed: $($process.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'Native bulk-operation report is missing.' }
           $result = Get-Content $report -Raw | ConvertFrom-Json
-          if (-not $result.passed -or $result.checks.Count -lt 718) { throw 'Native bulk-operation checks did not complete.' }
+          if (-not $result.passed -or $result.checks.Count -lt 772) { throw 'Native bulk-operation checks did not complete.' }
           Write-Output "Native completed assertions: $($result.checks.Count)"
           $result.checks | Where-Object { $_ -like 'Native creation *geometry*' -or $_ -like 'Native creation shows all eleven*' } | ForEach-Object { Write-Output $_ }
       - name: Ensure native Windows browser runtime
@@ -143,6 +143,14 @@ jobs:
             artifacts/checks/native-creation-knowledge-skills-light.png
             artifacts/checks/native-creation-knowledge-fullscreen-dark.png
             artifacts/checks/native-creation-knowledge-fullscreen-light.png
+            artifacts/checks/native-creation-contacts-scroll-dark.png
+            artifacts/checks/native-creation-contacts-scroll-light.png
+            artifacts/checks/native-creation-contacts-fullscreen-dark.png
+            artifacts/checks/native-creation-contacts-fullscreen-light.png
+            artifacts/checks/native-creation-enemies-scroll-dark.png
+            artifacts/checks/native-creation-enemies-scroll-light.png
+            artifacts/checks/native-creation-enemies-fullscreen-dark.png
+            artifacts/checks/native-creation-enemies-fullscreen-light.png
             artifacts/checks/native-catalog-error-dark.png
             artifacts/checks/native-catalog-error-light.png
             artifacts/checks/native-gear-quantity-dark.png

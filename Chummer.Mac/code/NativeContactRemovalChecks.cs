@@ -35,6 +35,15 @@ internal static class NativeContactRemovalChecks
         });
         return reply.Task;
     }
+    private static ContactControl[] Controllers(Forms.Form editor, bool enemy) => editor is frmCreate creation
+        ? (enemy ? creation.CreationEnemyControllers : creation.CreationContactControllers).ToArray()
+        : Field<Forms.Panel>(editor, enemy ? "panEnemies" : "panContacts").Controls.OfType<ContactControl>().ToArray();
+    private static async Task DeleteAsync(Forms.Form editor, ContactControl controller, bool enemy)
+    {
+        if (editor is not frmCreate creation) { Field<Forms.Button>(controller, "cmdDelete").PerformClick(); return; }
+        var section = creation.ContactPresentation(enemy)!; var row = section.Rows[controller];
+        await NativeContactInteractions.ClickAsync(section, row.Delete);
+    }
     internal static async Task RunAsync(Forms.Form owner, Character source, Action<bool, string> check)
     {
         foreach (bool career in new[] { false, true })
@@ -53,17 +62,19 @@ internal static class NativeContactRemovalChecks
             string label = " career=" + career + " enemy=" + enemy;
             try
             {
-                var panel = Field<Forms.Panel>(editor, enemy ? "panEnemies" : "panContacts");
-                var rows = panel.Controls.OfType<ContactControl>().ToArray();
+                var rows = Controllers(editor, enemy);
                 var middle = rows.Single(r => ReferenceEquals(r.ContactObject, contacts[1]));
                 var dirty = editor.GetType().GetField("_blnIsDirty", Flags)!; dirty.SetValue(editor, false);
                 editor.GetType().GetProperty("Loading")!.SetValue(editor, false);
                 var nameInput = Field<Forms.TextBox>(middle, "txtContactName");
                 const string editedName = "Synthetic literal [O'Brien]";
-                nameInput.Text = editedName;
+                if (editor is frmCreate creationNameOwner) creationNameOwner.ContactPresentation(enemy)!.Rows[middle].Name.Text = editedName;
+                else nameInput.Text = editedName;
                 check(middle.ContactObject.Name == editedName && (bool)dirty.GetValue(editor)!,
                     "Native contact name edit updates model and marks the actual owner dirty" + label);
-                dirty.SetValue(editor, false); nameInput.Text = editedName;
+                dirty.SetValue(editor, false);
+                if (editor is frmCreate creationNoopOwner) creationNoopOwner.ContactPresentation(enemy)!.Rows[middle].Name.Text = editedName;
+                else nameInput.Text = editedName;
                 check(!(bool)dirty.GetValue(editor)!, "Native unchanged contact name retains clean owner state" + label);
                 character.Options.ConfirmDelete = true;
                 character.Options.ConfirmKarmaExpense = false;
@@ -71,8 +82,9 @@ internal static class NativeContactRemovalChecks
                 {
                     byte[] before = character.CaptureSnapshot();
                     var reply = ReplyToConfirmation(closeWindow ? null : Forms.DialogResult.No);
-                    Field<Forms.Button>(middle, "cmdDelete").PerformClick(); await reply;
-                    check(before.SequenceEqual(character.CaptureSnapshot()) && panel.Controls.Contains(middle) && !middle.IsDisposed
+                    await DeleteAsync(editor, middle, enemy); await reply;
+                    check(before.SequenceEqual(character.CaptureSnapshot()) && Controllers(editor, enemy).Contains(middle)
+                        && (editor is not frmCreate canceledCreation || canceledCreation.ContactPresentation(enemy)!.Rows.ContainsKey(middle)) && !middle.IsDisposed
                         && !(bool)dirty.GetValue(editor)! && editor.Enabled,
                         "Native canceled contact deletion preserves model rows clean state and editor availability" + label + " closeWindow=" + closeWindow);
                 }
@@ -84,10 +96,9 @@ internal static class NativeContactRemovalChecks
                     var expected = character.Contacts.Where(c => !ReferenceEquals(c, contacts[index])).ToArray();
                     character.Options.ConfirmDelete = index == 1;
                     var consent = index == 1 ? ReplyToConfirmation(Forms.DialogResult.Yes) : Task.CompletedTask;
-                    Field<Forms.Button>(row, "cmdDelete").PerformClick(); await consent; await Task.Delay(10);
+                    await DeleteAsync(editor, row, enemy); await consent; await Task.Delay(10);
                     int cost = career && enemy ? 2 * character.Options.KarmaQuality : 0;
-                    check(character.Contacts.SequenceEqual(expected) && panel.Controls.OfType<ContactControl>()
-                        .Select(r => r.ContactObject).SequenceEqual(expected) && row.IsDisposed && (bool)dirty.GetValue(editor)!
+                    check(character.Contacts.SequenceEqual(expected) && Controllers(editor, enemy).Select(r => r.ContactObject).SequenceEqual(expected) && row.IsDisposed && (bool)dirty.GetValue(editor)!
                         && character.Karma == karma - cost && character.ExpenseEntries.Count == expenses + (career && enemy ? 1 : 0),
                         "Native contact deletion removes only the selected row with unchanged career charge" + label + " index=" + index);
                     // Verify each intermediate save, not only the final empty list.
@@ -95,7 +106,8 @@ internal static class NativeContactRemovalChecks
                     if (!reopened.Contacts.Select(c => c.Name + c.Notes).SequenceEqual(expected.Select(c => c.Name + c.Notes)))
                         throw new InvalidOperationException("Contact survivors changed during save-format reload.");
                 }
-                check(character.Contacts.Count == 0 && panel.Controls.Count == 0 && editor.Enabled,
+                check(character.Contacts.Count == 0 && Controllers(editor, enemy).Length == 0 && editor.Enabled
+                    && (editor is not frmCreate closedCreation || closedCreation.ContactPresentation(enemy)!.Rows.Count == 0),
                     "Native contact deletion retains save-format survivors through middle first and final removals" + label);
             }
             finally

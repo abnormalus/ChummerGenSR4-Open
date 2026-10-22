@@ -1,5 +1,7 @@
 # Native numeric input rollout
 
+Local creation contacts/enemies viewport work is isolated from accepted PR37's stability release. Ordered canonical controllers retain all accounting/rule callbacks; standard native rows provide name, ratings and group/Notes/Link/Delete commands. Full headless differential/picker/save checks pass;54 additional native assertions compile but have not executed, with required floor772 and unchanged operation/suite/report/exit gates. See [CREATION_CONTACTS.md](CREATION_CONTACTS.md) for source boundaries and pending Mac/Windows acceptance. No viewport release or visual acceptance is claimed yet.
+
 Use maintained Avalonia NumericUpDown controls for migrated inputs. NativeIntegerInput supplies whole-number parsing, unit stepping, logical sizing, formatting and framework range clipping. Keep decimal precision for currency, multipliers and fractional quantities; never round a decimal domain just to reuse the integer factory. The model owns rules, limits and calculations; the control owns typing, buttons, keyboard routing and layout.
 
 ## User priority: follow the character-creation journey

@@ -115,12 +115,26 @@ internal static class NativeCreationInputChecks
                     position.Y + text.TextLayout.Height <= input.Bounds.Height + 1));
             bool ContactsFit() => contacts.Right <= commonPage.ClientSize.Width && new[] { "panContacts", "panEnemies" }.All(name =>
             {
-                var panel = Field<Forms.Panel>(editor, name);
-                var rows = panel.Controls.OfType<ContactControl>().ToArray();
-                return rows.Length == 1 && rows.All(row => row.Right <= panel.ClientSize.Width && row.Bottom <= panel.ClientSize.Height &&
-                    row.Controls.Cast<Forms.Control>().Where(child => child.Visible).All(child => child.Left >= 0 &&
-                        child.Right <= row.ClientSize.Width && child.Bottom <= row.ClientSize.Height));
+                bool enemy = name == "panEnemies";
+                var presentation = editor.ContactPresentation(enemy);
+                var controllers = enemy ? editor.CreationEnemyControllers : editor.CreationContactControllers;
+                if (presentation == null || presentation.Rows.Count != 1 || controllers.Count != 1 || controllers[0].Parent != null) return false;
+                var row = presentation.Rows[controllers[0]];
+                var viewport = presentation.Viewport;
+                return new Avalonia.Controls.Control[] { row.Name, row.Connection, row.Loyalty, row.Group, row.Notes, row.Link, row.Delete }
+                    .All(field => field.IsEffectivelyVisible && field.Bounds.Width > 0 && field.Bounds.Height > 0
+                        && field.TranslatePoint(default, viewport) is { } point && point.X >= -1 && point.Y >= -1
+                        && point.X + field.Bounds.Width <= viewport.Bounds.Width + 1
+                        && point.Y + field.Bounds.Height <= viewport.Bounds.Height + 1);
             });
+            string ContactGeometry() => " [" + string.Join(";", new[] { false, true }.Select(enemy =>
+            {
+                var presentation = editor.ContactPresentation(enemy);
+                if (presentation == null) return "enemy=" + enemy + ":missing";
+                return "enemy=" + enemy + ":viewport=" + presentation.Viewport.Bounds + ":" + string.Join(",", presentation.Rows.Values.Select(row =>
+                    "frame=" + row.Frame.Bounds + "/" + string.Join("|", new Avalonia.Controls.Control[] { row.Name, row.Connection, row.Loyalty, row.Group, row.Notes, row.Link, row.Delete }
+                        .Select(field => field.GetType().Name + "=" + field.Bounds + "@" + field.TranslatePoint(default, presentation.Viewport)))));
+            })) + "]";
             void Capture(string name)
             {
                 using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
@@ -151,7 +165,8 @@ internal static class NativeCreationInputChecks
                         !attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Any(),
                         "Native creation shows all eleven attribute rows simultaneously without scrolling in " + theme.Key +
                         FormattableString.Invariant($" [window={window.ClientSize}; common={commonPage.ClientSize}; attributes={attributesPanel.Bounds}; root={root.Bounds}]"));
-                    check(ContactsFit(), "Native normal creation column exposes populated contact and enemy fields and commands in " + theme.Key);
+                    bool normalContactsFit = ContactsFit();
+                    check(normalContactsFit, "Native normal creation column exposes populated contact and enemy fields and commands in " + theme.Key + (normalContactsFit ? "" : ContactGeometry()));
                 }
                 var screen = window.Screens.ScreenFromWindow(window);
                 Size fullscreenSize = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : window.ClientSize;
@@ -166,7 +181,8 @@ internal static class NativeCreationInputChecks
                         FormattableString.Invariant($" [expected={fullscreenSize}; actual={window.ClientSize}; state={window.WindowState}]"));
                     check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Right <= commonPage.ClientSize.Width && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
                         "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
-                    check(ContactsFit(), "Native full-screen creation column exposes populated contact and enemy fields and commands in " + theme.Key);
+                    bool fullscreenContactsFit = ContactsFit();
+                    check(fullscreenContactsFit, "Native full-screen creation column exposes populated contact and enemy fields and commands in " + theme.Key + (fullscreenContactsFit ? "" : ContactGeometry()));
                     check(character.CaptureSnapshot().SequenceEqual(beforeLayout) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeLayout,
                         "Native creation resizing preserves character and dirty state in " + theme.Key);
                 }
