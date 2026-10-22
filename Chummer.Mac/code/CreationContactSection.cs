@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.Styling;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -28,7 +29,7 @@ internal sealed class CreationContactRow : IDisposable
     private readonly MenuItem attachItem = new(), openItem = new(), removeItem = new();
     private bool disposed, syncing;
     private int layoutMode = -1;
-    internal Grid Layout { get; } = new() { RowSpacing = 3, ColumnSpacing = 6, Margin = new Thickness(3) };
+    internal Grid Layout { get; } = new() { RowSpacing = 2, ColumnSpacing = 6, Margin = new Thickness(2) };
     internal Border Frame { get; }
     internal TextBox Name => name.Input;
     internal NumericUpDown Connection => connection.Input;
@@ -52,6 +53,20 @@ internal sealed class CreationContactRow : IDisposable
         connection = new NativeInlineNumericBinding(controller.CreationConnectionInput, controller.CreationToolTips, true, Available);
         loyalty = new NativeInlineNumericBinding(controller.CreationLoyaltyInput, controller.CreationToolTips, true, Available);
         Connection.Width = Loyalty.Width = 104;
+        // Match the established compact attribute editor: the normal Common
+        // column must show a complete row in its shorter enemy viewport.
+        Name.MinHeight = Name.Height = 26; Name.Padding = new Thickness(2, 0);
+        foreach (var input in new[] { Connection, Loyalty })
+        { input.MinHeight = input.Height = 26; input.Padding = new Thickness(2, 0); }
+        Layout.Styles.Add(new Style(selector => selector.OfType<NumericUpDown>().Template().OfType<TextBox>())
+        {
+            Setters = {
+                new Setter(TextBox.MinHeightProperty, 0d),
+                new Setter(TextBox.HeightProperty, 26d),
+                new Setter(TextBox.PaddingProperty, new Thickness(2, 0)),
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
+            }
+        });
         string identity = controller.ContactObject.EntityType == ContactType.Enemy ? "nativeCreationEnemy" : "nativeCreationContact";
         Name.Name = identity + "Name" + index;
         Connection.Name = identity + "Connection" + index; Loyalty.Name = identity + "Loyalty" + index;
