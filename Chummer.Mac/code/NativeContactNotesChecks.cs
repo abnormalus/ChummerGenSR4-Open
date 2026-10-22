@@ -61,7 +61,7 @@ internal static class NativeContactNotesChecks
                             { Forms.Application.OpenForms.OfType<frmNotes>().LastOrDefault()?.Close(); reply.TrySetException(error); }
                         });
                         if (editor is frmCreate creationEditor)
-                            await NativeContactInteractions.ClickAsync(creationEditor.ContactPresentation(false)!, creationEditor.ContactPresentation(false)!.Rows[control].Notes);
+                            await NativeContactInteractions.ClickAsync(creationEditor.ContactPresentation(false)!, creationEditor.ContactPresentation(false)!.Rows[control].Notes, check);
                         else control.GetType().GetMethod("imgNotes_Click", Flags)!.Invoke(control, new object[] { control, EventArgs.Empty });
                         await reply.Task;
                         string label = " career=" + career + " sample=" + sample + " repeat=" + repeat;

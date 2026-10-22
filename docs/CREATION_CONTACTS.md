@@ -36,3 +36,5 @@ Acceptance must cover canonical identities/order and all original rule/accountin
 
 
 Exact-source PR38 Windows native validation measured a126px contact row in123px/115px normal contact/enemy viewports, clipping commands. Contact name and numeric editors now use the existing26px compact attribute presentation, including the numeric template editor, with2px grid spacing/margins. Original full-field visibility checks remain unchanged; both-platform native and visual acceptance must establish the correction. No rule/controller/save change.
+
+After the compact correction, Mac native validation still stops after186 assertions at the visible Notes-button access boundary. A test-only structural timeout diagnostic records command/viewport bounds, scroll offset/extent and effective visibility/enabled state; it never records contact names or Notes. The20-second deadline and actual visible-button requirement remain unchanged. This is diagnostic coverage, not an application fix or acceptance claim.
