@@ -125,7 +125,8 @@ namespace Chummer
 
 			SetTooltips();
 			MoveControls();
-            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); };
+            InitializeCreationContactControllerLifetime();
+            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); InitializeCreationContactPresentation(); };
 		}
 
 		/// <summary>
@@ -651,7 +652,7 @@ namespace Chummer
 					objContactControl.BackColor = objContact.Colour;
 
 					objContactControl.Top = intContact * objContactControl.Height;
-					panContacts.Controls.Add(objContactControl);
+					AddCreationContactController(objContactControl, false);
 				}
 				if (objContact.EntityType == ContactType.Enemy)
 				{
@@ -673,7 +674,7 @@ namespace Chummer
 					objContactControl.BackColor = objContact.Colour;
 
 					objContactControl.Top = intEnemy * objContactControl.Height;
-					panEnemies.Controls.Add(objContactControl);
+					AddCreationContactController(objContactControl, true);
 				}
 				if (objContact.EntityType == ContactType.Pet)
 				{
@@ -1406,7 +1407,7 @@ namespace Chummer
 					objSkillControl.BreakGroupClicked -= objSkill_BreakGroupClicked;
 				}
 
-				foreach (ContactControl objContactControl in panContacts.Controls.OfType<ContactControl>())
+				foreach (ContactControl objContactControl in creationContactControllers)
 				{
 					objContactControl.ConnectionRatingChanged -= objContact_ConnectionRatingChanged;
 					objContactControl.ConnectionGroupRatingChanged -= objContact_ConnectionGroupRatingChanged;
@@ -1416,7 +1417,7 @@ namespace Chummer
             objContactControl.ContactNameChanged -= objContact_NameChanged;
 				}
 
-				foreach (ContactControl objContactControl in panEnemies.Controls.OfType<ContactControl>())
+				foreach (ContactControl objContactControl in creationEnemyControllers)
 				{
 					objContactControl.ConnectionRatingChanged -= objEnemy_ConnectionRatingChanged;
 					objContactControl.ConnectionGroupRatingChanged -= objEnemy_ConnectionGroupRatingChanged;
@@ -4872,7 +4873,7 @@ namespace Chummer
 			// Handle the DeleteContact Event for the ContactControl object.
 			ContactControl objSender = (ContactControl)sender;
 			bool blnFound = false;
-			foreach (ContactControl objContactControl in panContacts.Controls)
+			foreach (ContactControl objContactControl in creationContactControllers)
 			{
 				// Set the flag to show that we have found the Contact.
 				if (objContactControl == objSender)
@@ -4889,7 +4890,7 @@ namespace Chummer
 				}
 			}
 			// Remove the ContactControl that raised the Event.
-			panContacts.Controls.Remove(objSender);
+			RemoveCreationContactController(objSender, false);
             objSender.ConnectionRatingChanged -= objContact_ConnectionRatingChanged;
             objSender.ConnectionGroupRatingChanged -= objContact_ConnectionGroupRatingChanged;
             objSender.LoyaltyRatingChanged -= objContact_LoyaltyRatingChanged;
@@ -4938,7 +4939,7 @@ namespace Chummer
 				intNegativeQualityBP *= _objOptions.KarmaQuality;
 
 			int intBPUsed = 0;
-			foreach (ContactControl objContactControl in panEnemies.Controls)
+			foreach (ContactControl objContactControl in creationEnemyControllers)
 			{
 				if (_objCharacter.BuildMethod == CharacterBuildMethod.BP)
 					intBPUsed -= (objContactControl.ConnectionRating + objContactControl.LoyaltyRating + objContactControl.GroupRating);
@@ -5010,7 +5011,7 @@ namespace Chummer
 				intNegativeQualityBP *= _objOptions.KarmaQuality;
 
 			int intBPUsed = 0;
-			foreach (ContactControl objContactControl in panEnemies.Controls)
+			foreach (ContactControl objContactControl in creationEnemyControllers)
 			{
 				if (_objCharacter.BuildMethod == CharacterBuildMethod.BP)
 					intBPUsed -= (objContactControl.ConnectionRating + objContactControl.LoyaltyRating + objContactControl.GroupRating);
@@ -5088,7 +5089,7 @@ namespace Chummer
 				intNegativeQualityBP *= _objOptions.KarmaQuality;
 
 			int intBPUsed = 0;
-			foreach (ContactControl objContactControl in panEnemies.Controls)
+			foreach (ContactControl objContactControl in creationEnemyControllers)
 			{
 				if (_objCharacter.BuildMethod == CharacterBuildMethod.BP)
 					intBPUsed -= (objContactControl.ConnectionRating + objContactControl.LoyaltyRating + objContactControl.GroupRating);
@@ -5150,7 +5151,7 @@ namespace Chummer
 			// Handle the DeleteCOntact Event for the ContactControl object.
 			ContactControl objSender = (ContactControl)sender;
 			bool blnFound = false;
-			foreach (ContactControl objContactControl in panEnemies.Controls)
+			foreach (ContactControl objContactControl in creationEnemyControllers)
 			{
 				// Set the flag to show that we have found the contact.
 				if (objContactControl == objSender)
@@ -5167,7 +5168,7 @@ namespace Chummer
 				}
 			}
 			// Remove the ContactControl that raised the Event.
-			panEnemies.Controls.Remove(objSender);
+			RemoveCreationContactController(objSender, true);
             objSender.ConnectionRatingChanged -= objEnemy_ConnectionRatingChanged;
             objSender.ConnectionGroupRatingChanged -= objEnemy_ConnectionGroupRatingChanged;
             objSender.LoyaltyRatingChanged -= objEnemy_LoyaltyRatingChanged;
@@ -5635,7 +5636,7 @@ namespace Chummer
 			Contact objContact = new Contact(_objCharacter);
 			_objCharacter.Contacts.Add(objContact);
 
-			int i = panContacts.Controls.Count;
+			int i = creationContactControllers.Count;
 			ContactControl objContactControl = new ContactControl();
 			objContactControl.ContactObject = objContact;
 			objContactControl.EntityType = ContactType.Contact;
@@ -5650,7 +5651,7 @@ namespace Chummer
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panContacts.AutoScrollPosition.Y);
-			panContacts.Controls.Add(objContactControl);
+			AddCreationContactController(objContactControl, false);
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -5696,7 +5697,7 @@ namespace Chummer
 				strQualityPoints = "70 " +LanguageManager.Instance.GetString("String_Karma");
 			}
 
-			foreach (ContactControl objEnemyControl in panEnemies.Controls)
+			foreach (ContactControl objEnemyControl in creationEnemyControllers)
 			{
 				if (_objCharacter.BuildMethod == CharacterBuildMethod.BP)
 					intBPUsed -= (objEnemyControl.ConnectionRating + objEnemyControl.LoyaltyRating);
@@ -5722,7 +5723,7 @@ namespace Chummer
 			Contact objContact = new Contact(_objCharacter);
 			_objCharacter.Contacts.Add(objContact);
 
-			int i = panEnemies.Controls.Count;
+			int i = creationEnemyControllers.Count;
 			ContactControl objContactControl = new ContactControl();
 			objContactControl.ContactObject = objContact;
 			objContactControl.EntityType = ContactType.Enemy;
@@ -5737,7 +5738,7 @@ namespace Chummer
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panEnemies.AutoScrollPosition.Y);
-			panEnemies.Controls.Add(objContactControl);
+			AddCreationContactController(objContactControl, true);
 
 			UpdateCharacterInfo();
 
@@ -15477,7 +15478,7 @@ namespace Chummer
 
 			// Calculate the BP used by Contacts.
 			intPointsUsed = 0;
-			foreach (ContactControl objContactControl in panContacts.Controls)
+			foreach (ContactControl objContactControl in creationContactControllers)
 			{
 				if (!objContactControl.Free)
 				{
@@ -15538,7 +15539,7 @@ namespace Chummer
 			// Calculate the BP used by Enemies. These are added to the BP since they are tehnically
 			// a Negative Quality.
 			intPointsUsed = 0;
-			foreach (ContactControl objContactControl in panEnemies.Controls)
+			foreach (ContactControl objContactControl in creationEnemyControllers)
 			{
 				if (!objContactControl.Free)
 				{

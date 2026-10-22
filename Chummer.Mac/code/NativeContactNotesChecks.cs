@@ -28,7 +28,7 @@ internal static class NativeContactNotesChecks
             try
             {
                 var panel = Field<Forms.Panel>(editor, "panContacts");
-                var inputs = panel.Controls.OfType<ContactControl>().ToArray();
+                var inputs = editor is frmCreate creation ? creation.CreationContactControllers.ToArray() : panel.Controls.OfType<ContactControl>().ToArray();
                 var texts = new[] { "", "Synthetic writer’s notes; ordinary prose. ".PadRight(349, 'a'), "Synthetic ordinary notes - punctuation. ".PadRight(335, 'b') };
                 for (int sample = 0; sample < texts.Length; sample++)
                 {
@@ -60,7 +60,9 @@ internal static class NativeContactNotesChecks
                             catch (Exception error)
                             { Forms.Application.OpenForms.OfType<frmNotes>().LastOrDefault()?.Close(); reply.TrySetException(error); }
                         });
-                        control.GetType().GetMethod("imgNotes_Click", Flags)!.Invoke(control, new object[] { control, EventArgs.Empty });
+                        if (editor is frmCreate creationEditor)
+                            await NativeContactInteractions.ClickAsync(creationEditor.ContactPresentation(false)!, creationEditor.ContactPresentation(false)!.Rows[control].Notes, check);
+                        else control.GetType().GetMethod("imgNotes_Click", Flags)!.Invoke(control, new object[] { control, EventArgs.Empty });
                         await reply.Task;
                         string label = " career=" + career + " sample=" + sample + " repeat=" + repeat;
                         check(loaded && contact.Notes == expected + "\nSynthetic edit", "Contact notes modal loads and accepts exact synthetic plain text" + label);

@@ -137,10 +137,10 @@ namespace Chummer
 		private void tsAttachCharacter_Click(object sender, EventArgs e)
 		{
 			// Prompt the user to select a save file to associate with this Contact.
-			OpenFileDialog openFileDialog = new OpenFileDialog();
+			using OpenFileDialog openFileDialog = new OpenFileDialog();
 			openFileDialog.Filter = "Chummer Files (*.chum)|*.chum|All Files (*.*)|*.*";
 
-			if (openFileDialog.ShowDialog(this) == DialogResult.OK)
+			if (openFileDialog.ShowDialog(ContactDialogOwner) == DialogResult.OK)
 			{
 				_objContact.FileName = openFileDialog.FileName;
 				if (_objContact.EntityType == ContactType.Enemy)
@@ -175,7 +175,7 @@ namespace Chummer
 
 		private void cmdGroup_Click(object sender, EventArgs e)
 		{
-			frmSelectContactConnection frmPickContactConnection = new frmSelectContactConnection();
+			using frmSelectContactConnection frmPickContactConnection = new frmSelectContactConnection();
 			frmPickContactConnection.Membership = _objContact.Membership;
 			frmPickContactConnection.AreaOfInfluence = _objContact.AreaOfInfluence;
 			frmPickContactConnection.MagicalResources = _objContact.MagicalResources;
@@ -183,7 +183,7 @@ namespace Chummer
 			frmPickContactConnection.GroupName = _objContact.GroupName;
 			frmPickContactConnection.Colour = _objContact.Colour;
 			frmPickContactConnection.Free = _objContact.Free;
-			frmPickContactConnection.ShowDialog(this);
+			frmPickContactConnection.ShowDialog(ContactDialogOwner);
 
 			if (frmPickContactConnection.DialogResult == DialogResult.Cancel)
 				return;
@@ -216,7 +216,7 @@ namespace Chummer
                 using var frmContactNotes = new frmNotes();
                 frmContactNotes.Shown += (_, _) => AppDiagnostics.Record("contact.notes.opened");
                 frmContactNotes.Notes = _objContact.Notes;
-                frmContactNotes.ShowDialog(this);
+                frmContactNotes.ShowDialog(ContactDialogOwner);
                 if (frmContactNotes.DialogResult == DialogResult.OK)
                     _objContact.Notes = frmContactNotes.Notes;
                 AppDiagnostics.Record("contact.notes.closed");

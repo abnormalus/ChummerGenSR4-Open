@@ -314,6 +314,7 @@ namespace Chummer
 
 		private void cmdChangeSpec_Click(object sender, EventArgs e)
 		{
+			RevealCareerSpecialization();
 			_strOldSpec = cboSpec.Text;
 			cboSpec.Enabled = true;
 			cboSpec.Focus();
@@ -324,7 +325,9 @@ namespace Chummer
 			if (_objSkill.CharacterObject.Created && !_objSkill.ExoticSkill)
 			{
 				cboSpec.Enabled = false;
-				SpecializationLeave(this);
+				// Revealing an existing or empty specialty is presentation only.
+				// Keep the original purchase path for an actual text change.
+				if (cboSpec.Text != _strOldSpec) SpecializationLeave(this);
 			}
 		}
 
@@ -496,6 +499,7 @@ namespace Chummer
                     Text = LanguageManager.Instance.GetString("Button_AddSpecialty") };
                 addKnowledgeSpecialty.Click += (_, _) =>
                 {
+                    RevealCareerSpecialization();
                     using var prompt = new frmSelectText { AutoAcceptPrefilled = false,
                         SelectedValue = cboSpec.Text,
                         Description = LanguageManager.Instance.GetString("Label_KnowledgeSpecialty") };
@@ -515,6 +519,7 @@ namespace Chummer
             cmdDelete.Left = 758;
             cmdDelete.TabIndex = 5;
             Width = 833;
+            RefreshCareerSpecializationPresentation();
         }
 
         public bool KnowledgeSkill
@@ -613,6 +618,7 @@ namespace Chummer
 		        _objSkill.IsMeta = value;
 		        nudSkill.Visible = !value;
 		        cboSpec.Visible = !value;
+		        RefreshCareerSpecializationPresentation();
 	        }
         }
         
@@ -959,6 +965,7 @@ namespace Chummer
 				nudSkill.Visible = false;
 				cboSpec.Visible = false;
 			}
+			RefreshCareerSpecializationPresentation();
 		}
 		#endregion
     }

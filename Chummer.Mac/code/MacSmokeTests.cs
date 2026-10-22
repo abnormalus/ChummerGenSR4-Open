@@ -1023,12 +1023,16 @@ namespace Chummer
                         "Reopened creation editor decodes the saved portrait into a nonempty preview");
                     portraitEditor.Close();
                 }
+                CreationContactOwnershipChecks.Run(character, Check);
+                CreationContactViewportChecks.Run(character, Check);
+                CreationContactRuleChecks.Run(character, Check);
                 ContactEditChecks.Run(character, Check);
                 ContactRemovalChecks.Run(character, Check);
                 CreationActiveSkillChecks.Run(character, Check);
                 CreationActiveSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationActiveSkillMetaChecks.Run(character, Check);
                 SkillDisclosureChecks.Run(character, Check);
+                CareerSkillSpecializationChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationCommonLayoutChecks.Run(character, Check);
