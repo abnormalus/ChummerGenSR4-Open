@@ -16,6 +16,8 @@ The first Attributes migration must replace a coherent section with standard con
 
 ## Current inventory and release state
 
+Current authoritative release checkpoint: Nightly0.2.143/source d9d1f14f5f23e4134afc5fc6e5a302e6a5560bde is published and download-verified. Creation attributes/money, groups, active and knowledge sections are accepted on both platforms, including specialization disclosures, persistent Perception expansion and shared vertical alignment. The historical pending statements below record the implementation sequence.117 legacy declarations remain documented rule adapters and unmigrated surfaces; declaration counts are not overall completion percentages. Contact Connection/Loyalty is the next creation-facing viewport migration.
+
 The rollout baseline was 145 legacy NumericUpDown field declarations across all access modifiers. The earlier 130 count omitted 15 internal fields. This counts declarations, not user-visible defects or a percentage of overall modernization.
 
 | Checkpoint | Remaining legacy fields |
@@ -418,3 +420,12 @@ Grouped /tmp/chummer-skill-disclosure-checks.log passes the full headless suite,
 
 
 Exact CI39666662955/4b70abf4 passes full headless/all399 file+memory/both Foundry/audit/WindowsPDF and Mac691/Windows684 native checks. SHA-verified exact artifacts Mac12378775960 (4c21d95bfd5185b3ba7f37ca8819c9e736888fa4543d5331df0ccd7162dfbbe4) and Windows12376629536 (657008b4a161456cae71f9fe964374be94822c9c9c39fc5c3492c4f658d52a4b) show readable centered numeric fields and collapsed rows, but visual review rejects the new + buttons and filter captions sitting near their button tops. Shared native presentation now also explicitly centers Button and ToggleButton content. Existing native disclosure-default assertions require centered button content; minimum682 and every other gate are unchanged. This is a visual correction, not a rules or persistence change. New exact-platform image review remains required; the earlier green run is not final acceptance.
+
+
+## Contact deletion stability audit before viewport migration
+
+Auditing contact ownership reproduced a data-loss defect in the current creation editor: deleting the first of three synthetic contacts removes later contact records from the model while their controls remain visible. The same removal-in-reflow-loop pattern exists for creation enemies and career contacts/enemies. Baseline /tmp/chummer-contact-removal-baseline.log fails the actual-owner selected-model/row assertion. This is a synthetic reproduced defect, not a claim about a reported user save.
+
+The local correction removes a model record only when its controller matches the selected row; later rows only move. Accepted removal detaches all five editor callbacks and disposes the removed control. Original confirmation, career enemy Karma/expense behavior, remaining identities/order and character schema are retained. No legacy .NET Framework project or vendor host change is included.
+
+ContactRemovalChecks covers first/middle/last deletion in creation/career for both contacts/enemies:36 checks require exact remaining model/row identities, removed-row disposal/callback cleanup, and save-format survivor names/notes. /tmp/chummer-contact-removal-fixed.log passes the full headless suite (exit0); build zero warnings/errors. NativeContactRemovalChecks adds24 actual-window assertions for No cancellation, sequential middle/first/final deletion, intermediate save survivors, unchanged career charges and owner cleanup. The minimum682 becomes706, with20second operation/300second whole-suite/report/passed/nonzero exit gates unchanged. Native build /tmp/chummer-contact-removal-native-build.log passes zero warnings/errors; platform execution is pending. This local correction is not yet released. Preserve both baseline and passing logs before publication.

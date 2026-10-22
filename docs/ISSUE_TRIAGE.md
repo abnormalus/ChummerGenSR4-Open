@@ -4,6 +4,8 @@ The recurring modernization task reviews GitHub issues at least once per America
 
 ## Reviewed October 21, 2026
 
+Local stability audit after verified Nightly0.2.143: contact deletion can remove later contact records while leaving their rows visible. An actual creation-owner synthetic baseline reproduces this; matching creation-enemy/career handlers use the same faulty reflow loop. A bounded selected-record-only correction and36 passing headless ownership/serialization checks are local;24 native transition checks compile but await both-platform execution. No public issue comment or closure was posted. See NUMERIC_INPUTS.md for evidence and remaining gates.
+
 Open issues31,19,18,16,15 and both issue18 comments retain their previous timestamps/counts. No comments or closures posted. The reproduced synthetic notes-close correction is now released in verified Nightly0.2.140 (PR32/33); correspondence to every reported user incident remains unproven. Earlier draft-only statements below are historical review records. The human separately reported a missing portrait after reopening: saved bytes survive, and both editor reload paths left the decode stream at its end. PR34 contains the corrected read-only stream and passing actual creation/career headless preview checks; native/layout acceptance and publication remain pending. Current layout test-driver evidence is in NUMERIC_INPUTS.md. The daily machine-readable record and original triage output are current for America/Chicago October21.
 
 ## Reviewed October 20, 2026

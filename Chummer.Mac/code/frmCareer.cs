@@ -4709,17 +4709,26 @@ namespace Chummer
 			{
 				// Set the flag to show that we have found the Contact.
 				if (objContactControl == objSender)
+				{
 					blnFound = true;
+                    // Delete exactly the selected record; later rows only move.
+                    _objCharacter.Contacts.Remove(objContactControl.ContactObject);
+				}
 
 				// Once the Contact has been found, all of the other ContactControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
 				if (blnFound)
 				{
-					_objCharacter.Contacts.Remove(objContactControl.ContactObject);
 					objContactControl.Top -= 25;
 				}
 			}
 			// Remove the ContactControl that raised the Event.
 			panContacts.Controls.Remove(objSender);
+            objSender.ConnectionRatingChanged -= objContact_ConnectionRatingChanged;
+            objSender.ConnectionGroupRatingChanged -= objContact_ConnectionGroupRatingChanged;
+            objSender.LoyaltyRatingChanged -= objContact_LoyaltyRatingChanged;
+            objSender.DeleteContact -= objContact_DeleteContact;
+            objSender.FileNameChanged -= objContact_FileNameChanged;
+            objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -4794,17 +4803,26 @@ namespace Chummer
 			{
 				// Set the flag to show that we have found the contact.
 				if (objContactControl == objSender)
+				{
 					blnFound = true;
+                    // Delete exactly the selected record; later rows only move.
+                    _objCharacter.Contacts.Remove(objContactControl.ContactObject);
+				}
 
 				// Once the Enemy has been found, all of the other ContactControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
 				if (blnFound)
 				{
-					_objCharacter.Contacts.Remove(objContactControl.ContactObject);
 					objContactControl.Top -= 25;
 				}
 			}
 			// Remove the ContactControl that raised the Event.
 			panEnemies.Controls.Remove(objSender);
+            objSender.ConnectionRatingChanged -= objEnemy_ConnectionRatingChanged;
+            objSender.ConnectionGroupRatingChanged -= objEnemy_ConnectionGroupRatingChanged;
+            objSender.LoyaltyRatingChanged -= objEnemy_LoyaltyRatingChanged;
+            objSender.DeleteContact -= objEnemy_DeleteContact;
+            objSender.FileNameChanged -= objEnemy_FileNameChanged;
+            objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;

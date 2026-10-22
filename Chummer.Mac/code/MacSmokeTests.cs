@@ -1023,6 +1023,7 @@ namespace Chummer
                         "Reopened creation editor decodes the saved portrait into a nonempty preview");
                     portraitEditor.Close();
                 }
+                ContactRemovalChecks.Run(character, Check);
                 CreationActiveSkillChecks.Run(character, Check);
                 CreationActiveSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationActiveSkillMetaChecks.Run(character, Check);
