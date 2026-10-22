@@ -44,6 +44,9 @@ internal static class NativeContactRemovalChecks
                 dirty.SetValue(editor, false); nameInput.Text = editedName;
                 check(!(bool)dirty.GetValue(editor)!, "Native unchanged contact name retains clean owner state" + label);
                 character.Options.ConfirmDelete = true;
+                character.Options.ConfirmKarmaExpense = false;
+                foreach (bool closeWindow in new[] { false, true })
+                {
                 byte[] before = character.CaptureSnapshot();
                 var reply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 Dispatcher.UIThread.Post(async () =>
@@ -54,14 +57,16 @@ internal static class NativeContactRemovalChecks
                         while (!Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Any())
                         { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Contact deletion confirmation did not open."); await Task.Delay(10); }
                         var message = Forms.Application.OpenForms.OfType<Forms.MessageBoxForm>().Last();
-                        message.DialogResult = Forms.DialogResult.No; message.Close(); reply.TrySetResult();
+                        if (!closeWindow) message.DialogResult = Forms.DialogResult.No;
+                        message.Close(); reply.TrySetResult();
                     }
                     catch (Exception error) { reply.TrySetException(error); }
                 });
                 Field<Forms.Button>(middle, "cmdDelete").PerformClick(); await reply.Task;
                 check(before.SequenceEqual(character.CaptureSnapshot()) && panel.Controls.Contains(middle) && !middle.IsDisposed
                     && !(bool)dirty.GetValue(editor)! && editor.Enabled,
-                    "Native canceled contact deletion preserves model rows clean state and editor availability" + label);
+                    "Native canceled contact deletion preserves model rows clean state and editor availability" + label + " closeWindow=" + closeWindow);
+                }
                 character.Options.ConfirmDelete = false; character.Options.ConfirmKarmaExpense = false;
                 foreach (int index in new[] { 1, 0, 2 })
                 {
