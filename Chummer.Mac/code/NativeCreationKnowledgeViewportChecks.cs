@@ -89,9 +89,26 @@ internal static class NativeCreationKnowledgeViewportChecks
             var beforeWide = character.CaptureSnapshot(); bool dirtyBeforeWide = Field<bool>(editor, "_blnIsDirty");
             var screen = nativeWindow.Screens.ScreenFromWindow(nativeWindow);
             Size expectedWide = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : default;
+            var geometryTrace = new List<string>();
+            void TraceGeometry(string reason)
+            {
+                if (geometryTrace.Count < 32)
+                    geometryTrace.Add(FormattableString.Invariant($"{reason}:state={nativeWindow.WindowState}:client={nativeWindow.ClientSize}:requested={nativeWindow.Width}x{nativeWindow.Height}:frame={nativeWindow.FrameSize}:position={nativeWindow.Position}:active={nativeWindow.IsActive}"));
+            }
+            EventHandler<WindowResizedEventArgs> traceResize = (_, _) => TraceGeometry("resize");
+            EventHandler<AvaloniaPropertyChangedEventArgs> traceProperty = (_, change) =>
+            {
+                if (change.Property == Window.WidthProperty || change.Property == Window.HeightProperty ||
+                    change.Property == Window.WindowStateProperty || change.Property == TopLevel.ClientSizeProperty)
+                    TraceGeometry(change.Property.Name);
+            };
+            nativeWindow.Resized += traceResize;
+            nativeWindow.PropertyChanged += traceProperty;
+            TraceGeometry("before-fullscreen");
             try
             {
                 nativeWindow.WindowState = WindowState.FullScreen;
+                TraceGeometry("requested-fullscreen");
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
                     Application.Current.RequestedThemeVariant = theme;
@@ -123,11 +140,13 @@ internal static class NativeCreationKnowledgeViewportChecks
                     check(screen != null && ready && nativeWindow.WindowState == WindowState.FullScreen &&
                         Math.Abs(nativeWindow.ClientSize.Width - expectedWide.Width) <= 1 && Math.Abs(nativeWindow.ClientSize.Height - expectedWide.Height) <= 1 && complete,
                         "Native fullscreen knowledge exposes its complete final row at actual screen geometry in " + theme.Key +
-                        FormattableString.Invariant($" [expected={expectedWide}; actual={nativeWindow.ClientSize}; row={last.Layout.Bounds}; point={point}; viewport={section.Viewport.Viewport}]"));
+                        FormattableString.Invariant($" [expected={expectedWide}; actual={nativeWindow.ClientSize}; state={nativeWindow.WindowState}; screen={screen?.Bounds}; workarea={screen?.WorkingArea}; scaling={screen?.Scaling}; requested={nativeWindow.Width}x{nativeWindow.Height}; frame={nativeWindow.FrameSize}; min={nativeWindow.MinWidth}x{nativeWindow.MinHeight}; max={nativeWindow.MaxWidth}x{nativeWindow.MaxHeight}; sizing={nativeWindow.SizeToContent}; owner={owner.Size}; complete={complete}; row={last.Layout.Bounds}; point={point}; viewport={section.Viewport.Viewport}; trace={string.Join("|", geometryTrace)}]"));
                 }
             }
             finally
             {
+                nativeWindow.Resized -= traceResize;
+                nativeWindow.PropertyChanged -= traceProperty;
                 Application.Current.RequestedThemeVariant = originalTheme;
                 nativeWindow.WindowState = WindowState.Normal; owner.Size = previousSize; nativeWindow.UpdateLayout();
                 nativeWindow.WindowState = previousState; await Task.Delay(120);

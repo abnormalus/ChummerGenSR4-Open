@@ -2,6 +2,10 @@
 
 As each application section is repaired or improved, review whether it recreates a capability already supplied by the modern framework or an appropriate maintained library. Prefer established components where they reduce maintenance and preserve the required behavior. This is an incremental process, not a wholesale rewrite or an edition expansion.
 
+## Current isolated Add Quality stage
+
+The requested Add Quality window now uses standard catalog controls locally, with the original eligibility policy extracted unchanged and caller accounting preserved. Full headless validation passes; 39 added native assertions compile but still require both-platform execution and visual acceptance. See [QUALITY_SELECTION.md](QUALITY_SELECTION.md). This stage has not been released.
+
 ## For each section
 
 1. **Record its behavior.** Identify the character data/rules it reads and changes, source filtering, saved fields, commands, validation, undo requirements and platform interactions. Preserve custom entries and existing character-file compatibility.

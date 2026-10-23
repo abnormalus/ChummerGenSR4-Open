@@ -75,10 +75,12 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
         get => markup;
         set { value = Math.Clamp(value, -99, 1000); if (markup == value) return; markup = value; UpdateDetails(); }
     }
+    protected virtual bool AllowsFreeCost => IsCareer;
+    protected virtual bool ValidateSelection(CatalogEntry entry) => true;
     public bool FreeCost
     {
         get => freeCost;
-        set { value &= IsCareer; if (freeCost == value) return; freeCost = value; UpdateDetails(); }
+        set { value &= AllowsFreeCost; if (freeCost == value) return; freeCost = value; UpdateDetails(); }
     }
 
     protected CatalogPickerModel(Character character, bool career, XmlDocument catalog,
@@ -176,6 +178,7 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
             Refresh();
             error = LanguageManager.Instance.GetString("CatalogPicker_SelectionChanged"); Changed(); return null;
         }
+        if (!ValidateSelection(selectedEntry!)) return null;
         RememberCategory(selectedEntry!.Category);
         return new CatalogSelection(selectedEntry.Name, selectedEntry.Category, freeCost, markup, addAgain, this is IRatedCatalogPicker rated ? rated.Rating : 0, this is IQuantityCatalogPicker counted ? counted.Quantity : 1);
     }
