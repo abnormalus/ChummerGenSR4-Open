@@ -33,7 +33,8 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
     private static Binding Edit(string property) => new(property) { Mode = BindingMode.TwoWay };
 
     internal CatalogPickerWindow(TModel model, Character character, string titleKey, string namePrefix,
-        (string Label, string Property)[] detailFields, string? includedLabel = null)
+        (string Label, string Property)[] detailFields, string? includedLabel = null,
+        bool freeDuringCreation = false, bool showMarkup = true)
     {
         Model = model; DataContext = model;
         Title = T(titleKey); Width = 940; Height = 650; MinWidth = 740; MinHeight = 460;
@@ -155,13 +156,17 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
         Grid.SetRow(footer, 3); root.Children.Add(footer);
         var purchase = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
-        purchase.IsVisible = model.IsCareer;
+        purchase.IsVisible = model.IsCareer || freeDuringCreation;
         var free = new CheckBox { Name = namePrefix + "FreeCost", Content = T("Checkbox_Free"), VerticalAlignment = VerticalAlignment.Center };
         free.Bind(ToggleButton.IsCheckedProperty, Edit(nameof(model.FreeCost))); purchase.Children.Add(free);
-        purchase.Children.Add(new TextBlock { Text = T("Label_SelectGear_Markup"), VerticalAlignment = VerticalAlignment.Center });
-        var markup = NativeIntegerInput.Create(namePrefix + "Markup", -99, 1000);
-        markup.Bind(NumericUpDown.ValueProperty, Edit(nameof(model.Markup))); purchase.Children.Add(markup);
-        purchase.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center }); footer.Children.Add(purchase);
+        if (showMarkup)
+        {
+            purchase.Children.Add(new TextBlock { Text = T("Label_SelectGear_Markup"), VerticalAlignment = VerticalAlignment.Center });
+            var markup = NativeIntegerInput.Create(namePrefix + "Markup", -99, 1000);
+            markup.Bind(NumericUpDown.ValueProperty, Edit(nameof(model.Markup))); purchase.Children.Add(markup);
+            purchase.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center });
+        }
+        footer.Children.Add(purchase);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var cancel = new Button { Content = T("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
         AddMoreButton = new Button { Content = T("String_AddMore") };

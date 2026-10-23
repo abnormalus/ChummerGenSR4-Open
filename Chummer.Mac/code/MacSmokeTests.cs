@@ -1033,6 +1033,7 @@ namespace Chummer
                 CreationActiveSkillMetaChecks.Run(character, Check);
                 SkillDisclosureChecks.Run(character, Check);
                 CareerSkillSpecializationChecks.Run(character, Check);
+                QualitySelectionChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationCommonLayoutChecks.Run(character, Check);
@@ -1057,7 +1058,7 @@ namespace Chummer
                 PersonalizedGripChecks.Run(character, Check);
                 using (var dialog = new frmSelectGear(character)) Capture(dialog, output, "gear-dialog");
                 using (var dialog = new frmSelectCyberware(character)) Capture(dialog, output, "cyberware-dialog");
-                using (var dialog = new frmSelectQuality(character)) Capture(dialog, output, "quality-dialog");
+                Check(new QualityPickerModel(character).Items.Count > 0, "Quality standard picker supplies catalog choices");
                 using (var dialog = new frmSelectSpell(character)) Capture(dialog, output, "spell-dialog");
                 character.BOD.Value = 3;
                 var namingTime = new DateTime(2026, 10, 13, 14, 5, 9);

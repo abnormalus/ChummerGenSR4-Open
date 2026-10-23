@@ -7824,11 +7824,11 @@ namespace Chummer
 
 		private void cmdAddQuality_Click(object sender, EventArgs e)
 		{
-			frmSelectQuality frmPickQuality = new frmSelectQuality(_objCharacter);
+			using var frmPickQuality = new frmSelectQuality(_objCharacter);
 			frmPickQuality.ShowDialog(this);
 
 			// Don't do anything else if the form was canceled.
-			if (frmPickQuality.DialogResult == DialogResult.Cancel)
+			if (frmPickQuality.DialogResult != DialogResult.OK)
 				return;
 
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("qualities.xml");
