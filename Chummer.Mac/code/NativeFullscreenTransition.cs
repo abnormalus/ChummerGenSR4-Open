@@ -16,31 +16,47 @@ internal static class NativeFullscreenTransition
         // Normalization and fullscreen readiness share the original operation
         // budget. Callers retain their strict actual-screen and complete-row gates.
         DateTime deadline = DateTime.UtcNow.AddSeconds(20);
-        window.WindowState = WindowState.Normal;
-        DateTime? stableSince = null;
-        Size previous = default;
-        while (DateTime.UtcNow < deadline)
+        bool needsNativeExit = System.OperatingSystem.IsMacOS() && window.WindowState != WindowState.Normal;
+        bool normalRequestReturned = false;
+        bool nativeExitAcknowledged = !needsNativeExit;
+        EventHandler<WindowResizedEventArgs> acknowledgeExit = (_, _) =>
         {
-            bool normal = window.WindowState == WindowState.Normal &&
-                window.ClientSize.Width > 0 && window.ClientSize.Height > 0;
-            // The Mac host uses native title-bar decorations in normal mode.
-            // Their frame must have returned before requesting a new fullscreen
-            // transition; the property alone is only requested state.
-            if (System.OperatingSystem.IsMacOS() && window.WindowDecorations == WindowDecorations.Full)
-                normal &= window.FrameSize is { } frame && frame.Height > window.ClientSize.Height + 1;
-            if (normal && window.ClientSize == previous)
+            // SetWindowState synchronously reports provisional dimensions on Mac.
+            // Only a later native-loop resize acknowledges the OS exit request.
+            if (normalRequestReturned && window.WindowState == WindowState.Normal)
+                nativeExitAcknowledged = true;
+        };
+        window.Resized += acknowledgeExit;
+        try
+        {
+            window.WindowState = WindowState.Normal;
+            normalRequestReturned = true;
+            DateTime? stableSince = null;
+            Size previous = default;
+            while (DateTime.UtcNow < deadline)
             {
-                stableSince ??= DateTime.UtcNow;
-                if (DateTime.UtcNow - stableSince.Value >= TimeSpan.FromMilliseconds(120))
+                bool normal = nativeExitAcknowledged && window.WindowState == WindowState.Normal &&
+                    window.ClientSize.Width > 0 && window.ClientSize.Height > 0;
+                // The Mac host uses native title-bar decorations in normal mode.
+                // Their frame must have returned before requesting a new fullscreen
+                // transition; the property alone is only requested state.
+                if (System.OperatingSystem.IsMacOS() && window.WindowDecorations == WindowDecorations.Full)
+                    normal &= window.FrameSize is { } frame && frame.Height > window.ClientSize.Height + 1;
+                if (normal && window.ClientSize == previous)
                 {
-                    window.WindowState = WindowState.FullScreen;
-                    return deadline;
+                    stableSince ??= DateTime.UtcNow;
+                    if (DateTime.UtcNow - stableSince.Value >= TimeSpan.FromMilliseconds(120))
+                    {
+                        window.WindowState = WindowState.FullScreen;
+                        return deadline;
+                    }
                 }
+                else stableSince = null;
+                previous = window.ClientSize;
+                await Task.Delay(10);
             }
-            else stableSince = null;
-            previous = window.ClientSize;
-            await Task.Delay(10);
+            throw new TimeoutException("Native fullscreen test could not acknowledge the preceding native normal transition.");
         }
-        throw new TimeoutException("Native fullscreen test could not establish the preceding normal window state.");
+        finally { window.Resized -= acknowledgeExit; }
     }
 }
