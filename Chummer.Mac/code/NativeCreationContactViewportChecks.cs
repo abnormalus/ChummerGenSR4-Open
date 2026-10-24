@@ -191,6 +191,27 @@ internal static class NativeCreationContactViewportChecks
             image.Render(window); image.Save(System.IO.Path.Combine(output, "native-creation-" + (enemy ? "enemies" : "contacts")
                 + "-" + kind + "-" + variant.Key.ToString()!.ToLowerInvariant() + ".png"), PngBitmapEncoderOptions.Default);
         }
+        var geometryTrace = new System.Collections.Generic.List<string>();
+        void TraceGeometry(string reason)
+        {
+            if (geometryTrace.Count < 32)
+                geometryTrace.Add(FormattableString.Invariant($"{reason}:state={window.WindowState}:client={window.ClientSize}:requested={window.Width}x{window.Height}:frame={window.FrameSize}:position={window.Position}:active={window.IsActive}"));
+        }
+        EventHandler<WindowResizedEventArgs> traceResize = (_, _) => TraceGeometry("resize");
+        EventHandler<AvaloniaPropertyChangedEventArgs> traceProperty = (_, change) =>
+        {
+            if (change.Property == Window.WidthProperty || change.Property == Window.HeightProperty ||
+                change.Property == Window.WindowStateProperty || change.Property == TopLevel.ClientSizeProperty)
+            {
+                TraceGeometry(change.Property.Name);
+                if (geometryTrace.Count < 32 && (change.Property == Window.WidthProperty || change.Property == Window.HeightProperty))
+                    geometryTrace.Add("via=" + string.Join(">", new System.Diagnostics.StackTrace().GetFrames().Take(12)
+                        .Select(frame => frame.GetMethod()).Where(method => method != null)
+                        .Select(method => method!.DeclaringType?.FullName + "." + method.Name)));
+            }
+        };
+        window.Resized += traceResize; window.PropertyChanged += traceProperty;
+        TraceGeometry("before-contact-captures");
         try
         {
             foreach (var variant in new[] { ThemeVariant.Dark, ThemeVariant.Light })
@@ -202,7 +223,9 @@ internal static class NativeCreationContactViewportChecks
             }
             var screen = window.Screens.ScreenFromWindow(window);
             Size expected = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : default;
+            TraceGeometry("before-fullscreen");
             window.WindowState = WindowState.FullScreen;
+            TraceGeometry("requested-fullscreen");
             foreach (var variant in new[] { ThemeVariant.Dark, ThemeVariant.Light })
             {
                 Application.Current.RequestedThemeVariant = variant;
@@ -220,11 +243,12 @@ internal static class NativeCreationContactViewportChecks
                 check(screen != null && ready && window.WindowState == WindowState.FullScreen
                     && Math.Abs(window.ClientSize.Width - expected.Width) <= 1 && Math.Abs(window.ClientSize.Height - expected.Height) <= 1 && Fits(),
                     "Native fullscreen contact final row fits actual screen geometry enemy=" + enemy + " theme=" + variant.Key
-                    + FormattableString.Invariant($" [expected={expected}; actual={window.ClientSize}; row={row.Frame.Bounds}; viewport={section.Viewport.Viewport}; offset={section.Viewport.Offset}]"));
+                    + FormattableString.Invariant($" [expected={expected}; actual={window.ClientSize}; state={window.WindowState}; screen={screen?.Bounds}; workarea={screen?.WorkingArea}; scaling={screen?.Scaling}; requested={window.Width}x{window.Height}; frame={window.FrameSize}; min={window.MinWidth}x{window.MinHeight}; max={window.MaxWidth}x{window.MaxHeight}; sizing={window.SizeToContent}; owner={owner.Size}; fits={Fits()}; row={row.Frame.Bounds}; viewport={section.Viewport.Viewport}; offset={section.Viewport.Offset}; trace={string.Join("|", geometryTrace)}]"));
             }
         }
         finally
         {
+            window.Resized -= traceResize; window.PropertyChanged -= traceProperty;
             Application.Current.RequestedThemeVariant = theme;
             window.WindowState = WindowState.Normal; owner.Size = previousSize; window.UpdateLayout(); window.WindowState = previousState;
             await Task.Delay(120);
