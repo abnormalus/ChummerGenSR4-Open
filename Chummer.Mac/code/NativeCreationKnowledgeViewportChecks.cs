@@ -107,12 +107,14 @@ internal static class NativeCreationKnowledgeViewportChecks
             TraceGeometry("before-fullscreen");
             try
             {
-                nativeWindow.WindowState = WindowState.FullScreen;
+                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(nativeWindow);
+                bool firstFullscreenTheme = true;
                 TraceGeometry("requested-fullscreen");
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
                     Application.Current.RequestedThemeVariant = theme;
-                    var deadline = DateTime.UtcNow.AddSeconds(20); DateTime? matchedSince = null; bool ready = false;
+                    var deadline = firstFullscreenTheme ? firstFullscreenDeadline : DateTime.UtcNow.AddSeconds(20);
+                    firstFullscreenTheme = false; DateTime? matchedSince = null; bool ready = false;
                     while (DateTime.UtcNow < deadline)
                     {
                         bool matches = nativeWindow.WindowState == WindowState.FullScreen &&
