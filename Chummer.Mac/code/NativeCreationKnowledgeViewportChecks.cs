@@ -90,10 +90,12 @@ internal static class NativeCreationKnowledgeViewportChecks
             var screen = nativeWindow.Screens.ScreenFromWindow(nativeWindow);
             Size expectedWide = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : default;
             var geometryTrace = new List<string>();
+            var geometryWriters = new List<string>();
+            var geometryClock = System.Diagnostics.Stopwatch.StartNew();
             void TraceGeometry(string reason)
             {
                 if (geometryTrace.Count < 32)
-                    geometryTrace.Add(FormattableString.Invariant($"{reason}:state={nativeWindow.WindowState}:client={nativeWindow.ClientSize}:requested={nativeWindow.Width}x{nativeWindow.Height}:frame={nativeWindow.FrameSize}:position={nativeWindow.Position}:active={nativeWindow.IsActive}"));
+                    geometryTrace.Add(FormattableString.Invariant($"{geometryClock.ElapsedMilliseconds}ms:{reason}:state={nativeWindow.WindowState}:client={nativeWindow.ClientSize}:requested={nativeWindow.Width}x{nativeWindow.Height}:frame={nativeWindow.FrameSize}:position={nativeWindow.Position}:active={nativeWindow.IsActive}"));
             }
             EventHandler<WindowResizedEventArgs> traceResize = (_, _) => TraceGeometry("resize");
             EventHandler<AvaloniaPropertyChangedEventArgs> traceProperty = (_, change) =>
@@ -101,18 +103,26 @@ internal static class NativeCreationKnowledgeViewportChecks
                 if (change.Property == Window.WidthProperty || change.Property == Window.HeightProperty ||
                     change.Property == Window.WindowStateProperty || change.Property == TopLevel.ClientSizeProperty)
                     TraceGeometry(change.Property.Name);
+                if (geometryWriters.Count < 12 && (change.Property == Window.WidthProperty || change.Property == Window.HeightProperty))
+                    geometryWriters.Add(FormattableString.Invariant($"{geometryClock.ElapsedMilliseconds}ms:{change.Property.Name}:{nativeWindow.Width}x{nativeWindow.Height}:via=") +
+                        string.Join(">", new System.Diagnostics.StackTrace().GetFrames().Take(40)
+                            .Select(frame => frame.GetMethod()).Where(method => method != null)
+                            .Select(method => method!.DeclaringType?.FullName + "." + method.Name)));
+
             };
             nativeWindow.Resized += traceResize;
             nativeWindow.PropertyChanged += traceProperty;
             TraceGeometry("before-fullscreen");
             try
             {
-                nativeWindow.WindowState = WindowState.FullScreen;
+                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(nativeWindow, check);
+                bool firstFullscreenTheme = true;
                 TraceGeometry("requested-fullscreen");
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
                     Application.Current.RequestedThemeVariant = theme;
-                    var deadline = DateTime.UtcNow.AddSeconds(20); DateTime? matchedSince = null; bool ready = false;
+                    var deadline = firstFullscreenTheme ? firstFullscreenDeadline : DateTime.UtcNow.AddSeconds(20);
+                    firstFullscreenTheme = false; DateTime? matchedSince = null; bool ready = false;
                     while (DateTime.UtcNow < deadline)
                     {
                         bool matches = nativeWindow.WindowState == WindowState.FullScreen &&
@@ -140,7 +150,7 @@ internal static class NativeCreationKnowledgeViewportChecks
                     check(screen != null && ready && nativeWindow.WindowState == WindowState.FullScreen &&
                         Math.Abs(nativeWindow.ClientSize.Width - expectedWide.Width) <= 1 && Math.Abs(nativeWindow.ClientSize.Height - expectedWide.Height) <= 1 && complete,
                         "Native fullscreen knowledge exposes its complete final row at actual screen geometry in " + theme.Key +
-                        FormattableString.Invariant($" [expected={expectedWide}; actual={nativeWindow.ClientSize}; state={nativeWindow.WindowState}; screen={screen?.Bounds}; workarea={screen?.WorkingArea}; scaling={screen?.Scaling}; requested={nativeWindow.Width}x{nativeWindow.Height}; frame={nativeWindow.FrameSize}; min={nativeWindow.MinWidth}x{nativeWindow.MinHeight}; max={nativeWindow.MaxWidth}x{nativeWindow.MaxHeight}; sizing={nativeWindow.SizeToContent}; owner={owner.Size}; complete={complete}; row={last.Layout.Bounds}; point={point}; viewport={section.Viewport.Viewport}; trace={string.Join("|", geometryTrace)}]"));
+                        FormattableString.Invariant($" [expected={expectedWide}; actual={nativeWindow.ClientSize}; state={nativeWindow.WindowState}; screen={screen?.Bounds}; workarea={screen?.WorkingArea}; scaling={screen?.Scaling}; requested={nativeWindow.Width}x{nativeWindow.Height}; frame={nativeWindow.FrameSize}; min={nativeWindow.MinWidth}x{nativeWindow.MinHeight}; max={nativeWindow.MaxWidth}x{nativeWindow.MaxHeight}; sizing={nativeWindow.SizeToContent}; owner={owner.Size}; complete={complete}; row={last.Layout.Bounds}; point={point}; viewport={section.Viewport.Viewport}; trace={string.Join("|", geometryTrace)}; writers={string.Join("|", geometryWriters)}]"));
                 }
             }
             finally

@@ -81,3 +81,5 @@ The human subsequently authorized same-draft CI fixes between batches: “Allow 
 ## Deferred portrait library
 
 The human requests a large bundled portrait library after the current modernization updates are complete. They explicitly permit sharing the supplied diaz.png portrait. Do not spend agent resources researching, generating, collecting or implementing the library until everything else is done. This is a later deliverable, not scope for the current layout and portrait-reopen correction. Preserve the existing ability to import individual portraits.
+
+Native fullscreen acceptance now normalizes the test window before requesting fullscreen. The Mac diagnostic showed requested FullScreen state with a decorated 1024×709 client and no event on a same-value assignment. Contact, knowledge and creation-input fixtures share a public normal-state/frame acknowledgement, then retain the strict actual-screen and complete-row checks. Normalization and the first fullscreen check share the existing 20-second budget; the 300-second suite and minimum 825 checks remain unchanged. This changes the test driver only and awaits exact-head validation on both operating systems.

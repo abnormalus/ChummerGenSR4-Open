@@ -85,9 +85,9 @@ internal static class NativeCreationInputChecks
             }
             bool GeometryMatches(Avalonia.Controls.WindowState state, Size size) => window.WindowState == state &&
                 Math.Abs(window.ClientSize.Width - size.Width) <= 1 && Math.Abs(window.ClientSize.Height - size.Height) <= 1;
-            async Task<bool> WaitForGeometry(Avalonia.Controls.WindowState state, Size size)
+            async Task<bool> WaitForGeometry(Avalonia.Controls.WindowState state, Size size, DateTime? operationDeadline = null)
             {
-                var deadline = DateTime.UtcNow.AddSeconds(20);
+                var deadline = operationDeadline ?? DateTime.UtcNow.AddSeconds(20);
                 DateTime? matchedSince = null;
                 while (DateTime.UtcNow < deadline)
                 {
@@ -170,11 +170,13 @@ internal static class NativeCreationInputChecks
                 }
                 var screen = window.Screens.ScreenFromWindow(window);
                 Size fullscreenSize = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : window.ClientSize;
-                window.WindowState = Avalonia.Controls.WindowState.FullScreen;
+                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window, check);
+                bool firstFullscreenTheme = true;
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {
                     application.RequestedThemeVariant = theme;
-                    bool ready = await WaitForGeometry(Avalonia.Controls.WindowState.FullScreen, fullscreenSize);
+                    bool ready = await WaitForGeometry(Avalonia.Controls.WindowState.FullScreen, fullscreenSize, firstFullscreenTheme ? firstFullscreenDeadline : null);
+                    firstFullscreenTheme = false;
                     Capture("native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
                     check(screen != null && ready && GeometryMatches(Avalonia.Controls.WindowState.FullScreen, fullscreenSize),
                         "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
