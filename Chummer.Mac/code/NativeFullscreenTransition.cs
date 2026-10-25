@@ -16,6 +16,21 @@ internal static class NativeFullscreenTransition
         // Normalization and fullscreen readiness share the original operation
         // budget. Callers retain their strict actual-screen and complete-row gates.
         DateTime deadline = DateTime.UtcNow.AddSeconds(20);
+        // Preserve an already completed native fullscreen transition. Repeated
+        // fixtures share this window; exiting it solely to re-enter queues an
+        // unnecessary native transition and can invalidate the next capture.
+        var screen = window.Screens.ScreenFromWindow(window);
+        if (screen != null && window.WindowState == WindowState.FullScreen)
+        {
+            Size expected = screen.Bounds.Size.ToSize(screen.Scaling);
+            if (Math.Abs(window.ClientSize.Width - expected.Width) <= 1 &&
+                Math.Abs(window.ClientSize.Height - expected.Height) <= 1 &&
+                window.FrameSize is { } fullscreenFrame &&
+                Math.Abs(fullscreenFrame.Width - expected.Width) <= 1 &&
+                Math.Abs(fullscreenFrame.Height - expected.Height) <= 1)
+                return deadline;
+        }
+
         bool needsNativeExit = System.OperatingSystem.IsMacOS() && window.WindowState != WindowState.Normal;
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var trace = new System.Collections.Generic.List<string>();
