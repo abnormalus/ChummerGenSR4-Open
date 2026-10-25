@@ -20,16 +20,19 @@ internal static class NativeFullscreenTransition
         // fixtures share this window; exiting it solely to re-enter queues an
         // unnecessary native transition and can invalidate the next capture.
         var screen = window.Screens.ScreenFromWindow(window);
-        if (screen != null && window.WindowState == WindowState.FullScreen)
+        bool IsActualFullscreen()
         {
+            if (screen == null || window.WindowState != WindowState.FullScreen) return false;
             Size expected = screen.Bounds.Size.ToSize(screen.Scaling);
             if (Math.Abs(window.ClientSize.Width - expected.Width) <= 1 &&
                 Math.Abs(window.ClientSize.Height - expected.Height) <= 1 &&
                 window.FrameSize is { } fullscreenFrame &&
                 Math.Abs(fullscreenFrame.Width - expected.Width) <= 1 &&
                 Math.Abs(fullscreenFrame.Height - expected.Height) <= 1)
-                return deadline;
+                return true;
+            return false;
         }
+        if (IsActualFullscreen()) return deadline;
 
         bool needsNativeExit = System.OperatingSystem.IsMacOS() && window.WindowState != WindowState.Normal;
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -62,6 +65,14 @@ internal static class NativeFullscreenTransition
             Size previous = default;
             while (DateTime.UtcNow < deadline)
             {
+                // Native state reconciliation can complete fullscreen while a
+                // normal request is pending. Preserve that completed geometry;
+                // callers still require their original stable fullscreen gate.
+                if (IsActualFullscreen())
+                {
+                    Trace("native-fullscreen-reconciled");
+                    return deadline;
+                }
                 bool normal = nativeExitAcknowledged && window.WindowState == WindowState.Normal &&
                     window.ClientSize.Width > 0 && window.ClientSize.Height > 0;
                 // The Mac host uses native title-bar decorations in normal mode.
