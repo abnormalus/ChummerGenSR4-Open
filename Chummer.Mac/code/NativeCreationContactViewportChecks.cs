@@ -224,7 +224,7 @@ internal static class NativeCreationContactViewportChecks
             var screen = window.Screens.ScreenFromWindow(window);
             Size expected = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : default;
             TraceGeometry("before-fullscreen");
-            var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window);
+            var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window, check);
             bool firstFullscreenTheme = true;
             TraceGeometry("requested-fullscreen");
             foreach (var variant in new[] { ThemeVariant.Dark, ThemeVariant.Light })

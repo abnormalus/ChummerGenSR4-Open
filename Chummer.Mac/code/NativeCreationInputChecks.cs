@@ -170,7 +170,7 @@ internal static class NativeCreationInputChecks
                 }
                 var screen = window.Screens.ScreenFromWindow(window);
                 Size fullscreenSize = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : window.ClientSize;
-                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window);
+                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window, check);
                 bool firstFullscreenTheme = true;
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                 {

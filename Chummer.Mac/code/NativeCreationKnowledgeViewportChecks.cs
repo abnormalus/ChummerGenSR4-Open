@@ -115,7 +115,7 @@ internal static class NativeCreationKnowledgeViewportChecks
             TraceGeometry("before-fullscreen");
             try
             {
-                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(nativeWindow);
+                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(nativeWindow, check);
                 bool firstFullscreenTheme = true;
                 TraceGeometry("requested-fullscreen");
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })

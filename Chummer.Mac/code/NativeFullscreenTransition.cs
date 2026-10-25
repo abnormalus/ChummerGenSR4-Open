@@ -11,18 +11,29 @@ namespace Chummer;
 // that same property value does not request another native transition.
 internal static class NativeFullscreenTransition
 {
-    internal static async Task<DateTime> RequestAsync(Window window)
+    internal static async Task<DateTime> RequestAsync(Window window, Action<bool, string> check)
     {
         // Normalization and fullscreen readiness share the original operation
         // budget. Callers retain their strict actual-screen and complete-row gates.
         DateTime deadline = DateTime.UtcNow.AddSeconds(20);
         bool needsNativeExit = System.OperatingSystem.IsMacOS() && window.WindowState != WindowState.Normal;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var trace = new System.Collections.Generic.List<string>();
+        int synchronousResizes = 0, asynchronousResizes = 0;
+        void Trace(string reason)
+        {
+            if (trace.Count < 32)
+                trace.Add(FormattableString.Invariant($"{clock.ElapsedMilliseconds}ms:{reason}:state={window.WindowState}:client={window.ClientSize}:requested={window.Width}x{window.Height}:frame={window.FrameSize}:position={window.Position}"));
+        }
+        Trace("before-normal");
         bool normalRequestReturned = false;
         bool nativeExitAcknowledged = !needsNativeExit;
         EventHandler<WindowResizedEventArgs> acknowledgeExit = (_, _) =>
         {
             // SetWindowState synchronously reports provisional dimensions on Mac.
             // Only a later native-loop resize acknowledges the OS exit request.
+            if (normalRequestReturned) asynchronousResizes++; else synchronousResizes++;
+            Trace(normalRequestReturned ? "async-resize" : "sync-resize");
             if (normalRequestReturned && window.WindowState == WindowState.Normal)
                 nativeExitAcknowledged = true;
         };
@@ -31,6 +42,7 @@ internal static class NativeFullscreenTransition
         {
             window.WindowState = WindowState.Normal;
             normalRequestReturned = true;
+            Trace("normal-setter-returned");
             DateTime? stableSince = null;
             Size previous = default;
             while (DateTime.UtcNow < deadline)
@@ -47,6 +59,7 @@ internal static class NativeFullscreenTransition
                     stableSince ??= DateTime.UtcNow;
                     if (DateTime.UtcNow - stableSince.Value >= TimeSpan.FromMilliseconds(120))
                     {
+                        Trace("normal-acknowledged");
                         window.WindowState = WindowState.FullScreen;
                         return deadline;
                     }
@@ -55,6 +68,8 @@ internal static class NativeFullscreenTransition
                 previous = window.ClientSize;
                 await Task.Delay(10);
             }
+            Trace("normal-timeout");
+            check(false, FormattableString.Invariant($"Native fullscreen preceding normal transition acknowledged [needsExit={needsNativeExit}; acknowledged={nativeExitAcknowledged}; syncResizes={synchronousResizes}; asyncResizes={asynchronousResizes}; decorations={window.WindowDecorations}; trace={string.Join("|", trace)}]"));
             throw new TimeoutException("Native fullscreen test could not acknowledge the preceding native normal transition.");
         }
         finally { window.Resized -= acknowledgeExit; }
