@@ -105,3 +105,8 @@ NativeCyberwarePurchaseChecks compiles 16 assertions invoking the real Cyberware
 
 
 Six compiled native incomplete-text checks cover a lone signed essence-discount prefix in all four modes and an empty rating in the two rated Bioware modes. They require retaining the last whole draft without publishing an adapter purchase, then restore complete text before acceptance. Their runtime behavior remains unproven pending native CI. The native minimum is 997 (874 + 123 new assertions); incomplete-text build has zero errors and ten existing vendor XML warnings.
+
+
+The first exact PR42 run (7840173, 40364522230) passed Windows headless/all399/both Foundry, then failed native with 580 completed checks and no failedCheck label. Its SHA-verified structural report records all 107 new window/options/grade/vehicle-cancel assertions before the main purchase driver. The precise exception is not retained, so no application failure is inferred. Mac was cancelled with no executed steps; the run is terminal.
+
+Source inspection independently establishes that XmlManager.Load clones its cached document; the purchase fixture previously appended to one returned copy, invisible to independent picker/caller loads. The native test now adds its synthetic definition to the application catalog cache and removes it in finally, without changing files, production accounting or platform code. Callback exceptions now set a structural failedCheck type label. The workflow also explicitly uploads all eight new ware screenshots. Native count997, operation20seconds/suite300seconds and all existing gates remain unchanged. A fresh exact-head run is required; the failed source is not rerun.

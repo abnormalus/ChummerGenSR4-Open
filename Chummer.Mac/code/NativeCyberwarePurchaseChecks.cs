@@ -21,7 +21,16 @@ internal static class NativeCyberwarePurchaseChecks
         {
             var character = new Character(); character.LoadSnapshot(original.CaptureSnapshot()); character.Created = career; character.Nuyen = 1000000;
             if (!character.Options.Books.Contains("SR4")) character.Options.Books.Add("SR4");
-            var catalog = XmlManager.Instance.Load(bio ? "bioware.xml" : "cyberware.xml");
+            string catalogName = bio ? "bioware.xml" : "cyberware.xml";
+            XmlManager.Instance.Load(catalogName); // Ensure the public catalog cache exists.
+            // Load returns a copy. Add the synthetic fixture to the cached application
+            // catalog so independently loaded picker/caller definitions agree. This
+            // changes no files and is removed in finally below.
+            var references = (System.Collections.IEnumerable)typeof(XmlManager)
+                .GetField("_lstXmlDocuments", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+            var reference = references.Cast<object>().Single(item =>
+                (string)item.GetType().GetProperty("FileName")!.GetValue(item)! == catalogName);
+            var catalog = (System.Xml.XmlDocument)reference.GetType().GetProperty("XmlContent")!.GetValue(reference)!;
             string collection = bio ? "biowares" : "cyberwares", element = bio ? "bioware" : "cyberware";
             var source = catalog.SelectSingleNode("/chummer/" + collection + "/" + element + "[name='" + (bio ? "Muscle Toner" : "Datajack") + "']")!;
             var synthetic = source.CloneNode(true); const string name = "Synthetic \"Ware's\" Purchase";
@@ -58,7 +67,11 @@ internal static class NativeCyberwarePurchaseChecks
                     });
                     editor.GetType().GetMethod(bio ? "cmdAddBioware_Click" : "cmdAddCyberware_Click", Flags)!.Invoke(editor, new object[] { editor, EventArgs.Empty });
                     await completion.Task.WaitAsync(TimeSpan.FromSeconds(20));
-                    if (error != null) throw new InvalidOperationException("Native Cyberware purchase callback failed.", error);
+                    if (error != null)
+                    {
+                        check(false, "Native main ware purchase callback failed type=" + error.GetType().Name + " career=" + career + " bio=" + bio);
+                        throw new InvalidOperationException("Native Cyberware purchase callback failed.", error);
+                    }
                 }
                 await Pick(false);
                 check(character.CaptureSnapshot().SequenceEqual(before) && Field<bool>(editor, "_blnIsDirty") == dirty && history.Count == undo &&

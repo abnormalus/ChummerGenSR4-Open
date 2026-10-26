@@ -167,6 +167,14 @@ jobs:
             artifacts/checks/native-gear-creation-light.png
             artifacts/checks/native-gear-career-dark.png
             artifacts/checks/native-gear-career-light.png
+            artifacts/checks/native-cyberware-creation-dark.png
+            artifacts/checks/native-cyberware-creation-light.png
+            artifacts/checks/native-cyberware-career-dark.png
+            artifacts/checks/native-cyberware-career-light.png
+            artifacts/checks/native-bioware-creation-dark.png
+            artifacts/checks/native-bioware-creation-light.png
+            artifacts/checks/native-bioware-career-dark.png
+            artifacts/checks/native-bioware-career-light.png
             artifacts/checks/native-armor-owner-dark.png
             artifacts/checks/native-armor-owner-light.png
             artifacts/checks/native-character-theme-light-light.png
