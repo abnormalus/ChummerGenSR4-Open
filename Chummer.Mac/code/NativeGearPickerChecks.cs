@@ -82,8 +82,9 @@ internal static class NativeGearPickerChecks
                         foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
                         {
                             nativeOwner.RequestedThemeVariant = theme; window.Width = 820; window.Height = 560;
-                            await ExpectAsync(() => window.ActualThemeVariant == theme && quantity.Bounds.Width >= 110 && rating.Bounds.Height > 0,
-                                "Native Gear " + mode + " standard inputs follow " + (theme == ThemeVariant.Dark ? "dark" : "light") + " owner theme");
+                            await ExpectAsync(() => window.ActualThemeVariant == theme && quantity.Bounds.Width >= 110 && rating.Bounds.Height > 0 &&
+                                Input<CheckBox>("gearPickerStack").Content?.ToString() == "Stack",
+                                "Native Gear " + mode + " clean framework labels and standard inputs follow " + (theme == ThemeVariant.Dark ? "dark" : "light") + " owner theme");
                             await Task.Delay(100);
                             using var bitmap = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width * 2,(int)window.ClientSize.Height * 2),new Vector(192,192));
                             bitmap.Render(window); bitmap.Save(Path.Combine(output,"native-gear-"+mode+"-"+(theme==ThemeVariant.Dark?"dark":"light")+".png"),PngBitmapEncoderOptions.Default);

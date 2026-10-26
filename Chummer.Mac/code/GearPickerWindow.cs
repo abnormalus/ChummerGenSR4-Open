@@ -17,7 +17,7 @@ internal sealed class GearPickerWindow : CatalogPickerWindow<GearPickerModel, Ge
     {
         void Option(string name, string label, string property, string visible, string? enabled = null)
         {
-            var input = new CheckBox { Name = name, Content = LanguageManager.Instance.GetString(label) };
+            var input = new CheckBox { Name = name, Content = T(label) };
             input.Bind(ToggleButton.IsCheckedProperty, new Binding(property) { Mode = BindingMode.TwoWay });
             input.Bind(IsVisibleProperty, new Binding(visible));
             if (enabled != null) input.Bind(IsEnabledProperty, new Binding(enabled));
