@@ -1,0 +1,122 @@
+{
+  "rated quantity and markup": {
+    "Availability": "2",
+    "Cost": "4,140\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "0"
+  },
+  "armor capacity": {
+    "Availability": "2",
+    "Cost": "4,140\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "[5]"
+  },
+  "zero capacity": {
+    "Availability": "2",
+    "Cost": "4,140\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "[0]"
+  },
+  "per-rating capacity": {
+    "Availability": "2",
+    "Cost": "4,140\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "[4]"
+  },
+  "pack quantity": {
+    "Availability": "4R",
+    "Cost": "207\u00A5",
+    "AvailabilityTest": "0 (4, 1 day)",
+    "Capacity": "0"
+  },
+  "unrated per-rating capacity": {
+    "Availability": "4R",
+    "Cost": "207\u00A5",
+    "AvailabilityTest": "0 (4, 1 day)",
+    "Capacity": "[1]"
+  },
+  "DIY and caller modifiers": {
+    "Availability": "10",
+    "Cost": "3,450\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "0"
+  },
+  "free price": {
+    "Availability": "10",
+    "Cost": "0\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "0"
+  },
+  "software rating tier 1": {
+    "Availability": "2",
+    "Cost": "173\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "1"
+  },
+  "software rating tier 3": {
+    "Availability": "2",
+    "Cost": "518\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "1"
+  },
+  "software rating tier 4": {
+    "Availability": "2",
+    "Cost": "1,380\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "2"
+  },
+  "software rating tier 6": {
+    "Availability": "2",
+    "Cost": "2,070\u00A5",
+    "AvailabilityTest": "None",
+    "Capacity": "3"
+  },
+  "software rating tier 7": {
+    "Availability": "23F",
+    "Cost": "16,905\u00A5",
+    "AvailabilityTest": "0 (23, 1 week)",
+    "Capacity": "3"
+  },
+  "software rating tier 10": {
+    "Availability": "32F",
+    "Cost": "34,500\u00A5",
+    "AvailabilityTest": "0 (32, 1 week)",
+    "Capacity": "5"
+  },
+  "hacked software": {
+    "Availability": "32F",
+    "Cost": "3,450\u00A5",
+    "AvailabilityTest": "0 (32, 2 days)",
+    "Capacity": "5"
+  },
+  "variable range and bracket capacity": {
+    "Availability": "\u002B5R",
+    "Cost": "100-300\u00A5",
+    "AvailabilityTest": "0 (5, 1 day)",
+    "Capacity": "[3]"
+  },
+  "open variable range and fractional capacity": {
+    "Availability": "\u002B5R",
+    "Cost": "100\u00A5\u002B",
+    "AvailabilityTest": "0 (5, 1 day)",
+    "Capacity": "1"
+  },
+  "fractional price and split capacity": {
+    "Availability": "\u002B5R",
+    "Cost": "1,051\u00A5",
+    "AvailabilityTest": "0 (5, 2 days)",
+    "Capacity": "3/[2]"
+  },
+  "legacy fixed-value capacity fallback": {
+    "Availability": "\u002B5R",
+    "Cost": "345\u00A5",
+    "AvailabilityTest": "0 (5, 1 day)",
+    "Capacity": "3"
+  },
+  "legacy wildcard capacity fallback": {
+    "Availability": "\u002B5R",
+    "Cost": "345\u00A5",
+    "AvailabilityTest": "0 (5, 1 day)",
+    "Capacity": "[*]"
+  }
+}

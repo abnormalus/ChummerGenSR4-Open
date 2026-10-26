@@ -10922,11 +10922,11 @@ namespace Chummer
 			// Locate the selected Vehicle.
 			Vehicle objSelectedVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			frmPickGear.ShowPositiveCapacityOnly = true;
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Gear XML file and locate the selected piece.
@@ -11128,7 +11128,7 @@ namespace Chummer
 
 			XmlNode objXmlGear = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"" + objSensor.Name + "\" and category = \"" + objSensor.Category + "\"]");
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			//frmPickGear.ShowNegativeCapacityOnly = true;
 
 			if (objXmlGear != null)
@@ -11151,7 +11151,7 @@ namespace Chummer
 
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Gear XML file and locate the selected piece.
@@ -16408,14 +16408,14 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			string strCategories = "";
 			foreach (XmlNode objXmlCategory in objCyberware.AllowGear)
 				strCategories += objXmlCategory.InnerText + ",";
 			frmPickGear.AllowedCategories = strCategories;
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			TreeNode objNode = new TreeNode();
@@ -16587,7 +16587,7 @@ namespace Chummer
 
 			XmlNode objXmlGear = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"" + objSensor.Name + "\" and category = \"" + objSensor.Category + "\"]");
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			//frmPickGear.ShowNegativeCapacityOnly = true;
 
 			if (objXmlGear.InnerXml.Contains("<addoncategory>"))
@@ -16607,7 +16607,7 @@ namespace Chummer
 
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Gear XML file and locate the selected piece.
@@ -16744,14 +16744,14 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			string strCategories = "";
 			foreach (XmlNode objXmlCategory in objAccessory.AllowGear)
 				strCategories += objXmlCategory.InnerText + ",";
 			frmPickGear.AllowedCategories = strCategories;
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			TreeNode objNode = new TreeNode();
@@ -16906,7 +16906,7 @@ namespace Chummer
 
 			XmlNode objXmlGear = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"" + objSensor.Name + "\" and category = \"" + objSensor.Category + "\"]");
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			//frmPickGear.ShowNegativeCapacityOnly = true;
 
 			if (objXmlGear.InnerXml.Contains("<addoncategory>"))
@@ -16926,7 +16926,7 @@ namespace Chummer
 
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Gear XML file and locate the selected piece.
@@ -17193,7 +17193,7 @@ namespace Chummer
 
 			XmlNode objXmlGear = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"" + objSensor.Name + "\" and category = \"" + objSensor.Category + "\"]");
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			//frmPickGear.ShowNegativeCapacityOnly = true;
 
 			if (objXmlGear.InnerXml.Contains("<addoncategory>"))
@@ -17213,7 +17213,7 @@ namespace Chummer
 
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Gear XML file and locate the selected piece.
@@ -17349,14 +17349,14 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			string strCategories = "";
 			foreach (XmlNode objXmlCategory in objAccessory.AllowGear)
 				strCategories += objXmlCategory.InnerText + ",";
 			frmPickGear.AllowedCategories = strCategories;
 			frmPickGear.ShowDialog(this);
 
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return;
 
 			TreeNode objNode = new TreeNode();
@@ -23631,7 +23631,7 @@ namespace Chummer
 
 			XmlNode objXmlGear = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"" + objSelectedGear.Name + "\" and category = \"" + objSelectedGear.Category + "\"]");
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true, objSelectedGear.ChildAvailModifier, objSelectedGear.ChildCostMultiplier);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true, objSelectedGear.ChildAvailModifier, objSelectedGear.ChildCostMultiplier);
 			try
 			{
 				if (treGear.SelectedNode.Level > 0)
@@ -23697,7 +23697,7 @@ namespace Chummer
 			frmPickGear.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return false;
 
 			TreeNode objNode = new TreeNode();
@@ -23968,7 +23968,7 @@ namespace Chummer
 			UpdateCharacterInfo();
 			RefreshSelectedGear();
 
-			if (frmPickGear.DialogResult != DialogResult.Cancel)
+			if (frmPickGear.DialogResult == DialogResult.OK)
 			{
 				_blnIsDirty = true;
 				UpdateWindowTitle();
@@ -24034,7 +24034,7 @@ namespace Chummer
 
 			XmlNode objXmlGear = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"" + objSelectedGear.Name + "\" and category = \"" + objSelectedGear.Category + "\"]");
 
-			frmSelectGear frmPickGear = new frmSelectGear(_objCharacter, true);
+			using var frmPickGear = new frmSelectGear(_objCharacter, true);
 			frmPickGear.EnableStack = false;
 			frmPickGear.ShowArmorCapacityOnly = blnShowArmorCapacityOnly;
 			frmPickGear.CapacityDisplayStyle = objSelectedArmor.CapacityDisplayStyle;
@@ -24102,7 +24102,7 @@ namespace Chummer
 			frmPickGear.ShowDialog(this);
 
 			// Make sure the dialogue window was not canceled.
-			if (frmPickGear.DialogResult == DialogResult.Cancel)
+			if (frmPickGear.DialogResult != DialogResult.OK)
 				return false;
 
 			TreeNode objNode = new TreeNode();

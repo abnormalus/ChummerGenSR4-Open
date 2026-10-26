@@ -2,9 +2,11 @@
 
 As each application section is repaired or improved, review whether it recreates a capability already supplied by the modern framework or an appropriate maintained library. Prefer established components where they reduce maintenance and preserve the required behavior. This is an incremental process, not a wholesale rewrite or an edition expansion.
 
-## Current isolated Add Quality stage
+## Current isolated Gear stage
 
-The requested Add Quality window now uses standard catalog controls locally, with the original eligibility policy extracted unchanged and caller accounting preserved. Full headless validation passes; 39 added native assertions compile but still require both-platform execution and visual acceptance. See [QUALITY_SELECTION.md](QUALITY_SELECTION.md). This stage has not been released.
+Add Quality and the test-driver fullscreen reconciliation passed both-platform native and visual acceptance and are released in verified Nightly0.2.147 (source ea1a297a9aaa45dcfeb3fe7c0c7ea653d7bcde2c). Stable is unchanged. See [QUALITY_SELECTION.md](QUALITY_SELECTION.md) for the quality boundary.
+
+The next creation-facing Gear picker is now connected through its disposable adapter and standard catalog window; all21purchase callers explicitly require OK and dispose it. Legacy presentation is retired. Full headless contracts pass and49new native assertions compile, but both-platform native/visual acceptance remains pending. See [GEAR_SELECTION.md](GEAR_SELECTION.md). Cyberware remains the following shopping candidate. Historical pending records below describe earlier stages and do not supersede this checkpoint.
 
 ## For each section
 
@@ -32,7 +34,7 @@ The requested Add Quality window now uses standard catalog controls locally, wit
 
 ## Rendering priority
 
-The human explicitly includes the Add Quality window (frmSelectQuality) in the upcoming window modernization pass. Preserve its existing selection, filtering, source links and accept/cancel behavior when rebuilding it. The reported career specialty-field disclosure correction takes immediate priority; Add Quality remains an explicit named item in the window queue.
+The requested Add Quality window and career specialty disclosures are released. Continue through common Gear and Cyberware shopping controls, preserving selection, filtering, source links, accept/cancel, caller accounting and existing creation/career behavior. The current Gear preparation is described above.
 
 Repeated repaint defects justify examining shared invalidation/caching behavior before adding more screen-specific refresh calls. Prioritize the frequently affected item lists and changing detail values. The first shared repaint corrections and session-only full-redraw diagnostic are implemented and documented in [RENDERING.md](RENDERING.md). Use the cached-versus-complete frame checks as acceptance coverage for the next bounded standard-control migration. Prefer event-driven correctness and standard controls over continuously repainting the whole window to hide defects.
 
@@ -82,4 +84,4 @@ The human subsequently authorized same-draft CI fixes between batches: “Allow 
 
 The human requests a large bundled portrait library after the current modernization updates are complete. They explicitly permit sharing the supplied diaz.png portrait. Do not spend agent resources researching, generating, collecting or implementing the library until everything else is done. This is a later deliverable, not scope for the current layout and portrait-reopen correction. Preserve the existing ability to import individual portraits.
 
-Native fullscreen acceptance now normalizes the test window before requesting fullscreen. The Mac diagnostic showed requested FullScreen state with a decorated 1024×709 client and no event on a same-value assignment. Contact, knowledge and creation-input fixtures share a public normal-state/frame acknowledgement, then retain the strict actual-screen and complete-row checks. Normalization and the first fullscreen check share the existing 20-second budget; the 300-second suite and minimum 825 checks remain unchanged. This changes the test driver only and awaits exact-head validation on both operating systems.
+Native fullscreen acceptance uses a test-driver reconciliation helper: preserve an already completed fullscreen client and frame matching the actual screen, otherwise normalize and recognize native completion throughout the wait. Contact, knowledge and creation-input fixtures retain strict actual-screen, stable-geometry and complete-row checks. Normalization and the first check share the existing20-second budget;300-second suite/minimum825/report/exit gates remain. This driver correction passed both-platform exact-source CI and master release; it is not a production fullscreen fix.

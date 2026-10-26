@@ -23,6 +23,14 @@ internal interface IQuantityCatalogPicker
     bool IsQuantityEnabled { get; }
 }
 
+// Opt-in pack/range support. Existing quantity pickers retain their original defaults.
+internal interface IRangedQuantityCatalogPicker : IQuantityCatalogPicker
+{
+    int MinimumQuantity { get; }
+    int MaximumQuantity { get; }
+    int QuantityIncrement { get; }
+}
+
 internal interface ICatalogPickerDetails
 {
     string Source { get; }
@@ -84,11 +92,11 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
     }
 
     protected CatalogPickerModel(Character character, bool career, XmlDocument catalog,
-        string itemXPath, string lastCategory, string diagnosticName, bool hasCategories = true)
+        string itemXPath, string lastCategory, string diagnosticName, bool hasCategories = true, IReadOnlyList<CatalogCategory>? categories = null)
     {
         Character = character; Catalog = catalog; this.itemXPath = itemXPath;
         this.diagnosticName = diagnosticName; IsCareer = career;
-        Categories = !hasCategories ? Array.Empty<CatalogCategory>() : catalog.SelectNodes("/chummer/categories/category")!.Cast<XmlNode>()
+        Categories = !hasCategories ? Array.Empty<CatalogCategory>() : categories ?? catalog.SelectNodes("/chummer/categories/category")!.Cast<XmlNode>()
             .Select(node => new CatalogCategory(node.InnerText, node.Attributes?["translate"]?.InnerText ?? node.InnerText)).ToArray();
         category = Categories.FirstOrDefault(item => item.Code == lastCategory) ?? Categories.FirstOrDefault();
         // Derived constructors call Refresh after their own initialization is complete.

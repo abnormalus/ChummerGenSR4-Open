@@ -61,8 +61,8 @@ internal static class NativeInventoryEnhancementChecks
                 bool operatingSystemsSelected = false;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    var picker = Forms.Application.OpenForms.OfType<frmSelectGear>().Last();
-                    operatingSystemsSelected = Field<Forms.ComboBox>(picker, "cboCategory").SelectedValue?.ToString() == "Commlink Operating System";
+                    var picker = (GearPickerWindow)NativeDialogHost.ActiveWindow!;
+                    operatingSystemsSelected = picker.Model.Category?.Code == "Commlink Operating System";
                     picker.Close();
                 });
                 Invoke(editor, "tsGearAddAsPlugin_Click");
@@ -189,14 +189,14 @@ internal static class NativeInventoryEnhancementChecks
                 bool literalSearchRecovered = false;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    var picker = Forms.Application.OpenForms.OfType<frmSelectGear>().Last();
-                    Field<Forms.TextBox>(picker, "txtSearch").Text = "missing \"quoted\" ammunition";
-                    literalSearchRecovered = Field<Forms.ListBox>(picker, "lstGear").Items.Count == 0 &&
-                        !Field<Forms.Button>(picker, "cmdOK").Enabled && Field<Forms.Label>(picker, "lblCost").Text == "";
-                    Field<Forms.TextBox>(picker, "txtSearch").Text = "";
-                    Field<Forms.ListBox>(picker, "lstGear").SelectedValue = "Ammo: Regular Ammo";
-                    Field<Forms.NumericUpDown>(picker, "nudGearQty").Value = 10;
-                    Field<Forms.Button>(picker, "cmdOK").PerformClick();
+                    var picker = (GearPickerWindow)NativeDialogHost.ActiveWindow!;
+                    picker.SearchBox.Text = "missing \"quoted\" ammunition";
+                    literalSearchRecovered = picker.Model.Items.Count == 0 &&
+                        !picker.AcceptButton.IsEnabled && picker.Model.Details == null;
+                    picker.SearchBox.Text = "";
+                    picker.ItemList.SelectedItem = picker.Model.Items.Single(item => item.Name == "Ammo: Regular Ammo");
+                    picker.Model.Quantity = 10;
+                    picker.Accept(false);
                 });
                 command.PerformClick();
                 check(literalSearchRecovered, "Native " + mode + " quoted gear search clears stale purchase state and recovers");
@@ -206,7 +206,7 @@ internal static class NativeInventoryEnhancementChecks
                     (!career || character.Nuyen == beforeMoney - ammo.TotalCost),
                     "Native " + mode + " right-click ammo uses the weapon class, root inventory and existing purchase cost");
                 beforeCount = character.Gear.Count; beforeMoney = character.Nuyen;
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => Forms.Application.OpenForms.OfType<frmSelectGear>().Last().Close());
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => NativeDialogHost.ActiveWindow!.Close());
                 command.PerformClick();
                 weaponTree.SelectedNode = weaponTree.Nodes[0].Nodes.Cast<Forms.TreeNode>().Single(node => node.Tag?.ToString() == axe.InternalId);
                 menu.Show(weaponTree, new System.Drawing.Point(8, 8)); menu.Hide();
