@@ -2,11 +2,13 @@
 
 As each application section is repaired or improved, review whether it recreates a capability already supplied by the modern framework or an appropriate maintained library. Prefer established components where they reduce maintenance and preserve the required behavior. This is an incremental process, not a wholesale rewrite or an edition expansion.
 
-## Current isolated Gear stage
+## Current isolated Cyberware stage
 
 Add Quality and the test-driver fullscreen reconciliation passed both-platform native and visual acceptance and are released in verified Nightly0.2.147 (source ea1a297a9aaa45dcfeb3fe7c0c7ea653d7bcde2c). Stable is unchanged. See [QUALITY_SELECTION.md](QUALITY_SELECTION.md) for the quality boundary.
 
-The next creation-facing Gear picker is now connected through its disposable adapter and standard catalog window; all21purchase callers explicitly require OK and dispose it. Legacy presentation is retired. Full headless contracts pass and49new native assertions compile, but both-platform native/visual acceptance remains pending. See [GEAR_SELECTION.md](GEAR_SELECTION.md). Cyberware remains the following shopping candidate. Historical pending records below describe earlier stages and do not supersede this checkpoint.
+The creation-facing Gear picker is released in verified Nightly0.2.148 (source4a263195872a7c02703fb851155ccafe3d90b162). Its disposable adapter and standard catalog window passed Mac883/Windows876 native checks, full headless/all399/both Foundry/audit/WindowsPDF, and visual review of all40current batch frames perOS. All21purchase callers explicitly require OK and dispose it. See [GEAR_SELECTION.md](GEAR_SELECTION.md).
+
+Cyberware is now in isolated modernization:641local legacy/model/caller checks and the full headless suite pass, with94frozen catalog-context hashes and101independently captured preview cases. Reproduced grade-lock, search and vehicle parent-context defects have bounded local corrections; all four callers have scoped disposal, explicit acceptance and literal canonical lookup. A standard model/window is prepared and compiles but is not connected or natively executed. The legacy window remains active. The owned adapter, legacy retirement and platform acceptance remain pending. See [CYBERWARE_PICKER.md](CYBERWARE_PICKER.md). No Cyberware release is claimed. Historical pending records below do not supersede this checkpoint.
 
 ## For each section
 

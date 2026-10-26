@@ -11142,21 +11142,27 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectCyberware frmPickCyberware = new frmSelectCyberware(_objCharacter);
+			using var frmPickCyberware = new frmSelectCyberware(_objCharacter);
 			frmPickCyberware.SetGrade = "Standard";
 			frmPickCyberware.LockGrade();
 			frmPickCyberware.ShowOnlySubsystems = true;
 			frmPickCyberware.Subsystems = objMod.Subsystems;
 			frmPickCyberware.AllowModularPlugins = objMod.AllowModularPlugins;
+			frmPickCyberware.PluginSelection = true;
 			frmPickCyberware.ShowDialog(this);
 
-			if (frmPickCyberware.DialogResult == DialogResult.Cancel)
+			if (frmPickCyberware.DialogResult != DialogResult.OK)
 				return;
 
 			// Open the Cyberware XML file and locate the selected piece.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("cyberware.xml");
 
-			XmlNode objXmlCyberware = objXmlDocument.SelectSingleNode("/chummer/cyberwares/cyberware[name = \"" + frmPickCyberware.SelectedCyberware + "\"]");
+			XmlNode objXmlCyberware = CyberwareSelectionPolicy.FindDefinition(objXmlDocument, false, frmPickCyberware.SelectedCyberware, frmPickCyberware.SelectedCategory);
+            if (objXmlCyberware == null)
+            {
+                AppErrors.Inform(this, "Message_CyberwareSelectionUnavailable");
+                return;
+            }
 
 			// Create the Cyberware object.
 			Cyberware objCyberware = new Cyberware(_objCharacter);
@@ -18105,7 +18111,7 @@ namespace Chummer
                 return false;
             }
 
-			frmSelectCyberware frmPickCyberware = new frmSelectCyberware(_objCharacter);
+			using var frmPickCyberware = new frmSelectCyberware(_objCharacter);
 			double dblMultiplier = 1;
 			// Apply the character's Cyberware Essence cost multiplier if applicable.
 			if (_objImprovementManager.ValueOf(Improvement.ImprovementType.CyberwareEssCost) != 0 && objSource == Improvement.ImprovementSource.Cyberware)
@@ -18206,9 +18212,9 @@ namespace Chummer
 
 			XmlNode objXmlCyberware;
 			if (objSource == Improvement.ImprovementSource.Bioware)
-				objXmlCyberware = objXmlDocument.SelectSingleNode("/chummer/biowares/bioware[name = \"" + frmPickCyberware.SelectedCyberware + "\"]");
+				objXmlCyberware = CyberwareSelectionPolicy.FindDefinition(objXmlDocument, true, frmPickCyberware.SelectedCyberware, frmPickCyberware.SelectedCategory);
 			else
-				objXmlCyberware = objXmlDocument.SelectSingleNode("/chummer/cyberwares/cyberware[name = \"" + frmPickCyberware.SelectedCyberware + "\"]");
+				objXmlCyberware = CyberwareSelectionPolicy.FindDefinition(objXmlDocument, false, frmPickCyberware.SelectedCyberware, frmPickCyberware.SelectedCategory);
 
             if (objXmlCyberware == null)
             {

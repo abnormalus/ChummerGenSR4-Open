@@ -34,7 +34,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
 
     internal CatalogPickerWindow(TModel model, Character character, string titleKey, string namePrefix,
         (string Label, string Property)[] detailFields, string? includedLabel = null,
-        bool freeDuringCreation = false, bool showMarkup = true)
+        bool freeDuringCreation = false, bool showMarkup = true, string? freeVisibilityProperty = null)
     {
         Model = model; DataContext = model;
         Title = T(titleKey); Width = 940; Height = 650; MinWidth = 740; MinHeight = 460;
@@ -165,6 +165,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         purchase.IsVisible = model.IsCareer || freeDuringCreation;
         var free = new CheckBox { Name = namePrefix + "FreeCost", Content = T("Checkbox_Free"), VerticalAlignment = VerticalAlignment.Center };
         free.Bind(ToggleButton.IsCheckedProperty, Edit(nameof(model.FreeCost))); purchase.Children.Add(free);
+        if (freeVisibilityProperty != null) free.Bind(IsVisibleProperty, Read(freeVisibilityProperty));
         if (showMarkup)
         {
             purchase.Children.Add(new TextBlock { Text = T("Label_SelectGear_Markup"), VerticalAlignment = VerticalAlignment.Center });

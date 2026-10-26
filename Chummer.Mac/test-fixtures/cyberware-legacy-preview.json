@@ -1,0 +1,2729 @@
+{
+  "cyberware creation standard": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.3",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware creation Alphaware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.24",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware creation character and Basic modifiers": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.18",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware career standard": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.3",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware career Alphaware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.24",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware career character and Basic modifiers": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.18",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware creation standard": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.3",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware creation Alphaware": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.24",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware creation character and Basic modifiers": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.15",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware career standard": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.3",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware career Alphaware": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.24",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware career character and Basic modifiers": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Preview\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.15",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware Sensitive System standard": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.48",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware discount": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 10,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.42",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware variant refresh 1": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EFixedValues(100,200,300,400,500,600)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (3, 1 day)",
+      "Essence": "0.48",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware variant refresh 2": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EVariable(100-300)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "100-300\u00A5",
+      "AvailabilityTest": "0 (3, 12 hours)",
+      "Essence": "0.48",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware variant refresh 3": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EVariable(100\u002B)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "100\u00A5\u002B",
+      "AvailabilityTest": "0 (3, 12 hours)",
+      "Essence": "0.48",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware Free": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EVariable(100\u002B)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": true
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "0\u00A5",
+      "AvailabilityTest": "0 (3, 12 hours)",
+      "Essence": "0.48",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware variant refresh 4": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003E2/[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (3, 1 day)",
+      "Essence": "0.48",
+      "Capacity": "2/[3]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware variant refresh 5": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003E[*]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": false,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (3, 1 day)",
+      "Essence": "0.48",
+      "Capacity": "[*]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware unrated": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E100\u003C/cost\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "100\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware Sensitive System standard": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.21",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware discount": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003ERating * 2R\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003ERating * 0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 0.8,
+      "BasicBiowareEssenceMultiplier": 0.9,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 10,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6R",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "0 (6, 1 day)",
+      "Essence": "0.18",
+      "Capacity": "[3]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware variant refresh 1": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EFixedValues(100,200,300,400,500,600)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (3, 1 day)",
+      "Essence": "0.24",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware variant refresh 2": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EVariable(100-300)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "100-300\u00A5",
+      "AvailabilityTest": "0 (3, 12 hours)",
+      "Essence": "0.24",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware variant refresh 3": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EVariable(100\u002B)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "100\u00A5\u002B",
+      "AvailabilityTest": "0 (3, 12 hours)",
+      "Essence": "0.24",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware Free": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003EVariable(100\u002B)\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003EFixedValues(1,2,3,4,5,6)\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": true
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "0\u00A5",
+      "AvailabilityTest": "0 (3, 12 hours)",
+      "Essence": "0.24",
+      "Capacity": "3"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware variant refresh 4": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003E2/[Rating]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (3, 1 day)",
+      "Essence": "0.24",
+      "Capacity": "2/[3]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware variant refresh 5": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cminrating\u003E1\u003C/minrating\u003E\u003Cavail\u003EFixedValues(1R,2R,3R,4R,5R,6R)\u003C/avail\u003E\u003Ccost\u003ERating * 100\u003C/cost\u003E\u003Cess\u003EFixedValues(0.1,0.2,0.3,0.4,0.5,0.6)\u003C/ess\u003E\u003Ccapacity\u003E[*]\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 3,
+      "Bioware": true,
+      "GradeCostMultiplier": 2,
+      "GradeEssenceMultiplier": 0.8,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3R",
+      "Cost": "600\u00A5",
+      "AvailabilityTest": "0 (3, 1 day)",
+      "Essence": "0.24",
+      "Capacity": "[*]"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware unrated": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E100\u003C/cost\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "100\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware transgenic": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E100\u003C/cost\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": true,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "50\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware transgenic off": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E100\u003C/cost\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "100\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "bioware Genetech": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ESynthetic Ware Variants\u003C/name\u003E\u003Ccategory\u003EGenetech: Transgenics\u003C/category\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E100\u003C/cost\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E1\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 0.7,
+      "TransgenicCostMultiplier": 0.8,
+      "DiscountEnabled": true,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "50\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 1,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Headware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAttention Coprocessor\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003E0.3\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003ERating * 3000\u003C/cost\u003E\u003Cbonus\u003E\u003Cspecificskill\u003E\u003Cname\u003EPerception\u003C/name\u003E\u003Cbonus\u003ERating\u003C/bonus\u003E\u003C/specificskill\u003E\u003C/bonus\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E36\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "3,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.3",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Eyeware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECybereyes Basic System\u003C/name\u003E\u003Ccategory\u003EEyeware\u003C/category\u003E\u003Crating\u003E4\u003C/rating\u003E\u003Cess\u003E(Rating * 0.1) \u002B 0.1\u003C/ess\u003E\u003Ccapacity\u003E(Rating * 4)\u003C/capacity\u003E\u003Cavail\u003EFixedValues(0,4,6,8)\u003C/avail\u003E\u003Ccost\u003EFixedValues(500,750,1000,1500)\u003C/cost\u003E\u003Csubsystems\u003E\u003Csubsystem\u003EEyeware\u003C/subsystem\u003E\u003Csubsystem\u003ENanocybernetics\u003C/subsystem\u003E\u003C/subsystems\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E340\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "4"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Earware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAudio Enhancement\u003C/name\u003E\u003Ccategory\u003EEarware\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Cavail\u003ERating * 3\u003C/avail\u003E\u003Ccost\u003ERating * 1500\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E341\u003C/page\u003E\u003Cbonus\u003E\u003Cspecificskill\u003E\u003Cname\u003EPerception (Audio)\u003C/name\u003E\u003Cbonus\u003ERating\u003C/bonus\u003E\u003C/specificskill\u003E\u003C/bonus\u003E\u003Csenseimprovement\u003Eyes\u003C/senseimprovement\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3",
+      "Cost": "1,500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Biodrone Control": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECAST\u003C/name\u003E\u003Ccategory\u003EBiodrone Control\u003C/category\u003E\u003Cess\u003E0.5\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E25\u003C/avail\u003E\u003Ccost\u003E25000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E152\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "25",
+      "Cost": "25,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.5",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Bodyware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAuto-Injector (One-shot)\u003C/name\u003E\u003Ccategory\u003EBodyware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.05\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003E600 \u002B (Rating * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E39\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "700\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.05",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Cyberlimb": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EObvious Foot\u003C/name\u003E\u003Ccategory\u003ECyberlimb\u003C/category\u003E\u003Cess\u003E0.25\u003C/ess\u003E\u003Ccapacity\u003E4\u003C/capacity\u003E\u003Cavail\u003E2\u003C/avail\u003E\u003Ccost\u003E5000\u003C/cost\u003E\u003Cbonus\u003E\u003Cconditionmonitor\u003E\u003Cphysical\u003E1\u003C/physical\u003E\u003C/conditionmonitor\u003E\u003Cselectside /\u003E\u003C/bonus\u003E\u003Csubsystems\u003E\u003Csubsystem\u003EBodyware\u003C/subsystem\u003E\u003Csubsystem\u003ECyberlimb Enhancement\u003C/subsystem\u003E\u003Csubsystem\u003ECyberlimb Accessory\u003C/subsystem\u003E\u003Csubsystem\u003ECyberweapon\u003C/subsystem\u003E\u003Csubsystem\u003ENanocybernetics\u003C/subsystem\u003E\u003C/subsystems\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "2",
+      "Cost": "5,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.25",
+      "Capacity": "4"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Cyberlimb Enhancement": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArmor\u003C/name\u003E\u003Ccategory\u003ECyberlimb Enhancement\u003C/category\u003E\u003Crating\u003E4\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[Rating * 2]\u003C/capacity\u003E\u003Cavail\u003ERating * 5\u003C/avail\u003E\u003Ccost\u003ERating * 300\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Cb\u003ERating\u003C/b\u003E\u003Ci\u003ERating\u003C/i\u003E\u003C/armor\u003E\u003C/bonus\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "5",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Cyberlimb Accessory": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECyber Holster\u003C/name\u003E\u003Ccategory\u003ECyberlimb Accessory\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[7]\u003C/capacity\u003E\u003Cavail\u003E8R\u003C/avail\u003E\u003Ccost\u003E2000\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8R",
+      "Cost": "2,000\u00A5",
+      "AvailabilityTest": "0 (8, 2 days)",
+      "Essence": "0",
+      "Capacity": "[7]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Cyberweapon": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArticulated Weapon-Arm\u003C/name\u003E\u003Ccategory\u003ECyberweapon\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[8]\u003C/capacity\u003E\u003Cavail\u003E24F\u003C/avail\u003E\u003Ccost\u003E5000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E43\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "24F",
+      "Cost": "5,000\u00A5",
+      "AvailabilityTest": "0 (24, 2 days)",
+      "Essence": "0",
+      "Capacity": "[8]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Cosmetic Modification": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECybergland\u003C/name\u003E\u003Ccategory\u003ECosmetic Modification\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[1]\u003C/capacity\u003E\u003Cavail\u003E\u002B4\u003C/avail\u003E\u003Ccost\u003E500\u002B((Rating-1) * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E33\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "\u002B4",
+      "Cost": "500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Cosmetic Implant": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EBreast Implants\u003C/name\u003E\u003Ccategory\u003ECosmetic Implant\u003C/category\u003E\u003Cess\u003E0.25\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003E4\u003C/avail\u003E\u003Ccost\u003E3000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E34\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "4",
+      "Cost": "3,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.25",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=False/Nanocybernetics": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EDynamic Handprints\u003C/name\u003E\u003Ccategory\u003ENanocybernetics\u003C/category\u003E\u003Crating\u003E10\u003C/rating\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E12F\u003C/avail\u003E\u003Ccost\u003ERating * 1000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E112\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "12F",
+      "Cost": "1,000\u00A5",
+      "AvailabilityTest": "0 (12, 1 day)",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Headware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECommlink\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E2000\u003C/cost\u003E\u003Callowgear\u003E\u003Cgearcategory\u003ECommlink\u003C/gearcategory\u003E\u003C/allowgear\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E338\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "2,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Eyeware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EEye Laser Designator\u003C/name\u003E\u003Ccategory\u003EEyeware\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E12R\u003C/avail\u003E\u003Ccost\u003E1000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E39\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "12R",
+      "Cost": "1,000\u00A5",
+      "AvailabilityTest": "0 (12, 1 day)",
+      "Essence": "0",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Earware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAudio Enhancement\u003C/name\u003E\u003Ccategory\u003EEarware\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Cavail\u003ERating * 3\u003C/avail\u003E\u003Ccost\u003ERating * 1500\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E341\u003C/page\u003E\u003Cbonus\u003E\u003Cspecificskill\u003E\u003Cname\u003EPerception (Audio)\u003C/name\u003E\u003Cbonus\u003ERating\u003C/bonus\u003E\u003C/specificskill\u003E\u003C/bonus\u003E\u003Csenseimprovement\u003Eyes\u003C/senseimprovement\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3",
+      "Cost": "1,500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Bodyware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAuto-Injector (One-shot)\u003C/name\u003E\u003Ccategory\u003EBodyware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.05\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003E600 \u002B (Rating * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E39\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "700\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.05",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Cyberlimb Enhancement": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArmor\u003C/name\u003E\u003Ccategory\u003ECyberlimb Enhancement\u003C/category\u003E\u003Crating\u003E4\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[Rating * 2]\u003C/capacity\u003E\u003Cavail\u003ERating * 5\u003C/avail\u003E\u003Ccost\u003ERating * 300\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Cb\u003ERating\u003C/b\u003E\u003Ci\u003ERating\u003C/i\u003E\u003C/armor\u003E\u003C/bonus\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "5",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Cyberlimb Accessory": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECyber Holster\u003C/name\u003E\u003Ccategory\u003ECyberlimb Accessory\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[7]\u003C/capacity\u003E\u003Cavail\u003E8R\u003C/avail\u003E\u003Ccost\u003E2000\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8R",
+      "Cost": "2,000\u00A5",
+      "AvailabilityTest": "0 (8, 2 days)",
+      "Essence": "0",
+      "Capacity": "[7]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Cyberweapon": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArticulated Weapon-Arm\u003C/name\u003E\u003Ccategory\u003ECyberweapon\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[8]\u003C/capacity\u003E\u003Cavail\u003E24F\u003C/avail\u003E\u003Ccost\u003E5000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E43\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "24F",
+      "Cost": "5,000\u00A5",
+      "AvailabilityTest": "0 (24, 2 days)",
+      "Essence": "0",
+      "Capacity": "[8]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Cosmetic Modification": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECybergland\u003C/name\u003E\u003Ccategory\u003ECosmetic Modification\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[1]\u003C/capacity\u003E\u003Cavail\u003E\u002B4\u003C/avail\u003E\u003Ccost\u003E500\u002B((Rating-1) * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E33\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "\u002B4",
+      "Cost": "500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Cosmetic Implant": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EBreast Implants\u003C/name\u003E\u003Ccategory\u003ECosmetic Implant\u003C/category\u003E\u003Cess\u003E0.25\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003E4\u003C/avail\u003E\u003Ccost\u003E3000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E34\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "4",
+      "Cost": "3,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.25",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=False/subsystems=True/Nanocybernetics": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ENanohive\u003C/name\u003E\u003Ccategory\u003ENanocybernetics\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.5 \u002B (Rating * 0.25)\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003ERating * 5\u003C/avail\u003E\u003Ccost\u003ERating * 10000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E112\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "5",
+      "Cost": "10,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.75",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Headware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAttention Coprocessor\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003E0.3\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003ERating * 3000\u003C/cost\u003E\u003Cbonus\u003E\u003Cspecificskill\u003E\u003Cname\u003EPerception\u003C/name\u003E\u003Cbonus\u003ERating\u003C/bonus\u003E\u003C/specificskill\u003E\u003C/bonus\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E36\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "3,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.3",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Eyeware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECybereyes Basic System\u003C/name\u003E\u003Ccategory\u003EEyeware\u003C/category\u003E\u003Crating\u003E4\u003C/rating\u003E\u003Cess\u003E(Rating * 0.1) \u002B 0.1\u003C/ess\u003E\u003Ccapacity\u003E(Rating * 4)\u003C/capacity\u003E\u003Cavail\u003EFixedValues(0,4,6,8)\u003C/avail\u003E\u003Ccost\u003EFixedValues(500,750,1000,1500)\u003C/cost\u003E\u003Csubsystems\u003E\u003Csubsystem\u003EEyeware\u003C/subsystem\u003E\u003Csubsystem\u003ENanocybernetics\u003C/subsystem\u003E\u003C/subsystems\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E340\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "4"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Earware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAudio Enhancement\u003C/name\u003E\u003Ccategory\u003EEarware\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Cavail\u003ERating * 3\u003C/avail\u003E\u003Ccost\u003ERating * 1500\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E341\u003C/page\u003E\u003Cbonus\u003E\u003Cspecificskill\u003E\u003Cname\u003EPerception (Audio)\u003C/name\u003E\u003Cbonus\u003ERating\u003C/bonus\u003E\u003C/specificskill\u003E\u003C/bonus\u003E\u003Csenseimprovement\u003Eyes\u003C/senseimprovement\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3",
+      "Cost": "1,500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Biodrone Control": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECAST\u003C/name\u003E\u003Ccategory\u003EBiodrone Control\u003C/category\u003E\u003Cess\u003E0.5\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E25\u003C/avail\u003E\u003Ccost\u003E25000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E152\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "25",
+      "Cost": "25,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.5",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Bodyware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAuto-Injector (One-shot)\u003C/name\u003E\u003Ccategory\u003EBodyware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.05\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003E600 \u002B (Rating * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E39\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "700\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.05",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Cyberlimb": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EObvious Foot\u003C/name\u003E\u003Ccategory\u003ECyberlimb\u003C/category\u003E\u003Cess\u003E0.25\u003C/ess\u003E\u003Ccapacity\u003E4\u003C/capacity\u003E\u003Cavail\u003E2\u003C/avail\u003E\u003Ccost\u003E5000\u003C/cost\u003E\u003Cbonus\u003E\u003Cconditionmonitor\u003E\u003Cphysical\u003E1\u003C/physical\u003E\u003C/conditionmonitor\u003E\u003Cselectside /\u003E\u003C/bonus\u003E\u003Csubsystems\u003E\u003Csubsystem\u003EBodyware\u003C/subsystem\u003E\u003Csubsystem\u003ECyberlimb Enhancement\u003C/subsystem\u003E\u003Csubsystem\u003ECyberlimb Accessory\u003C/subsystem\u003E\u003Csubsystem\u003ECyberweapon\u003C/subsystem\u003E\u003Csubsystem\u003ENanocybernetics\u003C/subsystem\u003E\u003C/subsystems\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "2",
+      "Cost": "5,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.25",
+      "Capacity": "4"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Cyberlimb Enhancement": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArmor\u003C/name\u003E\u003Ccategory\u003ECyberlimb Enhancement\u003C/category\u003E\u003Crating\u003E4\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[Rating * 2]\u003C/capacity\u003E\u003Cavail\u003ERating * 5\u003C/avail\u003E\u003Ccost\u003ERating * 300\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Cb\u003ERating\u003C/b\u003E\u003Ci\u003ERating\u003C/i\u003E\u003C/armor\u003E\u003C/bonus\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "5",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Cyberlimb Accessory": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECyber Holster\u003C/name\u003E\u003Ccategory\u003ECyberlimb Accessory\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[7]\u003C/capacity\u003E\u003Cavail\u003E8R\u003C/avail\u003E\u003Ccost\u003E2000\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8R",
+      "Cost": "2,000\u00A5",
+      "AvailabilityTest": "0 (8, 2 days)",
+      "Essence": "0",
+      "Capacity": "[7]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Cyberweapon": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArticulated Weapon-Arm\u003C/name\u003E\u003Ccategory\u003ECyberweapon\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[8]\u003C/capacity\u003E\u003Cavail\u003E24F\u003C/avail\u003E\u003Ccost\u003E5000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E43\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "24F",
+      "Cost": "5,000\u00A5",
+      "AvailabilityTest": "0 (24, 2 days)",
+      "Essence": "0",
+      "Capacity": "[8]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Cosmetic Modification": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECybergland\u003C/name\u003E\u003Ccategory\u003ECosmetic Modification\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[1]\u003C/capacity\u003E\u003Cavail\u003E\u002B4\u003C/avail\u003E\u003Ccost\u003E500\u002B((Rating-1) * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E33\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "\u002B4",
+      "Cost": "500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Cosmetic Implant": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EBreast Implants\u003C/name\u003E\u003Ccategory\u003ECosmetic Implant\u003C/category\u003E\u003Cess\u003E0.25\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003E4\u003C/avail\u003E\u003Ccost\u003E3000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E34\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "4",
+      "Cost": "3,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.25",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Modular Plug-In": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EBuilt-in Medkit\u003C/name\u003E\u003Ccategory\u003EModular Plug-In\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E7\u003C/avail\u003E\u003Ccost\u003E1000 \u002B (Rating * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E46\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "7",
+      "Cost": "1,100\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=False/Nanocybernetics": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EDynamic Handprints\u003C/name\u003E\u003Ccategory\u003ENanocybernetics\u003C/category\u003E\u003Crating\u003E10\u003C/rating\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E12F\u003C/avail\u003E\u003Ccost\u003ERating * 1000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E112\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "12F",
+      "Cost": "1,000\u00A5",
+      "AvailabilityTest": "0 (12, 1 day)",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Headware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECommlink\u003C/name\u003E\u003Ccategory\u003EHeadware\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E2000\u003C/cost\u003E\u003Callowgear\u003E\u003Cgearcategory\u003ECommlink\u003C/gearcategory\u003E\u003C/allowgear\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E338\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "2,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Eyeware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EEye Laser Designator\u003C/name\u003E\u003Ccategory\u003EEyeware\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E12R\u003C/avail\u003E\u003Ccost\u003E1000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E39\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "12R",
+      "Cost": "1,000\u00A5",
+      "AvailabilityTest": "0 (12, 1 day)",
+      "Essence": "0",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Earware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAudio Enhancement\u003C/name\u003E\u003Ccategory\u003EEarware\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[Rating]\u003C/capacity\u003E\u003Cavail\u003ERating * 3\u003C/avail\u003E\u003Ccost\u003ERating * 1500\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E341\u003C/page\u003E\u003Cbonus\u003E\u003Cspecificskill\u003E\u003Cname\u003EPerception (Audio)\u003C/name\u003E\u003Cbonus\u003ERating\u003C/bonus\u003E\u003C/specificskill\u003E\u003C/bonus\u003E\u003Csenseimprovement\u003Eyes\u003C/senseimprovement\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "3",
+      "Cost": "1,500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Bodyware": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EAuto-Injector (One-shot)\u003C/name\u003E\u003Ccategory\u003EBodyware\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.05\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003E600 \u002B (Rating * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E39\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "700\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.05",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Cyberlimb Enhancement": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArmor\u003C/name\u003E\u003Ccategory\u003ECyberlimb Enhancement\u003C/category\u003E\u003Crating\u003E4\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[Rating * 2]\u003C/capacity\u003E\u003Cavail\u003ERating * 5\u003C/avail\u003E\u003Ccost\u003ERating * 300\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Cb\u003ERating\u003C/b\u003E\u003Ci\u003ERating\u003C/i\u003E\u003C/armor\u003E\u003C/bonus\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "5",
+      "Cost": "300\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Cyberlimb Accessory": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECyber Holster\u003C/name\u003E\u003Ccategory\u003ECyberlimb Accessory\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[7]\u003C/capacity\u003E\u003Cavail\u003E8R\u003C/avail\u003E\u003Ccost\u003E2000\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E344\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8R",
+      "Cost": "2,000\u00A5",
+      "AvailabilityTest": "0 (8, 2 days)",
+      "Essence": "0",
+      "Capacity": "[7]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Cyberweapon": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EArticulated Weapon-Arm\u003C/name\u003E\u003Ccategory\u003ECyberweapon\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[8]\u003C/capacity\u003E\u003Cavail\u003E24F\u003C/avail\u003E\u003Ccost\u003E5000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E43\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "24F",
+      "Cost": "5,000\u00A5",
+      "AvailabilityTest": "0 (24, 2 days)",
+      "Essence": "0",
+      "Capacity": "[8]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Cosmetic Modification": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ECybergland\u003C/name\u003E\u003Ccategory\u003ECosmetic Modification\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.1\u003C/ess\u003E\u003Ccapacity\u003E[1]\u003C/capacity\u003E\u003Cavail\u003E\u002B4\u003C/avail\u003E\u003Ccost\u003E500\u002B((Rating-1) * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E33\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "\u002B4",
+      "Cost": "500\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.1",
+      "Capacity": "[1]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Cosmetic Implant": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EBreast Implants\u003C/name\u003E\u003Ccategory\u003ECosmetic Implant\u003C/category\u003E\u003Cess\u003E0.25\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003E4\u003C/avail\u003E\u003Ccost\u003E3000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E34\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "4",
+      "Cost": "3,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.25",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Modular Plug-In": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003EBuilt-in Medkit\u003C/name\u003E\u003Ccategory\u003EModular Plug-In\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E[0]\u003C/capacity\u003E\u003Cavail\u003E7\u003C/avail\u003E\u003Ccost\u003E1000 \u002B (Rating * 100)\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E46\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "7",
+      "Cost": "1,100\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "[0]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "cyberware/modular=True/subsystems=True/Nanocybernetics": {
+    "DefinitionXml": "\u003Ccyberware\u003E\u003Cname\u003ENanohive\u003C/name\u003E\u003Ccategory\u003ENanocybernetics\u003C/category\u003E\u003Crating\u003E6\u003C/rating\u003E\u003Cess\u003E0.5 \u002B (Rating * 0.25)\u003C/ess\u003E\u003Ccapacity\u003E[2]\u003C/capacity\u003E\u003Cavail\u003ERating * 5\u003C/avail\u003E\u003Ccost\u003ERating * 10000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E112\u003C/page\u003E\u003C/cyberware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": false,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "5",
+      "Cost": "10,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.75",
+      "Capacity": "[2]"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Basic": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EAdrenaline Pump\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003ERating * 0.75\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E(Rating * 6)F\u003C/avail\u003E\u003Ccost\u003ERating * 30000\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E345\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6F",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "0 (6, 1 week)",
+      "Essence": "0.75",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Biosculpting": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EBiosculpting, Metatype Change\u003C/name\u003E\u003Ccategory\u003EBiosculpting\u003C/category\u003E\u003Cess\u003E0.3\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003E25000\u003C/cost\u003E\u003Cbonus /\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E62\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "25,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.3",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Cosmetic": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EChameleon Skin\u003C/name\u003E\u003Ccategory\u003ECosmetic\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E6\u003C/avail\u003E\u003Ccost\u003E4000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E62\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6",
+      "Cost": "4,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Cultured": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ECerebral Booster\u003C/name\u003E\u003Ccategory\u003ECultured\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003ERating * 0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003ERating * 6\u003C/avail\u003E\u003Ccost\u003ERating * 10000\u003C/cost\u003E\u003Cbonus\u003E\u003Cspecificattribute\u003E\u003Cname\u003ELOG\u003C/name\u003E\u003Cval\u003ERating\u003C/val\u003E\u003C/specificattribute\u003E\u003C/bonus\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E347\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6",
+      "Cost": "10,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Endosymbiont": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EBooster\u003C/name\u003E\u003Ccategory\u003EEndosymbiont\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16\u003C/avail\u003E\u003Ccost\u003E30000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E71\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Genetech: Genetic Restoration": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EAge Rejuvenation, L\u00E9onization\u003C/name\u003E\u003Ccategory\u003EGenetech: Genetic Restoration\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E12R\u003C/avail\u003E\u003Ccost\u003E400000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E88\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "12R",
+      "Cost": "400,000\u00A5",
+      "AvailabilityTest": "0 (12, 1 week)",
+      "Essence": "0",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Genetech: Phenotype Adjustments": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EDNA Masking, Genewipe\u003C/name\u003E\u003Ccategory\u003EGenetech: Phenotype Adjustments\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16F\u003C/avail\u003E\u003Ccost\u003E45000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E89\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16F",
+      "Cost": "45,000\u00A5",
+      "AvailabilityTest": "0 (16, 1 week)",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Genetech: Transgenics": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EEnhanced Protein Exchange, Adapsin\u003C/name\u003E\u003Ccategory\u003EGenetech: Transgenics\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16\u003C/avail\u003E\u003Ccost\u003E30000\u003C/cost\u003E\u003Cbonus\u003E\u003Cadapsin /\u003E\u003C/bonus\u003E\u003Cforcegrade\u003EStandard\u003C/forcegrade\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E90\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Genetic Infusions": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EBraveheart\u003C/name\u003E\u003Ccategory\u003EGenetic Infusions\u003C/category\u003E\u003Cess\u003E0.4\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16F\u003C/avail\u003E\u003Ccost\u003E1000\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Ci\u003E2\u003C/i\u003E\u003C/armor\u003E\u003Cspecificattribute\u003E\u003Cname\u003EWIL\u003C/name\u003E\u003Cval\u003E1\u003C/val\u003E\u003C/specificattribute\u003E\u003Cspecificattribute\u003E\u003Cname\u003EINT\u003C/name\u003E\u003Cval\u003E-1\u003C/val\u003E\u003C/specificattribute\u003E\u003C/bonus\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E94\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16F",
+      "Cost": "1,000\u00A5",
+      "AvailabilityTest": "0 (16, 1 day)",
+      "Essence": "0.4",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Organs and Limbs": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EEye\u003C/name\u003E\u003Ccategory\u003EOrgans and Limbs\u003C/category\u003E\u003Crating\u003E0\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E4000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E126\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "4,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=False/subsystems=False/Symbiont": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ECarapace\u003C/name\u003E\u003Ccategory\u003ESymbiont\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16\u003C/avail\u003E\u003Ccost\u003E30000\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Cb\u003E1\u003C/b\u003E\u003Ci\u003E1\u003C/i\u003E\u003C/armor\u003E\u003C/bonus\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E71\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Basic": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EAdrenaline Pump\u003C/name\u003E\u003Ccategory\u003EBasic\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003ERating * 0.75\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E(Rating * 6)F\u003C/avail\u003E\u003Ccost\u003ERating * 30000\u003C/cost\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E345\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6F",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "0 (6, 1 week)",
+      "Essence": "0.75",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Biosculpting": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EBiosculpting, Metatype Change\u003C/name\u003E\u003Ccategory\u003EBiosculpting\u003C/category\u003E\u003Cess\u003E0.3\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E8\u003C/avail\u003E\u003Ccost\u003E25000\u003C/cost\u003E\u003Cbonus /\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E62\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "8",
+      "Cost": "25,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.3",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Cosmetic": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EChameleon Skin\u003C/name\u003E\u003Ccategory\u003ECosmetic\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E6\u003C/avail\u003E\u003Ccost\u003E4000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E62\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6",
+      "Cost": "4,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Cultured": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ECerebral Booster\u003C/name\u003E\u003Ccategory\u003ECultured\u003C/category\u003E\u003Crating\u003E3\u003C/rating\u003E\u003Cess\u003ERating * 0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003ERating * 6\u003C/avail\u003E\u003Ccost\u003ERating * 10000\u003C/cost\u003E\u003Cbonus\u003E\u003Cspecificattribute\u003E\u003Cname\u003ELOG\u003C/name\u003E\u003Cval\u003ERating\u003C/val\u003E\u003C/specificattribute\u003E\u003C/bonus\u003E\u003Csource\u003ESR4\u003C/source\u003E\u003Cpage\u003E347\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "6",
+      "Cost": "10,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Endosymbiont": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EBooster\u003C/name\u003E\u003Ccategory\u003EEndosymbiont\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16\u003C/avail\u003E\u003Ccost\u003E30000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E71\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Genetech: Genetic Restoration": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EAge Rejuvenation, L\u00E9onization\u003C/name\u003E\u003Ccategory\u003EGenetech: Genetic Restoration\u003C/category\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E12R\u003C/avail\u003E\u003Ccost\u003E400000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E88\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "12R",
+      "Cost": "400,000\u00A5",
+      "AvailabilityTest": "0 (12, 1 week)",
+      "Essence": "0",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Genetech: Phenotype Adjustments": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EDNA Masking, Genewipe\u003C/name\u003E\u003Ccategory\u003EGenetech: Phenotype Adjustments\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16F\u003C/avail\u003E\u003Ccost\u003E45000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E89\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16F",
+      "Cost": "45,000\u00A5",
+      "AvailabilityTest": "0 (16, 1 week)",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Genetech: Transgenics": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EEnhanced Protein Exchange, Adapsin\u003C/name\u003E\u003Ccategory\u003EGenetech: Transgenics\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16\u003C/avail\u003E\u003Ccost\u003E30000\u003C/cost\u003E\u003Cbonus\u003E\u003Cadapsin /\u003E\u003C/bonus\u003E\u003Cforcegrade\u003EStandard\u003C/forcegrade\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E90\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Genetic Infusions": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EBraveheart\u003C/name\u003E\u003Ccategory\u003EGenetic Infusions\u003C/category\u003E\u003Cess\u003E0.4\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16F\u003C/avail\u003E\u003Ccost\u003E1000\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Ci\u003E2\u003C/i\u003E\u003C/armor\u003E\u003Cspecificattribute\u003E\u003Cname\u003EWIL\u003C/name\u003E\u003Cval\u003E1\u003C/val\u003E\u003C/specificattribute\u003E\u003Cspecificattribute\u003E\u003Cname\u003EINT\u003C/name\u003E\u003Cval\u003E-1\u003C/val\u003E\u003C/specificattribute\u003E\u003C/bonus\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E94\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16F",
+      "Cost": "1,000\u00A5",
+      "AvailabilityTest": "0 (16, 1 day)",
+      "Essence": "0.4",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Organs and Limbs": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003EEye\u003C/name\u003E\u003Ccategory\u003EOrgans and Limbs\u003C/category\u003E\u003Crating\u003E0\u003C/rating\u003E\u003Cess\u003E0\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E0\u003C/avail\u003E\u003Ccost\u003E4000\u003C/cost\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E126\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 1,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "0",
+      "Cost": "4,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  },
+  "bioware/modular=True/subsystems=False/Symbiont": {
+    "DefinitionXml": "\u003Cbioware\u003E\u003Cname\u003ECarapace\u003C/name\u003E\u003Ccategory\u003ESymbiont\u003C/category\u003E\u003Cess\u003E0.2\u003C/ess\u003E\u003Ccapacity\u003E0\u003C/capacity\u003E\u003Cavail\u003E16\u003C/avail\u003E\u003Ccost\u003E30000\u003C/cost\u003E\u003Cbonus\u003E\u003Carmor\u003E\u003Cb\u003E1\u003C/b\u003E\u003Ci\u003E1\u003C/i\u003E\u003C/armor\u003E\u003C/bonus\u003E\u003Csource\u003EAU\u003C/source\u003E\u003Cpage\u003E71\u003C/page\u003E\u003C/bioware\u003E",
+    "Request": {
+      "Rating": 0,
+      "Bioware": true,
+      "GradeCostMultiplier": 1,
+      "GradeEssenceMultiplier": 1,
+      "GradeAvailabilityModifier": 0,
+      "CharacterEssenceMultiplier": 1,
+      "BasicBiowareEssenceMultiplier": 1,
+      "GenetechCostMultiplier": 1,
+      "TransgenicCostMultiplier": 1,
+      "DiscountEnabled": false,
+      "EssenceDiscount": 0,
+      "Transgenic": false,
+      "FreeCost": false
+    },
+    "Result": {
+      "Availability": "16",
+      "Cost": "30,000\u00A5",
+      "AvailabilityTest": "None",
+      "Essence": "0.2",
+      "Capacity": "0"
+    },
+    "SensitiveSystemCount": 0,
+    "EssenceDecimals": 2
+  }
+}
