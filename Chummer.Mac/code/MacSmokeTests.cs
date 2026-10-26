@@ -63,6 +63,7 @@ namespace Chummer
                 GlobalOptions.Instance.AutomaticUpdate = false;
                 LanguageManager.Instance.Load("en-us", null);
                 Check(LanguageManager.Instance.Loaded, "English language loaded");
+                CyberwareCallerChecks.RunLookup(Check);
                 ReleaseUpdateChecks.Run();
                 Check(AppDiagnostics.NativeRenderTimerCode(new InvalidOperationException(
                     "Avalonia.Native was not able to start the RenderTimer. Native error code is: -666")) == -666 &&
@@ -646,8 +647,8 @@ namespace Chummer
                     Check(followingClicks == 1, "commands still run after a recoverable failure");
                     using var emptyPlugins = new frmSelectCyberware(choiceCharacter) {
                         PluginSelection = true, ShowOnlySubsystems = true, Subsystems = "No matching category" };
-                    emptyPlugins.Show();
-                    Check(emptyPlugins.DialogResult == DialogResult.Cancel && errorNotices == 2,
+                    var emptyPluginResult = emptyPlugins.ShowDialogAsync(recoveryHost);
+                    Check(emptyPluginResult.IsCompletedSuccessfully && emptyPluginResult.Result == DialogResult.Cancel && errorNotices == 2 && recoveryHost.Enabled,
                         "no compatible add-ins produces a notice and cancels the picker safely");
                 }
                 finally
@@ -1058,9 +1059,13 @@ namespace Chummer
                 GearSelectionChecks.Run(character, Check);
                 GearPreviewChecks.Run(character, Check);
                 GearPickerChecks.Run(character, Check);
+                CyberwarePreviewChecks.Run(character, Check);
+                CyberwareModelChecks.Run(character, Check);
+                CyberwareCallerChecks.Run(character, Check);
+                CyberwareAdapterChecks.Run(character, Check);
                 PersonalizedGripChecks.Run(character, Check);
                 Check(new GearPickerModel(character, false).Items.Count > 0, "Gear standard picker supplies catalog choices");
-                using (var dialog = new frmSelectCyberware(character)) Capture(dialog, output, "cyberware-dialog");
+                Check(new CyberwarePickerModel(character, false).Items.Count > 0, "Cyberware standard picker supplies catalog choices");
                 Check(new QualityPickerModel(character).Items.Count > 0, "Quality standard picker supplies catalog choices");
                 using (var dialog = new frmSelectSpell(character)) Capture(dialog, output, "spell-dialog");
                 character.BOD.Value = 3;

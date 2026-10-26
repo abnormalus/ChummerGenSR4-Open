@@ -1,6 +1,6 @@
 # Native numeric input rollout
 
-Local creation contacts/enemies viewport work is isolated from accepted PR37's stability release. Ordered canonical controllers retain all accounting/rule callbacks; standard native rows provide name, ratings and group/Notes/Link/Delete commands. Full headless differential/picker/save checks pass;54 additional native assertions compile but have not executed, with required floor772 and unchanged operation/suite/report/exit gates. See [CREATION_CONTACTS.md](CREATION_CONTACTS.md) for source boundaries and pending Mac/Windows acceptance. No viewport release or visual acceptance is claimed yet.
+Current checkpoint: creation contacts/enemies and the common Gear picker are accepted on both platforms and released, most recently in verified Nightly0.2.148/source4a263195872a7c02703fb851155ccafe3d90b162. Cyberware rating/essence-discount migration has a prepared shared model/window and audited caller boundary:641local checks pass and the window compiles, but production connection and native acceptance are pending. See [CYBERWARE_PICKER.md](CYBERWARE_PICKER.md). Earlier pending statements below are historical checkpoints rather than current acceptance claims.
 
 Use maintained Avalonia NumericUpDown controls for migrated inputs. NativeIntegerInput supplies whole-number parsing, unit stepping, logical sizing, formatting and framework range clipping. Keep decimal precision for currency, multipliers and fractional quantities; never round a decimal domain just to reuse the integer factory. The model owns rules, limits and calculations; the control owns typing, buttons, keyboard routing and layout.
 
@@ -18,7 +18,7 @@ The first Attributes migration must replace a coherent section with standard con
 
 ## Current inventory and release state
 
-Current authoritative release checkpoint: Nightly0.2.143/source d9d1f14f5f23e4134afc5fc6e5a302e6a5560bde is published and download-verified. Creation attributes/money, groups, active and knowledge sections are accepted on both platforms, including specialization disclosures, persistent Perception expansion and shared vertical alignment. The historical pending statements below record the implementation sequence.117 legacy declarations remain documented rule adapters and unmigrated surfaces; declaration counts are not overall completion percentages. Contact Connection/Loyalty is the next creation-facing viewport migration.
+Current authoritative release checkpoint: Nightly0.2.148/source4a263195872a7c02703fb851155ccafe3d90b162 is published and download-verified. Creation attributes/money, groups, active/knowledge sections, contacts/enemies and common Gear are accepted on both platforms. Cyberware is the current isolated shopping candidate. The historical pending statements and declaration counts below record the implementation sequence, not overall completion percentages or current native acceptance.
 
 The rollout baseline was 145 legacy NumericUpDown field declarations across all access modifiers. The earlier 130 count omitted 15 internal fields. This counts declarations, not user-visible defects or a percentage of overall modernization.
 

@@ -84,6 +84,9 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
         set { value = Math.Clamp(value, -99, 1000); if (markup == value) return; markup = value; UpdateDetails(); }
     }
     protected virtual bool AllowsFreeCost => IsCareer;
+    // Normalize a contextual option during detail calculation without recursively
+    // entering UpdateDetails; Changed publishes the resulting draft afterwards.
+    protected void ClearFreeCost() => freeCost = false;
     protected virtual bool ValidateSelection(CatalogEntry entry) => true;
     public bool FreeCost
     {
@@ -145,6 +148,13 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
     }
 
     protected void Notify(string property) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
+    protected bool RejectChangedSelection()
+    {
+        Refresh();
+        error = LanguageManager.Instance.GetString("CatalogPicker_SelectionChanged");
+        Changed();
+        return false;
+    }
 
     protected virtual void NotifyAdditionalProperties() { }
 
@@ -183,8 +193,7 @@ internal abstract class CatalogPickerModel<TDetails> : INotifyPropertyChanged wh
         // Reject a now-disabled source rather than accepting a newly auto-selected row.
         if (!AvailableEntries().Any(item => item.Name == selectedEntry!.Name && item.Category == selectedEntry.Category))
         {
-            Refresh();
-            error = LanguageManager.Instance.GetString("CatalogPicker_SelectionChanged"); Changed(); return null;
+            RejectChangedSelection(); return null;
         }
         if (!ValidateSelection(selectedEntry!)) return null;
         RememberCategory(selectedEntry!.Category);
