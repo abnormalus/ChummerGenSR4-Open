@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Forms = Majorsilence.Forms;
 
@@ -9,8 +8,6 @@ namespace Chummer;
 
 internal static class NativeGearEligibilityChecks
 {
-    private static T Field<T>(object owner, string name) => (T)owner.GetType()
-        .GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(owner)!;
     internal static async Task RunAsync(Forms.Form owner, Character character, Action<bool, string> check)
     {
         byte[] original = character.CaptureSnapshot();
@@ -27,20 +24,19 @@ internal static class NativeGearEligibilityChecks
                 string excluded = mode == "hardware" ? "Response 1" : mode == "positive capacity" ? "Self-Destruct, Area Effect" : "Skinlink";
                 string included = mode == "hardware" ? "Response 4" : mode == "positive capacity" ? "Skinlink" : "Self-Destruct, Area Effect";
                 var pending = picker.ShowDialogAsync(owner);
-                Field<Forms.TextBox>(picker, "txtSearch").Text = mode == "hardware" ? "comlink" : "Electronics and Sensor Options";
+                var window = (GearPickerWindow)NativeDialogHost.ActiveWindow!;
+                window.SearchBox.Text = mode == "hardware" ? "comlink" : "Electronics and Sensor Options";
                 await Task.Delay(20);
-                check(Field<Forms.ListBox>(picker, "lstGear").Items.Cast<ListItem>().Any(item => item.Value.StartsWith(included + "^", StringComparison.Ordinal)) &&
-                    !Field<Forms.ListBox>(picker, "lstGear").Items.Cast<ListItem>().Any(item => item.Value.StartsWith(excluded + "^", StringComparison.Ordinal)),
+                check(window.Model.Items.Any(item => item.Name == included) &&
+                    !window.Model.Items.Any(item => item.Name == excluded),
                     "Native gear " + mode + " category search preserves eligibility");
-                Field<Forms.TextBox>(picker, "txtSearch").Text = excluded;
+                window.SearchBox.Text = excluded;
                 await Task.Delay(20);
-                check(Field<Forms.ListBox>(picker, "lstGear").Items.Count == 0 && !Field<Forms.Button>(picker, "cmdOK").Enabled,
+                check(window.Model.Items.Count == 0 && !window.AcceptButton.IsEnabled,
                     "Native gear " + mode + " search excludes incompatible purchases");
-                Field<Forms.TextBox>(picker, "txtSearch").Text = included;
-                var list = Field<Forms.ListBox>(picker, "lstGear");
-                list.SelectedIndex = list.Items.Cast<ListItem>().Select((item, index) => (item, index))
-                    .First(pair => pair.item.Value.StartsWith(included + "^", StringComparison.Ordinal)).index;
-                Field<Forms.Button>(picker, "cmdOK").PerformClick();
+                window.SearchBox.Text = included;
+                window.ItemList.SelectedItem = window.Model.Items.Single(item => item.Name == included);
+                window.Accept(false);
                 check(await pending == Forms.DialogResult.OK && picker.SelectedGear == included,
                     "Native gear " + mode + " search accepts an eligible canonical choice");
             }

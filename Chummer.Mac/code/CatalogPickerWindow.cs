@@ -27,7 +27,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
     internal Button AcceptButton { get; }
     internal Button AddMoreButton { get; }
     protected StackPanel DetailPanel { get; private set; } = null!;
-    private static string T(string key) => LanguageManager.Instance.GetString(key)
+    protected static string T(string key) => LanguageManager.Instance.GetString(key)
         .Replace("&&", "\u0001").Replace("&", "").Replace("\u0001", "&");
     private static Binding Read(string property) => new(property);
     private static Binding Edit(string property) => new(property) { Mode = BindingMode.TwoWay };
@@ -118,6 +118,12 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
             var quantityRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
             quantityRow.Children.Add(new TextBlock { Text = T("Label_Qty"), VerticalAlignment = VerticalAlignment.Center });
             var quantity = NativeIntegerInput.Create(namePrefix + "Quantity", 1, 1000);
+            if (model is IRangedQuantityCatalogPicker)
+            {
+                quantity.Bind(NumericUpDown.MinimumProperty, Read(nameof(IRangedQuantityCatalogPicker.MinimumQuantity)));
+                quantity.Bind(NumericUpDown.MaximumProperty, Read(nameof(IRangedQuantityCatalogPicker.MaximumQuantity)));
+                quantity.Bind(NumericUpDown.IncrementProperty, Read(nameof(IRangedQuantityCatalogPicker.QuantityIncrement)));
+            }
             quantity.Bind(NumericUpDown.ValueProperty, Edit(nameof(IQuantityCatalogPicker.Quantity)));
             quantity.Bind(IsEnabledProperty, Read(nameof(IQuantityCatalogPicker.IsQuantityEnabled)));
             quantityRow.Children.Add(quantity); details.Children.Add(quantityRow);

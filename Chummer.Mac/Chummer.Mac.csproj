@@ -18,6 +18,10 @@
     <AnalysisLevel>10.0</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="test-fixtures/gear-legacy-catalog.json" LogicalName="Chummer.GearLegacyCatalog.json" />
+    <EmbeddedResource Include="test-fixtures/gear-legacy-preview.json" LogicalName="Chummer.GearLegacyPreview.json" />
+  </ItemGroup>
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../vendor/Majorsilence.Forms/Majorsilence.Forms.csproj" />
     <ProjectReference Include="../vendor/Majorsilence.Forms.Avalonia/Majorsilence.Forms.Avalonia.csproj" />

@@ -38,6 +38,6 @@ NativeWeaponPickerChecks, NativeArmorPickerChecks and NativeAccessoryPickerCheck
 
 ## Remaining migrations
 
-Gear, cyberware and vehicle pickers still use compatibility controls. Assess their rating controls, nested choices and variable-price behavior before extending this framework. Preserve the established rules and custom-entry behavior. A native numeric/detail prompt and fully asynchronous purchase commands remain later work; migrating a picker does not imply its downstream purchase prompts are all native yet.
+Gear now uses the shared native catalog framework locally, with platform acceptance pending; see [GEAR_SELECTION.md](GEAR_SELECTION.md). Cyberware remains a subsequent compatibility picker. Assess its grades, rating controls, nested choices and variable-price behavior before extending this framework. Preserve the established rules and custom-entry behavior. A native numeric/detail prompt and fully asynchronous purchase commands remain later work; migrating a picker does not imply its downstream purchase prompts are all native yet.
 
 Rated armor modifications are now a fourth native picker. Optional rating support and the app-wide numeric-input rollout are documented in [NUMERIC_INPUTS.md](NUMERIC_INPUTS.md).

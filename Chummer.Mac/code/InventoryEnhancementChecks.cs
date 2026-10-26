@@ -17,28 +17,20 @@ internal static class InventoryEnhancementChecks
         byte[] original = character.CaptureSnapshot();
         using (var picker = new frmSelectGear(character) { AllowedCategories = "Commlink Operating System,Commlink Upgrade" })
         {
-            picker.PreferCategoryForParent(new Commlink(character)); picker.Show();
-            check(Field<ComboBox>(picker, "cboCategory").SelectedValue?.ToString() == "Commlink Operating System",
-                "commlink plug-in selection starts in operating systems without changing allowed categories");
-            picker.Close();
+            picker.PreferCategoryForParent(new Commlink(character)); var model = picker.CreateModel();
+            check(model.Category?.Code == "Commlink Operating System", "commlink plug-in starts in operating systems without changing allowed categories");
         }
         using (var picker = new frmSelectGear(character) { AllowedCategories = "Ammunition", InitialCategory = "Commlink Operating System", AmmunitionCategory = "Assault Rifles" })
         {
-            picker.Show();
-            var choices = Field<ListBox>(picker, "lstGear").Items.Cast<ListItem>().ToArray();
-            check(Field<ComboBox>(picker, "cboCategory").SelectedValue?.ToString() == "Ammunition" && choices.Any(item => item.Value == "Ammo: Regular Ammo") &&
-                !choices.Any(item => item.Value.Contains("Arrow") || item.Value.Contains("Rocket") || item.Value.Contains("Bolt")),
-                "contextual ammo buying filters incompatible families and respects unavailable default categories");
-            Field<TextBox>(picker, "txtSearch").Text = "Arrow";
-            check(Field<ListBox>(picker, "lstGear").Items.Count == 0, "ammo search cannot reintroduce incompatible weapon families");
-            Field<TextBox>(picker, "txtSearch").Text = "missing \"quoted\" ammunition";
-            check(Field<ListBox>(picker, "lstGear").Items.Count == 0 && Field<Label>(picker, "lblCost").Text == "" && !Field<Button>(picker, "cmdOK").Enabled,
-                "gear search handles quoted input, clears stale details and disables purchase");
-            Field<TextBox>(picker, "txtSearch").Text = "Regular Ammo";
-            Field<ListBox>(picker, "lstGear").SelectedIndex = 0;
-            check(Field<Button>(picker, "cmdOK").Enabled && Field<Label>(picker, "lblCost").Text != "",
-                "gear purchase recovers after an empty quoted search");
-            picker.Close();
+            var model = picker.CreateModel();
+            check(model.Category?.Code == "Ammunition" && model.Items.Any(item => item.Name == "Ammo: Regular Ammo") &&
+                !model.Items.Any(item => item.Name.Contains("Arrow") || item.Name.Contains("Rocket") || item.Name.Contains("Bolt")),
+                "contextual ammo filters incompatible families and respects unavailable default categories");
+            model.SearchText = "Arrow"; check(model.Items.Count == 0, "ammo search cannot reintroduce incompatible weapon families");
+            model.SearchText = "missing \"quoted\" ammunition";
+            check(model.Items.Count == 0 && model.Details == null && !model.CanAccept, "quoted gear search clears stale details and disables purchase");
+            model.SearchText = "Regular Ammo";
+            check(model.CanAccept && model.Details?.Cost.Length > 0, "gear purchase recovers after empty quoted search");
         }
         var copy = new Character(); copy.LoadSnapshot(original);
         XmlDocument weapons = XmlManager.Instance.Load("weapons.xml");

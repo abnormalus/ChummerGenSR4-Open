@@ -1055,8 +1055,11 @@ namespace Chummer
                 AccessoryPickerChecks.Run(character, Check);
                 InventoryEnhancementChecks.Run(character, Check);
                 GearEligibilityChecks.Run(character, Check);
+                GearSelectionChecks.Run(character, Check);
+                GearPreviewChecks.Run(character, Check);
+                GearPickerChecks.Run(character, Check);
                 PersonalizedGripChecks.Run(character, Check);
-                using (var dialog = new frmSelectGear(character)) Capture(dialog, output, "gear-dialog");
+                Check(new GearPickerModel(character, false).Items.Count > 0, "Gear standard picker supplies catalog choices");
                 using (var dialog = new frmSelectCyberware(character)) Capture(dialog, output, "cyberware-dialog");
                 Check(new QualityPickerModel(character).Items.Count > 0, "Quality standard picker supplies catalog choices");
                 using (var dialog = new frmSelectSpell(character)) Capture(dialog, output, "spell-dialog");

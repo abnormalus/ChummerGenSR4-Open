@@ -107,8 +107,8 @@ internal static class NativePacksInteractionChecks
             var gearObserved = new TaskCompletionSource<bool>();
             Avalonia.Threading.Dispatcher.UIThread.Post(async () => {
                 try {
-                    await WaitForAsync(() => Application.OpenForms.OfType<frmSelectGear>().Any());
-                    Application.OpenForms.OfType<frmSelectGear>().Last().Close();
+                    await WaitForAsync(() => NativeDialogHost.ActiveWindow is GearPickerWindow);
+                    NativeDialogHost.ActiveWindow!.Close();
                     gearObserved.TrySetResult(true);
                 } catch (Exception error) { gearObserved.TrySetException(error); }
             });
