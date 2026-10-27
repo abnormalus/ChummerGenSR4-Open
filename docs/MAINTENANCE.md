@@ -13,6 +13,23 @@ The shared desktop application currently lives in Chummer.Mac. It can be publish
 - `knowledge-suggestions.xml` supplements the existing ruleset skills with the supplied `knowledge skills.csv` and `interests.csv` entries. The CSV category `Interests` maps to the existing `Interest` category. Suggestions are optional names, not new rules or source attributions; the category is chosen first and curates the available names. The arrow restores the full category list, while typing filters it. Add Specialty uses the shared free-text prompt and the existing career Karma flow. Keep these suggestions separate from `skills.xml` so ruleset updates preserve them.
 - Keep extracting rules from window handlers when changing those areas, rather than rewriting the rules engine during unrelated UI fixes.
 
+### Native inline controller adapters
+
+`NativeInlineTextBinding`, `NativeInlineChoiceBinding`, `NativeInlineNumericBinding` and
+`NativeInlineCommandBinding` bridge existing controller controls into native sections.
+They share `NativeControlObservation` for EnabledChanged, VisibleChanged and Invalidated
+subscriptions. Dispose the binding when its owning section closes: the observer detaches
+only its own callbacks and never disposes the controller control. It performs no initial
+refresh; each adapter synchronizes after initializing its native input and handlers.
+
+Text/value events, feedback guards, validation and native input handlers stay in the
+individual adapters because their semantics differ. This consolidation replaces four
+copies of common subscription/cleanup code without sharing their domain policies.
+`NativeControlObservationChecks` exercises forwarding, independent observers and repeated
+disposal in the headless suite; existing section checks cover edits and controller state.
+Changes to these adapters also need the affected native section checks on Mac and Windows
+before release.
+
 ## Diagnostics
 
 Help → Open Diagnostic Logs opens the local log folder. On Mac it is under Library/Application Support/ChummerGenSR4Mac/logs. Logs contain UTC time, command ID, assembly version, unique compiled-module build ID, OS/runtime/architecture, exception types/HRESULTs, and method stacks without source-file paths. The specific numeric Avalonia render-timer registration error is recorded when present; arbitrary exception messages, character XML, aliases, and character filenames are omitted. No logs are uploaded automatically.

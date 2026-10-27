@@ -15,16 +15,15 @@ internal sealed class NativeInlineCommandBinding : IDisposable
     private readonly Func<bool> available;
     private readonly Func<string> caption;
     private readonly Action execute;
-    private readonly Forms.InvalidateEventHandler invalidated;
+    private readonly NativeControlObservation observation;
     private bool disposed;
     internal Button Input { get; } = new() { MinHeight = 32, FontSize = 12, Padding = new Thickness(6, 2), Margin = new Thickness(1) };
     internal NativeInlineCommandBinding(Forms.Control source, Forms.ToolTip tips, Func<bool> available, Action execute, Func<string>? caption = null)
     {
         this.source = source; this.tips = tips; this.available = available; this.execute = execute;
         this.caption = caption ?? (() => source.Text);
-        invalidated = (_, _) => Refresh();
-        source.TextChanged += SourceChanged; source.EnabledChanged += SourceChanged;
-        source.VisibleChanged += SourceChanged; source.Invalidated += invalidated;
+        observation = new NativeControlObservation(source, Refresh);
+        source.TextChanged += SourceChanged;
         Input.Click += Click; Refresh();
     }
     internal void Refresh()
@@ -43,7 +42,7 @@ internal sealed class NativeInlineCommandBinding : IDisposable
     {
         if (disposed) return;
         disposed = true; Input.Click -= Click;
-        source.TextChanged -= SourceChanged; source.EnabledChanged -= SourceChanged;
-        source.VisibleChanged -= SourceChanged; source.Invalidated -= invalidated;
+        source.TextChanged -= SourceChanged;
+        observation.Dispose();
     }
 }

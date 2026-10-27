@@ -16,7 +16,7 @@ internal sealed class NativeInlineNumericBinding : IDisposable
     private readonly Forms.ToolTip tips;
     private readonly bool wholeNumbers;
     private readonly Func<bool>? available;
-    private readonly Forms.InvalidateEventHandler invalidated;
+    private readonly NativeControlObservation observation;
     private bool syncing, disposed;
     internal NumericUpDown Input { get; }
 
@@ -26,9 +26,8 @@ internal sealed class NativeInlineNumericBinding : IDisposable
         Input = new NumericUpDown { Name = "native" + source.Name, Width = 120, MinHeight = 32, FontSize = 12,
             Padding = new Thickness(2), ClipValueToMinMax = true,
             ParsingNumberStyle = wholeNumbers ? NumberStyles.Integer : NumberStyles.Number };
-        invalidated = (_, _) => Refresh();
-        source.ValueChanged += SourceChanged; source.EnabledChanged += SourceChanged;
-        source.VisibleChanged += SourceChanged; source.Invalidated += invalidated;
+        observation = new NativeControlObservation(source, Refresh);
+        source.ValueChanged += SourceChanged;
         Input.ValueChanged += NativeChanged; Input.LostFocus += NativeLostFocus;
         Refresh();
     }
@@ -64,8 +63,8 @@ internal sealed class NativeInlineNumericBinding : IDisposable
     {
         if (disposed) return;
         disposed = true;
-        source.ValueChanged -= SourceChanged; source.EnabledChanged -= SourceChanged;
-        source.VisibleChanged -= SourceChanged; source.Invalidated -= invalidated;
+        source.ValueChanged -= SourceChanged;
+        observation.Dispose();
         Input.ValueChanged -= NativeChanged; Input.LostFocus -= NativeLostFocus;
     }
 }
