@@ -15905,7 +15905,8 @@ namespace Chummer
                             }
                             else
                             {
-								// TODO: Merge with existing code above, as values might be modified this way
+								// Plain factors add against each original base. Keep this separate from
+                                // sign-bearing expressions, where a single value changes walking only.
                                 decAccelWalking += (Convert.ToDecimal(AccelWalking, GlobalOptions.Instance.CultureInfo) * Convert.ToDecimal(objMod.Bonus["accel"].InnerText, GlobalOptions.Instance.CultureInfo));
 								decAccelRunning += (Convert.ToDecimal(AccelRunning, GlobalOptions.Instance.CultureInfo) * Convert.ToDecimal(objMod.Bonus["accel"].InnerText, GlobalOptions.Instance.CultureInfo));
 							}

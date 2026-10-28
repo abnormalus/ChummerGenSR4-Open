@@ -63,6 +63,7 @@ namespace Chummer
                 GlobalOptions.Instance.AutomaticUpdate = false;
                 LanguageManager.Instance.Load("en-us", null);
                 Check(LanguageManager.Instance.Loaded, "English language loaded");
+                ClipboardDocumentChecks.Run(Check);
                 XmlCatalogCacheChecks.Run(Check);
                 CyberwareCallerChecks.RunLookup(Check);
                 ReleaseUpdateChecks.Run();
@@ -1047,6 +1048,7 @@ namespace Chummer
                 BuildIdentityChecks.Run(Check);
                 BuildPointPersistenceChecks.Run(character, Check);
                 WeaponFocusBindingChecks.Run(character, Check);
+                ClipboardCopyChecks.Run(character, Check);
                 AccessoryBatchChecks.Run(character, Check);
                 WeaponAmmunitionChecks.Run(character, Check);
                 ArmorPickerChecks.Run(character, Check);

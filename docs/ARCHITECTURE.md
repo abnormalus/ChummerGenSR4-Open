@@ -30,6 +30,8 @@ The original `Chummer` project is historical source. `Chummer.Mac.sln` builds th
 
 [Installed vehicle movement](VEHICLE_MOVEMENT.md) records the shared final arithmetic and the deliberately separate Speed multiplier/acceleration expression paths. Vehicle model selection and armor eligibility stay model-owned; the arithmetic component reads no controls or persisted state.
 
+[Inventory Copy](CLIPBOARD_COPY.md) separates the temporary Unicode XML wrapper from model Save dispatch and global clipboard policy. The existing Gear failure-order limitation remains explicit; the wrapper does not claim atomic publication or rollback of callback effects.
+
 ## Verification and remaining architecture work
 
 `MacSmokeTests` orchestrates headless behavior and compatibility checks. Native drivers execute real platform interactions separately; `.github/workflows/desktop-build.yml` builds and verifies Mac/Windows and retains diagnostics. See [CONTRIBUTING](../CONTRIBUTING.md) for commands and verification limits.

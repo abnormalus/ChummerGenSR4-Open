@@ -2817,38 +2817,10 @@ namespace Chummer
 						if (objCopyLifestyle == null)
 							return;
 
-						MemoryStream objStream = new MemoryStream();
-						XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-						objWriter.Formatting = Formatting.Indented;
-						objWriter.Indentation = 1;
-						objWriter.IndentChar = '\t';
-
-						objWriter.WriteStartDocument();
-
-						// </characters>
-						objWriter.WriteStartElement("character");
-
-						objCopyLifestyle.Save(objWriter);
-
-						// </characters>
-						objWriter.WriteEndElement();
-
-						// Finish the document and flush the Writer and Stream.
-						objWriter.WriteEndDocument();
-						objWriter.Flush();
-						objStream.Flush();
-
-						// Read the stream.
-						StreamReader objReader = new StreamReader(objStream);
-						objStream.Position = 0;
-						XmlDocument objCharacterXML = new XmlDocument();
-
-						// Put the stream into an XmlDocument.
-						string strXML = objReader.ReadToEnd();
-						objCharacterXML.LoadXml(strXML);
-
-						objWriter.Close();
-						objStream.Close();
+						XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+						{
+							objCopyLifestyle.Save(objWriter);
+						});
 
 						GlobalOptions.Instance.Clipboard = objCharacterXML;
 						GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Lifestyle;
@@ -2869,38 +2841,10 @@ namespace Chummer
 
 						if (objCopyArmor != null)
 						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							objCopyArmor.Save(objWriter);
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+							{
+								objCopyArmor.Save(objWriter);
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Armor;
@@ -2914,61 +2858,33 @@ namespace Chummer
 
 						if (objCopyGear != null)
 						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							if (objCopyGear.GetType() == typeof(Commlink))
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
 							{
-								Commlink objCommlink = (Commlink)objCopyGear;
-								objCommlink.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
-							}
-							else if (objCopyGear.GetType() == typeof(OperatingSystem))
-							{
-								OperatingSystem objOS = (OperatingSystem)objCopyGear;
-								objOS.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
-							}
-							else
-							{
-								objCopyGear.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
-							}
+								if (objCopyGear.GetType() == typeof(Commlink))
+								{
+									Commlink objCommlink = (Commlink)objCopyGear;
+									objCommlink.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
+								}
+								else if (objCopyGear.GetType() == typeof(OperatingSystem))
+								{
+									OperatingSystem objOS = (OperatingSystem)objCopyGear;
+									objOS.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
+								}
+								else
+								{
+									objCopyGear.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+								}
 
-							if (objCopyGear.WeaponID != Guid.Empty.ToString())
-							{
-								// Copy any Weapon that comes with the Gear.
-								Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
-								objCopyWeapon.Save(objWriter);
-							}
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+								if (objCopyGear.WeaponID != Guid.Empty.ToString())
+								{
+									// Copy any Weapon that comes with the Gear.
+									Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
+									objCopyWeapon.Save(objWriter);
+								}
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 
@@ -2995,38 +2911,10 @@ namespace Chummer
 							if (objCopyWeapon.Category == "Gear" || objCopyWeapon.Category.StartsWith("Cyberware"))
 								return;
 
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							objCopyWeapon.Save(objWriter);
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+							{
+								objCopyWeapon.Save(objWriter);
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Weapon;
@@ -3040,61 +2928,33 @@ namespace Chummer
 
 						if (objCopyGear != null)
 						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							if (objCopyGear.GetType() == typeof(Commlink))
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
 							{
-								Commlink objCommlink = (Commlink)objCopyGear;
-								objCommlink.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
-							}
-							else if (objCopyGear.GetType() == typeof(OperatingSystem))
-							{
-								OperatingSystem objOS = (OperatingSystem)objCopyGear;
-								objOS.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
-							}
-							else
-							{
-								objCopyGear.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
-							}
+								if (objCopyGear.GetType() == typeof(Commlink))
+								{
+									Commlink objCommlink = (Commlink)objCopyGear;
+									objCommlink.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
+								}
+								else if (objCopyGear.GetType() == typeof(OperatingSystem))
+								{
+									OperatingSystem objOS = (OperatingSystem)objCopyGear;
+									objOS.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
+								}
+								else
+								{
+									objCopyGear.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+								}
 
-							if (objCopyGear.WeaponID != Guid.Empty.ToString())
-							{
-								// Copy any Weapon that comes with the Gear.
-								Weapon objCopyGearWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
-								objCopyGearWeapon.Save(objWriter);
-							}
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+								if (objCopyGear.WeaponID != Guid.Empty.ToString())
+								{
+									// Copy any Weapon that comes with the Gear.
+									Weapon objCopyGearWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
+									objCopyGearWeapon.Save(objWriter);
+								}
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 
@@ -3118,136 +2978,8 @@ namespace Chummer
 						if (objCopyGear == null)
 							return;
 
-						MemoryStream objStream = new MemoryStream();
-						XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-						objWriter.Formatting = Formatting.Indented;
-						objWriter.Indentation = 1;
-						objWriter.IndentChar = '\t';
-
-						objWriter.WriteStartDocument();
-
-						// </characters>
-						objWriter.WriteStartElement("character");
-
-						if (objCopyGear.GetType() == typeof(Commlink))
+						XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
 						{
-							Commlink objCommlink = (Commlink)objCopyGear;
-							objCommlink.Save(objWriter);
-							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
-						}
-						else if (objCopyGear.GetType() == typeof(OperatingSystem))
-						{
-							OperatingSystem objOS = (OperatingSystem)objCopyGear;
-							objOS.Save(objWriter);
-							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
-						}
-						else
-						{
-							objCopyGear.Save(objWriter);
-							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
-						}
-
-						if (objCopyGear.WeaponID != Guid.Empty.ToString())
-						{
-							// Copy any Weapon that comes with the Gear.
-							Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
-							objCopyWeapon.Save(objWriter);
-						}
-
-						// </characters>
-						objWriter.WriteEndElement();
-
-						// Finish the document and flush the Writer and Stream.
-						objWriter.WriteEndDocument();
-						objWriter.Flush();
-						objStream.Flush();
-
-						// Read the stream.
-						StreamReader objReader = new StreamReader(objStream);
-						objStream.Position = 0;
-						XmlDocument objCharacterXML = new XmlDocument();
-
-						// Put the stream into an XmlDocument.
-						string strXML = objReader.ReadToEnd();
-						objCharacterXML.LoadXml(strXML);
-
-						objWriter.Close();
-						objStream.Close();
-
-						GlobalOptions.Instance.Clipboard = objCharacterXML;
-						//Clipboard.SetText(objCharacterXML.OuterXml);
-					}
-					catch
-					{
-					}
-				}
-			}
-
-			// Vehicles Tab.
-			if (tabCharacterTabs.SelectedTab == tabVehicles)
-			{
-				try
-				{
-					if (treVehicles.SelectedNode.Level == 1)
-					{
-						// Copy the selected Vehicle.
-						Vehicle objCopyVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
-
-						MemoryStream objStream = new MemoryStream();
-						XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-						objWriter.Formatting = Formatting.Indented;
-						objWriter.Indentation = 1;
-						objWriter.IndentChar = '\t';
-
-						objWriter.WriteStartDocument();
-
-						// </characters>
-						objWriter.WriteStartElement("character");
-
-						objCopyVehicle.Save(objWriter);
-
-						// </characters>
-						objWriter.WriteEndElement();
-
-						// Finish the document and flush the Writer and Stream.
-						objWriter.WriteEndDocument();
-						objWriter.Flush();
-						objStream.Flush();
-
-						// Read the stream.
-						StreamReader objReader = new StreamReader(objStream);
-						objStream.Position = 0;
-						XmlDocument objCharacterXML = new XmlDocument();
-
-						// Put the stream into an XmlDocument.
-						string strXML = objReader.ReadToEnd();
-						objCharacterXML.LoadXml(strXML);
-
-						objWriter.Close();
-						objStream.Close();
-
-						GlobalOptions.Instance.Clipboard = objCharacterXML;
-						GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Vehicle;
-						//Clipboard.SetText(objCharacterXML.OuterXml);
-					}
-					else
-					{
-						Vehicle objVehicle = new Vehicle(_objCharacter);
-						Gear objCopyGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objVehicle);
-
-						if (objCopyGear != null)
-						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
 							if (objCopyGear.GetType() == typeof(Commlink))
 							{
 								Commlink objCommlink = (Commlink)objCopyGear;
@@ -3272,26 +3004,70 @@ namespace Chummer
 								Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
 								objCopyWeapon.Save(objWriter);
 							}
+						});
 
-							// </characters>
-							objWriter.WriteEndElement();
+						GlobalOptions.Instance.Clipboard = objCharacterXML;
+						//Clipboard.SetText(objCharacterXML.OuterXml);
+					}
+					catch
+					{
+					}
+				}
+			}
 
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
+			// Vehicles Tab.
+			if (tabCharacterTabs.SelectedTab == tabVehicles)
+			{
+				try
+				{
+					if (treVehicles.SelectedNode.Level == 1)
+					{
+						// Copy the selected Vehicle.
+						Vehicle objCopyVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
+						XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+						{
+							objCopyVehicle.Save(objWriter);
+						});
 
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
+						GlobalOptions.Instance.Clipboard = objCharacterXML;
+						GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Vehicle;
+						//Clipboard.SetText(objCharacterXML.OuterXml);
+					}
+					else
+					{
+						Vehicle objVehicle = new Vehicle(_objCharacter);
+						Gear objCopyGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objVehicle);
 
-							objWriter.Close();
-							objStream.Close();
+						if (objCopyGear != null)
+						{
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+							{
+								if (objCopyGear.GetType() == typeof(Commlink))
+								{
+									Commlink objCommlink = (Commlink)objCopyGear;
+									objCommlink.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
+								}
+								else if (objCopyGear.GetType() == typeof(OperatingSystem))
+								{
+									OperatingSystem objOS = (OperatingSystem)objCopyGear;
+									objOS.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
+								}
+								else
+								{
+									objCopyGear.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+								}
+
+								if (objCopyGear.WeaponID != Guid.Empty.ToString())
+								{
+									// Copy any Weapon that comes with the Gear.
+									Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
+									objCopyWeapon.Save(objWriter);
+								}
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 
@@ -3310,38 +3086,10 @@ namespace Chummer
 									if (objCopyWeapon.Category == "Gear" || objCopyWeapon.Category.StartsWith("Cyberware"))
 										return;
 
-									MemoryStream objStream = new MemoryStream();
-									XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-									objWriter.Formatting = Formatting.Indented;
-									objWriter.Indentation = 1;
-									objWriter.IndentChar = '\t';
-
-									objWriter.WriteStartDocument();
-
-									// </characters>
-									objWriter.WriteStartElement("character");
-
-									objCopyWeapon.Save(objWriter);
-
-									// </characters>
-									objWriter.WriteEndElement();
-
-									// Finish the document and flush the Writer and Stream.
-									objWriter.WriteEndDocument();
-									objWriter.Flush();
-									objStream.Flush();
-
-									// Read the stream.
-									StreamReader objReader = new StreamReader(objStream);
-									objStream.Position = 0;
-									XmlDocument objCharacterXML = new XmlDocument();
-
-									// Put the stream into an XmlDocument.
-									string strXML = objReader.ReadToEnd();
-									objCharacterXML.LoadXml(strXML);
-
-									objWriter.Close();
-									objStream.Close();
+									XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+									{
+										objCopyWeapon.Save(objWriter);
+									});
 
 									GlobalOptions.Instance.Clipboard = objCharacterXML;
 									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Weapon;

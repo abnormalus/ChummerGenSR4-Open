@@ -12,6 +12,8 @@ The owned Cyberware/Bioware picker is connected and its legacy Designer/resx pat
 
 The continuation is [draft PR #44](https://github.com/abnormalus/ChummerGenSR4-Open/pull/44), based on that merge. It consolidates native inline-controller observation and adds bounded restore/build/headless execution with retained stage logs; see [MAINTENANCE.md](MAINTENANCE.md). Finish its current-source full/native/visual acceptance before selecting another migration. Use live GitHub checks and the PR checkpoint for execution state rather than treating historical pending records as new work. PR #43 remains a separate open change; inspect it before editing overlapping code.
 
+Draft [PR #44](https://github.com/abnormalus/ChummerGenSR4-Open/pull/44) records the next bounded ownership work: [native adapter observation](MAINTENANCE.md), [Power Point summaries](ADEPT_POWER_POINTS.md), [catalog merge stages](XML_CATALOG_OWNERSHIP.md) and [installed vehicle movement](VEHICLE_MOVEMENT.md). Independent baseline expectations and full headless compatibility passed for each arithmetic/merge extraction. Source `2ddad36` passed both-platform native checks; later catalog/vehicle revisions have their own pending platform and affected-image gates. These increments remain draft work, with no merge or release claim. Use the PR's exact-source checkpoint rather than treating prior green results as acceptance of a later revision.
+
 ## For each section
 
 1. **Record its behavior.** Identify the character data/rules it reads and changes, source filtering, saved fields, commands, validation, undo requirements and platform interactions. Preserve custom entries and existing character-file compatibility.
