@@ -2,13 +2,15 @@
 
 As each application section is repaired or improved, review whether it recreates a capability already supplied by the modern framework or an appropriate maintained library. Prefer established components where they reduce maintenance and preserve the required behavior. This is an incremental process, not a wholesale rewrite or an edition expansion.
 
-## Current isolated Cyberware stage
+## Current modernization checkpoint
 
 Add Quality and the test-driver fullscreen reconciliation passed both-platform native and visual acceptance and are released in verified Nightly0.2.147 (source ea1a297a9aaa45dcfeb3fe7c0c7ea653d7bcde2c). Stable is unchanged. See [QUALITY_SELECTION.md](QUALITY_SELECTION.md) for the quality boundary.
 
 The creation-facing Gear picker is released in verified Nightly0.2.148 (source4a263195872a7c02703fb851155ccafe3d90b162). Its disposable adapter and standard catalog window passed Mac883/Windows876 native checks, full headless/all399/both Foundry/audit/WindowsPDF, and visual review of all40current batch frames perOS. All21purchase callers explicitly require OK and dispose it. See [GEAR_SELECTION.md](GEAR_SELECTION.md).
 
-Cyberware is now in isolated modernization:641local legacy/model/caller checks and the full headless suite pass, with94frozen catalog-context hashes and101independently captured preview cases. Reproduced grade-lock, search and vehicle parent-context defects have bounded local corrections; all four callers have scoped disposal, explicit acceptance and literal canonical lookup. A standard model/window is prepared and compiles but is not connected or natively executed. The legacy window remains active. The owned adapter, legacy retirement and platform acceptance remain pending. See [CYBERWARE_PICKER.md](CYBERWARE_PICKER.md). No Cyberware release is claimed. Historical pending records below do not supersede this checkpoint.
+The owned Cyberware/Bioware picker is connected and its legacy Designer/resx path is retired. [PR #42](https://github.com/abnormalus/ChummerGenSR4-Open/pull/42) merged as `6c1d886e0b7ed1a37ff7ba6247a4825522281e51`. Its accepted source `c594521928b32919c101401760120fee811d9554` passed Mac 1006/Windows 999 native assertions, full headless checks, all 399 file/memory round trips, both Foundry targets, dependency audit and Windows PDF checks. All 48 current-batch frames per OS were visually reviewed. See [CYBERWARE_PICKER.md](CYBERWARE_PICKER.md) for the behavior boundary and historical development evidence. This acceptance does not establish a subsequent release or promote Stable.
+
+The continuation is [draft PR #44](https://github.com/abnormalus/ChummerGenSR4-Open/pull/44), based on that merge. It consolidates native inline-controller observation and adds bounded restore/build/headless execution with retained stage logs; see [MAINTENANCE.md](MAINTENANCE.md). Finish its current-source full/native/visual acceptance before selecting another migration. Use live GitHub checks and the PR checkpoint for execution state rather than treating historical pending records as new work. PR #43 remains a separate open change; inspect it before editing overlapping code.
 
 ## For each section
 
@@ -36,7 +38,7 @@ Cyberware is now in isolated modernization:641local legacy/model/caller checks a
 
 ## Rendering priority
 
-The requested Add Quality window and career specialty disclosures are released. Continue through common Gear and Cyberware shopping controls, preserving selection, filtering, source links, accept/cancel, caller accounting and existing creation/career behavior. The current Gear preparation is described above.
+The requested Add Quality window and career specialty disclosures are released. Gear and Cyberware shopping-control migrations have the acceptance recorded above. Preserve selection, filtering, source links, accept/cancel, caller accounting and existing creation/career behavior when choosing the next section after the current draft is verified.
 
 Repeated repaint defects justify examining shared invalidation/caching behavior before adding more screen-specific refresh calls. Prioritize the frequently affected item lists and changing detail values. The first shared repaint corrections and session-only full-redraw diagnostic are implemented and documented in [RENDERING.md](RENDERING.md). Use the cached-versus-complete frame checks as acceptance coverage for the next bounded standard-control migration. Prefer event-driven correctness and standard controls over continuously repainting the whole window to hide defects.
 
