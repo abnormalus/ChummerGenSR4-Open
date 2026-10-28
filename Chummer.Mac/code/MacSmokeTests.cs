@@ -63,6 +63,7 @@ namespace Chummer
                 GlobalOptions.Instance.AutomaticUpdate = false;
                 LanguageManager.Instance.Load("en-us", null);
                 Check(LanguageManager.Instance.Loaded, "English language loaded");
+                XmlCatalogCacheChecks.Run(Check);
                 CyberwareCallerChecks.RunLookup(Check);
                 ReleaseUpdateChecks.Run();
                 Check(AppDiagnostics.NativeRenderTimerCode(new InvalidOperationException(

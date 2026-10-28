@@ -180,7 +180,7 @@ internal static class NativeCreationInputChecks
                     Capture("native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
                     check(screen != null && ready && GeometryMatches(Avalonia.Controls.WindowState.FullScreen, fullscreenSize),
                         "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
-                        FormattableString.Invariant($" [expected={fullscreenSize}; actual={window.ClientSize}; state={window.WindowState}]"));
+                        FormattableString.Invariant($" [expected={fullscreenSize}; actual={window.ClientSize}; state={window.WindowState}; frame={window.FrameSize}; decorations={window.WindowDecorations}; extended={window.ExtendClientAreaToDecorationsHint}; screen={screen?.Bounds}; workingArea={screen?.WorkingArea}; scaling={screen?.Scaling}]"));
                     check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Right <= commonPage.ClientSize.Width && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
                         "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
                     bool fullscreenContactsFit = ContactsFit();

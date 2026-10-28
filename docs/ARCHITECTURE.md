@@ -24,7 +24,7 @@ For the ordinary career purchase path in `frmCareer`, inspect the block after `C
 
 ## Data, settings and compatibility
 
-Matching rule catalogs, translations, sheets, sample characters and settings reside under `Chummer.Mac/assets`. Character serialization remains in the legacy model. Settings/sourcebook/PDF associations have separate lifetimes and must not be implicitly reset by a UI migration.
+Matching rule catalogs, translations, sheets, sample characters and settings reside under `Chummer.Mac/assets`. [XML catalog ownership](XML_CATALOG_OWNERSHIP.md) records the process cache, caller-owned copies and custom-data merge boundary, including current invalidation limits. Character serialization remains in the legacy model. Settings/sourcebook/PDF associations have separate lifetimes and must not be implicitly reset by a UI migration.
 
 The original `Chummer` project is historical source. `Chummer.Mac.sln` builds the current Mac/Windows application. Vendor changes require reviewing `vendor/LOCAL_PATCHES.md` and the capability inventory in [COMPATIBILITY_CONTROLS](COMPATIBILITY_CONTROLS.md); compilation cannot prove a no-op platform API behaves correctly.
 
