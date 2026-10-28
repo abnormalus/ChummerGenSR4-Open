@@ -84,6 +84,7 @@ internal static class NativeBulkChecks
             await NativeCharacterThemeChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativePowerPointSummaryChecks.RunAsync(main, character, Check);
             await NativeVehicleMovementChecks.RunAsync(main, character, Check);
+            await NativeClipboardCopyChecks.RunAsync(main, character, Check);
             await NativeAmmunitionViewChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCyberwareRemovalChecks.RunAsync(main, character, Check);
             await NativeWeaponFocusChecks.RunAsync(main, character, Check);
