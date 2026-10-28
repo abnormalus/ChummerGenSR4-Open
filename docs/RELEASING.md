@@ -38,6 +38,18 @@ The **Consolidate daily download archives** workflow safely migrates the old tim
 
 The Nightly Assets section contains only the current packages and metadata. Superseded filenames are removed from Nightly only after verified archival and successful replacement uploads. GitHub does not provide nested release categories; daily releases keep the main Releases page compact while preserving individual builds.
 
+## Recover a previous package set
+
+A failed validation leaves the prior published packages available. A failure during publication needs separate inspection: asset upload, moving-tag update and release-note publication are individual GitHub operations, so do not assume the current Nightly assets form one complete build after an interrupted publish.
+
+1. Record the failing build's About/BUILD.txt source identity and retain its diagnostics. For an interrupted publish, inspect the workflow stage and current Nightly asset names before retrying; do not remove the remaining downloads or daily archive.
+2. Select one prior build from the daily archive's table. Match its source commit and shared UTC timestamp/identity prefix in ARCHIVE.json. Download that build's packages and BUILD.txt together. Preserve current character files and settings separately before trying an older application; this procedure does not establish that every older version can read newer saved data.
+3. Verify every selected download against its ARCHIVE.json SHA-256 and original filename mapping. If downloading the entire daily archive, verify all its renamed assets with SHA256SUMS-ARCHIVE.txt. The archived original SHA256SUMS.txt refers to original names and cannot directly check prefixed downloads. A matching tag or filename alone does not verify bytes.
+4. Use the verified Mac ZIP or Windows MSI for the required platform. Installer replacement behavior depends on version; the documented same-version replacement does not establish that a Windows downgrade succeeds. Keep user data outside the installation tree and verify application startup, identity, a copied character and settings/source/PDF associations before retaining this package as the working version.
+5. Record the selected source and evidence. Restoring local packages does not change Nightly or Stable. Republishing, moving a release tag or promoting a channel requires separate authorization and exact-source package/platform verification. The publisher deliberately refuses an obsolete SOURCE_SHA once master advances; do not bypass that guard to restore an older Nightly.
+
+Archive integrity and retry/conflict safeguards have offline tests in `scripts/tests/test_archive_nightly.py`. Those tests use a fake GitHub service: they do not prove an installed downgrade, platform startup, or a live interrupted-release recovery. Keep those checks explicit when performing a real recovery.
+
 ## Local retention
 
 Keep one verified Stable package set and one verified Nightly package set locally. Use temporary directories for intermediate builds and remove their generated bundles/publish folders after validation, provided they are not running. Do not delete logs, screenshots, character exports, source files or installed/running applications as part of build cleanup. Replace a retained channel only after verifying the replacement checksums. Older releases remain in GitHub daily archives; local per-iteration bundles are unnecessary.
