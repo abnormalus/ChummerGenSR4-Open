@@ -1051,6 +1051,7 @@ namespace Chummer
                 WeaponAmmunitionChecks.Run(character, Check);
                 ArmorPickerChecks.Run(character, Check);
                 VehiclePickerChecks.Run(character, Check);
+                VehicleMovementChecks.Run(Check);
                 VehicleModPreviewChecks.Run(Check);
                 VehicleModPickerChecks.Run(character, Check);
                 BasicLifestylePromptChecks.Run(character, Check);

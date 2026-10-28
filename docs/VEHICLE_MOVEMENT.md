@@ -1,0 +1,19 @@
+# Installed vehicle movement statistics
+
+`Vehicle.TotalSpeed` and `Vehicle.TotalAccel` in `clsEquipment.cs` calculate installed statistics. `VehicleModPurchasePreview` evaluates purchase cost instead; its regression matrix does not establish movement-rule parity.
+
+Only installed modifications that are not included in the vehicle's base configuration contribute their bonus XML. Speed adds each multiplier against base Speed. Acceleration uses a separate legacy selection rule: any plus/minus selects XPath expression evaluation with Rating substitution; slash-separated expressions can change walking and running independently, while a single expression changes walking only. Otherwise, each side adds its own base value multiplied by the decimal bonus. In particular, `-2` is an acceleration expression, not a negative multiplier. Preserve this distinction unless deliberately changing rules in a separate reviewed change.
+
+After modification aggregation, armor exceeding both modified Body and the vehicle's original Armor subtracts 20 percent of the original base movement value. It does not multiply the augmented total by 0.8. Each final value clamps at zero and rounds upward. Base armor alone does not trigger the penalty, and armor equal to Body is below the penalty threshold.
+
+## Characterization before consolidation
+
+`VehicleMovementChecks` invokes the original public getters with synthetic models and fixed handwritten expectations. The initial 12 cases/24 assertions passed the full headless suite, all 399 character file/memory round trips, both Foundry targets and shutdown checks (188.9 seconds). The expanded matrix adds fractional ceilings, negative Speed clamping, armor equal to Body and malformed-expression failure/input preservation, for 31 assertions; the complete baseline passed (191.4 seconds), including all 399 file/memory round trips and both Foundry targets.
+
+Expected outputs are independent of any future shared arithmetic helper. Existing model base fields and modification XML/rating/installed/included flags must remain unchanged after reads. The matrix does not claim coverage of every vehicle rule, all catalog data, persisted vehicle changes or native interactions. The local extraction builds successfully: the armor predicate has one model owner and final arithmetic is in `VehicleMovementValue.Calculate`. The extraction passed all 31 unchanged assertions and the complete headless suite, all 399 file/memory round trips, both Foundry targets and shutdown (189.6 seconds). Native selected-editor coverage is prepared and still requires execution.
+
+The intended boundary is shared final arithmetic, with catalog/modification selection, XPath expression evaluation and existing eligibility conditions retained explicitly in the model. Do not merge the Speed multiplier branch with the acceleration expression branch merely because both ultimately contribute decimal values. Character and settings formats remain outside this calculation boundary.
+
+Both `frmCreate` and `frmCareer` publish these model getters through `lblVehicleAccel` and `lblVehicleSpeed` when a vehicle is selected. Native purchase drivers cover surrounding commands, but direct model parity alone does not prove those selected-vehicle labels refresh correctly; retain affected-editor verification as an explicit gate.
+
+`NativeVehicleMovementChecks` adds 16 actual-editor assertions: creation/career, Light/Dark, installed/disabled synthetic modification, fixed visible labels and unchanged snapshot/clean-editor state. Its builds pass. Local execution failed before window initialization with Avalonia render-timer code -6661, so this driver has not yet established native acceptance. The suite retains initial creation geometry first, the five-minute deadline, final passed report and raised assertion minimum (1029). Do not infer a passing native fixture from compilation or model parity.

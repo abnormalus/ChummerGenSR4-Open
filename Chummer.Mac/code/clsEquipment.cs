@@ -15839,6 +15839,10 @@ namespace Chummer
 			}
 		}
 
+		// Base armor alone does not penalize movement; keep the original short-circuit
+		// getter order for modified Armor/Body. Final arithmetic is state-independent.
+		private bool HasMovementArmorPenalty => TotalArmor > TotalBody && TotalArmor > _intArmor;
+
 		/// <summary>
 		/// Total Speed of the Vehicle including Modifications.
 		/// </summary>
@@ -15858,18 +15862,7 @@ namespace Chummer
 					}
 				}
 
-				// If the Vehicle's Total Armor exceeds its Total Body, Accel and Speed are decreased by 20%.
-				// The value must also exceed the Armor Rating that the Vehicles comes equipped with by default.
-				if (TotalArmor > TotalBody && TotalArmor > _intArmor)
-				{
-					decSpeed -= (Convert.ToDecimal(_intSpeed, GlobalOptions.Instance.CultureInfo) * 0.2m);
-				}
-
-				// Make sure Speed doesn't go below 0.
-				if (decSpeed < 0.0m)
-					decSpeed = 0.0m;
-
-				return Convert.ToInt32(Math.Ceiling(decSpeed));
+				return VehicleMovementValue.Calculate(decSpeed, HasMovementArmorPenalty ? (int?)_intSpeed : null);
 			}
 		}
 
@@ -15920,21 +15913,12 @@ namespace Chummer
 					}
 				}
 
-				// If the Vehicle's Total Armor exceeds its Total Body, Accel and Speed are decreased by 20%.
-				// The value must also exceed the Armor Rating that the Vehicles comes equipped with by default.
-				if (TotalArmor > TotalBody && TotalArmor > _intArmor)
-				{
-					decAccelWalking -= (Convert.ToDecimal(AccelWalking, GlobalOptions.Instance.CultureInfo) * 0.2m);
-					decAccelRunning -= (Convert.ToDecimal(AccelRunning, GlobalOptions.Instance.CultureInfo) * 0.2m);
-				}
-
-				// Make sure Acceleration doesn't go below 0.
-				if (decAccelWalking < 0.0m)
-					decAccelWalking = 0.0m;
-				if (decAccelRunning < 0.0m)
-					decAccelRunning = 0.0m;
-
-				return Convert.ToInt32(Math.Ceiling(decAccelWalking)).ToString() + "/" + Convert.ToInt32(Math.Ceiling(decAccelRunning)).ToString();
+				bool armorPenalty = HasMovementArmorPenalty;
+				// Resolve both original bases before rounding, as in the legacy path.
+				int? walkingBase = armorPenalty ? AccelWalking : null;
+				int? runningBase = armorPenalty ? AccelRunning : null;
+				return VehicleMovementValue.Calculate(decAccelWalking, walkingBase).ToString() + "/" +
+					VehicleMovementValue.Calculate(decAccelRunning, runningBase).ToString();
 			}
 		}
 

@@ -21,3 +21,19 @@ This records implementation ownership and verification entry points. It does not
 The catalog cache and its caller-owned copies have a separate [ownership and merge-stage record](XML_CATALOG_OWNERSHIP.md), including invalidation limits and the native fixture that currently accesses private cache entries. Keep file access, custom merge policy and control localization distinct when extending that boundary.
 
 This is a bounded inventory, not an exhaustive review of every vendor stub, nullable exclusion, global cache or duplicated calculation. Broader exception review and explicit human CI/dependency responsibility remain completion work. Use [MODERNIZATION](MODERNIZATION.md) and [COMPATIBILITY_CONTROLS](COMPATIBILITY_CONTROLS.md) alongside the current source rather than treating dated checkpoints as current verification.
+
+## Developer validation replacement inventory
+
+`frmTest` remains reachable from `frmMain` when the second application argument is `/test`; it is not an ordinary character-edit command. Its Test action constructs catalog objects and evaluates their properties, collecting failures in the output textbox. The existing 399-character round-trip sweep does not by itself cover every catalog construction/property probe.
+
+| Existing phase | Permitted message-pump calls | Replacement scope |
+|---|---:|---|
+| TestVehicles | 2 | Vehicle definitions and vehicle modifications; construction plus total cost, acceleration, armor, body, handling and speed probes. |
+| TestWeapons | 3 | Weapon definitions, accessories and modifications, preserving creation and property-error reporting. |
+| TestArmor | 2 | Armor definitions and modifications, preserving creation and property-error reporting. |
+| TestGear | 1 | Gear definitions and their construction/property probes. |
+| TestCyberware | 1 | Both cyberware and bioware catalog selection through the same method. |
+| TestQuality | 1 | Quality construction, including generated weapons/nodes. |
+| TestMetatype | 1 | Metatypes and critters, including dependent qualities, powers, skills, forms and nested gear. |
+
+Before retiring a phase, record the exact catalog inputs and probes, independent expected failures/results, prompt dependencies and diagnostics. Move bounded non-UI validation behind a headless entry point and retain explicit failure reporting; constructor success alone is insufficient. Remove the corresponding UI path and update the specific guard-manifest exception only after that replacement is verified. The count remains eleven; this inventory grants no new pumping or claim that the screen has been replaced.

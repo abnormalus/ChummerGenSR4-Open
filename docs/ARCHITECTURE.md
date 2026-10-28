@@ -28,6 +28,8 @@ Matching rule catalogs, translations, sheets, sample characters and settings res
 
 The original `Chummer` project is historical source. `Chummer.Mac.sln` builds the current Mac/Windows application. Vendor changes require reviewing `vendor/LOCAL_PATCHES.md` and the capability inventory in [COMPATIBILITY_CONTROLS](COMPATIBILITY_CONTROLS.md); compilation cannot prove a no-op platform API behaves correctly.
 
+[Installed vehicle movement](VEHICLE_MOVEMENT.md) records the shared final arithmetic and the deliberately separate Speed multiplier/acceleration expression paths. Vehicle model selection and armor eligibility stay model-owned; the arithmetic component reads no controls or persisted state.
+
 ## Verification and remaining architecture work
 
 `MacSmokeTests` orchestrates headless behavior and compatibility checks. Native drivers execute real platform interactions separately; `.github/workflows/desktop-build.yml` builds and verifies Mac/Windows and retains diagnostics. See [CONTRIBUTING](../CONTRIBUTING.md) for commands and verification limits.
