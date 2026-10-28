@@ -53,6 +53,13 @@ python scripts/run-bounded.py --label build --timeout 600 -- dotnet build Chumme
 python scripts/run-bounded.py --label headless --timeout 600 -- dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
 ```
 
+Pass `--log-file artifacts/verification/STAGE.log` to retain raw child output and runner
+status together. Parent directories are created before launching the command; each write
+is flushed, and an existing stage log is overwritten so a retry cannot mix old success
+with new failures. Use a separate output directory per source revision when retaining
+multiple attempts. Logs can contain everything the child prints; use the same handling
+as the underlying verification output. Desktop CI uploads these logs on success or failure.
+
 After a timeout, retain the command, source revision, log and last completed check.
 Investigate that stage before repeating it; do not rerun an unchanged hung command
 indefinitely or treat a smaller passing subset as full acceptance. Build-server stalls
