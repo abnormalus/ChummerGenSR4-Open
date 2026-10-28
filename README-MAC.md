@@ -1,8 +1,8 @@
 # Apple Silicon version
 
-See [docs/MAC_PORT.md](docs/MAC_PORT.md) for application installation, build instructions, validation and remaining limitations.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) for the supported shared build and verification commands. [docs/MAC_PORT.md](docs/MAC_PORT.md) records the original port and its historical limitations; use current CI and maintenance guidance for present acceptance status.
 
-`Chummer.Mac` is the native ARM64 preview project. `Chummer` is the original Windows application. Both character creation and career tracking are included in the Mac project's migrated code.
+Despite its name, `Chummer.Mac` is the shared .NET 10 application for Mac and Windows, including character creation and career tracking. `Chummer` is the historical .NET Framework application; it is not the current Windows release build. Build the shared `Chummer.Mac.sln` for either platform.
 
 Build a standalone Mac application with the .NET 10 SDK:
 
