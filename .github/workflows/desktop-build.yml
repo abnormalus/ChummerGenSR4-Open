@@ -12,6 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   validate:
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -34,20 +35,25 @@ jobs:
         run: python scripts/check-modernization.py
       - name: Test modernization safeguards
         run: python scripts/tests/test_modernization.py
+      - name: Test bounded verification runner
+        run: python scripts/tests/test_run_bounded.py
       - name: Restore reviewed dependency graph
-        run: dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
+        timeout-minutes: 6
+        run: python scripts/run-bounded.py --label restore --timeout 300 -- dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
       - name: Verify build identity safeguards
         run: python scripts/tests/test_build_identity.py
       - name: Build shared desktop application
+        timeout-minutes: 11
         shell: pwsh
         run: |
           $identity = python scripts/build_identity.py | ConvertFrom-Json
-          dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts= "-p:ChummerReleaseVersion=$($identity.informationalVersion)" "-p:ChummerFileVersion=$($identity.fileVersion)"
+          python scripts/run-bounded.py --label build --timeout 600 -- dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts= "-p:ChummerReleaseVersion=$($identity.informationalVersion)" "-p:ChummerFileVersion=$($identity.fileVersion)"
           if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
           $actual = dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --version-json | ConvertFrom-Json
           if ($actual.version -ne $identity.informationalVersion -or $actual.sourceCommit -ne $identity.sourceCommit -or $actual.fileVersion -ne $identity.fileVersion -or $actual.channel -ne $identity.channel) { throw 'Embedded build identity does not match the source checkout.' }
       - name: Check characters and UI behavior
-        run: dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
+        timeout-minutes: 11
+        run: python scripts/run-bounded.py --label headless --timeout 600 -- dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
       - name: Verify native bulk-operation cancellation and shutdown
         shell: pwsh
         run: |

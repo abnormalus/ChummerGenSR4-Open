@@ -38,6 +38,33 @@ The active diagnostics.jsonl file rotates at approximately 2 MiB with three reta
 
 ## Validation
 
+### Bounded execution and interrupted work
+
+Use `scripts/run-bounded.py` for long verification stages. It streams child output,
+prints elapsed/idle status every 15 seconds, and stops the process tree when the total
+deadline or the no-output limit is reached. Exit 124 means timeout, never success;
+ordinary failure codes are preserved. The default no-output limit is 180 seconds.
+Raise it explicitly for a known quiet operation, with a recorded reason, while retaining
+an overall deadline. The limits are execution safeguards, not evidence that a stage passed.
+
+```text
+python scripts/run-bounded.py --label restore --timeout 300 -- dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
+python scripts/run-bounded.py --label build --timeout 600 -- dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts=
+python scripts/run-bounded.py --label headless --timeout 600 -- dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
+```
+
+After a timeout, retain the command, source revision, log and last completed check.
+Investigate that stage before repeating it; do not rerun an unchanged hung command
+indefinitely or treat a smaller passing subset as full acceptance. Build-server stalls
+can be isolated with `--disable-build-servers` and `-p:UseSharedCompilation=false`.
+Cached dependencies may support local investigation but do not establish a fresh locked
+restore or vulnerability audit. CI uses the same wrapper for restore/build/headless and
+also has outer job/step limits; native operation/report/count gates remain separate.
+
+Before ending a work session, record completed work, its verification limits, the active
+branch/PR and the next concrete action. These checkpoints support resumption; they do
+not themselves schedule unattended work.
+
 Use the installed .NET 10 SDK to build Chummer.Mac.sln. Run the application with --smoke-test OUTPUT_DIRECTORY Chummer.Mac/assets/saves to check existing character-file compatibility and meaningful UI regressions. The test user directory isolates preferences, saves, and logs.
 
 .github/workflows/desktop-build.yml builds and checks the shared application on Mac and Windows, then publishes platform-specific output. These checks run after pushing the workflow to GitHub; local Mac checks do not establish Windows usability. Test native menus and window interactions on the relevant OS as well as the automated checks.
