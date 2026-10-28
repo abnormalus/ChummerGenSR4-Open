@@ -1009,6 +1009,7 @@ namespace Chummer
                 CritterPowerPromptChecks.Run(character, Check);
                 CreationInputLifecycleChecks.Run(Check);
                 NativeControlObservationChecks.Run(Check);
+                PowerPointSummaryChecks.Run(character, Check);
                 CreationSkillInputChecks.Run(character, Check);
                 CreationSkillGroupSectionChecks.Run(character, Check);
                 var portraitEditorCharacter = new Character();

@@ -16381,26 +16381,15 @@ namespace Chummer
 				objPowerControl.UpdatePointsPerLevel();
 			}
 
-			int intMAG = 0;
-			if (_objCharacter.AdeptEnabled && _objCharacter.MagicianEnabled)
-			{
-				// If both Adept and Magician are enabled, this is a Mystic Adept, so use the MAG amount assigned to this portion.
-				intMAG = _objCharacter.MAGAdept;
-			}
-			else
-			{
-				// The character is just an Adept, so use the full value.
-				intMAG = _objCharacter.MAG.TotalValue;
-			}
-
-			// Add any Power Point Improvements to MAG.
-			intMAG += _objImprovementManager.ValueOf(Improvement.ImprovementType.AdeptPowerPoints);
-
-			string strRemain = (intMAG - decPowerPoints).ToString();
-			while (strRemain.EndsWith("0") && strRemain.Length > 4)
-				strRemain = strRemain.Substring(0, strRemain.Length - 1);
-
-			lblPowerPoints.Text = String.Format("{1} ({0} " + LanguageManager.Instance.GetString("String_Remaining") + ")", strRemain, intMAG);
+			// Pricing stays in Power; preserve reading each row before refreshing it.
+			bool mysticAdept = _objCharacter.AdeptEnabled && _objCharacter.MagicianEnabled;
+			var budget = AdeptPowerPointBudget.Calculate(
+			    mysticAdept, mysticAdept ? 0 : _objCharacter.MAG.TotalValue,
+			    mysticAdept ? _objCharacter.MAGAdept : 0,
+			    _objImprovementManager.ValueOf(Improvement.ImprovementType.AdeptPowerPoints),
+			    decPowerPoints);
+			lblPowerPoints.Text = AdeptPowerPointSummary.Format(budget,
+			    LanguageManager.Instance.GetString("String_Remaining"));
 		}
 
 		/// <summary>

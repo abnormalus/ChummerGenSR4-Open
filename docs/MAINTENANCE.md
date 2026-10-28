@@ -30,6 +30,10 @@ disposal in the headless suite; existing section checks cover edits and controll
 Changes to these adapters also need the affected native section checks on Mac and Windows
 before release.
 
+## Adept Power Point summaries
+
+Creation and career share pure `AdeptPowerPointBudget` arithmetic and a separate culture-sensitive `AdeptPowerPointSummary` formatter. Existing `Power` pricing and editor-owned row refresh remain authoritative. See [ADEPT_POWER_POINTS.md](ADEPT_POWER_POINTS.md) for inputs, ownership, preserved formats and independent baseline evidence.
+
 ## Diagnostics
 
 Help → Open Diagnostic Logs opens the local log folder. On Mac it is under Library/Application Support/ChummerGenSR4Mac/logs. Logs contain UTC time, command ID, assembly version, unique compiled-module build ID, OS/runtime/architecture, exception types/HRESULTs, and method stacks without source-file paths. The specific numeric Avalonia render-timer registration error is recorded when present; arbitrary exception messages, character XML, aliases, and character filenames are omitted. No logs are uploaded automatically.
