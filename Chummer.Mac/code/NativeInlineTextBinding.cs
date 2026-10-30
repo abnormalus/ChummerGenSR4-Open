@@ -11,15 +11,14 @@ internal sealed class NativeInlineTextBinding : IDisposable
 {
     private readonly Forms.TextBox source;
     private readonly Func<bool> available;
-    private readonly Forms.InvalidateEventHandler invalidated;
+    private readonly NativeControlObservation observation;
     private bool syncing, disposed;
     internal TextBox Input { get; } = new() { MinHeight = 32, FontSize = 12 };
     internal NativeInlineTextBinding(Forms.TextBox source, Func<bool> available)
     {
         this.source = source; this.available = available;
-        invalidated = (_, _) => Refresh();
-        source.TextChanged += SourceChanged; source.EnabledChanged += SourceChanged;
-        source.VisibleChanged += SourceChanged; source.Invalidated += invalidated;
+        observation = new NativeControlObservation(source, Refresh);
+        source.TextChanged += SourceChanged;
         Input.PropertyChanged += NativeChanged; Refresh();
     }
     internal void Refresh()
@@ -42,7 +41,7 @@ internal sealed class NativeInlineTextBinding : IDisposable
     {
         if (disposed) return;
         disposed = true; Input.PropertyChanged -= NativeChanged;
-        source.TextChanged -= SourceChanged; source.EnabledChanged -= SourceChanged;
-        source.VisibleChanged -= SourceChanged; source.Invalidated -= invalidated;
+        source.TextChanged -= SourceChanged;
+        observation.Dispose();
     }
 }

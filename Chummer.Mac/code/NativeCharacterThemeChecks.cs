@@ -40,12 +40,28 @@ internal static class NativeCharacterThemeChecks
                     foreach (var theme in new[] { initial, initial == Avalonia.Styling.ThemeVariant.Light ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light })
                     {
                         app.RequestedThemeVariant = theme; await Task.Delay(120);
+                        // No quality is selected in this fixture. Initial and live
+                        // theme transitions must not reveal Designer placeholders.
+                        check(Field<Forms.Label>(editor, "lblQualityBP").Text == "" &&
+                            Field<Forms.Label>(editor, "lblQualitySource").Text == "" &&
+                            string.IsNullOrEmpty(Field<Forms.ToolTip>(editor, "tipTooltip").GetToolTip(Field<Forms.Label>(editor, "lblQualitySource"))),
+                            "Native unselected quality details remain empty in " + initial.Key + " to " + theme.Key);
                         var nativeWindow = Forms.AvaloniaHostInterop.ToAvaloniaWindow(main);
                         using (var image = new Avalonia.Media.Imaging.RenderTargetBitmap(new Avalonia.PixelSize((int)nativeWindow.ClientSize.Width, (int)nativeWindow.ClientSize.Height)))
                         {
                             image.Render(nativeWindow);
                             image.Save(Path.Combine(output, "native-character-theme-" + initial.Key.ToString()!.ToLowerInvariant() + "-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
                         }
+                        var qualityTree = Field<Forms.TreeView>(editor, "treQualities");
+                        var qualityNode = new CommonFunctions(character).FindNode(character.Qualities[0].InternalId, qualityTree);
+                        qualityTree.SelectedNode = qualityNode;
+                        bool populatedDetails = Field<Forms.Label>(editor, "lblQualityBP").Text != "" &&
+                            Field<Forms.Label>(editor, "lblQualitySource").Text != "";
+                        qualityTree.SelectedNode = null;
+                        check(populatedDetails && Field<Forms.Label>(editor, "lblQualityBP").Text == "" &&
+                            Field<Forms.Label>(editor, "lblQualitySource").Text == "" &&
+                            string.IsNullOrEmpty(Field<Forms.ToolTip>(editor, "tipTooltip").GetToolTip(Field<Forms.Label>(editor, "lblQualitySource"))),
+                            "Native cleared quality selection clears populated details in " + initial.Key + " to " + theme.Key);
                         check(warning.ForeColor.ToArgb() == System.Drawing.Color.Red.ToArgb() && warning.Font.Italic,
                             "Native explicit review red and italic survive " + initial.Key + " to " + theme.Key);
                         check(semantic.ForeColor.ToArgb() == Forms.Theme.ForegroundColor.ToDrawingColor().ToArgb() &&

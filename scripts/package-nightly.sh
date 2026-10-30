@@ -18,7 +18,7 @@ PYIDENTITY
 chummer_version="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["informationalVersion"])' "$chummer_output/build-identity.json")"
 chummer_file_version="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["fileVersion"])' "$chummer_output/build-identity.json")"
 bash scripts/build-mac.sh "$chummer_output/mac"
-"$chummer_dotnet" "$chummer_output/mac/publish/ChummerMac.dll" --smoke-test "$chummer_output/checks" Chummer.Mac/assets/saves
+python3 scripts/run-bounded.py --label headless --timeout 600 -- "$chummer_dotnet" "$chummer_output/mac/publish/ChummerMac.dll" --smoke-test "$chummer_output/checks" Chummer.Mac/assets/saves
 "$chummer_dotnet" publish Chummer.Mac/Chummer.Mac.csproj -c Release -r win-x64 --self-contained true \
     -p:UsedAvaloniaProducts= "-p:ChummerReleaseVersion=$chummer_version" "-p:ChummerFileVersion=$chummer_file_version" -o "$chummer_output/windows"
 cp "$chummer_output/build-identity.json" "$chummer_output/windows/build-identity.json"

@@ -33,7 +33,7 @@ internal static class NativeBulkChecks
         foreach (var editor in Application.OpenForms.OfType<frmCreate>().ToArray())
             editor.GetType().GetField("_blnIsDirty", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(editor, false);
     }
-    internal static async Task RunAsync(frmMain main, string path, string report)
+    internal static async Task RunAsync(frmMain main, string path, string report, bool sensorTransactionsOnly = false, bool focusCommandOnly = false)
     {
         var checks = new List<string>();
         bool passed = false;
@@ -58,6 +58,22 @@ internal static class NativeBulkChecks
             byte[] originalFile = File.ReadAllBytes(path);
             var character = new Character { FileName = path };
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
+            // Additional caller coverage runs in its own bounded process. The
+            // original bulk suite, assertion gate and shutdown deadline remain.
+            if (focusCommandOnly)
+            {
+                await NativeFocusCommandChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native focus commands preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (sensorTransactionsOnly)
+            {
+                await NativeSensorTransactionChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native sensor transactions preserve the source character file");
+                passed = true;
+                return;
+            }
             // Measure creation on the real main window's initial normal geometry,
             // before other checks exercise fullscreen/restore transitions on it.
             await NativeCreationInputChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
@@ -82,6 +98,9 @@ internal static class NativeBulkChecks
             }
             await NativePacksInteractionChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCharacterThemeChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativePowerPointSummaryChecks.RunAsync(main, character, Check);
+            await NativeVehicleMovementChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeClipboardCopyChecks.RunAsync(main, character, Check);
             await NativeAmmunitionViewChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCyberwareRemovalChecks.RunAsync(main, character, Check);
             await NativeWeaponFocusChecks.RunAsync(main, character, Check);

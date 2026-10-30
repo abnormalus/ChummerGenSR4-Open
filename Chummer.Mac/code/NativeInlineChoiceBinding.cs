@@ -12,7 +12,7 @@ namespace Chummer;
 internal sealed class NativeInlineChoiceBinding : IDisposable
 {
     private readonly Forms.ComboBox source;
-    private readonly Forms.InvalidateEventHandler invalidated;
+    private readonly NativeControlObservation observation;
     private object[] choices = Array.Empty<object>();
     private bool syncing, disposed;
     internal AutoCompleteBox Input { get; }
@@ -21,9 +21,8 @@ internal sealed class NativeInlineChoiceBinding : IDisposable
         this.source = source;
         Input = new AutoCompleteBox { MinHeight = 32, MinimumPrefixLength = 0,
             IsTextCompletionEnabled = false, FilterMode = AutoCompleteFilterMode.Contains };
-        invalidated = (_, _) => Refresh();
-        source.TextChanged += SourceChanged; source.EnabledChanged += SourceChanged;
-        source.VisibleChanged += SourceChanged; source.Invalidated += invalidated;
+        observation = new NativeControlObservation(source, Refresh);
+        source.TextChanged += SourceChanged;
         Input.PropertyChanged += NativeChanged;
         Refresh();
     }
@@ -68,7 +67,7 @@ internal sealed class NativeInlineChoiceBinding : IDisposable
         if (disposed) return;
         disposed = true;
         Input.PropertyChanged -= NativeChanged;
-        source.TextChanged -= SourceChanged; source.EnabledChanged -= SourceChanged;
-        source.VisibleChanged -= SourceChanged; source.Invalidated -= invalidated;
+        source.TextChanged -= SourceChanged;
+        observation.Dispose();
     }
 }
