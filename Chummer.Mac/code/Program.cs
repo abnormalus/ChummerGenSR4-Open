@@ -31,13 +31,14 @@ namespace Chummer
                 Environment.Exit(MacSmokeTests.Run(args));
                 return;
             }
-            if (args.Length >= 3 && args[0] == "--check-bulk")
-                MacPaths.TestUserDirectory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(args[2])), "native-bulk-user");
+            bool nativeCheck = args.Length >= 3 && (args[0] == "--check-bulk" || args[0] == "--check-sensor-transactions");
+            if (nativeCheck)
+                MacPaths.TestUserDirectory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(args[2])), args[0] == "--check-bulk" ? "native-bulk-user" : "native-sensor-transactions-user");
             AppDiagnostics.Initialize();
             try
             {
                 MacPaths.Initialize();
-                if (args.Length >= 3 && args[0] == "--check-bulk")
+                if (nativeCheck)
                 {
                     GlobalOptions.Instance.AutomaticUpdate = false;
                     GlobalOptions.Instance.StartupFullscreen = false;
@@ -51,13 +52,13 @@ namespace Chummer
                     using var main = new frmMain();
                     AppDiagnostics.Record("desktop-window-initialized");
                     using var watchdog = AppDiagnostics.StartWatchdog();
-                    if (args.Length >= 3 && args[0] == "--check-bulk")
+                    if (nativeCheck)
                     {
                         // Establish the capture fixture before the native window opens.
                         // Later fullscreen tests must not supply its initial restore bounds.
                         main.Size = new System.Drawing.Size(932, 545);
                         main.Shown += async (_, _) => {
-                            try { await NativeBulkChecks.RunAsync(main, args[1], args[2]); }
+                            try { await NativeBulkChecks.RunAsync(main, args[1], args[2], args[0] == "--check-sensor-transactions"); }
                             catch (Exception error) { AppDiagnostics.Record("bulk.native-checks-failed", error); Environment.ExitCode = 1; }
                             finally { NativeBulkChecks.DiscardEditors(); await AppPlatform.QuitApplicationAsync(); }
                         };

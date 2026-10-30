@@ -32,6 +32,10 @@ The original `Chummer` project is historical source. `Chummer.Mac.sln` builds th
 
 [Inventory Copy](CLIPBOARD_COPY.md) separates the temporary Unicode XML wrapper from model Save dispatch and global clipboard policy. The existing Gear failure-order limitation remains explicit; the wrapper does not claim atomic publication or rollback of callback effects.
 
+[Vehicle sensor transitions](VEHICLE_SENSORS.md) now follow a separate model/adapter/projection path. Both editors call `VehicleSensorCatalog.Apply`, which loads the catalog and supplies the legacy `Gear.Create` factory to `VehicleSensorTransition.Apply`. The transition owns seven-size ordering, first-recognized boundary behavior and eight-field mutation of the existing sensor; it reads no controls, catalog files or persistence services. The editor then updates the canonical tree node. The catalog adapter retains constructor prompts/improvements and failure ordering, so this is not a transaction boundary: missing-node failure still follows model mutation, and purchase/sale/undo accounting remains in the six unchanged callers.
+
+[Stacked-focus characterization](STACKED_FOCUS.md) identifies another retained command boundary. The original editor handlers combine modal selection, Bonded writes, validation, linked-record creation and tree refresh. Actual cancellation checks expose a one-selection cancellation defect; a shared staged proposal is a planned repair, not an implemented architecture component. Characterization and extraction acceptance must remain distinct.
+
 ## Verification and remaining architecture work
 
 `MacSmokeTests` orchestrates headless behavior and compatibility checks. Native drivers execute real platform interactions separately; `.github/workflows/desktop-build.yml` builds and verifies Mac/Windows and retains diagnostics. See [CONTRIBUTING](../CONTRIBUTING.md) for commands and verification limits.

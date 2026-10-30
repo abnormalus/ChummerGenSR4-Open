@@ -38,6 +38,14 @@ Follow [SECTION_MODERNIZATION](docs/SECTION_MODERNIZATION.md): record behavior a
 
 The headless command above includes character file/memory round trips and both Foundry export targets. Use the real native drivers and visual gates in `.github/workflows/desktop-build.yml` for affected interactions. The workflow also runs runner, modernization, archival and build-identity checks. Do not lower report/count gates or substitute a small passing subset for full required acceptance.
 
+The additional native sensor caller check uses the built application on a real desktop after generating `artifacts/checks/creation.chum` with the headless suite:
+
+```text
+dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --check-sensor-transactions artifacts/checks/creation.chum artifacts/checks/native-sensor-transactions.json
+```
+
+This command is compiled but hosted acceptance is pending. Use the workflow's180-second process bound, passing-report and17-assertion requirements; a report alone does not prove successful process exit. It adds purchase/sale/undo coverage without replacing the full bulk/native or visual gates. See [sensor verification scope](docs/VEHICLE_SENSORS.md).
+
 ## Diagnose and publish
 
 [MAINTENANCE](docs/MAINTENANCE.md) describes privacy-preserving logs and shared boundaries. [MODERNIZATION](docs/MODERNIZATION.md) records dependency/API policy; [MAINTENANCE_RESPONSIBILITIES](docs/MAINTENANCE_RESPONSIBILITIES.md) identifies automation entry points and reviewed exceptions with removal conditions. [COMPATIBILITY_CONTROLS](docs/COMPATIBILITY_CONTROLS.md) inventories toolkit capabilities. Keep exception rationale and removal conditions explicit.
