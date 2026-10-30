@@ -15,9 +15,13 @@ dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/che
 
 Restore needs access to the configured NuGet feed and a writable package cache. Do not regenerate dependency locks merely to bypass a failed locked restore. Review deliberate dependency changes and repeat the locked restore and platform checks. Application warnings fail the build; documented vendor warning debt has a separate policy.
 
+Verification scripts require Python 3. On Mac use `python3` (check `python3 --version`); on Windows use `python` when that command selects Python 3. A `python` alias is not present on every Mac. The direct .NET commands above do not depend on that alias.
+
+The full headless suite starts local loopback servers for PDF/preview checks. It needs permission to bind and access those local listeners; a restricted run that stops before the server checks does not establish an application failure or a passing suite. Retain stage logs and diagnose the environment before retrying.
+
 Long commands should use the bounded runner and separate retained stage logs described in [MAINTENANCE](docs/MAINTENANCE.md). A timeout is a failed verification attempt. Preserve its log and investigate before retrying. A local restricted-process build stalled during continuation verification; a build with normal process access, `-m:1 -p:UseSharedCompilation=false` succeeded. That observation is an environment diagnostic, not a required application workaround or proof of a root cause.
 
-The commands above were verified from an independent clean checkout at `d4bb8bf` with SDK 10.0.401 on Mac: locked restore, the exact Release build command and the full headless suite passed, including all 399 character file/memory round trips and both Foundry export targets. Headless execution completed in 187 seconds. The build retained ten existing vendor documentation warnings and had zero errors. This validates these commands on that Mac/source tree; Windows native acceptance, packaging and release/recovery procedures are separate verification. Keep verification tied to source revisions and retain its limits.
+The commands above were verified from an independent clean checkout at `64f46188e037427976ad24864f32c6edcabed6ba` (tree `e1869ea6d38d1cd9503d0480015b42ef5a9682c7`) with SDK10.0.401 on Mac. Locked restore passed in1.9s; the exact Release build command passed in15.8s with zero errors and ten existing vendor documentation warnings. The full headless suite passed in200.2s, including28 quality-detail regressions,90 sensor-baseline assertions,399 file/memory round trips,both Foundry targets and shutdown. Python3.9.6 invoked the bounded wrapper; the underlying .NET command arguments were unchanged. The checkout remained free of tracked changes after verification. This proves those commands on the named Mac/source tree; Windows native interaction, packaging and release/recovery have separate gates.
 
 ## Find the right boundary
 

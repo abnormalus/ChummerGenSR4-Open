@@ -62,7 +62,7 @@ jobs:
           $appName = if ($IsWindows) { 'ChummerMac.exe' } else { 'ChummerMac' }
           $exe = (Resolve-Path "Chummer.Mac/bin/Release/net10.0/$appName").Path
           $process = Start-Process -FilePath $exe -ArgumentList @('--check-bulk', "`"$character`"", "`"$report`"") -PassThru
-          # The 1053+ real UI assertions can exceed three minutes on hosted Mac runners.
+          # The 1069+ real UI assertions can exceed three minutes on hosted Mac runners.
           # Keep individual operation deadlines and the required report/count checks;
           # this five-minute outer bound allows the complete suite to finish.
           if (-not $process.WaitForExit(300000)) {
@@ -72,7 +72,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Native bulk-operation checks failed: $($process.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'Native bulk-operation report is missing.' }
           $result = Get-Content $report -Raw | ConvertFrom-Json
-          if (-not $result.passed -or $result.checks.Count -lt 1053) { throw 'Native bulk-operation checks did not complete.' }
+          if (-not $result.passed -or $result.checks.Count -lt 1069) { throw 'Native bulk-operation checks did not complete.' }
           Write-Output "Native completed assertions: $($result.checks.Count)"
           $result.checks | Where-Object { $_ -like 'Native creation *geometry*' -or $_ -like 'Native creation shows all eleven*' } | ForEach-Object { Write-Output $_ }
       - name: Ensure native Windows browser runtime
@@ -128,6 +128,10 @@ jobs:
             artifacts/checks/native-natural-weapon-dark.png
             artifacts/checks/native-natural-weapon-light.png
             artifacts/checks/native-vehicle-picker-dark.png
+            artifacts/checks/native-sensor-creation-light.png
+            artifacts/checks/native-sensor-creation-dark.png
+            artifacts/checks/native-sensor-career-light.png
+            artifacts/checks/native-sensor-career-dark.png
             artifacts/checks/native-vehicle-picker-light.png
             artifacts/checks/native-vehicle-mod-dark.png
             artifacts/checks/native-vehicle-mod-light.png

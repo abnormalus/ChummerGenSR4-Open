@@ -52,10 +52,12 @@ Raise it explicitly for a known quiet operation, with a recorded reason, while r
 an overall deadline. The limits are execution safeguards, not evidence that a stage passed.
 
 ```text
-python scripts/run-bounded.py --label restore --timeout 300 -- dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
-python scripts/run-bounded.py --label build --timeout 600 -- dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts=
-python scripts/run-bounded.py --label headless --timeout 600 -- dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
+python3 scripts/run-bounded.py --label restore --timeout 300 -- dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
+python3 scripts/run-bounded.py --label build --timeout 600 -- dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts=
+python3 scripts/run-bounded.py --label headless --timeout 600 -- dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
 ```
+
+The examples use the Mac `python3` command. On Windows substitute `python` if that selects the installed Python 3 interpreter; verify its version first.
 
 Pass `--log-file artifacts/verification/STAGE.log` to retain raw child output and runner
 status together. Parent directories are created before launching the command; each write

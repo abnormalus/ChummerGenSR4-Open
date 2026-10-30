@@ -13,7 +13,7 @@ internal static class NativeVehicleMovementChecks
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
     private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, Flags)!.GetValue(owner)!;
-    internal static async Task RunAsync(Forms.Form owner, Character source, Action<bool, string> check)
+    internal static async Task RunAsync(Forms.Form owner, Character source, string output, Action<bool, string> check)
     {
         var app = Avalonia.Application.Current!; var originalTheme = app.RequestedThemeVariant;
         try
@@ -48,6 +48,7 @@ internal static class NativeVehicleMovementChecks
                         check(before.AsSpan().SequenceEqual(character.CaptureSnapshot()) && !Field<bool>(editor, "_blnIsDirty"),
                             "Native selected vehicle refresh preserves character and clean editor" + context);
                     }
+                    await NativeVehicleSensorChecks.RunAsync(owner, editor, character, vehicle, node, output, check, career);
                 }
                 finally { editor.GetType().GetField("_blnIsDirty", Flags)!.SetValue(editor, false); editor.Close(); }
             }

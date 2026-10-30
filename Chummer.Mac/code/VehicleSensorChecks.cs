@@ -5,8 +5,9 @@ using Forms = Majorsilence.Forms;
 
 namespace Chummer;
 
-// Characterize both original editor methods before separating sensor mutation
-// from tree labels. Fixed catalog expectations do not call a replacement policy.
+// Recorded expectations from both original editor methods remain unchanged.
+// Current wrappers exercise shared mutation and editor-owned tree projection;
+// fixed catalog expectations do not call the replacement policy.
 internal static class VehicleSensorChecks
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;

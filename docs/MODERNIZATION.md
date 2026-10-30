@@ -34,7 +34,7 @@ The only remaining documented manual message pumping is the developer-only `frmT
 
 ## Verification and maintenance
 
-Run from the repository root:
+Run from the repository root. The Python commands below assume `python` selects Python 3; use `python3` on Mac when no `python` alias is installed. Contributor setup and interpreter checks are documented in [CONTRIBUTING](../CONTRIBUTING.md).
 
 ```text
 python scripts/check-modernization.py
