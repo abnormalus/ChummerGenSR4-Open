@@ -37,3 +37,5 @@ The original `Chummer` project is historical source. `Chummer.Mac.sln` builds th
 `MacSmokeTests` orchestrates headless behavior and compatibility checks. Native drivers execute real platform interactions separately; `.github/workflows/desktop-build.yml` builds and verifies Mac/Windows and retains diagnostics. See [CONTRIBUTING](../CONTRIBUTING.md) for commands and verification limits.
 
 Remaining work includes tracing other representative sections, inventorying duplicate rules/accounting and global mutable caches, documenting retained exceptions and their removal conditions, and recording CI/dependency ownership. Review those findings alongside the section migration process; this map is an initial maintained entry point, not project completion evidence.
+
+[Selected quality details](QUALITY_DETAILS.md) share a read-only presentation owner for cost, source and tooltip; creation/career explicitly select their existing BP/Karma display convention. Invalid selection clears the projection without changing the character.

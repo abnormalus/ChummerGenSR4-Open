@@ -1,6 +1,8 @@
 # Maintenance responsibilities and retained exceptions
 
-This records implementation ownership and verification entry points. It does not appoint a human maintainer: no CODEOWNERS file was found in the inspected `.github` inventory. Confirm reviewer responsibility when assigning work; automated proposals do not authorize merging.
+The repository owner is responsible for investigating CI failures and reviewing dependency updates, as assigned on October 30, 2026. This includes failed desktop checks, dependency-audit findings/feed errors and Dependabot proposals. The owner may delegate individual investigations or reviews while retaining responsibility for follow-through.
+
+The table below records maintained entry points and required verification. No CODEOWNERS file was found in the inspected `.github` inventory; this documented assignment does not add automatic review routing. Automated proposals do not authorize merging.
 
 | Area | Maintained entry point | Required follow-through |
 |---|---|---|
@@ -20,7 +22,7 @@ This records implementation ownership and verification entry points. It does not
 
 The catalog cache and its caller-owned copies have a separate [ownership and merge-stage record](XML_CATALOG_OWNERSHIP.md), including invalidation limits and the native fixture that currently accesses private cache entries. Keep file access, custom merge policy and control localization distinct when extending that boundary.
 
-This is a bounded inventory, not an exhaustive review of every vendor stub, nullable exclusion, global cache or duplicated calculation. Broader exception review and explicit human CI/dependency responsibility remain completion work. Use [MODERNIZATION](MODERNIZATION.md) and [COMPATIBILITY_CONTROLS](COMPATIBILITY_CONTROLS.md) alongside the current source rather than treating dated checkpoints as current verification.
+This is a bounded inventory, not an exhaustive review of every vendor stub, nullable exclusion, global cache or duplicated calculation. Broader exception review remains completion work; human CI/dependency responsibility is assigned above. Use [MODERNIZATION](MODERNIZATION.md) and [COMPATIBILITY_CONTROLS](COMPATIBILITY_CONTROLS.md) alongside the current source rather than treating dated checkpoints as current verification.
 
 ## Developer validation replacement inventory
 

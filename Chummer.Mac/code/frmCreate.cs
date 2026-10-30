@@ -72,6 +72,7 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
+            QualityDetailsPresentation.Clear(lblQualityBP, lblQualitySource, tipTooltip);
             InitializeWeaponAmmunitionMenus();
             Load += (_, _) => { if (!_packsWorkspace) InitializeInventoryUndo(); };
             treQualities.ShowLines = false;
@@ -12370,31 +12371,10 @@ namespace Chummer
 
 		#region Additional Common Tab Control Events
 		private void treQualities_AfterSelect(object sender, TreeViewEventArgs e)
-		{
-			// Locate the selected Quality.
-			lblQualitySource.Text = "";
-			tipTooltip.SetToolTip(lblQualitySource, null);
-			try
-			{
-				if (treQualities.SelectedNode.Level == 0)
-					return;
-			}
-			catch
-			{
-				return;
-			}
-
-			Quality objQuality = _objFunctions.FindQuality(treQualities.SelectedNode.Tag.ToString(), _objCharacter.Qualities);
-
-			string strBook = _objOptions.LanguageBookShort(objQuality.Source);
-			string strPage = objQuality.Page;
-			lblQualitySource.Text = strBook + " " + strPage;
-			tipTooltip.SetToolTip(lblQualitySource, _objOptions.LanguageBookLong(objQuality.Source) + " " + LanguageManager.Instance.GetString("String_Page") + " " + objQuality.Page);
-			if (_objCharacter.BuildMethod == CharacterBuildMethod.BP)
-				lblQualityBP.Text = objQuality.BP.ToString() + " " + LanguageManager.Instance.GetString("String_BP");
-			else
-				lblQualityBP.Text = (objQuality.BP * _objOptions.KarmaQuality).ToString() + " " + LanguageManager.Instance.GetString("String_Karma");
-		}
+        {
+            QualityDetailsPresentation.Refresh(_objCharacter, _objCharacter.BuildMethod != CharacterBuildMethod.BP, treQualities.SelectedNode,
+                lblQualityBP, lblQualitySource, tipTooltip);
+        }
 		#endregion
 
 		#region Additional Cyberware Tab Control Events

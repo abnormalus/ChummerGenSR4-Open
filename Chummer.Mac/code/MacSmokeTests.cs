@@ -1039,6 +1039,7 @@ namespace Chummer
                 SkillDisclosureChecks.Run(character, Check);
                 CareerSkillSpecializationChecks.Run(character, Check);
                 QualitySelectionChecks.Run(character, Check);
+                QualityDetailsChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationCommonLayoutChecks.Run(character, Check);

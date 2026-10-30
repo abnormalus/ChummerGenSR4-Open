@@ -1,0 +1,11 @@
+# Selected quality details
+
+`QualityDetailsPresentation` owns the read-only cost/source/tooltip projection shared by creation and career. The editors retain the selected tree node and their model; character rules, purchase/binding accounting and serialization are unchanged.
+
+Both constructors clear the detail values after creating their controls. Every selection refresh clears all three outputs before validating the node and looking up its canonical quality ID. No selection, a category node, a missing Tag or a stale ID leaves empty details. This intentionally fixes designer placeholders on initial display, the previous quality's cost remaining after a category selection, and stale IDs reaching an unchecked model lookup. Empty tooltip text removes the entry through the toolkit's existing API.
+
+A valid creation selection displays BP when the build method is BP and the existing configured Karma multiplier otherwise. Career always displays Karma, independently of its saved build method. Book abbreviations, localized full-book/page tooltip and current-culture cost formatting retain their original sources. The presenter does not mutate character data or dirty state, own/dispose the controls, open PDFs or apply selection changes.
+
+The observed Windows `67e0cf6` initial dark-theme capture showed `[BP]` and `[Source]`; it is retained as evidence rather than accepted as final appearance. `QualityDetailsChecks` adds 24 actual-editor checks across both editor modes and BP/Karma builds: initial empty state, fixed 3BP/6Karma projection, category clearing, stale/missing identity and snapshot/dirty preservation. `NativeCharacterThemeChecks` adds four real shown-creation-editor checks before captures across initial/live theme transitions. The native minimum rises from1045 to1049; remaining operation/report gates are unchanged.
+
+The change builds and passes source safeguards and the complete headless suite (197.4 seconds), including all 24 new editor checks, 90 sensor-baseline checks, 399 character round trips, both Foundry targets and shutdown. Current-source Mac/Windows native/image acceptance remains pending. Headless state checks do not establish pixels or native input behavior; the earlier visual capture does not establish acceptance of this fix.

@@ -40,6 +40,12 @@ internal static class NativeCharacterThemeChecks
                     foreach (var theme in new[] { initial, initial == Avalonia.Styling.ThemeVariant.Light ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light })
                     {
                         app.RequestedThemeVariant = theme; await Task.Delay(120);
+                        // No quality is selected in this fixture. Initial and live
+                        // theme transitions must not reveal Designer placeholders.
+                        check(Field<Forms.Label>(editor, "lblQualityBP").Text == "" &&
+                            Field<Forms.Label>(editor, "lblQualitySource").Text == "" &&
+                            string.IsNullOrEmpty(Field<Forms.ToolTip>(editor, "tipTooltip").GetToolTip(Field<Forms.Label>(editor, "lblQualitySource"))),
+                            "Native unselected quality details remain empty in " + initial.Key + " to " + theme.Key);
                         var nativeWindow = Forms.AvaloniaHostInterop.ToAvaloniaWindow(main);
                         using (var image = new Avalonia.Media.Imaging.RenderTargetBitmap(new Avalonia.PixelSize((int)nativeWindow.ClientSize.Width, (int)nativeWindow.ClientSize.Height)))
                         {
