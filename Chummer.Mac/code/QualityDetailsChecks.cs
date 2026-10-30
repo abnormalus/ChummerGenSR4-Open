@@ -27,27 +27,43 @@ internal static class QualityDetailsChecks
             string context = " career=" + career + " karmaBuild=" + karma;
             bool Empty() => cost.Text == "" && source.Text == "" && string.IsNullOrEmpty(tooltip.GetToolTip(source));
             check(Empty(), "Quality details start empty without designer placeholders" + context);
-            tree.Nodes.Clear(); var root = new Forms.TreeNode("Synthetic category") { Tag = "category" };
-            var node = new Forms.TreeNode("Synthetic detail") { Tag = quality.InternalId }; root.Nodes.Add(node); tree.Nodes.Add(root);
-            byte[] before = character.CaptureSnapshot(); bool dirty = Field<bool>(editor, "_blnIsDirty");
-            tree.SelectedNode = node;
-            check(cost.Text == ((career || karma) ? "6 " + LanguageManager.Instance.GetString("String_Karma") : "3 " + LanguageManager.Instance.GetString("String_BP")) &&
-                source.Text == character.Options.LanguageBookShort("SR4") + " 77" && tooltip.GetToolTip(source).EndsWith(" 77"),
-                "Quality details preserve fixed BP Karma and source projection" + context);
-            tree.SelectedNode = root;
-            check(Empty(), "Quality category selection clears prior cost source and tooltip" + context);
-            tree.SelectedNode = node;
-            // Retag without AfterSelect, then invoke the real handler as a
-            // queued refresh would after its model disappeared.
-            node.Tag = Guid.NewGuid().ToString();
-            editor.GetType().GetMethod("treQualities_AfterSelect", Flags)!.Invoke(editor, new object?[] { tree, null });
-            check(Empty(), "Quality stale identity clears prior details safely" + context);
-            node.Tag = null;
-            editor.GetType().GetMethod("treQualities_AfterSelect", Flags)!.Invoke(editor, new object?[] { tree, null });
-            check(Empty(), "Quality missing identity leaves details empty" + context);
-            tree.SelectedNode = null;
-            check(Empty() && before.AsSpan().SequenceEqual(character.CaptureSnapshot()) && dirty == Field<bool>(editor, "_blnIsDirty"),
-                "Quality detail transitions preserve character and editor dirty state" + context);
+            try
+            {
+                // Invalidate notifications require a created control. Exercise
+                // the real shown editor, while the earlier check covers construction.
+                editor.Show();
+                tree.Nodes.Clear(); var root = new Forms.TreeNode("Synthetic category") { Tag = "category" };
+                var node = new Forms.TreeNode("Synthetic detail") { Tag = quality.InternalId }; root.Nodes.Add(node); tree.Nodes.Add(root);
+                byte[] before = character.CaptureSnapshot(); bool dirty = Field<bool>(editor, "_blnIsDirty");
+                tree.SelectedNode = node;
+                check(cost.Text == ((career || karma) ? "6 " + LanguageManager.Instance.GetString("String_Karma") : "3 " + LanguageManager.Instance.GetString("String_BP")) &&
+                    source.Text == character.Options.LanguageBookShort("SR4") + " 77" && tooltip.GetToolTip(source).EndsWith(" 77"),
+                    "Quality details preserve fixed BP Karma and source projection" + context);
+                tree.SelectedNode = null;
+                check(Empty(), "Quality cleared selection removes populated details without AfterSelect" + context);
+                tree.SelectedNode = node;
+                tree.SelectedNode = root;
+                check(Empty(), "Quality category selection clears prior cost source and tooltip" + context);
+                tree.SelectedNode = node;
+                // Retag without AfterSelect, then invoke the real handler as a
+                // queued refresh would after its model disappeared.
+                node.Tag = Guid.NewGuid().ToString();
+                editor.GetType().GetMethod("treQualities_AfterSelect", Flags)!.Invoke(editor, new object?[] { tree, null });
+                check(Empty(), "Quality stale identity clears prior details safely" + context);
+                node.Tag = quality.InternalId;
+                editor.GetType().GetMethod("treQualities_AfterSelect", Flags)!.Invoke(editor, new object?[] { tree, null });
+                node.Tag = null;
+                editor.GetType().GetMethod("treQualities_AfterSelect", Flags)!.Invoke(editor, new object?[] { tree, null });
+                check(Empty(), "Quality missing identity leaves details empty" + context);
+                tree.SelectedNode = null;
+                check(Empty() && before.AsSpan().SequenceEqual(character.CaptureSnapshot()) && dirty == Field<bool>(editor, "_blnIsDirty"),
+                    "Quality detail transitions preserve character and editor dirty state" + context);
+            }
+            finally
+            {
+                editor.GetType().GetField("_blnIsDirty", Flags)!.SetValue(editor, false);
+                editor.Close();
+            }
         }
     }
 }

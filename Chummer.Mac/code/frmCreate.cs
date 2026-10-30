@@ -72,7 +72,7 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
-            QualityDetailsPresentation.Clear(lblQualityBP, lblQualitySource, tipTooltip);
+            QualityDetailsPresentation.Initialize(treQualities, lblQualityBP, lblQualitySource, tipTooltip);
             InitializeWeaponAmmunitionMenus();
             Load += (_, _) => { if (!_packsWorkspace) InitializeInventoryUndo(); };
             treQualities.ShowLines = false;

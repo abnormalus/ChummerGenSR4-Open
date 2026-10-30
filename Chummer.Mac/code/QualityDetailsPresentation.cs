@@ -8,6 +8,24 @@ namespace Chummer;
 // accounting or persistence writes; callers explicitly choose BP versus Karma.
 internal static class QualityDetailsPresentation
 {
+    internal static void Initialize(Forms.TreeView tree, Forms.Label cost, Forms.Label source, Forms.ToolTip tooltip)
+    {
+        Clear(cost, source, tooltip);
+        // The compatibility tree deliberately emits no AfterSelect when its
+        // selection is cleared. Its invalidation still exposes that transition.
+        // These controls share one form lifetime; no global observer is retained.
+        void ClearIfUnselected()
+        {
+            if (tree.SelectedNode == null && (cost.Text != "" || source.Text != "" ||
+                !string.IsNullOrEmpty(tooltip.GetToolTip(source))))
+                Clear(cost, source, tooltip);
+        }
+        tree.Invalidated += (_, _) => ClearIfUnselected();
+        // Before creation, Invalidate deliberately does nothing. Reconcile any
+        // pre-show selection clearing when this tree first becomes live.
+        tree.HandleCreated += (_, _) => ClearIfUnselected();
+    }
+
     internal static void Clear(Forms.Label cost, Forms.Label source, Forms.ToolTip tooltip)
     {
         // Initial, category and stale selections must not expose designer text

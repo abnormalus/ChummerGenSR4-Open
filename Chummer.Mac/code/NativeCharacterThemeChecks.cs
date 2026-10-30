@@ -52,6 +52,16 @@ internal static class NativeCharacterThemeChecks
                             image.Render(nativeWindow);
                             image.Save(Path.Combine(output, "native-character-theme-" + initial.Key.ToString()!.ToLowerInvariant() + "-" + theme.Key.ToString()!.ToLowerInvariant() + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
                         }
+                        var qualityTree = Field<Forms.TreeView>(editor, "treQualities");
+                        var qualityNode = new CommonFunctions(character).FindNode(character.Qualities[0].InternalId, qualityTree);
+                        qualityTree.SelectedNode = qualityNode;
+                        bool populatedDetails = Field<Forms.Label>(editor, "lblQualityBP").Text != "" &&
+                            Field<Forms.Label>(editor, "lblQualitySource").Text != "";
+                        qualityTree.SelectedNode = null;
+                        check(populatedDetails && Field<Forms.Label>(editor, "lblQualityBP").Text == "" &&
+                            Field<Forms.Label>(editor, "lblQualitySource").Text == "" &&
+                            string.IsNullOrEmpty(Field<Forms.ToolTip>(editor, "tipTooltip").GetToolTip(Field<Forms.Label>(editor, "lblQualitySource"))),
+                            "Native cleared quality selection clears populated details in " + initial.Key + " to " + theme.Key);
                         check(warning.ForeColor.ToArgb() == System.Drawing.Color.Red.ToArgb() && warning.Font.Italic,
                             "Native explicit review red and italic survive " + initial.Key + " to " + theme.Key);
                         check(semantic.ForeColor.ToArgb() == Forms.Theme.ForegroundColor.ToDrawingColor().ToArgb() &&
