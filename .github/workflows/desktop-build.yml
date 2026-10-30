@@ -92,6 +92,23 @@ jobs:
           $result = Get-Content $report -Raw | ConvertFrom-Json
           if (-not $result.passed -or $result.checks.Count -lt 17) { throw 'Native sensor transaction checks did not complete.' }
           Write-Output "Native sensor transaction assertions: $($result.checks.Count)"
+      - name: Verify native stacked-focus command cancellation and persistence
+        shell: pwsh
+        run: |
+          $character = (Resolve-Path 'artifacts/checks/creation.chum').Path
+          $report = Join-Path $PWD 'artifacts/checks/native-focus-command.json'
+          $appName = if ($IsWindows) { 'ChummerMac.exe' } else { 'ChummerMac' }
+          $exe = (Resolve-Path "Chummer.Mac/bin/Release/net10.0/$appName").Path
+          $process = Start-Process -FilePath $exe -ArgumentList @('--check-focus-command', "`"$character`"", "`"$report`"") -PassThru
+          if (-not $process.WaitForExit(180000)) {
+            $process.Kill($true)
+            throw 'Native focus command checks timed out.'
+          }
+          if ($process.ExitCode -ne 0) { throw "Native focus command checks failed: $($process.ExitCode)" }
+          if (-not (Test-Path $report)) { throw 'Native focus command report is missing.' }
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          if (-not $result.passed -or $result.checks.Count -lt 66) { throw 'Native focus command checks did not complete.' }
+          Write-Output "Native focus command assertions: $($result.checks.Count)"
       - name: Ensure native Windows browser runtime
         if: runner.os == 'Windows'
         shell: pwsh
@@ -145,6 +162,10 @@ jobs:
             artifacts/checks/native-natural-weapon-dark.png
             artifacts/checks/native-natural-weapon-light.png
             artifacts/checks/native-vehicle-picker-dark.png
+            artifacts/checks/native-focus-creation-light.png
+            artifacts/checks/native-focus-creation-dark.png
+            artifacts/checks/native-focus-career-light.png
+            artifacts/checks/native-focus-career-dark.png
             artifacts/checks/native-sensor-creation-light.png
             artifacts/checks/native-sensor-creation-dark.png
             artifacts/checks/native-sensor-career-light.png

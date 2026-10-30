@@ -46,6 +46,14 @@ dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --check-sensor-transaction
 
 This command is compiled but hosted acceptance is pending. Use the workflow's180-second process bound, passing-report and17-assertion requirements; a report alone does not prove successful process exit. It adds purchase/sale/undo coverage without replacing the full bulk/native or visual gates. See [sensor verification scope](docs/VEHICLE_SENSORS.md).
 
+The additional focus command suite runs the fixed command references in both native themes and captures selected stacked gear:
+
+```text
+dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --check-focus-command artifacts/checks/creation.chum artifacts/checks/native-focus-command.json
+```
+
+Its separate180-second bound, passing-report/minimum66 gate and four image captures supplement the existing suites. This driver compiles; hosted execution and image review remain pending before calling the focus section complete. See [focus verification scope](docs/STACKED_FOCUS.md).
+
 ## Diagnose and publish
 
 [MAINTENANCE](docs/MAINTENANCE.md) describes privacy-preserving logs and shared boundaries. [MODERNIZATION](docs/MODERNIZATION.md) records dependency/API policy; [MAINTENANCE_RESPONSIBILITIES](docs/MAINTENANCE_RESPONSIBILITIES.md) identifies automation entry points and reviewed exceptions with removal conditions. [COMPATIBILITY_CONTROLS](docs/COMPATIBILITY_CONTROLS.md) inventories toolkit capabilities. Keep exception rationale and removal conditions explicit.

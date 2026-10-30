@@ -1,6 +1,6 @@
 # Stacked-focus command characterization
 
-Both `frmCreate.cmdCreateStackedFocus_Click` and `frmCareer.cmdCreateStackedFocus_Click` currently own the same modal command. They collect unbonded Foci/Metamagic Foci, mark each accepted choice bonded, validate the minimum count and optional Force-six cap, then replace component gear with a linked stacked-focus record and refresh the editor. Selection, mutation, validation and tree projection are still coupled.
+At the recorded baseline, `frmCreate.cmdCreateStackedFocus_Click` and `frmCareer.cmdCreateStackedFocus_Click` owned the same modal command. They collect unbonded Foci/Metamagic Foci, mark each accepted choice bonded, validate the minimum count and optional Force-six cap, then replace component gear with a linked stacked-focus record and refresh the editor. Selection, mutation, validation and tree projection are still coupled.
 
 ## Observed cancellation defect
 
@@ -21,4 +21,23 @@ The `focus-success` extension now has all thirty original-handler assertions pas
 
 Native Mac/Windows modal acceptance remains required for a later command change. The catalog/rule-validity of arbitrary focus combinations and every external improvement are outside these synthetic ownership cases.
 
-A repair should stage selection without changing owned gear, validate the complete proposal, then commit model changes once. Keep the proposal/rules component independent of modal controls and persistence, with explicit inputs for the higher-Force option. The editor should own prompts and projection. Update the recorded cancellation expectations as an intentional bug fix and verify affected native interactions before section acceptance. No such repair or shared command is implemented by these checks.
+A repair should stage selection without changing owned gear, validate the complete proposal, then commit model changes once. Keep the proposal/rules component independent of modal controls and persistence, with explicit inputs for the higher-Force option. The editor should own prompts and projection. Update the recorded cancellation expectations as an intentional bug fix and verify affected native interactions before section acceptance. The prepared replacement below is an explicit behavior repair and still needs its own verification.
+
+
+## Prepared model and editor replacement
+
+`StackedFocusProposal` copies the selected object references, validates minimum count, duplicate/reference ownership, current unbonded/category eligibility and the explicit higher-Force option. It reads no controls, settings services, files or expense ledger. Invalid proposals reject before writes. Cost/name evaluation and both linked records are constructed before owned Bonded/collection changes; malformed custom costs are explicitly tested for unchanged state. Original unchecked integer aggregation is retained. This does not promise rollback of allocation failures, unrelated global effects or later UI projection failures.
+
+`StackedFocusEditorCommand` owns the disposable modal picker and tree projection. Available/selected lists are private drafts; selecting one item no longer bonds it. The option callback is read after the modal sequence. Cancel after at least two selections still completes that original selection sequence; fewer than two rejects without edits. Success delegates one model transfer, then removes component nodes and adds the linked item node. Both form handlers are eight-line wrappers retaining their own dirty flag, focus list, character summary and window-title updates. Source hashes prove all code outside the two replaced125-line bodies is unchanged.
+
+`StackedFocusCommandChecks` retains fixed original success/Force references, with one intentional expectation change: one-selection cancellation now requires both components unbonded and the complete snapshot unchanged. `StackedFocusProposalChecks` adds nine independent model contracts for rejection, staleness, malformed cost and ordered commit/accounting. The proposal-only binary passed the complete suite in218.2s. The switched editor code passes the complete suite in216.9s, including all39 focus checks, eight actual sensor deletion checks,399 file/memory cases,both Foundry targets and shutdown. Original baseline success does not accept this replacement. Native Mac/Windows modal interactions remain required before section completion.
+
+
+## Native acceptance prepared
+
+`--check-focus-command` runs the same fixed command cases on the native dispatcher in Light and Dark with real MDI owners. Sixty command assertions plus four selected-name/cost projection assertions and synchronization/source-file checks require at least66 assertions. Four synthetic captures show the successful two-component stack in creation/career and both themes; they join the existing88 captures for92 named images perOS. The selected gear must display the fixed synthetic name and cost300 before capture.
+
+The native-only driver compiles with zero warnings/errors (8.73s), but has not executed locally or on hosted platforms. Its own isolated test-user directory,180-second process bound, passing-report/minimum66 and image review are additional required gates. Existing bulk300s/min1069 and sensor-transaction180s/min17 steps remain byte-identical. The headless216.9s result does not accept later native-only driver code or real platform modal/rendering behavior.
+
+
+The supplemental modes also share startup recognition with frmMain's character-file path. A prior sensor-only hosted attempt exposed the missing exclusion before any driver assertion. The startup correction includes the focus mode; successful compilation does not replace its pending native66 run or image review.

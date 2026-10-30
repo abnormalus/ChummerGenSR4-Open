@@ -1058,7 +1058,8 @@ namespace Chummer
                 VehicleMovementChecks.Run(Check);
                 VehicleSensorChecks.Run(character, Check);
                 VehicleSensorDeletionChecks.Run(character, Check);
-                StackedFocusCancellationChecks.Run(character, Check);
+                StackedFocusCommandChecks.Run(character, Check);
+                StackedFocusProposalChecks.Run(Check);
                 VehicleSensorTransitionChecks.Run(Check);
                 VehicleModPreviewChecks.Run(Check);
                 VehicleModPickerChecks.Run(character, Check);

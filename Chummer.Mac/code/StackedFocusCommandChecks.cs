@@ -7,13 +7,13 @@ using Forms = Majorsilence.Forms;
 
 namespace Chummer;
 
-// Characterize the original handlers before sharing their command policy.
-// The one-selection case records a verified defect, not desired cancel behavior.
-internal static class StackedFocusCancellationChecks
+// Fixed success/Force references were recorded against the original handlers.
+// One-selection cancellation now expects the explicit repair: no model edits.
+internal static class StackedFocusCommandChecks
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
     private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, Flags)!.GetValue(owner)!;
-    internal static void Run(Character source, Action<bool, string> check)
+    internal static void Run(Character source, Action<bool, string> check, Forms.Form? owner = null, Action<Forms.Form, Character, bool, int>? afterScenario = null)
     {
         foreach (bool career in new[] { false, true })
         foreach (int scenario in new[] { 0, 1, 2, 3, 4, 5 })
@@ -30,7 +30,7 @@ internal static class StackedFocusCancellationChecks
             if (scenario == 5) character.Gear.Add(third);
             bool allowHigher = character.Options.AllowHigherStackedFoci;
             character.Options.AllowHigherStackedFoci = scenario == 4;
-            using Forms.Form editor = career ? new frmCareer(character) { Loading = true } : new frmCreate(character) { Loading = true };
+            using Forms.Form editor = career ? new frmCareer(character) { Loading = true, MdiParent = owner } : new frmCreate(character) { Loading = true, MdiParent = owner };
             editor.Show(); editor.GetType().GetField("_blnIsDirty", Flags)!.SetValue(editor, false);
             var backend = Forms.Backends.Platform.Backend; int picks = 0, notices = 0; bool expired = false;
             bool finished = false;
@@ -73,29 +73,30 @@ internal static class StackedFocusCancellationChecks
                         (components == 2 || third.Bonded) && stack.Gear.Count == components &&
                         ReferenceEquals(stack.Gear[0], first) && ReferenceEquals(stack.Gear[1], second) &&
                         (components == 2 || ReferenceEquals(stack.Gear[2], third)) && !stack.Bonded,
-                        "Original stacked-focus success transfers ordered bonded components to an unbonded stack" + context);
+                        "Shared stacked-focus success transfers ordered bonded components to an unbonded stack" + context);
                     check(stack.GearId == item.InternalId && item.Category == "Stacked Focus" && item.Cost == (components == 3 ? "600" : "300") &&
                         item.Source == "SM" && item.Page == "84" && item.Avail == "0" && item.Rating == 0 &&
                         new CommonFunctions(character).FindNode(item.InternalId, tree).Text == item.DisplayNameShort &&
                         character.Nuyen == money && character.ExpenseEntries.Count == expenses && Field<bool>(editor, "_blnIsDirty"),
-                        "Original stacked-focus success retains linked gear cost source tree and caller accounting" + context);
+                        "Shared stacked-focus success retains linked gear cost source tree and caller accounting" + context);
                     var restored = new Character(); restored.LoadSnapshot(character.CaptureSnapshot());
                     check(restored.Gear.Count == 1 && restored.StackedFoci.Count == 1 &&
                         restored.StackedFoci[0].GearId == restored.Gear[0].InternalId && restored.StackedFoci[0].Gear.Count == components &&
                         restored.StackedFoci[0].Gear[0].InternalId == first.InternalId && restored.StackedFoci[0].Gear[0].Bonded &&
                         restored.Gear[0].Cost == (components == 3 ? "600" : "300"),
-                        "Original stacked-focus linked gear and component identity survive the existing snapshot format" + context);
+                        "Shared stacked-focus linked gear and component identity survive the existing snapshot format" + context);
                 }
                 else
                 {
                     check(picks == (scenario == 0 ? 1 : 2) && notices == 1 && editor.Enabled,
-                        "Original stacked-focus rejection returns through expected notice" + context);
-                    check(first.Bonded == selectOne && !second.Bonded && character.Gear.Count == 2 &&
+                        "Shared stacked-focus rejection returns through expected notice" + context);
+                    check(!first.Bonded && !second.Bonded && character.Gear.Count == 2 &&
                         ReferenceEquals(character.Gear[0], first) && ReferenceEquals(character.Gear[1], second) && character.StackedFoci.Count == 0 &&
                         character.Nuyen == money && character.ExpenseEntries.Count == expenses && !Field<bool>(editor, "_blnIsDirty") &&
-                        (selectOne || before.AsSpan().SequenceEqual(character.CaptureSnapshot())),
-                        "Original stacked-focus rejection retains inventory and accounting with characterized bonding" + context);
+                        before.AsSpan().SequenceEqual(character.CaptureSnapshot()),
+                        "Shared stacked-focus rejection retains inventory and accounting and leaves rejected components unbonded" + context);
                 }
+                afterScenario?.Invoke(editor, character, career, scenario);
             }
             finally { character.Options.AllowHigherStackedFoci = allowHigher; finished = true; editor.GetType().GetField("_blnIsDirty", Flags)!.SetValue(editor, false); editor.Close(); }
         }
