@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -18,8 +19,15 @@ internal static class NativeVehicleSensorChecks
         Vehicle vehicle, Forms.TreeNode vehicleNode, string output, Action<bool, string> check, bool career)
     {
         var tree = Field<Forms.TreeView>(editor, "treVehicles");
-        var sensor = vehicle.Gear.Single(g => g.Name == "Vehicle Sensor");
-        var sensorNode = new CommonFunctions(character).FindNode(sensor.InternalId, tree);
+        // The movement fixture intentionally passes createChildren=false. Install
+        // the catalog sensor explicitly, following Vehicle.Create's bundled-gear
+        // cost/rating/node setup without importing unrelated vehicle mods.
+        var sensor = new Gear(character); var sensorNode = new Forms.TreeNode();
+        sensor.Create(XmlManager.Instance.Load("gear.xml").SelectSingleNode("/chummer/gears/gear[name='Vehicle Sensor' and category='Sensors']")!,
+            character, sensorNode, 0, new List<Weapon>(), new List<Forms.TreeNode>());
+        sensor.Cost = "0"; sensor.Quantity = 1; sensor.MaxRating = sensor.Rating;
+        sensorNode.Text = sensor.DisplayName;
+        vehicle.Gear.Add(sensor); vehicleNode.Nodes.Add(sensorNode);
         var originalChildren = sensor.Children.ToArray(); string id = sensor.InternalId; int count = vehicle.Gear.Count;
         var change = editor.GetType().GetMethod("ChangeVehicleSensor", Flags)!;
         foreach (var theme in new[] { Avalonia.Styling.ThemeVariant.Light, Avalonia.Styling.ThemeVariant.Dark })
