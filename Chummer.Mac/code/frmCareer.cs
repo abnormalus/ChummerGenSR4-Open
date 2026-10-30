@@ -12071,6 +12071,16 @@ namespace Chummer
 		private void tsVehicleSell_Click(object sender, EventArgs e)
 		{
             if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
+            // Model/ledger changes precede this projection. Keep them marked
+            // changed even if a legacy summary/detail refresh later fails.
+            void FinishSale()
+            {
+                _blnIsDirty = true;
+                UpdateWindowTitle();
+                UpdateCharacterInfo();
+                RefreshSelectedVehicle();
+            }
+
 			// Delete the selected Vehicle.
 			try
 			{
@@ -12147,8 +12157,13 @@ namespace Chummer
 									objExpense.Create(intAmount, LanguageManager.Instance.GetString("String_ExpenseSoldVehicleMod") + " " + objMod.DisplayNameShort, ExpenseType.Nuyen, DateTime.Now);
 									_objCharacter.ExpenseEntries.Add(objExpense);
 									_objCharacter.Nuyen += intAmount;
+                                    // Removing the selected mod clears selection.
+                                    // This sale is complete; do not fall through to
+                                    // unrelated gear/weapon lookup on a null node.
+                                    FinishSale();
+                                    return;
 								}
-								break;
+
 							}
 						}
 					}
@@ -12564,14 +12579,11 @@ namespace Chummer
 						_objCharacter.Nuyen += intAmount;
 					}
 				}
-				UpdateCharacterInfo();
-				RefreshSelectedVehicle();
-
-				_blnIsDirty = true;
-				UpdateWindowTitle();
+                FinishSale();
 			}
-			catch
+			catch (Exception error)
 			{
+                AppDiagnostics.Record("inventory.vehicle-sale-failed", error);
 			}
 		}
 
