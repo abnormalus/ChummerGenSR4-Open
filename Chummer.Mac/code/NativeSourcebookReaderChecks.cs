@@ -22,15 +22,21 @@ internal static class NativeSourcebookReaderChecks
             await Task.Delay(50);
         }
     }
-    private static async Task<bool> TrueAsync(Forms.WebBrowser browser, string expression)
+    private static async Task<bool> TrueAsync(Forms.WebBrowser browser, string expression, bool opening = false)
     {
-        var script = browser.ExecuteScriptAsync(expression);
+        Task<string?> script;
+        try { script = browser.ExecuteScriptAsync(expression); }
+        catch (InvalidOperationException) when (opening) { return false; }
         if (await Task.WhenAny(script, Task.Delay(5000)) != script)
             throw new TimeoutException("Native sourcebook reader script timed out.");
-        return (await script)?.Trim().Trim('"') == "true";
+        try { return (await script)?.Trim().Trim('"') == "true"; }
+        catch (InvalidOperationException) when (opening) { return false; }
     }
     internal static async Task RunAsync(Forms.Form owner, string output, Action<bool, string> check)
     {
+        // This isolated mode starts in main.Shown; give the native host its
+        // first dispatcher turn before opening a child with a real webview.
+        await Task.Delay(100);
         string path = Path.Combine(output, "native-reader-synthetic.pdf");
         WriteBook(path);
         var before = Forms.Application.OpenForms.ToArray();
@@ -40,7 +46,7 @@ internal static class NativeSourcebookReaderChecks
         {
             var browser = reader.Controls.OfType<Forms.WebBrowser>().Single();
             check(reader.Visible && browser.IsWebViewFunctional, "Native sourcebook opens the actual owned functional reader");
-            await WaitForAsync(() => TrueAsync(browser, "document.getElementById('pages')?.textContent === '/ 2' && document.getElementById('status')?.textContent === ''"));
+            await WaitForAsync(() => TrueAsync(browser, "document.getElementById('pages')?.textContent === '/ 2' && document.getElementById('status')?.textContent === ''", opening: true));
             check(true, "Native sourcebook loads both synthetic pages without an error notice");
             await WaitForAsync(() => TrueAsync(browser, "(() => { const c = document.querySelector('.page canvas'); if (!c || !c.width || !c.height) return false; const d = c.getContext('2d').getImageData(0,0,c.width,c.height).data; for(let i=0;i<d.length;i+=4) if(d[i+3]>0 && d[i]<180 && d[i+1]<180 && d[i+2]<180) return document.querySelector('.textLayer')?.textContent.includes('Chummer reader verification'); return false; })()"));
             check(true, "Native sourcebook renders nonblank page pixels and fixed synthetic text");
