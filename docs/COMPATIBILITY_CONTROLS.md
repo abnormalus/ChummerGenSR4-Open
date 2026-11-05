@@ -1,6 +1,6 @@
 # Compatibility-control inventory — reviewed November 5, 2026
 
-This inventory covers the first high-impact pass through the shipping Chummer.Mac application, not every capability in the vendor toolkit. Historical Chummer/ is excluded. Compilation alone cannot establish that a control works. Native driver coverage below is source-reviewed. At4351319, both platforms pass full/native bulk/sensor17/focus66; WindowsPDF also passes. All92-image acceptance remains open because the four focus captures show Common. The e942000 capture correction and subsequent native-reader gate require fresh source-specific results.
+This inventory covers the first high-impact pass through the shipping Chummer.Mac application, not every capability in the vendor toolkit. Historical Chummer/ is excluded. Compilation alone cannot establish that a control works. Native driver coverage below is source-reviewed. At4351319, both platforms pass full/native bulk/sensor17/focus66; WindowsPDF also passes. The e942000 correction passes both-platform native suites and92-image review perOS; its four focus captures show the intended Gear view. The subsequent293158a native-reader gate requires its own actual platform results.
 
 | Reachable surface | Implementation and evidence | Remaining coverage |
 |---|---|---|
@@ -13,7 +13,7 @@ This inventory covers the first high-impact pass through the shipping Chummer.Ma
 
 ## Supplemental caller acceptance
 
-Sensor transactions use their own180-second/min17 report gate for actual creation/career purchase, funds rejection, sale and expense undo. Focus commands use a separate180-second/min66 gate in both themes, with four selected-gear captures. They supplement the original300-second/min1069 native bulk suite. Both-platform7d supplemental results exposed an accepted-sale dirty-state defect after15passing assertions; d486 contains the explicit completion fix. Both17/66 process gates pass on Mac and Windows at4351319, but direct review rejects its focus captures. Fresh selected-tab captures and the separately bounded actual sourcebook-reader gate remain required; process success alone does not establish visual acceptance.
+Sensor transactions use their own180-second/min17 report gate for actual creation/career purchase, funds rejection, sale and expense undo. Focus commands use a separate180-second/min66 gate in both themes, with four selected-gear captures. They supplement the original300-second/min1069 native bulk suite. Both-platform7d supplemental results exposed an accepted-sale dirty-state defect after15passing assertions; d486 contains the explicit completion fix. Both17/66 process gates pass on Mac and Windows at4351319, but direct review rejects its focus captures. The e942000 selected-tab correction passes both-platform92-image review. The separately bounded actual sourcebook-reader gate still needs its own source-specific platform proof; process success alone does not establish visual acceptance.
 
 ## Unused or deliberately unsupported APIs
 

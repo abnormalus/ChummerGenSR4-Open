@@ -30,7 +30,7 @@ The commands above were verified from an independent clean checkout at `7d4cda70
 - `vendor/Majorsilence.Forms*` contains the compatibility toolkit. Consult `vendor/LOCAL_PATCHES.md` before changing it; add a behavior regression or record platform verification for a patch.
 - `scripts` and `.github/workflows` own source safeguards, dependency auditing, verification and packaging. The desktop workflow validates both Mac and Windows. Passing local headless checks does not establish native interaction or visual correctness.
 
-For a bounded feature example, follow the [architecture map](docs/ARCHITECTURE.md) from the ware picker through the actual creation/career caller and character serialization. Acceptance in a picker is not itself persistence. [CYBERWARE_PICKER](docs/CYBERWARE_PICKER.md) records the behavior and independent references. Broader architecture and exception review remain follow-up work.
+For a bounded feature example, follow the [architecture map](docs/ARCHITECTURE.md) from the ware picker through the actual creation/career caller and character serialization. Acceptance in a picker is not itself persistence. [CYBERWARE_PICKER](docs/CYBERWARE_PICKER.md) records the behavior and independent references. The architecture and retained-exception reviews are recorded in those guides; reopen them when affected callers, dependencies or ownership change.
 
 ## Change and verify a section
 
@@ -41,18 +41,26 @@ The headless command above includes character file/memory round trips and both F
 The additional native sensor caller check uses the built application on a real desktop after generating `artifacts/checks/creation.chum` with the headless suite:
 
 ```text
-dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --check-sensor-transactions artifacts/checks/creation.chum artifacts/checks/native-sensor-transactions.json
+Chummer.Mac/bin/Release/net10.0/ChummerMac --check-sensor-transactions artifacts/checks/creation.chum artifacts/checks/native-sensor-transactions.json
 ```
 
-This command is compiled but hosted acceptance is pending. Use the workflow's180-second process bound, passing-report and17-assertion requirements; a report alone does not prove successful process exit. It adds purchase/sale/undo coverage without replacing the full bulk/native or visual gates. See [sensor verification scope](docs/VEHICLE_SENSORS.md).
+Use the native apphost shown on Mac; on Windows invoke `Chummer.Mac/bin/Release/net10.0/ChummerMac.exe` so its STA/Windows manifest is used. Sensor17 passes on both platforms at4351319; later sources require their own results. Use the workflow's180-second process bound, passing-report and17-assertion requirements; a report alone does not prove successful process exit. It adds purchase/sale/undo coverage without replacing the full bulk/native or visual gates. See [sensor verification scope](docs/VEHICLE_SENSORS.md).
 
 The additional focus command suite runs the fixed command references in both native themes and captures selected stacked gear:
 
 ```text
-dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --check-focus-command artifacts/checks/creation.chum artifacts/checks/native-focus-command.json
+Chummer.Mac/bin/Release/net10.0/ChummerMac --check-focus-command artifacts/checks/creation.chum artifacts/checks/native-focus-command.json
 ```
 
-Its separate180-second bound, passing-report/minimum66 gate and four image captures supplement the existing suites. This driver compiles; hosted execution and image review remain pending before calling the focus section complete. See [focus verification scope](docs/STACKED_FOCUS.md).
+Its separate180-second bound, passing-report/minimum66 gate and four image captures supplement the existing suites. Native66 passes both platforms at4351319, but direct review rejects its focus captures because they show Common. The e942000 correction passes both-platform native66 and92-image review perOS; later sources require their own gates. See [focus verification scope](docs/STACKED_FOCUS.md).
+
+The sourcebook reader has a separate native check, after the same generated character exists:
+
+```text
+Chummer.Mac/bin/Release/net10.0/ChummerMac --check-pdf-reader artifacts/checks/creation.chum artifacts/checks/native-pdf-reader.json
+```
+
+On Windows use the `.exe` apphost and the workflow's WebView2 runtime setup. Its180-second process bound, passing report and minimum10 assertions cover actual reader pixels/text/search/page/zoom and form/server closure, with a synthetic book and isolated test-user directory. Character-sheet PDF export is a separate path. At introduction293158a the reader check compiled and hosted results were pending; inspect the current source's reader report and process exit before claiming acceptance. These native command instructions identify the workflow entry points; clean-checkout verification above covers the named headless commands, not interactive native acceptance.
 
 ## Diagnose and publish
 

@@ -1,6 +1,6 @@
 # Installed vehicle sensor transitions
 
-Current process evidence at `4351319`: Mac full249.4s/native1078/sensor17 and Windows full198.5s/native1071/sensor17/PDF pass, including accepted-sale dirty state. The later `2217258` updates PDF.js and requires its own results. All92-image acceptance remains open:435 focus captures were rejected during direct review because Common was shown, and `e942000` corrects the focus capture fixture. The source-specific sections below are historical evidence, not claims that supplemental callers remain unexecuted.
+Current process evidence at `4351319`: Mac full249.4s/native1078/sensor17 and Windows full198.5s/native1071/sensor17/PDF pass, including accepted-sale dirty state. The later `2217258` updates PDF.js and requires its own results. All92-image batches perOS are accepted at `e942000`: Mac82 exact RGBA transfers plus10 direct inspections and Windows88 plus4 direct. The corrected focus captures show Gear;435 Common-tab images remain rejected. Later293 sourcebook-reader changes require separate actual native acceptance. The source-specific sections below are historical evidence, not claims that supplemental callers remain unexecuted.
 
 ## Owner and callers
 
