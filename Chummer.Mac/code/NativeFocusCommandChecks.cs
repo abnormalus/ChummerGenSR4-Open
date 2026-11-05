@@ -22,7 +22,7 @@ internal static class NativeFocusCommandChecks
             foreach (var theme in new[] { Avalonia.Styling.ThemeVariant.Light, Avalonia.Styling.ThemeVariant.Dark })
             {
                 app.RequestedThemeVariant = theme; await Task.Delay(50);
-                StackedFocusCommandChecks.Run(source, check, owner, (editor, character, career, scenario) =>
+                await StackedFocusCommandChecks.RunAsync(source, check, owner, async (editor, character, career, scenario) =>
                 {
                     if (scenario != 3) return;
                     Field<Forms.TabControl>(editor, "tabCharacterTabs").SelectedTab = Field<Forms.TabPage>(editor, "tabStreetGear");
@@ -31,9 +31,18 @@ internal static class NativeFocusCommandChecks
                     foreach (Forms.TreeNode root in tree.Nodes) root.Expand();
                     tree.SelectedNode = new CommonFunctions(character).FindNode(item.InternalId, tree);
                     editor.Select();
+                    // Let the native host apply tab visibility before validating/capturing.
+                    // Legacy label.Visible alone also passes for hidden tab contents.
+                    await Task.Delay(100);
                     var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner); window.UpdateLayout();
                     var name = Field<Forms.Label>(editor, "lblGearName"); var cost = Field<Forms.Label>(editor, "lblGearCost");
-                    check(name.Visible && name.Text.StartsWith("Stacked Focus: Synthetic first focus") && cost.Visible && cost.Text.StartsWith("300"),
+                    var mainTabs = Field<Forms.TabControl>(editor, "tabCharacterTabs");
+                    var gearTabs = Field<Forms.TabControl>(editor, "tabStreetGearTabs");
+                    var streetPage = Field<Forms.TabPage>(editor, "tabStreetGear");
+                    var gearPage = Field<Forms.TabPage>(editor, "tabGear");
+                    check(mainTabs.SelectedTab == streetPage && gearTabs.SelectedTab == gearPage &&
+                        streetPage.Visible && gearPage.Visible && name.Width > 0 && name.Height > 0 && cost.Width > 0 && cost.Height > 0 &&
+                        name.Visible && name.Text.StartsWith("Stacked Focus: Synthetic first focus") && cost.Visible && cost.Text.StartsWith("300"),
                         "Native stacked-focus selected gear shows fixed name and cost career=" + career + " theme=" + theme.Key);
                     using var image = new Avalonia.Media.Imaging.RenderTargetBitmap(new Avalonia.PixelSize((int)window.ClientSize.Width, (int)window.ClientSize.Height));
                     image.Render(window);

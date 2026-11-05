@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -13,7 +14,9 @@ internal static class StackedFocusCommandChecks
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
     private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, Flags)!.GetValue(owner)!;
-    internal static void Run(Character source, Action<bool, string> check, Forms.Form? owner = null, Action<Forms.Form, Character, bool, int>? afterScenario = null)
+    internal static void Run(Character source, Action<bool, string> check) => RunAsync(source, check).GetAwaiter().GetResult();
+
+    internal static async Task RunAsync(Character source, Action<bool, string> check, Forms.Form? owner = null, Func<Forms.Form, Character, bool, int, Task>? afterScenario = null)
     {
         foreach (bool career in new[] { false, true })
         foreach (int scenario in new[] { 0, 1, 2, 3, 4, 5 })
@@ -96,7 +99,7 @@ internal static class StackedFocusCommandChecks
                         before.AsSpan().SequenceEqual(character.CaptureSnapshot()),
                         "Shared stacked-focus rejection retains inventory and accounting and leaves rejected components unbonded" + context);
                 }
-                afterScenario?.Invoke(editor, character, career, scenario);
+                if (afterScenario != null) await afterScenario(editor, character, career, scenario);
             }
             finally { character.Options.AllowHigherStackedFoci = allowHigher; finished = true; editor.GetType().GetField("_blnIsDirty", Flags)!.SetValue(editor, false); editor.Close(); }
         }
