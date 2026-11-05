@@ -16,18 +16,23 @@ internal static class StackedFocusEditorCommand
         var available = character.Gear.Where(g => !g.Bonded && (g.Category == "Foci" || g.Category == "Metamagic Foci")).ToList();
         if (available.Count < 2) { Notice("Message_CannotStackFoci"); return false; }
         var selected = new List<Gear>();
-        using var picker = new frmSelectItem();
+        Forms.DialogResult answer;
         do
         {
+            // A completed native dialog has closed its backing window. Keep
+            // selection state in these drafts and create one window per choice,
+            // rather than showing the same closed native window again.
+            using var picker = new frmSelectItem();
             picker.Gear = available; picker.AllowAutoSelect = false;
             picker.Description = LanguageManager.Instance.GetString("String_SelectItemFocus");
             picker.ShowDialog(owner);
-            if (picker.DialogResult == Forms.DialogResult.OK)
+            answer = picker.DialogResult;
+            if (answer == Forms.DialogResult.OK)
             {
                 var component = available.FirstOrDefault(g => g.InternalId == picker.SelectedItem);
                 if (component != null) { selected.Add(component); available.Remove(component); }
             }
-        } while (available.Count > 0 && picker.DialogResult != Forms.DialogResult.Cancel);
+        } while (available.Count > 0 && answer != Forms.DialogResult.Cancel);
 
         // Cancel after two selections still completes the original command's
         // selection sequence. Fewer than two now rejects without bonding one.

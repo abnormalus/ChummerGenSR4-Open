@@ -41,3 +41,10 @@ The native-only driver compiles with zero warnings/errors (8.73s), but has not e
 
 
 The supplemental modes also share startup recognition with frmMain's character-file path. A prior sensor-only hosted attempt exposed the missing exclusion before any driver assertion. The startup correction includes the focus mode; successful compilation does not replace its pending native66 run or image review.
+
+
+## First native lifecycle finding
+
+At d486a59, Windows passes the full310.7s headless suite,1071 native bulk assertions and all17 sensor transaction assertions, including the sale dirty-state repair. The new focus process passes its synchronization check and the first zero-selection cancellation case, then fails in `PointToScreen`/modal centering when scenario1 needs a second picker display. The shared adapter reused the same picker after its native backing window closed on the first accepted choice.
+
+The follow-up creates and disposes one picker window per choice while retaining the available/selected lists in the model draft. It does not change minimum/Force rules, accounting, cancellation expectations or the66-assertion gate. The lifecycle correction builds successfully (16.35s, zero errors and ten known vendor warnings) and passes the full local regression suite in 213.6s, including all39 focus checks,8 actual sensor deletions,95 sensor contracts,28 quality cases,399 file/memory round trips, both Foundry targets and shutdown checks. Fresh hosted modal/image acceptance remains pending. The earlier native driver's existence/compilation did not establish this behavior. No editor-attachment delay or graphics fallback was added.
