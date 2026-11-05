@@ -13,7 +13,7 @@ namespace Chummer
         // Native verification flags must also be excluded from frmMain's file
         // opening path; otherwise startup prompts before the driver can run.
         internal static bool IsNativeVerificationArgument(string argument) =>
-            argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command";
+            argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command" || argument == "--check-pdf-reader";
 
         /// <summary>
         /// The main entry point for the application.
@@ -38,7 +38,7 @@ namespace Chummer
             }
             bool nativeCheck = args.Length >= 3 && IsNativeVerificationArgument(args[0]);
             if (nativeCheck)
-                MacPaths.TestUserDirectory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(args[2])), args[0] == "--check-bulk" ? "native-bulk-user" : args[0] == "--check-focus-command" ? "native-focus-command-user" : "native-sensor-transactions-user");
+                MacPaths.TestUserDirectory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(args[2])), args[0] == "--check-pdf-reader" ? "native-pdf-reader-user" : args[0] == "--check-bulk" ? "native-bulk-user" : args[0] == "--check-focus-command" ? "native-focus-command-user" : "native-sensor-transactions-user");
             AppDiagnostics.Initialize();
             try
             {
@@ -63,7 +63,7 @@ namespace Chummer
                         // Later fullscreen tests must not supply its initial restore bounds.
                         main.Size = new System.Drawing.Size(932, 545);
                         main.Shown += async (_, _) => {
-                            try { await NativeBulkChecks.RunAsync(main, args[1], args[2], args[0] == "--check-sensor-transactions", args[0] == "--check-focus-command"); }
+                            try { await NativeBulkChecks.RunAsync(main, args[1], args[2], args[0] == "--check-sensor-transactions", args[0] == "--check-focus-command", args[0] == "--check-pdf-reader"); }
                             catch (Exception error) { AppDiagnostics.Record("bulk.native-checks-failed", error); Environment.ExitCode = 1; }
                             finally { NativeBulkChecks.DiscardEditors(); await AppPlatform.QuitApplicationAsync(); }
                         };

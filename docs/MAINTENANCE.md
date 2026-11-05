@@ -133,3 +133,8 @@ Windows executables must embed `packaging/windows/app.manifest` via `Application
 Compatibility capabilities and remaining interaction checks are recorded in `COMPATIBILITY_CONTROLS.md`. Bundled reader integrity and update procedures are in `PDFJS_MAINTENANCE.md`.
 
 Rendering ownership, the Help → Full Redraw (Diagnostic) option, visual regressions and the next bounded control migration are documented in [RENDERING.md](RENDERING.md).
+
+
+## Native sourcebook reader gate
+
+`--check-pdf-reader <generated-character> <report>` exercises the production SourcebookReader.OpenDocument entry with a fixed synthetic two-page book and an isolated test-user directory. It requires a functional actual WKWebView/WebView2, two loaded pages, nonblank canvas pixels plus expected text, two highlighted search matches, next-page and zoom controls, form removal, released loopback port and unchanged source character. Each asynchronous operation is bounded; the hosted process has180seconds and requires a passing report with at least10 assertions. Windows installs/locates WebView2 before this step. Existing bulk/sensor/focus/preview gates are retained. This compiled driver is pending actual hosted acceptance; its existence does not establish renderer compatibility. No sourcebook preferences or character settings are changed.

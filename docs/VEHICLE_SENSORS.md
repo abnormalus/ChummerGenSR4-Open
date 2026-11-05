@@ -1,6 +1,6 @@
 # Installed vehicle sensor transitions
 
-Current acceptance at `7d4cda7`: the transition and actual deletion checks pass locally, and previous `75b3717` passes both-platform bulk label/transition gates. The supplemental caller suite is compiled but still unexecuted after its startup correction. Current-source platform checks and92-image review remain pending. The source-specific sections below retain historical results and explain which checks they prove.
+Current process evidence at `4351319`: Mac full249.4s/native1078/sensor17 and Windows full198.5s/native1071/sensor17/PDF pass, including accepted-sale dirty state. The later `2217258` updates PDF.js and requires its own results. All92-image acceptance remains open:435 focus captures were rejected during direct review because Common was shown, and `e942000` corrects the focus capture fixture. The source-specific sections below are historical evidence, not claims that supplemental callers remain unexecuted.
 
 ## Owner and callers
 

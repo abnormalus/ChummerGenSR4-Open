@@ -33,7 +33,7 @@ internal static class NativeBulkChecks
         foreach (var editor in Application.OpenForms.OfType<frmCreate>().ToArray())
             editor.GetType().GetField("_blnIsDirty", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(editor, false);
     }
-    internal static async Task RunAsync(frmMain main, string path, string report, bool sensorTransactionsOnly = false, bool focusCommandOnly = false)
+    internal static async Task RunAsync(frmMain main, string path, string report, bool sensorTransactionsOnly = false, bool focusCommandOnly = false, bool pdfReaderOnly = false)
     {
         var checks = new List<string>();
         bool passed = false;
@@ -60,6 +60,13 @@ internal static class NativeBulkChecks
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
             // Additional caller coverage runs in its own bounded process. The
             // original bulk suite, assertion gate and shutdown deadline remain.
+            if (pdfReaderOnly)
+            {
+                await NativeSourcebookReaderChecks.RunAsync(main, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native sourcebook checks preserve the source character file");
+                passed = true;
+                return;
+            }
             if (focusCommandOnly)
             {
                 await NativeFocusCommandChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
