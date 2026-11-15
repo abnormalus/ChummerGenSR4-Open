@@ -65,8 +65,12 @@ internal static class NativeSourcebookReaderChecks
             await WaitForAsync(async () =>
             {
                 using var client = new TcpClient();
-                try { await client.ConnectAsync("127.0.0.1", port).WaitAsync(TimeSpan.FromSeconds(2)); return false; }
-                catch (SocketException) { return true; }
+                // Match the established headless listener probe: Windows may
+                // take more than two seconds to report connection refusal. A
+                // timeout is never proof of cleanup, and the socket is cancelled.
+                using var timeout = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try { await client.ConnectAsync(System.Net.IPAddress.Loopback, port, timeout.Token); return false; }
+                catch (SocketException error) when (error.SocketErrorCode == SocketError.ConnectionRefused) { return true; }
             });
             check(true, "Native sourcebook close releases its loopback server port");
         }
