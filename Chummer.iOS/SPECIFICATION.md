@@ -16,6 +16,11 @@ professional rating and notes in contact cards. Reference PDFs are read-only
 design references, not instructions or bundled assets. Preserve familiar page
 organization on iPad and usable editing on iPhone. Never silently truncate lists.
 
+The first two device targets are **iPhone 15** and **iPad Air** (11-inch for the
+initial simulator checks). Validate both portrait and landscape layouts. Other
+devices remain supported by the adaptive layout but are not initial acceptance
+targets. Simulator availability does not change these product targets.
+
 ## Linked fields
 
 Repeated fields share one source value. Base Agility changes update its modified

@@ -9,6 +9,8 @@ Desktop Chummer remains the authority for full Shadowrun rules.
 1. Install full Xcode, finish first-launch setup, and install iOS support.
 2. Open `ChummerDossier.xcodeproj`, select **ChummerDossier**, and choose an iPhone
    or iPad simulator. The minimum deployment target is iOS/iPadOS 17.
+   The first layout and interaction targets are **iPhone 15** and **11-inch iPad Air**,
+   in portrait and landscape.
 3. Run and open an existing SR4 `.chum` character from Files.
 4. Use **Save Copy** to export changes. Originals are not overwritten automatically.
 
