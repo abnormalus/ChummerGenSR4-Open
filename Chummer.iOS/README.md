@@ -1,0 +1,72 @@
+# Chummer Dossier for iPhone and iPad
+
+An early native SwiftUI companion inside the Chummer SR4 repository. Open an
+existing `.chum` character, edit a linked sheet, and save a separate XML copy.
+Desktop Chummer remains the authority for full Shadowrun rules.
+
+## Run
+
+1. Install full Xcode, finish first-launch setup, and install iOS support.
+2. Open `ChummerDossier.xcodeproj`, select **ChummerDossier**, and choose an iPhone
+   or iPad simulator. The minimum deployment target is iOS/iPadOS 17.
+3. Run and open an existing SR4 `.chum` character from Files.
+4. Use **Save Copy** to export changes. Originals are not overwritten automatically.
+
+There are no external Swift dependencies. `DossierCore` is a local package.
+Physical-device signing requires selecting your development team in Xcode.
+The synthetic demo is for exploring the sheet, not a complete desktop character;
+demo export is disabled.
+
+## First milestone
+
+- Four adaptive native views: character/combat/skills, equipment, history, contacts.
+  Blue panels follow the SR4 Anniversary sheet's organization. History and contact
+  content follows dossier pages 15 and 8, adapted to SR4. This is an initial layout,
+  not finished artwork or an exact PDF reproduction.
+- UTF-8/UTF-16 import. Unedited documents retain original bytes; edited documents
+  serialize as UTF-8. Unknown fields, attributes, comments, CDATA and element order
+  are retained. Whitespace, quote style and entity spelling are not byte guarantees.
+- Base attribute changes flow into modified attributes and linked skill pools
+  using imported modifier offsets. Skill rating/pool edits and simple initiative
+  formulas with editable modifiers are supported.
+- Physical/Stun: tap to fill damage through a box; tap the last damaged box to
+  remove one damage. Hold toggles blocking. Damage cannot jump over a blocked gap;
+  blocking within damage truncates the count. Only damage counts are saved.
+  Blocking is session-only; initial capacity uses Body/Willpower sheet formulas.
+- History and extended contact data live in versioned supported notes fields.
+- New equipment can be entered freely with a separate recoil adjustment and is
+  preserved as pending data in notes. Existing top-level equipment fields can be
+  edited. Numeric export checks reject text in known numeric fields.
+
+## Remaining work
+
+The target behavior is recorded in [SPECIFICATION.md](SPECIFICATION.md).
+
+- **Desktop equipment matching/review is not implemented.** Pending entries do
+  not yet become desktop equipment; no incomplete weapon nodes are injected.
+- Complete field/formula mapping: primary equipment links, matrix initiative,
+  nested gear, skill-group/defaulting transitions, modifiers and missing snapshots.
+- Actual desktop load/save/mobile reimport verification. Swift XML round trips
+  alone do not prove desktop acceptance.
+- Portrait editing, pending-equipment editing, deleting existing equipment,
+  overflow/print layout, zoom/page mode, PDF export, and native visual/input QA.
+- Autosave, unsaved-change handling and file-conflict detection. For this milestone
+  export before opening another character or closing the app.
+
+No user character or reference PDF is bundled. Desktop behavior and packaging
+are unchanged. No advancement enforcement, purchases or automatic karma charges.
+
+## Verify
+
+With full Xcode selected, or `DEVELOPER_DIR` set to its developer directory:
+
+```sh
+CHUMMER_FIXTURE_ROOT="$PWD/../Chummer.Mac/assets/saves" swift test
+xcodebuild -project ChummerDossier.xcodeproj -scheme ChummerDossier \
+  -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+```
+
+The tests cover linked values, manual offsets, independent value snapshots,
+damage behavior, metadata, unsupported XML, numeric validation and the repository
+character corpus. CI runs core tests and builds the simulator app. Native gesture,
+VoiceOver, phone/tablet visual review and desktop round trips are separate gates.
