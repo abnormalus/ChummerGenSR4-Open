@@ -69,16 +69,9 @@ struct DossierHome: View {
         }
         .tint(SheetTheme.ink)
         .fileImporter(isPresented: $importing, allowedContentTypes: [.chummerCharacter, .xml]) { result in
-            do {
-                let url = try result.get()
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                let opened = try DossierCharacter(data: Data(contentsOf: url))
-                character = opened
-                filename = url.deletingPathExtension().lastPathComponent
-                isDemo = false
-            } catch { errorMessage = error.localizedDescription }
+            do { openCharacter(try result.get()) } catch { errorMessage = error.localizedDescription }
         }
+        .onOpenURL { openCharacter($0) }
         .fileExporter(isPresented: $exporting, document: exportFile,
                       contentType: .chummerCharacter, defaultFilename: filename + " - Dossier") { result in
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
@@ -86,5 +79,17 @@ struct DossierHome: View {
         .alert("Couldn't complete that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
+    }
+
+    private func openCharacter(_ url: URL) {
+        do {
+            guard url.isFileURL else { throw CocoaError(.fileReadUnsupportedScheme) }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let opened = try DossierCharacter(data: Data(contentsOf: url))
+            character = opened
+            filename = url.deletingPathExtension().lastPathComponent
+            isDemo = false
+        } catch { errorMessage = error.localizedDescription }
     }
 }

@@ -70,3 +70,6 @@ The tests cover linked values, manual offsets, independent value snapshots,
 damage behavior, metadata, unsupported XML, numeric validation and the repository
 character corpus. CI runs core tests and builds the simulator app. Native gesture,
 VoiceOver, phone/tablet visual review and desktop round trips are separate gates.
+
+See [local Xcode verification](VERIFICATION.md) for the passing XCTest/corpus and
+simulator build results, and the remaining first-boot simulator limitation.
