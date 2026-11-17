@@ -2,19 +2,47 @@ import SwiftUI
 import UIKit
 import DossierCore
 
+enum DossierPage: String, CaseIterable, Identifiable {
+    case character = "Character", equipment = "Equipment", background = "Background", contacts = "Contacts"
+    var id: String { rawValue }
+    var icon: String {
+        switch self {
+        case .character: return "person.text.rectangle"
+        case .equipment: return "backpack"
+        case .background: return "book.closed"
+        case .contacts: return "person.2"
+        }
+    }
+}
+
 struct DossierView: View {
     @Binding var character: DossierCharacter
+    @Binding var selectedPage: DossierPage
     @State private var errorMessage: String?
     var body: some View {
-        TabView {
-            page { overview }.tabItem { Label("Character", systemImage: "person.text.rectangle") }
-            page { EquipmentPage(character: $character) }.tabItem { Label("Equipment", systemImage: "backpack") }
-            page { history }.tabItem { Label("Background", systemImage: "book.closed") }
-            page { contacts }.tabItem { Label("Contacts", systemImage: "person.2") }
+        Group {
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                selectedContent
+            } else {
+                TabView(selection: $selectedPage) {
+                    page { overview }.tabItem { Label("Character", systemImage: "person.text.rectangle") }.tag(DossierPage.character)
+                    page { EquipmentPage(character: $character) }.tabItem { Label("Equipment", systemImage: "backpack") }.tag(DossierPage.equipment)
+                    page { history }.tabItem { Label("Background", systemImage: "book.closed") }.tag(DossierPage.background)
+                    page { contacts }.tabItem { Label("Contacts", systemImage: "person.2") }.tag(DossierPage.contacts)
+                }
+            }
         }
         .alert("Couldn't save that field", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
+    }
+    @ViewBuilder private var selectedContent: some View {
+        switch selectedPage {
+        case .character: page { overview }
+        case .equipment: page { EquipmentPage(character: $character) }
+        case .background: page { history }
+        case .contacts: page { contacts }
+        }
     }
     private func page<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         ScrollView { VStack(spacing: 16) { content() }.frame(maxWidth: 1100).padding(16).frame(maxWidth: .infinity) }
@@ -31,29 +59,47 @@ struct DossierView: View {
     private var overview: some View {
         VStack(spacing: 16) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 310), alignment: .top)], alignment: .leading, spacing: 16) {
-                SheetCard(title: "Personal data") {
-                    SheetField(title: "Name", value: field("name"))
-                    SheetField(title: "Primary alias", value: field("alias"))
-                    HStack { SheetField(title: "Metatype", value: field("metatype")); SheetField(title: "Ethnicity", value: dossier("ethnicity")) }
-                    HStack { SheetField(title: "Age", value: field("age")); SheetField(title: "Sex", value: field("sex")) }
-                    HStack { SheetField(title: "Total karma", value: field("totalkarma")); SheetField(title: "Current karma", value: field("karma")) }
-                    HStack { SheetField(title: "Street cred", value: field("streetcred")); SheetField(title: "Notoriety", value: field("notoriety")) }
+                SheetCard(title: "Personal data", rowSpacing: 0) {
+                    SheetField(title: "Name", value: field("name")).sheetRow(0)
+                    SheetField(title: "Primary alias", value: field("alias")).sheetRow(1)
+                    HStack { SheetField(title: "Metatype", value: field("metatype")); SheetField(title: "Ethnicity", value: dossier("ethnicity")) }.sheetRow(2)
+                    HStack { SheetField(title: "Age", value: field("age")); SheetField(title: "Sex", value: field("sex")) }.sheetRow(3)
+                    HStack { SheetField(title: "Total karma", value: field("totalkarma")); SheetField(title: "Current karma", value: field("karma")) }.sheetRow(4)
+                    HStack { SheetField(title: "Street cred", value: field("streetcred")); SheetField(title: "Notoriety", value: field("notoriety")) }.sheetRow(5)
                 }
-                SheetCard(title: "Attributes") {
+                SheetCard(title: "Attributes", rowSpacing: 0) {
                     HStack { Text("Attribute").frame(maxWidth: .infinity, alignment: .leading); Text("Base / Modified").font(.caption) }
-                    ForEach(character.attributes) { attribute in
+                    ForEach(Array(character.attributes.enumerated()), id: \.element.id) { index, attribute in
                         HStack {
                             Text(attribute.id).font(.subheadline.bold()).frame(maxWidth: .infinity, alignment: .leading)
                             NumberField(title: "Base", value: Binding(get: { character.attributes.first { $0.id == attribute.id }?.base ?? 0 },
                                 set: { character.setAttribute(attribute.id, base: $0) })).frame(width: 70)
                             NumberField(title: "Modified", value: Binding(get: { character.total(attribute.id) },
                                 set: { character.setAttributeTotal(attribute.id, total: $0) })).frame(width: 70)
-                        }
+                        }.sheetRow(index)
                     }
                 }
                 SheetCard(title: "Core combat info") {
                     Text("Initiative: \(character.initiative)").font(.title3.bold())
                     Text("Astral initiative: \(character.astralInitiative)")
+                    HStack {
+                        Text("Matrix initiative")
+                        Spacer()
+                        Text(character.matrixInitiative.map(String.init) ?? "—")
+                    }.sheetRow(2)
+                    HStack {
+                        Text("Matrix passes")
+                        Spacer()
+                        Text(String(character.matrixInitiativePasses))
+                    }.sheetRow(3)
+                    DisclosureGroup("Matrix adjustments") {
+                        SheetField(title: "Response override (optional)", value: dossier("matrixResponse"))
+                        SheetField(title: "Initiative modifier", value: dossier("matrixInitiativeModifier"))
+                        SheetField(title: "Passes modifier", value: dossier("matrixPassesModifier"))
+                        SheetField(title: "Special persona initiative (optional)", value: dossier("matrixInitiativeOverride"))
+                    }
+                    Text("Matrix totals use saved upgrades and bonuses; adjust for desktop program-load settings.")
+                        .font(.caption).foregroundStyle(.secondary)
                     SheetField(title: "Initiative modifier", value: dossier("initiativeModifier"))
                     SheetField(title: "Astral modifier", value: dossier("astralModifier"))
                     SheetField(title: "Initiative passes", value: dossier("initiativePasses"))
@@ -67,29 +113,29 @@ struct DossierView: View {
                     }
                 }
             }
-            SheetCard(title: "Skills") {
+            SheetCard(title: "Skills", rowSpacing: 0) {
                 ForEach(character.skills) { skill in
                     HStack {
                         VStack(alignment: .leading) { Text(skill.name); Text("\(skill.attribute) · \(character.total(skill.attribute))").font(.caption).foregroundStyle(.secondary) }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         NumberField(title: "Rating", value: Binding(get: { character.skills.first { $0.id == skill.id }?.rating ?? 0 }, set: { character.setSkillRating(skill.id, rating: $0) })).frame(width: 65)
                         NumberField(title: "Pool", value: Binding(get: { character.skills.first { $0.id == skill.id }?.pool ?? 0 }, set: { character.setSkillPool(skill.id, pool: $0) })).frame(width: 65)
-                    }
-                    Divider()
+                    }.sheetRow(skill.id)
                 }
             }
             SheetCard(title: "IDs / lifestyles / currency") {
                 SheetField(title: "Nuyen", value: field("nuyen"))
                 SheetField(title: "IDs, licenses and related funds", value: dossier("identities"), multiline: true)
                 ForEach(character.rows(collection: "lifestyles", item: "lifestyle")) { row in
-                    Text(row["name"] + " · " + row["baselifestyle"])
+                    Text(row["name"] + " · " + row["baselifestyle"]).sheetRow(row.id)
                 }
             }
-            SheetCard(title: "Qualities") {
-                ForEach(character.rows(collection: "qualities", item: "quality")) { row in Text(row["name"] + " · " + row["extra"]) }
+            SheetCard(title: "Qualities", rowSpacing: 0) {
+                ForEach(character.rows(collection: "qualities", item: "quality")) { row in Text(row["name"] + " · " + row["extra"]).sheetRow(row.id) }
             }
         }
     }
+    private let historyKeys = ["Date created", "Date first played", "Date retired", "Biggest debt", "Corps with bounties on your head", "Biggest corps you've run against", "Biggest corps you've run for", "Biggest critters you've squared off with", "Largest karma award", "Largest debt collected", "Most nuyen acquired at one time", "Most people killed in a single firefight", "Most rounds fired in a single firefight", "Number of cities lived in", "Number of runs undertaken", "Number of successful runs", "Number of times dealing with a dragon", "Number of times screwed by Mr. Johnson", "Worst lie told by Mr. Johnson", "Worst lie told to Mr. Johnson", "Final fate"]
     private var history: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 310), alignment: .top)], alignment: .leading, spacing: 16) {
             SheetCard(title: "Character history and background") {
@@ -104,9 +150,9 @@ struct DossierView: View {
                 HStack { SheetField(title: "Eye color", value: field("eyes")); SheetField(title: "Hair color", value: field("hair")) }
                 SheetField(title: "Other features", value: field("description"), multiline: true)
             }
-            SheetCard(title: "Important dates and personal facts") {
-                ForEach(["Date created", "Date first played", "Date retired", "Biggest debt", "Corps with bounties on your head", "Biggest corps you've run against", "Biggest corps you've run for", "Biggest critters you've squared off with", "Largest karma award", "Largest debt collected", "Most nuyen acquired at one time", "Most people killed in a single firefight", "Most rounds fired in a single firefight", "Number of cities lived in", "Number of runs undertaken", "Number of successful runs", "Number of times dealing with a dragon", "Number of times screwed by Mr. Johnson", "Worst lie told by Mr. Johnson", "Worst lie told to Mr. Johnson", "Final fate"], id: \.self) { key in
-                    SheetField(title: key, value: dossier("history." + key))
+            SheetCard(title: "Important dates and personal facts", rowSpacing: 0) {
+                ForEach(historyKeys, id: \.self) { key in
+                    SheetField(title: key, value: dossier("history." + key)).sheetRow(historyKeys.firstIndex(of: key) ?? 0)
                 }
             }
             SheetCard(title: "Notes") {
@@ -121,17 +167,17 @@ struct DossierView: View {
             Button("Add Contact", systemImage: "person.badge.plus") { character.addContact() }.buttonStyle(.bordered)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 310), alignment: .top)], alignment: .leading, spacing: 16) {
                 ForEach(character.rows(collection: "contacts", item: "contact")) { contact in
-                    SheetCard(title: contact["name"].isEmpty ? "Contact" : contact["name"]) {
-                        SheetField(title: "Name", value: contactField(contact.id, "name"))
-                        HStack { SheetField(title: "Connection", value: contactField(contact.id, "connection")); SheetField(title: "Loyalty", value: contactField(contact.id, "loyalty")) }
+                    SheetCard(title: contact["name"].isEmpty ? "Contact" : contact["name"], rowSpacing: 0) {
+                        SheetField(title: "Name", value: contactField(contact.id, "name")).sheetRow(0)
+                        HStack { SheetField(title: "Connection", value: contactField(contact.id, "connection")); SheetField(title: "Loyalty", value: contactField(contact.id, "loyalty")) }.sheetRow(1)
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4)) {
                             ForEach(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"], id: \.self) { key in
-                                SheetField(title: key, value: contactDetail(contact.id, key))
+                                SheetField(title: key, value: contactDetail(contact.id, key)).sheetRow(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"].firstIndex(of: key) ?? 0)
                             }
                         }
-                        SheetField(title: "Initiative / passes", value: contactDetail(contact.id, "initiative"))
+                        SheetField(title: "Initiative / passes", value: contactDetail(contact.id, "initiative")).sheetRow(2)
                         SheetField(title: "Skills and dice pools", value: contactDetail(contact.id, "skills"), multiline: true)
-                        SheetField(title: "Professional rating", value: contactDetail(contact.id, "professionalRating"))
+                        SheetField(title: "Professional rating", value: contactDetail(contact.id, "professionalRating")).sheetRow(3)
                         SheetField(title: "Notes", value: Binding(get: { character.contactNotes(contact.id) }, set: { value in
                             do { try character.setContactNotes(contact.id, text: value) } catch { errorMessage = error.localizedDescription }
                         }), multiline: true)

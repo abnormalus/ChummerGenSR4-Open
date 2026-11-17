@@ -18,6 +18,20 @@ public struct SheetRow: Identifiable, Equatable {
     public subscript(_ key: String) -> String { fields[key] ?? "" }
 }
 
+/// A gear instance retains its source hierarchy; paths distinguish repeated names.
+public struct SheetGear: Identifiable {
+    public let path: [Int]
+    public let fields: [String: String]
+    public let children: [SheetGear]
+    public var id: [Int] { path }
+    public subscript(_ key: String) -> String { fields[key] ?? "" }
+    public var isProgram: Bool { self["category"] == "Matrix Programs" || self["category"] == "Sensor Software" }
+    public var isMatrixEquipment: Bool {
+        ["Commlink", "Matrix Programs", "Sensor Software", "Commlink Operating System"].contains(self["category"])
+    }
+    public var descendants: [SheetGear] { children.flatMap { [$0] + $0.descendants } }
+}
+
 /// Sheet arithmetic only. Imported totals supply the modifier offset; no catalogs,
 /// cyberlimb averaging, purchase accounting, or advancement rules are executed here.
 public struct DossierCharacter {
@@ -113,11 +127,104 @@ public struct DossierCharacter {
     }
     public var initiative: Int { total("REA") + total("INT") + (Int(dossierField("initiativeModifier")) ?? 0) }
     public var astralInitiative: Int { 2 * total("INT") + (Int(dossierField("astralModifier")) ?? 0) }
+    /// Provisional sheet formulas use saved enabled improvements. Desktop settings can
+    /// additionally reduce Response for program load; an explicit override covers that.
+    public var matrixResponse: Int? {
+        if let override = Int(dossierField("matrixResponse")) { return override }
+        guard let link = gear.last(where: { $0["category"] == "Commlink" && $0["active"].lowercased() == "true" }) else { return nil }
+        let upgrades = link.children.filter { $0["category"] == "Commlink Upgrade" }.compactMap { Int($0["response"]) }
+        var response = max(Int(link["response"]) ?? 0, upgrades.max() ?? 0)
+        if link["homenode"].lowercased() == "true" { response += Int(ceil(Double(total("INT")) / 2)) }
+        return response
+    }
+    private var isTechnomancer: Bool {
+        value("technomancerenabled").lowercased() == "true" || value("resenabled").lowercased() == "true"
+    }
+    private func matrixImprovement(_ type: String) -> Int {
+        let entries = rows(collection: "improvements", item: "improvement").filter {
+            $0["improvementttype"] == type && $0["enabled"].lowercased() != "false"
+                && $0["addtorating"].lowercased() != "true"
+                && !(isTechnomancer && type == "MatrixInitiativePass" && $0["improvementsource"] == "Gear")
+        }
+        func sum(_ rows: [SheetRow]) -> Int {
+            var result = 0
+            var unique: [String: [Int]] = [:]
+            for row in rows {
+                let value = Int(row["val"]) ?? 0
+                if row["unique"].isEmpty { result += value }
+                else { unique[row["unique"], default: []].append(value) }
+            }
+            if let values = unique["precedence0"] { return values.max() ?? 0 }
+            if let values = unique["precedence1"] { return values.reduce(0, +) }
+            return result + unique.values.reduce(0) { $0 + ($1.max() ?? 0) }
+        }
+        return sum(entries.filter { $0["custom"].lowercased() != "true" })
+            + sum(entries.filter { $0["custom"].lowercased() == "true" })
+    }
+    public var matrixInitiative: Int? {
+        let metatype = value("metatype")
+        // Special personas need a desktop snapshot or explicit sheet input.
+        if metatype.hasSuffix("Sprite") || metatype.hasSuffix("A.I.") || ["Technocritters", "Protosapients"].contains(value("metatypecategory")) {
+            return Int(dossierField("matrixInitiativeOverride"))
+        }
+        let base: Int
+        if isTechnomancer { base = 2 * total("INT") + 1 + matrixImprovement("LivingPersonaResponse") }
+        else {
+            guard let response = matrixResponse else { return nil }
+            base = total("INT") + response + matrixImprovement("MatrixInitiative")
+        }
+        return base + (Int(dossierField("matrixInitiativeModifier")) ?? 0)
+    }
+    public var matrixInitiativePasses: Int {
+        (isTechnomancer ? 3 : 1) + matrixImprovement("MatrixInitiativePass")
+            + matrixImprovement("MatrixInitiativePassAdd") + (Int(dossierField("matrixPassesModifier")) ?? 0)
+    }
     public func damage(_ physical: Bool) -> Int { max(0, Int(value(physical ? "physicalcmfilled" : "stuncmfilled")) ?? 0) }
     public mutating func setDamage(_ count: Int, physical: Bool) {
         setValue(physical ? "physicalcmfilled" : "stuncmfilled", String(max(0, count)))
     }
     public func trackCapacity(_ physical: Bool) -> Int { 8 + Int(ceil(Double(total(physical ? "BOD" : "WIL")) / 2)) }
+
+    public var gear: [SheetGear] {
+        func entries(_ elements: [CharacterElement], parent: [Int]) -> [SheetGear] {
+            elements.enumerated().map { index, element in
+                let path = parent + [index]
+                var fields: [String: String] = [:]
+                for case .element(let child) in element.content where child.name != "children" {
+                    // Only expose scalar fields. Never flatten nested XML into display text.
+                    if !child.content.contains(where: { if case .element = $0 { return true }; return false }) {
+                        fields[child.name] = child.text
+                    }
+                }
+                return SheetGear(path: path, fields: fields,
+                                 children: entries(element.child("children")?.children("gear") ?? [], parent: path))
+            }
+        }
+        return entries(xml.root.child("gears")?.children("gear") ?? [], parent: [])
+    }
+
+    public mutating func setGearValue(path: [Int], field: String, value: String) {
+        func contains(_ entries: [SheetGear], _ path: ArraySlice<Int>) -> Bool {
+            guard let index = path.first, entries.indices.contains(index) else { return false }
+            return path.count == 1 || contains(entries[index].children, path.dropFirst())
+        }
+        guard contains(gear, path[...]) else { return }
+        func update(_ collection: inout CharacterElement, path: ArraySlice<Int>) {
+            guard let index = path.first else { return }
+            collection.updateRow("gear", index: index) { entry in
+                if path.count == 1 { entry.set(field, value) }
+                else { entry.update("children") { update(&$0, path: path.dropFirst()) } }
+            }
+        }
+        xml.root.update("gears") { update(&$0, path: path[...]) }
+    }
+
+    public var programs: [SheetGear] {
+        gear.flatMap { [$0] + $0.descendants }.filter { $0.isProgram }.sorted {
+            let order = $0["name"].localizedCaseInsensitiveCompare($1["name"])
+            return order == .orderedSame ? $0.path.lexicographicallyPrecedes($1.path) : order == .orderedAscending
+        }
+    }
 
     public func rows(collection: String, item: String) -> [SheetRow] {
         (xml.root.child(collection)?.children(item) ?? []).enumerated().map { index, element in

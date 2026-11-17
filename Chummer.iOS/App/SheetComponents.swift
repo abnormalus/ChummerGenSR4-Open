@@ -9,17 +9,35 @@ enum SheetTheme {
 
 struct SheetCard<Content: View>: View {
     let title: String
+    var rowSpacing: CGFloat = 12
     @ViewBuilder var content: Content
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title.uppercased()).font(.headline).tracking(1)
                 .foregroundStyle(SheetTheme.ink).padding(10).frame(maxWidth: .infinity, alignment: .leading)
                 .background(SheetTheme.header)
-            VStack(alignment: .leading, spacing: 12) { content }.padding(12)
+            VStack(alignment: .leading, spacing: rowSpacing) { content }.padding(12)
         }
         .background(.background).clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(SheetTheme.ink.opacity(0.35), lineWidth: 1))
     }
+}
+
+/// Shared treatment for structured entries, never prose blocks.
+struct SheetRowStyle: ViewModifier {
+    let index: Int
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SheetTheme.ink.opacity(index.isMultiple(of: 2) ? 0.08 : 0.025))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(SheetTheme.ink.opacity(0.18)).frame(height: 0.5)
+            }
+    }
+}
+extension View {
+    func sheetRow(_ index: Int) -> some View { modifier(SheetRowStyle(index: index)) }
 }
 
 struct SheetField: View {

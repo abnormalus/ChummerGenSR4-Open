@@ -24,22 +24,32 @@ struct ChummerDossierApp: App {
 
 struct DossierHome: View {
     @State private var character: DossierCharacter?
+    @State private var selectedPage = DossierPage.character
     @State private var filename = "Character"
     @State private var importing = false
     @State private var exporting = false
     @State private var exportFile: CharacterFile?
     @State private var isDemo = false
     @State private var errorMessage: String?
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var library = DossierLibrary()
+    @State private var selectedID: UUID?
+    @State private var loadedLibrary = false
+    @State private var libraryAvailable = false
+    @State private var savedData: Data?
+
+    private var libraryURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Dossier/library.json")
+    }
+
 
     var body: some View {
         NavigationStack {
             Group {
                 if let snapshot = character {
-                    DossierView(character: Binding(get: { character ?? snapshot }, set: { character = $0 }))
-                        .safeAreaInset(edge: .top) {
-                            if isDemo { Text("Demo character · Open a Chummer file to save your changes.")
-                                    .font(.caption).padding(8).frame(maxWidth: .infinity).background(.thinMaterial) }
-                        }
+                    DossierView(character: Binding(get: { character ?? snapshot }, set: { character = $0 }), selectedPage: $selectedPage)
+                        .id(selectedID)
                 } else {
                     ContentUnavailableView {
                         Label("Chummer Dossier", systemImage: "person.text.rectangle")
@@ -48,7 +58,7 @@ struct DossierHome: View {
                     } actions: {
                         Button("Open Chummer Character") { importing = true }.buttonStyle(.borderedProminent)
                         Button("Explore a Demo") {
-                            do { character = try .demo; isDemo = true } catch { errorMessage = error.localizedDescription }
+                            do { let demo = try DossierCharacter.demo; character = demo; savedData = demo.data(); selectedID = nil; isDemo = true } catch { errorMessage = error.localizedDescription }
                         }
                     }
                 }
@@ -56,8 +66,36 @@ struct DossierHome: View {
             .navigationTitle(character?.title ?? "Chummer Dossier")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Menu {
+                        if isDemo { Text("Demo · Open a character to save changes") }
+                        ForEach(library.entries) { entry in
+                            Button { switchCharacter(to: entry) } label: {
+                                if entry.id == selectedID { Label(entry.title, systemImage: "checkmark") }
+                                else { Text(entry.title) }
+                            }
+                        }
+                        Divider()
+                        Button("Open Character…", systemImage: "folder") { importing = true }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text((character?.title ?? "Chummer Dossier") + (isDemo ? " · Demo" : "")).font(.headline).lineLimit(1)
+                            Image(systemName: "chevron.down").font(.caption2)
+                        }
+                    }
+                    .accessibilityLabel("\(character?.title ?? "Chummer Dossier"), switch character")
+                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button("Open", systemImage: "folder") { importing = true }
+                    if character != nil && UIDevice.current.userInterfaceIdiom == .pad {
+                        Menu {
+                            ForEach(DossierPage.allCases) { page in
+                                Button { selectedPage = page } label: {
+                                    Label(page.rawValue, systemImage: page == selectedPage ? "checkmark" : page.icon)
+                                }
+                            }
+                        } label: { Image(systemName: selectedPage.icon) }
+                        .accessibilityLabel("\(selectedPage.rawValue), choose dossier page")
+                    }
                     Button("Save Copy", systemImage: "square.and.arrow.up") {
                         do {
                             if let character { exportFile = CharacterFile(data: try character.exportData()); exporting = true }
@@ -68,27 +106,93 @@ struct DossierHome: View {
             }
         }
         .tint(SheetTheme.ink)
+        .task { restoreLibrary() }
+        .task(id: character?.data()) {
+            do { try await Task.sleep(for: .milliseconds(700)) } catch { return }
+            _ = autosave()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { _ = autosave() }
+        }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.chummerCharacter, .xml]) { result in
             do { openCharacter(try result.get()) } catch { errorMessage = error.localizedDescription }
         }
         .onOpenURL { openCharacter($0) }
         .fileExporter(isPresented: $exporting, document: exportFile,
                       contentType: .chummerCharacter, defaultFilename: filename + " - Dossier") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            switch result {
+            case .success: break
+            case .failure(let error): errorMessage = error.localizedDescription
+            }
         }
         .alert("Couldn't complete that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
     }
 
+    private func restoreLibrary() {
+        guard !loadedLibrary else { return }
+        loadedLibrary = true
+        do {
+            library = try DossierLibrary.load(from: libraryURL)
+            libraryAvailable = true
+            if let entry = library.entries.first(where: { $0.id == library.selectedID }) {
+                character = try DossierCharacter(data: entry.data)
+                filename = entry.filename
+                selectedID = entry.id
+                savedData = entry.data
+            }
+        } catch { errorMessage = "Couldn't restore saved characters: " + error.localizedDescription }
+    }
+
+    @discardableResult
+    private func autosave() -> Bool {
+        guard let character, !isDemo else { return true }
+        guard libraryAvailable else {
+            errorMessage = "Saved characters couldn't be loaded. Your current sheet is still open; use Save Copy to keep it."
+            return false
+        }
+        guard character.data() != savedData || selectedID != library.selectedID else { return true }
+        do {
+            selectedID = try library.save(character, filename: filename, id: selectedID, to: libraryURL)
+            savedData = character.data()
+            return true
+        } catch {
+            errorMessage = "Couldn't save this character. Keep it open and try Save Copy. " + error.localizedDescription
+            return false
+        }
+    }
+
+    private func switchCharacter(to entry: DossierLibrary.Entry) {
+        guard entry.id != selectedID else { return }
+        do {
+            let opened = try DossierCharacter(data: entry.data)
+            guard autosave() else { return }
+            _ = try library.save(opened, filename: entry.filename, id: entry.id, to: libraryURL)
+            character = opened
+            filename = entry.filename
+            selectedID = entry.id
+            isDemo = false
+            savedData = opened.data()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
     private func openCharacter(_ url: URL) {
         do {
+            restoreLibrary()
             guard url.isFileURL else { throw CocoaError(.fileReadUnsupportedScheme) }
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let opened = try DossierCharacter(data: Data(contentsOf: url))
+            guard autosave() else { return }
+            // Persist the incoming working copy before replacing the current screen.
+            let name = url.deletingPathExtension().lastPathComponent
+            guard libraryAvailable else { throw CocoaError(.fileWriteUnknown) }
+            let id = try library.save(opened, filename: name, id: nil, to: libraryURL)
             character = opened
-            filename = url.deletingPathExtension().lastPathComponent
+            filename = name
+            selectedID = id
+            savedData = opened.data()
             isDemo = false
         } catch { errorMessage = error.localizedDescription }
     }

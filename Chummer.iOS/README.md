@@ -12,7 +12,14 @@ Desktop Chummer remains the authority for full Shadowrun rules.
    The first layout and interaction targets are **iPhone 15** and **11-inch iPad Air**,
    in portrait and landscape.
 3. Run and open an existing SR4 `.chum` character from Files.
-4. Use **Save Copy** to export changes. Originals are not overwritten automatically.
+4. Tap the character name and small chevron to switch between imported characters
+   or open another file. There is no character tab strip.
+5. Edits autosave to private on-device working copies after a short pause, before
+   switching characters, and when the app loses focus or backgrounds (including
+   screen lock). The last character restores on launch. Save failures keep the
+   current character open and show an error.
+6. Use **Save Copy** to export changes for desktop Chummer. Imported source files
+   are not overwritten; local autosave and desktop export are separate.
 
 There are no external Swift dependencies. `DossierCore` is a local package.
 Physical-device signing requires selecting your development team in Xcode.
@@ -22,6 +29,8 @@ demo export is disabled.
 ## First milestone
 
 - Four adaptive native views: character/combat/skills, equipment, history, contacts.
+  iPad uses a compact page menu beside the title instead of a second tab row;
+  demo status lives in the title/menu rather than a persistent banner.
   Blue panels follow the SR4 Anniversary sheet's organization. History and contact
   content follows dossier pages 15 and 8, adapted to SR4. This is an initial layout,
   not finished artwork or an exact PDF reproduction.
@@ -47,13 +56,22 @@ The target behavior is recorded in [SPECIFICATION.md](SPECIFICATION.md).
 - **Desktop equipment matching/review is not implemented.** Pending entries do
   not yet become desktop equipment; no incomplete weapon nodes are injected.
 - Complete field/formula mapping: primary equipment links, matrix initiative,
-  nested gear, skill-group/defaulting transitions, modifiers and missing snapshots.
+  effective commlink totals, nested-gear editing, skill-group/defaulting transitions,
+  modifiers and missing snapshots. Nested gear/programs are now displayed in their
+  saved hierarchy, including ratings, device base stats, upgrades and program options.
 - Actual desktop load/save/mobile reimport verification. Swift XML round trips
   alone do not prove desktop acceptance.
 - Portrait editing, pending-equipment editing, deleting existing equipment,
   overflow/print layout, zoom/page mode, PDF export, and native visual/input QA.
-- Autosave, unsaved-change handling and file-conflict detection. For this milestone
-  export before opening another character or closing the app.
+- Native lifecycle/lock and relaunch acceptance checks remain pending. Local
+  working copies are not cloud sync; source-file conflict detection, library
+  removal/renaming, import deduplication and multiwindow editing remain open.
+  The app uses one window to prevent independent library writers.
+
+Programs appear alphabetically with Loaded checkboxes. Weapons show matching
+ammunition with tap-to-spend menus; loaded magazines and reserves are separate.
+Saved equipment source codes/pages support at-table lookup without sourcebooks.
+Matrix initiative/passes are provisional, with editable adjustments.
 
 No user character or reference PDF is bundled. Desktop behavior and packaging
 are unchanged. No advancement enforcement, purchases or automatic karma charges.

@@ -21,6 +21,25 @@ initial simulator checks). Validate both portrait and landscape layouts. Other
 devices remain supported by the adaptive layout but are not initial acceptance
 targets. Simulator availability does not change these product targets.
 
+## Structured rows
+
+Use thin row dividers and alternating subtle shading as the shared default for
+structured lists and repeated entries (attributes, skills, qualities, gear,
+programs, contacts and history facts). Keep row spacing compact. On iPad, names,
+qualifiers and program options share one horizontal row, with numeric values at
+the trailing edge; long option lists remain available by horizontal scrolling.
+Preserve parent-child indentation for installed equipment. Freeform background,
+description and notes blocks stay plain, without paragraph-by-paragraph striping.
+
+## Character switching and saving
+
+Keep multi-character navigation subtle: tap the dossier name with a small chevron
+for a character menu and Open action. Do not add a character tab strip or persistent
+sidebar. Autosave local working copies by default on focus loss/screen lock and
+before switching; restore the selected character on relaunch. Short debounced saves
+also reduce exposure to abrupt termination. Save errors must retain the current
+sheet rather than discard edits. Desktop exchange remains an explicit Save Copy.
+
 ## Linked fields
 
 Repeated fields share one source value. Base Agility changes update its modified
@@ -66,6 +85,22 @@ cannot safely be passed to the existing loader.
    identity, prevent duplicate imports, and record resolution/snapshots for mobile.
    Reconciliation must not charge money/karma. Unchanged items must not repeatedly
    prompt. Deferred/cancelled work must preserve pending entries and character.
+
+## At-table equipment controls
+
+Display each equipment instance once in its appropriate section. Show saved source
+book codes/pages for lookup; never bundle sourcebooks or reproduce their text.
+Programs use one alphabetical table with a Loaded checkbox column and inline
+options; omit program counts and parent-grouping explanations from the UI. Loaded
+maps to the existing equipped field on the original instance, without moving it.
+
+List compatible ammunition beneath weapons, matching the saved ammunition category
+(or weapon category) against ammunition's saved extra/category selection. Counts
+are shared inventory, not per-weapon copies. Tapping ammunition opens Fire choices
+suggested by saved SS/SA/BF/FA modes; keep 1/2/3/6/9/15 available as other round totals.
+These are expenditure shortcuts, not attack/action legality enforcement. Firing a
+loaded magazine reduces its saved remaining count only; reserve spending reduces
+the selected gear quantity only. Never double-deduct or go below zero.
 
 ## Storage
 
