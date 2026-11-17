@@ -22,6 +22,8 @@ struct DossierView: View {
     @State private var errorMessage: String?
     @State private var positivePoolsOnly = false
     @State private var expandedContacts: Set<Int> = []
+    @Environment(\.saveDossier) private var save
+    @FocusState private var essenceFocused: Bool
     var body: some View {
         Group {
             if UIDevice.current.userInterfaceIdiom == .pad {
@@ -89,6 +91,8 @@ struct DossierView: View {
                         TextField("Essence", text: Binding(get: { character.essence }, set: { character.setValue("totaless", $0) }))
                             .keyboardType(.decimalPad).multilineTextAlignment(.center).frame(width: 70)
                             .accessibilityIdentifier("character-essence")
+                            .focused($essenceFocused).onChange(of: essenceFocused) { _, active in if !active { save() } }
+                            .onSubmit { save() }
                     }.sheetRow(character.attributes.count)
                 }
 
@@ -142,12 +146,12 @@ struct DossierView: View {
                             .font(.caption).foregroundStyle(SheetTheme.secondary)
                     }.padding(.horizontal, 8).padding(.vertical, 4)
                 }
-                SheetCard(title: "Condition monitor") {
+                SheetCard(title: "Condition monitor · " + String(character.woundModifier)) {
                     HStack(alignment: .top, spacing: 12) {
-                        DamageTrackView(title: "Physical", damage: Binding(get: { character.damage(true) }, set: { character.setDamage($0, physical: true) }), capacity: character.trackCapacity(true))
-                        DamageTrackView(title: "Stun", damage: Binding(get: { character.damage(false) }, set: { character.setDamage($0, physical: false) }), capacity: character.trackCapacity(false))
+                        DamageTrackView(title: "Physical", damage: Binding(get: { character.damage(true) }, set: { character.setDamage($0, physical: true) }), capacity: character.trackCapacity(true), penaltyThreshold: character.woundThreshold, penaltyOffset: character.woundOffset, ignorePenalties: character.ignoresWounds(physical: true))
+                        DamageTrackView(title: "Stun", damage: Binding(get: { character.damage(false) }, set: { character.setDamage($0, physical: false) }), capacity: character.trackCapacity(false), penaltyThreshold: character.woundThreshold, penaltyOffset: character.woundOffset, ignorePenalties: character.ignoresWounds(physical: false))
                     }
-                    Text("Tap to set damage; tap the last marked box to remove one. Hold a box after eight to adjust the optional track. Penalties appear every third usable box.")
+                    Text("Tap to set damage; tap the last marked box to remove one. Hold a box after eight to adjust the optional track. Shown wound penalties adjust skill pools and initiative; saved abilities can delay or suppress them.")
                         .font(.caption).foregroundStyle(SheetTheme.secondary)
                 }
         }

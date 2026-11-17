@@ -1,6 +1,28 @@
 import Foundation
 
 extension DossierCharacter {
+    public var woundThreshold: Int { max(1, 3 + savedImprovement("CMThreshold")) }
+    public var woundOffset: Int { savedImprovement("CMThresholdOffset") }
+    public func ignoresWounds(physical: Bool) -> Bool {
+        rows(collection: "improvements", item: "improvement").contains {
+            $0["improvementttype"] == (physical ? "IgnoreCMPenaltyPhysical" : "IgnoreCMPenaltyStun") && $0["enabled"].lowercased() != "false"
+        }
+    }
+    public var woundModifier: Int {
+        [true, false].reduce(0) { result, physical in
+            guard !ignoresWounds(physical: physical) else { return result }
+            let marked = min(damage(physical), trackCapacity(physical))
+            return result - max(0, marked - woundOffset) / woundThreshold
+        }
+    }
+    /// Imported pool snapshots already include this saved desktop penalty. Replace
+    /// its contribution with the current monitor penalty instead of adding twice.
+    var importedWoundModifier: Int {
+        rows(collection: "improvements", item: "improvement").filter {
+            $0["improvementsource"] == "ConditionMonitor" && $0["enabled"].lowercased() != "false"
+        }.reduce(0) { $0 + (Int($1["val"]) ?? 0) }
+    }
+
     public var isMagician: Bool { value("magician").lowercased() == "true" }
     public var isAdept: Bool { value("adept").lowercased() == "true" }
     /// An optional manual total remains available for temporary table effects.

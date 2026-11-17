@@ -1,7 +1,7 @@
 import XCTest
 
 final class DossierUITests: XCTestCase {
-    private func launch(theme: String, kind: String = "adept", page: String = "Equipment") -> XCUIApplication {
+    private func launch(theme: String, kind: String = "adept", page: String = "Equipment", secondCharacter: Bool = false, damageArchive: String = "") -> XCUIApplication {
         let app = XCUIApplication()
         let fixture = """
         <character><name>QA Runner</name><alias>QA Runner</alias><adept>\(kind == "adept")</adept><magician>\(kind == "magician")</magician><resenabled>\(kind == "technomancer")</resenabled>
@@ -19,11 +19,66 @@ final class DossierUITests: XCTestCase {
         </character>
         """
         app.launchEnvironment["DOSSIER_UI_FIXTURE"] = Data(fixture.utf8).base64EncodedString()
+        if secondCharacter {
+            let second = fixture.replacingOccurrences(of: "QA Runner", with: "Second Runner").replacingOccurrences(of: "<attributes>", with: "<age>22</age><attributes>")
+            app.launchEnvironment["DOSSIER_UI_SECOND_FIXTURE"] = Data(second.utf8).base64EncodedString()
+        }
+        app.launchEnvironment["DOSSIER_UI_DAMAGE_ARCHIVE"] = damageArchive
         app.launchEnvironment["DOSSIER_UI_THEME"] = theme
         app.launchEnvironment["DOSSIER_UI_PAGE"] = page
         app.launch()
         XCTAssertTrue(app.buttons["Save Copy"].waitForExistence(timeout: 15))
         return app
+    }
+    private func go(_ page: String, in app: XCUIApplication) {
+        let chooser = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "choose dossier page")).firstMatch
+        if chooser.exists { chooser.tap(); app.buttons[page].tap() }
+        else { app.tabBars.buttons[page].tap() }
+    }
+    func testUnreadableLibraryOffersExplicitSafeFreshStart() {
+        let app = launch(theme: "light", page: "Character", damageArchive: "both")
+        app.terminate()
+        app.launchEnvironment["DOSSIER_UI_RESTORE"] = "1"
+        app.launch()
+        XCTAssertTrue(app.buttons["Keep Recovery Copies and Start Fresh"].waitForExistence(timeout: 10))
+        app.buttons["Keep Recovery Copies and Start Fresh"].tap()
+        XCTAssertTrue(app.buttons["Open Chummer Character"].waitForExistence(timeout: 5))
+        capture(app, "recovered-empty-library")
+    }
+    func testFocusLossSwitchingAndBackgroundRelaunchPreserveEdits() {
+        let app = launch(theme: "light", page: "Character", secondCharacter: true)
+        let age = app.textFields["Age"]
+        age.tap(); age.typeText("44")
+        app.textFields["Sex"].tap()
+        app.buttons["QA Runner, switch character"].tap()
+        app.buttons["Second Runner"].tap()
+        XCTAssertEqual(app.textFields["Age"].value as? String, "22")
+        app.buttons["Second Runner, switch character"].tap()
+        app.buttons["QA Runner"].tap()
+        XCTAssertEqual(app.textFields["Age"].value as? String, "44")
+        XCUIDevice.shared.press(.home)
+        app.terminate()
+        app.launchEnvironment["DOSSIER_UI_RESTORE"] = "1"
+        app.launch()
+        XCTAssertTrue(app.buttons["QA Runner, switch character"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.textFields["Age"].value as? String, "44")
+        app.buttons["QA Runner, switch character"].tap()
+        app.buttons["Second Runner"].tap()
+        XCTAssertEqual(app.textFields["Age"].value as? String, "22")
+        capture(app, "restored-character-library")
+    }
+    func testDamageUpdatesWoundPenaltyAndSkillPools() {
+        let app = launch(theme: "dark", page: "Combat")
+        let box = app.buttons["Physical box 3"]
+        XCTAssertTrue(box.waitForExistence(timeout: 5))
+        for _ in 0..<3 { if box.isHittable { break }; app.swipeUp() }
+        box.tap()
+        XCTAssertTrue(app.staticTexts["CONDITION MONITOR · -1"].exists)
+        go("Character", in: app)
+        let filter = app.buttons["skills-positive-pool-filter"]
+        for _ in 0..<6 { if filter.isHittable { break }; app.swipeUp() }
+        XCTAssertEqual(app.textFields["Pool"].firstMatch.value as? String, "1")
+        capture(app, "wounded-skill-pools")
     }
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())

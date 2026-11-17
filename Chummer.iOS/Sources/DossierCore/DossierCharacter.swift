@@ -151,17 +151,19 @@ public struct DossierCharacter {
             }
         }
         for skill in priorSkills where skill.attribute == id {
-            setRowValue(collection: "skills", item: "skill", index: skill.id, field: "totalvalue", value: String(skill.pool + delta))
+            setSkillPool(skill.id, pool: skill.pool + delta)
         }
     }
     public var skills: [SheetSkill] {
         if let skills = cache.skills { return skills }
+        let wounds = woundModifier
+        let importedWounds = importedWoundModifier
         let skills = rows(collection: "skills", item: "skill").map { row in
             let rating = Int(row["rating"]) ?? 0
             let attr = total(row["attribute"])
             let defaultPool = rating == 0 && row["default"].lowercased() == "true" ? attr - 1 : attr + rating
             return SheetSkill(id: row.id, name: row["name"], attribute: row["attribute"], rating: rating,
-                              pool: Int(row["totalvalue"]) ?? defaultPool)
+                              pool: max(0, row.fields["totalvalue"] != nil ? (Int(row["totalvalue"]) ?? defaultPool) - importedWounds + wounds : defaultPool + wounds))
         }
         cache.skills = skills; return skills
     }
@@ -171,10 +173,10 @@ public struct DossierCharacter {
         setSkillPool(index, pool: prior.pool + rating - prior.rating)
     }
     public mutating func setSkillPool(_ index: Int, pool: Int) {
-        setRowValue(collection: "skills", item: "skill", index: index, field: "totalvalue", value: String(pool))
+        setRowValue(collection: "skills", item: "skill", index: index, field: "totalvalue", value: String(pool - woundModifier + importedWoundModifier))
     }
-    public var initiative: Int { total("REA") + total("INT") + (Int(dossierField("initiativeModifier")) ?? 0) }
-    public var astralInitiative: Int { 2 * total("INT") + (Int(dossierField("astralModifier")) ?? 0) }
+    public var initiative: Int { max(0, total("REA") + total("INT") + savedImprovement("Initiative") + woundModifier + (Int(dossierField("initiativeModifier")) ?? 0)) }
+    public var astralInitiative: Int { max(0, 2 * total("INT") + woundModifier + (Int(dossierField("astralModifier")) ?? 0)) }
     /// Provisional sheet formulas use saved enabled improvements. Desktop settings can
     /// additionally reduce Response for program load; an explicit override covers that.
     public var matrixResponse: Int? {
@@ -221,7 +223,7 @@ public struct DossierCharacter {
             let response = matrixResponse ?? 0
             base = total("INT") + response + savedImprovement("MatrixInitiative")
         }
-        return base + (Int(dossierField("matrixInitiativeModifier")) ?? 0)
+        return max(0, base + woundModifier + (Int(dossierField("matrixInitiativeModifier")) ?? 0))
     }
     public var matrixInitiativePasses: Int {
         (isTechnomancer ? 3 : 1) + savedImprovement("MatrixInitiativePass")

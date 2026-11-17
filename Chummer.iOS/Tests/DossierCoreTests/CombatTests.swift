@@ -5,6 +5,60 @@ final class CombatTests: XCTestCase {
     private func character(_ body: String) throws -> DossierCharacter {
         try DossierCharacter(data: Data(("<character><attributes><attribute><name>STR</name><value>5</value></attribute></attributes>" + body + "</character>").utf8))
     }
+    func testWoundsUpdatePoolsAndInitiativeWithoutDoubleApplyingImportedPenalty() throws {
+        var runner = try DossierCharacter(data: Data("""
+        <character><attributes><attribute><name>REA</name><value>4</value></attribute><attribute><name>INT</name><value>4</value></attribute><attribute><name>BOD</name><value>4</value></attribute><attribute><name>WIL</name><value>4</value></attribute></attributes>
+        <physicalcmfilled>3</physicalcmfilled><stuncmfilled>3</stuncmfilled>
+        <skills><skill><name>Test</name><attribute>REA</attribute><rating>3</rating><totalvalue>5</totalvalue></skill></skills>
+        <improvements><improvement><improvementsource>ConditionMonitor</improvementsource><improvementttype>ConditionMonitor</improvementttype><enabled>True</enabled><val>-2</val></improvement></improvements></character>
+        """.utf8))
+        XCTAssertEqual(runner.woundModifier, -2)
+        XCTAssertEqual(runner.skills[0].pool, 5)
+        XCTAssertEqual(runner.initiative, 6)
+        XCTAssertEqual(runner.astralInitiative, 6)
+        XCTAssertEqual(runner.matrixInitiative, 2)
+        runner.setDamage(6, physical: true)
+        XCTAssertEqual(runner.woundModifier, -3)
+        XCTAssertEqual(runner.skills[0].pool, 4)
+        runner.setSkillPool(0, pool: 9)
+        runner.setAttribute("REA", base: 5)
+        XCTAssertEqual(runner.skills[0].pool, 10)
+        let saved = try DossierCharacter(data: runner.exportData())
+        XCTAssertEqual(saved.skills[0].pool, 10)
+        runner.setDamage(10, physical: true); runner.setDamage(10, physical: false)
+        XCTAssertGreaterThanOrEqual(runner.skills[0].pool, 0)
+        runner.setDamage(0, physical: true); runner.setDamage(0, physical: false)
+        XCTAssertEqual(runner.skills[0].pool, 13)
+        XCTAssertEqual(runner.initiative, 9)
+        try runner.setDossierField("initiativeModifier", value: "-99")
+        XCTAssertEqual(runner.initiative, 0)
+    }
+    func testWoundAdjustedPoolFloorsAtZeroAndRecoversItsSavedBaseline() throws {
+        var runner = try DossierCharacter(data: Data("<character><attributes/><skills><skill><name>Test</name><rating>1</rating><totalvalue>1</totalvalue></skill></skills></character>".utf8))
+        runner.setDamage(6, physical: true)
+        XCTAssertEqual(runner.skills[0].pool, 0)
+        runner.setDamage(0, physical: true)
+        XCTAssertEqual(runner.skills[0].pool, 1)
+    }
+    func testWoundThresholdOffsetAndImmunitiesMatchConditionMonitorBehavior() throws {
+        var runner = try DossierCharacter(data: Data("""
+        <character><attributes><attribute><name>BOD</name><value>4</value></attribute><attribute><name>WIL</name><value>4</value></attribute></attributes>
+        <physicalcmfilled>5</physicalcmfilled><stuncmfilled>9</stuncmfilled>
+        <improvements><improvement><improvementttype>CMThreshold</improvementttype><val>1</val></improvement>
+        <improvement><improvementttype>CMThresholdOffset</improvementttype><val>1</val></improvement>
+        <improvement><improvementttype>IgnoreCMPenaltyStun</improvementttype><val>0</val><enabled>True</enabled></improvement>
+        <improvement><improvementttype>IgnoreCMPenaltyPhysical</improvementttype><enabled>False</enabled></improvement></improvements></character>
+        """.utf8))
+        XCTAssertEqual(runner.woundThreshold, 4)
+        XCTAssertEqual(runner.woundModifier, -1)
+        runner.setDamage(9, physical: true)
+        XCTAssertEqual(runner.woundModifier, -2)
+        let track = DamageTrack(damage: 0, capacity: 10)
+        XCTAssertNil(track.penalty(at: 2, threshold: 4, offset: 1))
+        XCTAssertEqual(track.penalty(at: 4, threshold: 4, offset: 1), -1)
+        XCTAssertEqual(track.penalty(at: 8, threshold: 4, offset: 1), -2)
+        XCTAssertNil(track.penalty(at: 8, threshold: 4, offset: 1, ignored: true))
+    }
     func testDamageResolvesAttributesRoundUpAndPreservesUnsupportedExpressions() throws {
         var runner = try character("<weapons><weapon><name>Nodachi</name><damage>(STR/2+4)P</damage></weapon></weapons>")
         var weapon = runner.rows(collection: "weapons", item: "weapon")[0]

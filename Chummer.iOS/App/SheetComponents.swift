@@ -1,6 +1,16 @@
 import SwiftUI
 import DossierCore
 
+private struct SaveDossierKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+extension EnvironmentValues {
+    var saveDossier: () -> Void {
+        get { self[SaveDossierKey.self] }
+        set { self[SaveDossierKey.self] = newValue }
+    }
+}
+
 enum SheetTheme {
     // Labels and controls must adapt together with the card surface.
     static let ink = Color(uiColor: UIColor { traits in
@@ -65,12 +75,16 @@ struct SheetField: View {
     let title: String
     @Binding var value: String
     var multiline = false
+    @Environment(\.saveDossier) private var save
+    @FocusState private var focused: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title).font(.caption).foregroundStyle(SheetTheme.secondary)
             TextField(title, text: $value, axis: multiline ? .vertical : .horizontal)
                 .lineLimit(multiline ? 3...12 : 1...1)
                 .textFieldStyle(.plain).padding(.vertical, 3)
+                .focused($focused).onChange(of: focused) { _, active in if !active { save() } }
+                .onSubmit { save() }
             Rectangle().fill(SheetTheme.ink.opacity(0.25)).frame(height: 1)
         }
     }
@@ -79,11 +93,15 @@ struct SheetField: View {
 struct NumberField: View {
     let title: String
     @Binding var value: Int
+    @Environment(\.saveDossier) private var save
+    @FocusState private var focused: Bool
     var body: some View {
         VStack(spacing: 4) {
             Text(title).font(.caption2).foregroundStyle(SheetTheme.secondary)
             TextField(title, value: $value, format: .number)
                 .keyboardType(.numbersAndPunctuation).multilineTextAlignment(.center)
+                .focused($focused).onChange(of: focused) { _, active in if !active { save() } }
+                .onSubmit { save() }
                 .padding(6).background(SheetTheme.header.opacity(0.3), in: RoundedRectangle(cornerRadius: 5))
         }
         .frame(minWidth: 44)
@@ -94,9 +112,13 @@ struct DamageTrackView: View {
     let title: String
     @Binding var damage: Int
     let capacity: Int
+    var penaltyThreshold: Int
+    var penaltyOffset: Int
+    var ignorePenalties: Bool
     @State private var track: DamageTrack
-    init(title: String, damage: Binding<Int>, capacity: Int) {
+    init(title: String, damage: Binding<Int>, capacity: Int, penaltyThreshold: Int = 3, penaltyOffset: Int = 0, ignorePenalties: Bool = false) {
         self.title = title; self._damage = damage; self.capacity = capacity
+        self.penaltyThreshold = penaltyThreshold; self.penaltyOffset = penaltyOffset; self.ignorePenalties = ignorePenalties
         _track = State(initialValue: DamageTrack(damage: damage.wrappedValue, capacity: capacity))
     }
     var body: some View {
@@ -108,7 +130,7 @@ struct DamageTrackView: View {
                     ZStack {
                         Rectangle().fill(state == .blocked ? SheetTheme.ink : Color.clear)
                         Rectangle().stroke(SheetTheme.ink, lineWidth: 1)
-                        if let penalty = track.penalty(at: index) {
+                        if let penalty = track.penalty(at: index, threshold: penaltyThreshold, offset: penaltyOffset, ignored: ignorePenalties) {
                             Text(String(penalty)).font(.caption.bold())
                                 .foregroundStyle(.primary).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(3)
                         }

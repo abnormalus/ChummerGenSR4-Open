@@ -64,6 +64,7 @@ struct DossierHome: View {
                 if let snapshot = character {
                     DossierView(character: Binding(get: { character ?? snapshot }, set: { character = $0 }), selectedPage: $selectedPage)
                         .id(selectedID)
+                        .environment(\.saveDossier, { _ = autosave() })
                 } else {
                     ContentUnavailableView {
                         Label("SR 4 Dossier", systemImage: "person.text.rectangle")
@@ -85,8 +86,8 @@ struct DossierHome: View {
                         if isDemo { Text("Demo · Open a character to save changes") }
                         ForEach(library.entries) { entry in
                             Button { switchCharacter(to: entry) } label: {
-                                if entry.id == selectedID { Label(entry.title, systemImage: "checkmark") }
-                                else { Text(entry.title) }
+                                if entry.id == selectedID { Label(library.displayName(for: entry), systemImage: "checkmark") }
+                                else { Text(library.displayName(for: entry)) }
                             }
                         }
                         Divider()
@@ -126,6 +127,7 @@ struct DossierHome: View {
             do { try await Task.sleep(for: .milliseconds(700)) } catch { return }
             _ = autosave()
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in _ = autosave() }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { _ = autosave() }
         }
@@ -140,9 +142,22 @@ struct DossierHome: View {
             case .failure(let error): errorMessage = error.localizedDescription
             }
         }
-        .alert("Couldn't complete that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert(errorMessage?.hasPrefix("Recovered characters") == true ? "Saved characters recovered" : "Couldn't complete that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            if loadedLibrary && !libraryAvailable {
+                Button("Keep Recovery Copies and Start Fresh") { startFreshLibrary() }
+            }
             Button("OK", role: .cancel) { errorMessage = nil }
-        } message: { Text(errorMessage ?? "") }
+        } message: {
+            Text((errorMessage ?? "") + (loadedLibrary && !libraryAvailable ? "\nYour saved archives have not been replaced. Starting fresh keeps recovery copies; you can then reopen your original characters from Files." : ""))
+        }
+
+    }
+
+    private func startFreshLibrary() {
+        do {
+            library = try DossierLibrary.startFreshPreservingArchives(at: libraryURL)
+            libraryAvailable = true; character = nil; selectedID = nil; savedData = nil; isDemo = false
+        } catch { errorMessage = "Couldn't retain recovery copies. Your saved files have been kept. " + error.localizedDescription }
     }
 
     private func restoreLibrary() {
@@ -150,17 +165,26 @@ struct DossierHome: View {
         loadedLibrary = true
         do {
             #if DEBUG
-            if let encoded = ProcessInfo.processInfo.environment["DOSSIER_UI_FIXTURE"], let data = Data(base64Encoded: encoded) {
+            if let name = ProcessInfo.processInfo.environment["DOSSIER_UI_PAGE"], let page = DossierPage(rawValue: name) { selectedPage = page }
+            if ProcessInfo.processInfo.environment["DOSSIER_UI_RESTORE"] != "1", let encoded = ProcessInfo.processInfo.environment["DOSSIER_UI_FIXTURE"], let data = Data(base64Encoded: encoded) {
                 let opened = try DossierCharacter(data: data)
                 library = DossierLibrary(); libraryAvailable = true
                 selectedID = try library.save(opened, filename: "QA Runner", id: nil, to: libraryURL)
+                if let second = ProcessInfo.processInfo.environment["DOSSIER_UI_SECOND_FIXTURE"], let bytes = Data(base64Encoded: second) {
+                    _ = try library.save(DossierCharacter(data: bytes), filename: "Second", id: nil, to: libraryURL)
+                    _ = try library.save(opened, filename: "QA Runner", id: selectedID, to: libraryURL)
+                }
+                if let damage = ProcessInfo.processInfo.environment["DOSSIER_UI_DAMAGE_ARCHIVE"], !damage.isEmpty {
+                    try Data("damaged test archive".utf8).write(to: libraryURL)
+                    if damage == "both" { try Data("damaged test backup".utf8).write(to: libraryURL.appendingPathExtension("backup")) }
+                }
                 character = opened; savedData = data
-                if let name = ProcessInfo.processInfo.environment["DOSSIER_UI_PAGE"], let page = DossierPage(rawValue: name) { selectedPage = page }
                 return
             }
             #endif
             library = try DossierLibrary.load(from: libraryURL)
             libraryAvailable = true
+            if library.recoveredFromBackup { errorMessage = "Recovered characters from the previous saved copy. The latest edits may be missing. The damaged archive will be retained when you next save." }
             if let entry = library.entries.first(where: { $0.id == library.selectedID }) {
                 character = try DossierCharacter(data: entry.data)
                 filename = entry.filename
@@ -177,7 +201,7 @@ struct DossierHome: View {
             errorMessage = "Saved characters couldn't be loaded. Your current sheet is still open; use Save Copy to keep it."
             return false
         }
-        guard character.data() != savedData || selectedID != library.selectedID else { return true }
+        guard character.data() != savedData || selectedID != library.selectedID || library.recoveredFromBackup else { return true }
         do {
             selectedID = try library.save(character, filename: filename, id: selectedID, to: libraryURL)
             savedData = character.data()

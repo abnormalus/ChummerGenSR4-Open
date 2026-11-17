@@ -18,9 +18,11 @@ public struct DamageTrack: Equatable {
         if index >= capacity { return .blocked }
         return index < damage ? .damaged : .undamaged
     }
-    public func penalty(at index: Int) -> Int? {
-        guard index < capacity, index >= 0, (index + 1).isMultiple(of: 3) else { return nil }
-        return -(index + 1) / 3
+    public func penalty(at index: Int, threshold: Int = 3, offset: Int = 0, ignored: Bool = false) -> Int? {
+        let interval = max(1, threshold)
+        let count = index + 1 - offset
+        guard !ignored, index < capacity, index >= 0, count > 0, count.isMultiple(of: interval) else { return nil }
+        return -count / interval
     }
     public mutating func tap(_ index: Int) {
         guard (0..<capacity).contains(index) else { return }

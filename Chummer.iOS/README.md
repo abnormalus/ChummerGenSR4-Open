@@ -14,7 +14,8 @@ no external Swift dependencies. Current work uses simulators only.
 Open a `.chum` through Files. Tap the character's name to switch working copies.
 On iPhone, Character, Combat, Equipment, Background and Contacts are pages; iPad
 uses the compact toolbar page menu. Contacts show Connection/Loyalty and hide
-optional statistics behind Stats. Professional Rating is omitted.
+optional statistics behind Stats in each contact header. Professional Rating is omitted.
+The Skills header has a Pool > 0 filter; augmentation ratings appear beside names.
 
 - Manually edit attributes, skill ratings/pools, money, contacts and existing
   equipment values. No karma/nuyen is spent automatically. Long-press gear or
@@ -24,7 +25,11 @@ optional statistics behind Stats. Professional Rating is omitted.
   powers for adepts. Technomancers use the spirit collection for sprites.
 - Health uses contiguous damage counts. First eight boxes are fixed; hold optional
   boxes to adjust the tail without erasing marked damage. Penalties are labelled
-  every third usable box. Vehicle damage uses Chummer's existing saved field.
+  every third usable box by default, with saved threshold/ignore abilities applied.
+  Wounds adjust skill pools and initiative without duplicating imported penalties.
+  Vehicle damage uses Chummer's existing saved field.
+- Grenades have a compact Use button and quantity. Use consumes one from the
+  linked inventory entry and disables at zero.
 - Loaded magazines and shared reserves remain separate. Fire spends from the
   selected supply once. Use an ammunition menu to reload/change ammunition or
   unload a magazine. Loading takes a manually entered round count; capacity and
@@ -43,11 +48,19 @@ and on focus loss/backgrounding. The last selected character restores on launch.
 Failures retain the current sheet and show an error. Imported source files remain
 unchanged. Save Copy exports a separate `.chum` for desktop Chummer.
 
+A previous-save backup recovers an unreadable working archive with a notice that
+recent edits may be missing. Damaged archives are retained before repair. If both
+copies are unreadable, an explicit Start Fresh action keeps recovery copies before
+opening an empty library. Reopening the same character creates an independent copy;
+matching names are numbered in the switch menu.
+
 Unknown XML, child equipment and human notes are retained. Extra sheet fields live
 in the supported dossier notes envelope. Desktop Chummer recalculates derived
 rules values when it loads/saves: imported snapshots and manual sheet calculations
 are not a replacement for its complete rules engine. Advanced cyberlimb, optional
 house-rule, program-load and situational effects require explicit table adjustments.
+Imported pools that were already clamped to zero while wounded do not retain all
+of their original modifier information; review those pools manually after healing.
 No automatic advancement or purchase accounting runs in this companion.
 
 ## Verify
@@ -65,7 +78,7 @@ See [specification](SPECIFICATION.md), [device feedback](DEVICE_FEEDBACK.md) and
 
 ## Before first release
 
-Finish printable SR4A sheet/PDF export, save recovery/conflict handling, and
-broader accessibility/rotation/lifecycle acceptance. Review wounded-character,
-conditional-rule and special-persona handling explicitly. A clean build and the
+Finish printable SR4A sheet/PDF export and broader accessibility/rotation/lifecycle
+acceptance. Review conditional-rule and special-persona handling explicitly;
+physical screen-lock and provider-level conflict testing remain outstanding. A clean build and the
 five-character audit do not establish every Shadowrun rule or a Stable release.
