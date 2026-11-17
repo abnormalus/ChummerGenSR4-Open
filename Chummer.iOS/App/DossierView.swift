@@ -172,14 +172,15 @@ struct DossierView: View {
                     SheetCard(title: contact["name"].isEmpty ? "Contact" : contact["name"], rowSpacing: 0) {
                         SheetField(title: "Name", value: contactField(contact.id, "name")).sheetRow(0)
                         HStack { SheetField(title: "Connection", value: contactField(contact.id, "connection")); SheetField(title: "Loyalty", value: contactField(contact.id, "loyalty")) }.sheetRow(1)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4)) {
-                            ForEach(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"], id: \.self) { key in
-                                SheetField(title: key, value: contactDetail(contact.id, key)).sheetRow(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"].firstIndex(of: key) ?? 0)
+                        DisclosureGroup("Stats") {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4)) {
+                                ForEach(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"], id: \.self) { key in
+                                    SheetField(title: key, value: contactDetail(contact.id, key)).sheetRow(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"].firstIndex(of: key) ?? 0)
+                                }
                             }
-                        }
-                        SheetField(title: "Initiative / passes", value: contactDetail(contact.id, "initiative")).sheetRow(2)
-                        SheetField(title: "Skills and dice pools", value: contactDetail(contact.id, "skills"), multiline: true)
-                        SheetField(title: "Professional rating", value: contactDetail(contact.id, "professionalRating")).sheetRow(3)
+                            SheetField(title: "Initiative / passes", value: contactDetail(contact.id, "initiative")).sheetRow(2)
+                            SheetField(title: "Skills and dice pools", value: contactDetail(contact.id, "skills"), multiline: true)
+                        }.padding(.vertical, 8)
                         SheetField(title: "Notes", value: Binding(get: { character.contactNotes(contact.id) }, set: { value in
                             do { try character.setContactNotes(contact.id, text: value) } catch { errorMessage = error.localizedDescription }
                         }), multiline: true)
