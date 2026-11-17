@@ -39,11 +39,22 @@ struct EquipmentPage: View {
         }
     }
     private var weapons: [SheetRow] { character.rows(collection: "weapons", item: "weapon") }
-    private var assignedAmmoPaths: Set<[Int]> { Set(weapons.flatMap { character.ammunition(forWeapon: $0).map(\.path) }) }
+    private var assignedAmmoPaths: Set<[Int]> { Set(weapons.flatMap { (character.ammunition(forWeapon: $0) + character.grenades(forWeapon: $0)).map(\.path) }) }
     private var weaponSection: some View {
         SheetCard(title: "Weapons", rowSpacing: 0) {
             ForEach(weapons) { weapon in
                 VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 4) {
+                        let grenades = character.grenades(forWeapon: weapon)
+                        if !grenades.isEmpty {
+                            Button("Use") {
+                                if let grenade = grenades.first(where: { (Decimal(string: $0["qty"]) ?? 0) >= 1 }) {
+                                    do { try character.useGrenade(path: grenade.path) } catch { errorMessage = error.localizedDescription }
+                                }
+                            }.font(.caption).buttonStyle(.borderless).frame(minWidth: 44, minHeight: 44)
+                                .disabled(!grenades.contains { (Decimal(string: $0["qty"]) ?? 0) >= 1 })
+                                .accessibilityLabel("Use " + weapon["name"])
+                        }
                     DisclosureGroup {
                         ForEach(["name", "damage", "ap", "mode", "rc", "ammo"], id: \.self) { key in
                             SheetField(title: key.uppercased(), value: Binding(get: {
@@ -69,10 +80,15 @@ struct EquipmentPage: View {
                     } label: {
                         HStack {
                             Text(weapon["name"]).bold().foregroundStyle(.primary)
+                            if !grenades.isEmpty {
+                                Text("×" + NSDecimalNumber(decimal: grenades.reduce(Decimal.zero) { $0 + (Decimal(string: $1["qty"]) ?? 0) }).stringValue)
+                                    .font(.caption).accessibilityIdentifier("grenade-count-" + weapon["guid"])
+                            }
                             Text([weapon["mode"], character.weaponDamage(weapon), character.weaponAP(weapon).isEmpty ? "" : "AP " + character.weaponAP(weapon)].filter { !$0.isEmpty && $0 != "0" }.joined(separator: " · ")).font(.caption).foregroundStyle(SheetTheme.secondary)
                             Spacer()
                             SourceReference(source: weapon["source"], page: weapon["page"])
                         }
+                    }
                     }.sheetRow(weapon.id)
                     if weapon["type"].lowercased() == "ranged" {
                         ForEach(1...4, id: \.self) { slot in
@@ -157,8 +173,13 @@ struct EquipmentPage: View {
             }
         }
     }
+    private func augmentationSummary(_ row: SheetRow) -> String {
+        [row["name"], row["extra"].isEmpty ? "" : "(" + row["extra"] + ")", (Int(row["rating"]) ?? 0) > 0 ? "Rating " + row["rating"] : ""].filter { !$0.isEmpty }.joined(separator: " ")
+    }
     private func gearEntry(_ gear: SheetGear, index: Int) -> some View {
-        GearTree(gear: gear, shaded: index.isMultiple(of: 2), hiddenPaths: assignedAmmoPaths, edit: { editingGear = $0 })
+        GearTree(gear: gear, shaded: index.isMultiple(of: 2), hiddenPaths: assignedAmmoPaths, edit: { editingGear = $0 }, use: { grenade in
+            do { try character.useGrenade(path: grenade.path) } catch { errorMessage = error.localizedDescription }
+        })
     }
 
     var body: some View {
@@ -203,7 +224,7 @@ struct EquipmentPage: View {
                                     }
                                 } label: {
                                     HStack {
-                                        Text(section.collection == "powers" ? character.powerSummary(row) : row["name"]).foregroundStyle(.primary)
+                                        Text(section.collection == "powers" ? character.powerSummary(row) : section.collection == "cyberwares" ? augmentationSummary(row) : row["name"]).foregroundStyle(.primary)
                                         Spacer()
                                         SourceReference(source: row["source"], page: row["page"])
                                     }
@@ -299,6 +320,7 @@ private struct GearTree: View {
     var banded = true
     var hiddenPaths: Set<[Int]> = []
     var edit: ((SheetGear) -> Void)?
+    var use: ((SheetGear) -> Void)?
     private var options: String {
         gear.children.filter { $0["category"] == "Program Options" }.map {
             $0["name"] + ((Int($0["rating"]) ?? 0) > 0 ? " \($0["rating"])" : "")
@@ -318,17 +340,28 @@ private struct GearTree: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Group {
-                if banded { summary.sheetRow(shaded ? 0 : 1) } else { summary }
+                if banded { entry.sheetRow(shaded ? 0 : 1) } else { entry }
             }
             .contextMenu { if let edit { Button("Edit Gear", systemImage: "pencil") { edit(gear) } } }
             .accessibilityAction(named: "Edit Gear") { edit?(gear) }
             if showChildren {
                 ForEach(Array(gear.children.filter { $0["category"] != "Program Options" && !$0.isProgram && !hiddenPaths.contains($0.path) }.enumerated()), id: \.element.id) { index, child in
-                    GearTree(gear: child, shaded: index.isMultiple(of: 2), hiddenPaths: hiddenPaths, edit: edit).padding(.leading, 12)
+                    GearTree(gear: child, shaded: index.isMultiple(of: 2), hiddenPaths: hiddenPaths, edit: edit, use: use).padding(.leading, 12)
                 }
             }
         }
         .accessibilityElement(children: .contain)
+    }
+    private var entry: some View {
+        HStack(spacing: 4) {
+            if gear.isGrenade, let use {
+                Button("Use") { use(gear) }.font(.caption).buttonStyle(.borderless).frame(minWidth: 44, minHeight: 44)
+                    .disabled((Decimal(string: gear["qty"]) ?? 0) < 1)
+                    .accessibilityLabel("Use " + gear["name"])
+            }
+            summary
+            if gear.isGrenade { Text("×" + gear["qty"]).font(.caption) }
+        }
     }
     @ViewBuilder private var summary: some View {
         if UIDevice.current.userInterfaceIdiom == .pad {

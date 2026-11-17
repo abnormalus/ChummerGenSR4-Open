@@ -25,12 +25,17 @@ enum SheetTheme {
 struct SheetCard<Content: View>: View {
     let title: String
     var rowSpacing: CGFloat = 12
+    var headerAccessory: AnyView? = nil
     @ViewBuilder var content: Content
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title.uppercased()).font(.headline).tracking(1)
-                .foregroundStyle(SheetTheme.ink).padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                .background(SheetTheme.header)
+            HStack(spacing: 8) {
+                Text(title.uppercased()).font(.headline).tracking(1)
+                Spacer(minLength: 0)
+                headerAccessory
+            }
+            .foregroundStyle(SheetTheme.ink).padding(.horizontal, 10).frame(minHeight: 44)
+            .background(SheetTheme.header)
             VStack(alignment: .leading, spacing: rowSpacing) { content }.padding(12)
         }
         .foregroundStyle(.primary)

@@ -6,9 +6,12 @@ final class DossierUITests: XCTestCase {
         let fixture = """
         <character><name>QA Runner</name><alias>QA Runner</alias><adept>\(kind == "adept")</adept><magician>\(kind == "magician")</magician><resenabled>\(kind == "technomancer")</resenabled>
         <attributes><attribute><name>STR</name><value>5</value></attribute><attribute><name>BOD</name><value>4</value></attribute><attribute><name>WIL</name><value>3</value></attribute></attributes>
+        <totaless>2.78</totaless>
+        <skills><skill><name>Positive skill</name><rating>1</rating><totalvalue>2</totalvalue></skill><skill><name>Zero skill</name><rating>0</rating><totalvalue>0</totalvalue></skill><skill><name>Negative skill</name><rating>0</rating><totalvalue>-1</totalvalue></skill></skills>
+        <cyberwares><cyberware><name>Wired Reflexes</name><rating>2</rating></cyberware><cyberware><name>Trauma Damper</name><rating>0</rating></cyberware></cyberwares>
         <physicalcmfilled>0</physicalcmfilled><stuncmfilled>0</stuncmfilled>
-        <weapons><weapon><name>Nodachi</name><damage>(STR/2+4)P</damage><ap>-2</ap><source>AR</source><page>14</page></weapon><weapon><guid>70000000-0000-0000-0000-000000000001</guid><name>QA pistol</name><type>Ranged</type><category>Heavy Pistols</category><damage>4P</damage><ap>-</ap><mode>SA</mode><ammo>10(c)</ammo><ammoremaining>0</ammoremaining></weapon></weapons>
-        <gears><gear><guid>10000000-0000-0000-0000-000000000001</guid><name>Regular rounds</name><category>Ammunition</category><extra>Heavy Pistols</extra><qty>30</qty></gear></gears>
+        <weapons><weapon><name>Nodachi</name><damage>(STR/2+4)P</damage><ap>-2</ap><source>AR</source><page>14</page></weapon><weapon><guid>70000000-0000-0000-0000-000000000001</guid><name>QA pistol</name><type>Ranged</type><category>Heavy Pistols</category><damage>4P</damage><ap>-</ap><mode>SA</mode><ammo>10(c)</ammo><ammoremaining>0</ammoremaining></weapon><weapon><guid>70000000-0000-0000-0000-000000000003</guid><name>Grenade: Flash-Bang</name><category>Gear</category><ammo>0</ammo></weapon></weapons>
+        <gears><gear><guid>10000000-0000-0000-0000-000000000001</guid><name>Regular rounds</name><category>Ammunition</category><extra>Heavy Pistols</extra><qty>30</qty></gear><gear><name>Grenade: Flash-Bang</name><category>Ammunition</category><qty>2</qty><weaponguid>70000000-0000-0000-0000-000000000003</weaponguid></gear></gears>
         <contacts><contact><name>QA Contact</name><connection>2</connection><loyalty>1</loyalty><notes></notes></contact></contacts>
         <powers><power><name>Attribute Boost</name><extra>AGI</extra><rating>4</rating><levels>True</levels></power></powers>
         <vehicles><vehicle><name>QA Drone</name><body>3</body><physicalcmfilled>0</physicalcmfilled></vehicle></vehicles>
@@ -25,6 +28,48 @@ final class DossierUITests: XCTestCase {
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+    func testEssenceAndSkillsHeaderFilter() {
+        let app = launch(theme: "light", page: "Character")
+        let essence = app.textFields["character-essence"]
+        XCTAssertTrue(essence.waitForExistence(timeout: 5))
+        XCTAssertEqual(essence.value as? String, "2.78")
+        let filter = app.buttons["skills-positive-pool-filter"]
+        for _ in 0..<6 { if filter.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(filter.isHittable)
+        XCTAssertEqual(filter.value as? String, "Off")
+        XCTAssertTrue(app.staticTexts["Zero skill"].exists)
+        let header = app.staticTexts["SKILLS"]
+        XCTAssertLessThan(abs(filter.frame.midY - header.frame.midY), 5)
+        filter.tap()
+        XCTAssertEqual(filter.value as? String, "On")
+        XCTAssertTrue(app.staticTexts["Positive skill"].exists)
+        XCTAssertFalse(app.staticTexts["Zero skill"].exists)
+        XCTAssertFalse(app.staticTexts["Negative skill"].exists)
+        filter.tap()
+        XCTAssertTrue(app.staticTexts["Zero skill"].exists)
+        capture(app, "skills-header-filter")
+    }
+    func testGrenadeUsageAndAugmentationRatings() {
+        let app = launch(theme: "dark")
+        let use = app.buttons["Use Grenade: Flash-Bang"]
+        XCTAssertTrue(use.waitForExistence(timeout: 5))
+        let count = app.staticTexts["grenade-count-70000000-0000-0000-0000-000000000003"]
+        XCTAssertEqual(count.label, "×2")
+        use.tap()
+        XCTAssertEqual(count.label, "×1")
+        XCTAssertTrue(use.isEnabled)
+        use.tap()
+        XCTAssertEqual(count.label, "×0")
+        XCTAssertFalse(use.isEnabled)
+        capture(app, "grenade-used-up")
+        for _ in 0..<8 {
+            if app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Wired Reflexes Rating 2")).firstMatch.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Wired Reflexes Rating 2")).firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Trauma Damper Rating 0")).firstMatch.exists)
+        capture(app, "augmentation-ratings")
     }
     func testEquipmentInBothThemesAndReadablePowerLabels() {
         for theme in ["light", "dark"] {
@@ -75,7 +120,9 @@ final class DossierUITests: XCTestCase {
         XCTAssertTrue(app.textFields["Connection"].exists)
         XCTAssertTrue(app.textFields["Loyalty"].exists)
         XCTAssertFalse(app.textFields["BOD"].exists)
-        app.buttons["Stats"].tap()
+        let stats = app.buttons["Stats"]
+        XCTAssertLessThan(abs(stats.frame.midY - app.staticTexts["QA CONTACT"].frame.midY), 5)
+        stats.tap()
         XCTAssertTrue(app.textFields["BOD"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.textFields["Professional rating"].exists)
         app.buttons["Stats"].tap()

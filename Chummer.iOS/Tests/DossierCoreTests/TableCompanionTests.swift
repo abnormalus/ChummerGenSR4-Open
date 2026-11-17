@@ -2,6 +2,61 @@ import XCTest
 @testable import DossierCore
 
 final class TableCompanionTests: XCTestCase {
+    func testSavedEssenceUsesDecimalSnapshotAndPreservesPlaceholder() throws {
+        for amount in ["6", "2.78", "3.0", "0"] {
+            let data = Data("<character><totaless>\(amount)</totaless><attributes><attribute><name>ESS</name><value>1</value><totalvalue>1</totalvalue><metatypemax>6</metatypemax></attribute></attributes></character>".utf8)
+            var runner = try DossierCharacter(data: data)
+            XCTAssertEqual(runner.essence, amount)
+            XCTAssertEqual(runner.essenceMaximum, "6")
+            XCTAssertEqual(try runner.exportData(), data, "Reading must not modify the file")
+            runner.setValue("totaless", "4.25")
+            let saved = try DossierCharacter(data: runner.exportData())
+            XCTAssertEqual(saved.essence, "4.25")
+            XCTAssertEqual(saved.attributes.first?.base, 1, "ESS placeholder remains intact")
+        }
+    }
+    func testPositivePoolFilterIncludesOnlyPositivePoolsAndKeepsAllData() throws {
+        let data = Data("<character><attributes/><skills><skill><name>Positive</name><rating>0</rating><totalvalue>1</totalvalue></skill><skill><name>Zero</name><rating>0</rating><totalvalue>0</totalvalue></skill><skill><name>Negative</name><rating>0</rating><totalvalue>-1</totalvalue></skill></skills></character>".utf8)
+        let runner = try DossierCharacter(data: data)
+        XCTAssertEqual(runner.visibleSkills(positivePoolsOnly: true).map(\.name), ["Positive"])
+        XCTAssertEqual(runner.visibleSkills(positivePoolsOnly: false).count, 3)
+        XCTAssertEqual(try runner.exportData(), data)
+    }
+    func testGrenadeUseTracksLinkedNestedLotAndRejectsEmptyOrUnrelatedGear() throws {
+        let data = Data("""
+        <character><attributes/><weapons><weapon><guid>70000000-0000-0000-0000-000000000001</guid><name>Grenade: Flash-Bang</name></weapon></weapons>
+        <gears><gear><name>Bag</name><qty>1</qty><children><gear><name>Grenade: Flash-Bang</name><category>Ammunition</category><qty>2</qty><weaponguid>70000000-0000-0000-0000-000000000001</weaponguid></gear></children></gear><gear><name>Grenade: Flash-Bang</name><category>Ammunition</category><qty>5</qty><weaponguid>70000000-0000-0000-0000-000000000002</weaponguid></gear></gears></character>
+        """.utf8)
+        var runner = try DossierCharacter(data: data)
+        let weapon = try XCTUnwrap(runner.rows(collection: "weapons", item: "weapon").first)
+        XCTAssertEqual(runner.grenades(forWeapon: weapon).map(\.path), [[0, 0]])
+        try runner.useGrenade(path: [0, 0])
+        let saved = try DossierCharacter(data: runner.exportData())
+        XCTAssertEqual(saved.gear(at: [0, 0])?["qty"], "1")
+        XCTAssertEqual(saved.gear(at: [1])?["qty"], "5")
+        try runner.useGrenade(path: [0, 0])
+        let before = runner.data()
+        XCTAssertThrowsError(try runner.useGrenade(path: [0, 0]))
+        XCTAssertThrowsError(try runner.useGrenade(path: [0]))
+        XCTAssertEqual(runner.data(), before)
+    }
+    func testPrivateSavedEssenceAndGrenadeUse() throws {
+        guard let directory = ProcessInfo.processInfo.environment["DOSSIER_PRIVATE_INPUT"] else { throw XCTSkip("Optional private character verification") }
+        for (file, essence) in [("Willow.chum", "6"), ("Dialtone.chum", "2.78"), ("Blue Smoke.chum", "3.0")] {
+            let data = try Data(contentsOf: URL(fileURLWithPath: directory).appendingPathComponent(file))
+            let runner = try DossierCharacter(data: data)
+            XCTAssertEqual(runner.essence, essence, file)
+            XCTAssertEqual(try runner.exportData(), data)
+        }
+        let data = try Data(contentsOf: URL(fileURLWithPath: directory).appendingPathComponent("Mongoose-Ready to play.chum"))
+        var runner = try DossierCharacter(data: data)
+        let grenade = try XCTUnwrap(runner.rows(collection: "weapons", item: "weapon").first { $0["name"] == "Grenade: Flash-Bang" })
+        let lot = try XCTUnwrap(runner.grenades(forWeapon: grenade).first)
+        XCTAssertEqual(lot["qty"], "2")
+        try runner.useGrenade(path: lot.path)
+        let saved = try DossierCharacter(data: runner.exportData())
+        XCTAssertEqual(saved.gear(at: lot.path)?["qty"], "1")
+    }
     private var sample: Data { Data("""
     <character><attributes><attribute><name>STR</name><value>5</value><totalvalue>7</totalvalue></attribute></attributes>
     <karma>12</karma><totalkarma>40</totalkarma><nuyen>500</nuyen>

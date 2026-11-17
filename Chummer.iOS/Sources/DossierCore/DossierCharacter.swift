@@ -25,6 +25,10 @@ public struct SheetGear: Identifiable {
     public let children: [SheetGear]
     public var id: [Int] { path }
     public subscript(_ key: String) -> String { fields[key] ?? "" }
+    public var isGrenade: Bool {
+        let name = self["name"].lowercased()
+        return self["category"] == "Grenades" || (self["category"] == "Ammunition" && (name.hasPrefix("grenade:") || name.hasPrefix("minigrenade:")))
+    }
     public var isProgram: Bool { self["category"] == "Matrix Programs" || self["category"] == "Sensor Software" }
     public var isMatrixEquipment: Bool {
         ["Commlink", "Matrix Programs", "Sensor Software", "Commlink Operating System"].contains(self["category"])
@@ -70,6 +74,11 @@ public struct DossierCharacter {
         for key in ["karma", "totalkarma", "streetcred", "notoriety", "nuyen", "physicalcmfilled", "stuncmfilled"] {
             if let node = xml.root.child(key) { try integer(node.text, key) }
         }
+        if let essence = xml.root.child("totaless") {
+            guard let number = Decimal(string: essence.text, locale: Locale(identifier: "en_US_POSIX")), !number.isNaN else {
+                throw DossierError.invalidXML("Essence must be a number")
+            }
+        }
         for attribute in xml.root.child("attributes")?.children("attribute") ?? [] {
             try integer(attribute.value("value"), attribute.value("name"))
         }
@@ -110,6 +119,20 @@ public struct DossierCharacter {
             return SheetAttribute(id: $0.value("name"), base: base, total: Int($0.value("totalvalue")) ?? base)
         }
         cache.attributes = attributes; return attributes
+    }
+    /// Desktop saves actual (possibly fractional) Essence separately from the
+    /// generic ESS attribute, whose value is only a placeholder.
+    public var essence: String {
+        if !value("totaless").isEmpty { return value("totaless") }
+        let attribute = xml.root.child("attributes")?.children("attribute").first { $0.value("name") == "ESS" }
+        return [attribute?.value("totalvalue"), attribute?.value("value"), "6"].compactMap { $0 }.first { !$0.isEmpty } ?? "6"
+    }
+    public var essenceMaximum: String {
+        let maximum = xml.root.child("attributes")?.children("attribute").first { $0.value("name") == "ESS" }?.value("metatypemax") ?? ""
+        return maximum.isEmpty ? "6" : maximum
+    }
+    public func visibleSkills(positivePoolsOnly: Bool) -> [SheetSkill] {
+        positivePoolsOnly ? skills.filter { $0.pool > 0 } : skills
     }
     public func total(_ attribute: String) -> Int { attributes.first { $0.id == attribute }?.total ?? 0 }
     public mutating func setAttribute(_ id: String, base: Int) {

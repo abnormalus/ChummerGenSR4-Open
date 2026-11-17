@@ -20,6 +20,8 @@ struct DossierView: View {
     @Binding var character: DossierCharacter
     @Binding var selectedPage: DossierPage
     @State private var errorMessage: String?
+    @State private var positivePoolsOnly = false
+    @State private var expandedContacts: Set<Int> = []
     var body: some View {
         Group {
             if UIDevice.current.userInterfaceIdiom == .pad {
@@ -72,7 +74,7 @@ struct DossierView: View {
                 }
                 SheetCard(title: "Attributes", rowSpacing: 0) {
                     HStack { Text("Attribute").frame(maxWidth: .infinity, alignment: .leading); Text("Base / Modified").font(.caption) }
-                    ForEach(Array(character.attributes.enumerated()), id: \.element.id) { index, attribute in
+                    ForEach(Array(character.attributes.filter { $0.id != "ESS" }.enumerated()), id: \.element.id) { index, attribute in
                         HStack {
                             Text(attribute.id).font(.subheadline.bold()).frame(maxWidth: .infinity, alignment: .leading)
                             NumberField(title: "Base", value: Binding(get: { character.attributes.first { $0.id == attribute.id }?.base ?? 0 },
@@ -81,11 +83,25 @@ struct DossierView: View {
                                 set: { character.setAttributeTotal(attribute.id, total: $0) })).frame(width: 70)
                         }.sheetRow(index)
                     }
+                    HStack {
+                        Text("ESS").font(.subheadline.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(character.essenceMaximum).frame(width: 70)
+                        TextField("Essence", text: Binding(get: { character.essence }, set: { character.setValue("totaless", $0) }))
+                            .keyboardType(.decimalPad).multilineTextAlignment(.center).frame(width: 70)
+                            .accessibilityIdentifier("character-essence")
+                    }.sheetRow(character.attributes.count)
                 }
 
             }
-            SheetCard(title: "Skills", rowSpacing: 0) {
-                ForEach(character.skills) { skill in
+            SheetCard(title: "Skills", rowSpacing: 0, headerAccessory: AnyView(
+                Button { positivePoolsOnly.toggle() } label: {
+                    Label("Pool > 0", systemImage: positivePoolsOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.subheadline)
+                }.buttonStyle(.plain).frame(minHeight: 44)
+                    .accessibilityIdentifier("skills-positive-pool-filter")
+                    .accessibilityValue(positivePoolsOnly ? "On" : "Off")
+            )) {
+                ForEach(character.visibleSkills(positivePoolsOnly: positivePoolsOnly)) { skill in
                     HStack {
                         VStack(alignment: .leading) { Text(skill.name); Text("\(skill.attribute) · \(character.total(skill.attribute))").font(.caption).foregroundStyle(SheetTheme.secondary) }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -169,10 +185,18 @@ struct DossierView: View {
             Button("Add Contact", systemImage: "person.badge.plus") { character.addContact() }.buttonStyle(.bordered)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 310), alignment: .top)], alignment: .leading, spacing: 16) {
                 ForEach(character.rows(collection: "contacts", item: "contact")) { contact in
-                    SheetCard(title: contact["name"].isEmpty ? "Contact" : contact["name"], rowSpacing: 0) {
+                    SheetCard(title: contact["name"].isEmpty ? "Contact" : contact["name"], rowSpacing: 0, headerAccessory: AnyView(
+                        Button {
+                            if expandedContacts.contains(contact.id) { expandedContacts.remove(contact.id) }
+                            else { expandedContacts.insert(contact.id) }
+                        } label: {
+                            Label("Stats", systemImage: expandedContacts.contains(contact.id) ? "chevron.up" : "chevron.down").font(.subheadline)
+                        }.buttonStyle(.plain).frame(minHeight: 44)
+                            .accessibilityValue(expandedContacts.contains(contact.id) ? "Expanded" : "Collapsed")
+                    )) {
                         SheetField(title: "Name", value: contactField(contact.id, "name")).sheetRow(0)
                         HStack { SheetField(title: "Connection", value: contactField(contact.id, "connection")); SheetField(title: "Loyalty", value: contactField(contact.id, "loyalty")) }.sheetRow(1)
-                        DisclosureGroup("Stats") {
+                        if expandedContacts.contains(contact.id) {
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4)) {
                                 ForEach(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"], id: \.self) { key in
                                     SheetField(title: key, value: contactDetail(contact.id, key)).sheetRow(["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "ESS", "MAG", "RES"].firstIndex(of: key) ?? 0)
@@ -180,7 +204,7 @@ struct DossierView: View {
                             }
                             SheetField(title: "Initiative / passes", value: contactDetail(contact.id, "initiative")).sheetRow(2)
                             SheetField(title: "Skills and dice pools", value: contactDetail(contact.id, "skills"), multiline: true)
-                        }.padding(.vertical, 8)
+                        }
                         SheetField(title: "Notes", value: Binding(get: { character.contactNotes(contact.id) }, set: { value in
                             do { try character.setContactNotes(contact.id, text: value) } catch { errorMessage = error.localizedDescription }
                         }), multiline: true)

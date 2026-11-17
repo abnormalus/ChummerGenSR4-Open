@@ -11,6 +11,19 @@ public enum AmmunitionError: LocalizedError {
 }
 
 extension DossierCharacter {
+    public func grenades(forWeapon weapon: SheetRow) -> [SheetGear] {
+        guard let guid = UUID(uuidString: weapon["guid"]), guid != UUID(uuidString: "00000000-0000-0000-0000-000000000000") else { return [] }
+        return gear.flatMap { [$0] + $0.descendants }.filter {
+            $0.isGrenade && UUID(uuidString: $0["weaponguid"]) == guid
+        }
+    }
+    public mutating func useGrenade(path: [Int]) throws {
+        guard let grenade = gear(at: path), grenade.isGrenade,
+              let quantity = Decimal(string: grenade["qty"], locale: Locale(identifier: "en_US_POSIX")) else { throw AmmunitionError.invalidSelection }
+        guard quantity >= 1 else { throw AmmunitionError.insufficientRounds }
+        setGearValue(path: path, field: "qty", value: NSDecimalNumber(decimal: quantity - 1).stringValue)
+    }
+
     public func ammunition(forWeapon weapon: SheetRow) -> [SheetGear] {
         guard weapon["type"].lowercased() == "ranged", weapon["requireammo"].lowercased() != "false", weapon["ammo"] != "0" else { return [] }
         let category = (weapon["ammocategory"].isEmpty ? weapon["category"].replacingOccurrences(of: "Cyberware", with: "").trimmingCharacters(in: .whitespaces) : weapon["ammocategory"])
