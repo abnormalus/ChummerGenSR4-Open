@@ -58,7 +58,10 @@ struct CharacterElement: Equatable {
     func children(_ name: String) -> [CharacterElement] {
         content.compactMap { if case .element(let node) = $0, node.name == name { return node }; return nil }
     }
-    func child(_ name: String) -> CharacterElement? { children(name).first }
+    func child(_ name: String) -> CharacterElement? {
+        for case .element(let node) in content where node.name == name { return node }
+        return nil
+    }
     func value(_ name: String) -> String { child(name)?.text ?? "" }
     mutating func update(_ name: String, matching: (CharacterElement) -> Bool = { _ in true },
                          _ body: (inout CharacterElement) -> Void) {

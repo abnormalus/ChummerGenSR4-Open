@@ -2,9 +2,24 @@ import SwiftUI
 import DossierCore
 
 enum SheetTheme {
-    static let ink = Color(red: 0.04, green: 0.35, blue: 0.40)
-    static let header = Color(red: 0.70, green: 0.88, blue: 0.91)
-    static let paper = Color(red: 0.95, green: 0.98, blue: 0.99)
+    // Labels and controls must adapt together with the card surface.
+    static let ink = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.45, green: 0.86, blue: 0.92, alpha: 1)
+            : UIColor(red: 0.02, green: 0.31, blue: 0.36, alpha: 1)
+    })
+    static let header = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.08, green: 0.22, blue: 0.25, alpha: 1)
+            : UIColor(red: 0.70, green: 0.88, blue: 0.91, alpha: 1)
+    })
+    static let paper = Color(uiColor: .systemGroupedBackground)
+    static let secondary = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.72, green: 0.77, blue: 0.79, alpha: 1)
+            : UIColor(red: 0.28, green: 0.32, blue: 0.34, alpha: 1)
+    })
+    static let card = Color(uiColor: .secondarySystemGroupedBackground)
 }
 
 struct SheetCard<Content: View>: View {
@@ -18,7 +33,8 @@ struct SheetCard<Content: View>: View {
                 .background(SheetTheme.header)
             VStack(alignment: .leading, spacing: rowSpacing) { content }.padding(12)
         }
-        .background(.background).clipShape(RoundedRectangle(cornerRadius: 10))
+        .foregroundStyle(.primary)
+        .background(SheetTheme.card).clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(SheetTheme.ink.opacity(0.35), lineWidth: 1))
     }
 }
@@ -46,7 +62,7 @@ struct SheetField: View {
     var multiline = false
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.caption).foregroundStyle(SheetTheme.secondary)
             TextField(title, text: $value, axis: multiline ? .vertical : .horizontal)
                 .lineLimit(multiline ? 3...12 : 1...1)
                 .textFieldStyle(.plain).padding(.vertical, 3)
@@ -60,7 +76,7 @@ struct NumberField: View {
     @Binding var value: Int
     var body: some View {
         VStack(spacing: 4) {
-            Text(title).font(.caption2).foregroundStyle(.secondary)
+            Text(title).font(.caption2).foregroundStyle(SheetTheme.secondary)
             TextField(title, value: $value, format: .number)
                 .keyboardType(.numbersAndPunctuation).multilineTextAlignment(.center)
                 .padding(6).background(SheetTheme.header.opacity(0.3), in: RoundedRectangle(cornerRadius: 5))
@@ -87,7 +103,11 @@ struct DamageTrackView: View {
                     ZStack {
                         Rectangle().fill(state == .blocked ? SheetTheme.ink : Color.clear)
                         Rectangle().stroke(SheetTheme.ink, lineWidth: 1)
-                        if state == .damaged { Image(systemName: "xmark").font(.title2).foregroundStyle(SheetTheme.ink) }
+                        if let penalty = track.penalty(at: index) {
+                            Text(String(penalty)).font(.caption.bold())
+                                .foregroundStyle(.primary).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(3)
+                        }
+                        if state == .damaged { Image(systemName: "xmark").font(.title2).foregroundStyle(.primary) }
                     }
                     .frame(width: 44, height: 44).contentShape(Rectangle())
                     .gesture(LongPressGesture(minimumDuration: 0.5).exclusively(before: TapGesture()).onEnded { gesture in
@@ -102,10 +122,9 @@ struct DamageTrackView: View {
                     .accessibilityValue(state == .blocked ? "Blocked" : state == .damaged ? "Damage" : "Undamaged")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityAction { track.tap(index); damage = track.damage }
-                    .accessibilityAction(named: "Block or unblock") { track.hold(index); damage = track.damage }
+                    .accessibilityAction(named: "Adjust optional boxes after eight") { track.hold(index); damage = track.damage }
                 }
             }
-            Text("Tap to set damage. Hold to block or unblock.").font(.caption2).foregroundStyle(.secondary)
         }
         .onChange(of: damage) { _, new in
             if track.damage != new { track = DamageTrack(damage: new, capacity: capacity) }

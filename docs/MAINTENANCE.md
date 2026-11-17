@@ -13,6 +13,27 @@ The shared desktop application currently lives in Chummer.Mac. It can be publish
 - `knowledge-suggestions.xml` supplements the existing ruleset skills with the supplied `knowledge skills.csv` and `interests.csv` entries. The CSV category `Interests` maps to the existing `Interest` category. Suggestions are optional names, not new rules or source attributions; the category is chosen first and curates the available names. The arrow restores the full category list, while typing filters it. Add Specialty uses the shared free-text prompt and the existing career Karma flow. Keep these suggestions separate from `skills.xml` so ruleset updates preserve them.
 - Keep extracting rules from window handlers when changing those areas, rather than rewriting the rules engine during unrelated UI fixes.
 
+### Native inline controller adapters
+
+`NativeInlineTextBinding`, `NativeInlineChoiceBinding`, `NativeInlineNumericBinding` and
+`NativeInlineCommandBinding` bridge existing controller controls into native sections.
+They share `NativeControlObservation` for EnabledChanged, VisibleChanged and Invalidated
+subscriptions. Dispose the binding when its owning section closes: the observer detaches
+only its own callbacks and never disposes the controller control. It performs no initial
+refresh; each adapter synchronizes after initializing its native input and handlers.
+
+Text/value events, feedback guards, validation and native input handlers stay in the
+individual adapters because their semantics differ. This consolidation replaces four
+copies of common subscription/cleanup code without sharing their domain policies.
+`NativeControlObservationChecks` exercises forwarding, independent observers and repeated
+disposal in the headless suite; existing section checks cover edits and controller state.
+Changes to these adapters also need the affected native section checks on Mac and Windows
+before release.
+
+## Adept Power Point summaries
+
+Creation and career share pure `AdeptPowerPointBudget` arithmetic and a separate culture-sensitive `AdeptPowerPointSummary` formatter. Existing `Power` pricing and editor-owned row refresh remain authoritative. See [ADEPT_POWER_POINTS.md](ADEPT_POWER_POINTS.md) for inputs, ownership, preserved formats and independent baseline evidence.
+
 ## Diagnostics
 
 Help → Open Diagnostic Logs opens the local log folder. On Mac it is under Library/Application Support/ChummerGenSR4Mac/logs. Logs contain UTC time, command ID, assembly version, unique compiled-module build ID, OS/runtime/architecture, exception types/HRESULTs, and method stacks without source-file paths. The specific numeric Avalonia render-timer registration error is recorded when present; arbitrary exception messages, character XML, aliases, and character filenames are omitted. No logs are uploaded automatically.
@@ -20,6 +41,42 @@ Help → Open Diagnostic Logs opens the local log folder. On Mac it is under Lib
 The active diagnostics.jsonl file rotates at approximately 2 MiB with three retained archives. Disk/permission failures in logging never block app operations. Caught file failures and main-loop failures are recorded; native menu setup failures retain the ordinary menu as a fallback. Diagnostic coverage is intentionally incremental: additional caught errors should explicitly call AppDiagnostics.Record with a fixed category.
 
 ## Validation
+
+### Bounded execution and interrupted work
+
+Use `scripts/run-bounded.py` for long verification stages. It streams child output,
+prints elapsed/idle status every 15 seconds, and stops the process tree when the total
+deadline or the no-output limit is reached. Exit 124 means timeout, never success;
+ordinary failure codes are preserved. The default no-output limit is 180 seconds.
+Raise it explicitly for a known quiet operation, with a recorded reason, while retaining
+an overall deadline. The limits are execution safeguards, not evidence that a stage passed.
+
+```text
+python3 scripts/run-bounded.py --label restore --timeout 300 -- dotnet restore Chummer.Mac.sln --locked-mode -p:UsedAvaloniaProducts=
+python3 scripts/run-bounded.py --label build --timeout 600 -- dotnet build Chummer.Mac.sln -c Release --no-restore --disable-build-servers -p:UsedAvaloniaProducts=
+python3 scripts/run-bounded.py --label headless --timeout 600 -- dotnet Chummer.Mac/bin/Release/net10.0/ChummerMac.dll --smoke-test artifacts/checks Chummer.Mac/assets/saves
+```
+
+The examples use the Mac `python3` command. On Windows substitute `python` if that selects the installed Python 3 interpreter; verify its version first.
+
+Pass `--log-file artifacts/verification/STAGE.log` to retain raw child output and runner
+status together. Parent directories are created before launching the command; each write
+is flushed, and an existing stage log is overwritten so a retry cannot mix old success
+with new failures. Use a separate output directory per source revision when retaining
+multiple attempts. Logs can contain everything the child prints; use the same handling
+as the underlying verification output. Desktop CI uploads these logs on success or failure.
+
+After a timeout, retain the command, source revision, log and last completed check.
+Investigate that stage before repeating it; do not rerun an unchanged hung command
+indefinitely or treat a smaller passing subset as full acceptance. Build-server stalls
+can be isolated with `--disable-build-servers` and `-p:UseSharedCompilation=false`.
+Cached dependencies may support local investigation but do not establish a fresh locked
+restore or vulnerability audit. CI uses the same wrapper for restore/build/headless and
+also has outer job/step limits; native operation/report/count gates remain separate.
+
+Before ending a work session, record completed work, its verification limits, the active
+branch/PR and the next concrete action. These checkpoints support resumption; they do
+not themselves schedule unattended work.
 
 Use the installed .NET 10 SDK to build Chummer.Mac.sln. Run the application with --smoke-test OUTPUT_DIRECTORY Chummer.Mac/assets/saves to check existing character-file compatibility and meaningful UI regressions. The test user directory isolates preferences, saves, and logs.
 
@@ -57,7 +114,9 @@ Hair, eyes, and skin use `AppearanceColors` with the editable `SearchableChoices
 
 `CommonFunctions.OpenPDF` delegates to `SourcebookReader`, which resolves localized book codes and applies the existing `SourcebookInfo.Offset`. Sourcebook links and Settings → sourcebook PDF Test use the same path. An external executable is no longer required; existing linked paths, offsets, and character files remain compatible.
 
-The reader hosts bundled Mozilla PDF.js 6.4.299 in the toolkit’s existing native WebBrowser control (WKWebView on macOS, WebView2 on Windows). The distribution is pinned with its npm integrity hash and Apache-2.0 license in `Chummer.Mac/pdfjs/VERSION.txt` and `LICENSE`. Its legacy display/viewer builds, worker, CMaps, standard fonts, image assets, and WASM decoders are included locally, without CDN access or a Chromium bundle. To update, verify the official npm tarball integrity, replace all matching-version files together, and retest native rendering/search plus byte-range and shutdown checks.
+The reader hosts bundled Mozilla PDF.js 6.5.438 in the toolkit’s existing native WebBrowser control (WKWebView on macOS, WebView2 on Windows). The distribution is pinned with its npm integrity hash and Apache-2.0 license in `Chummer.Mac/pdfjs/VERSION.txt` and `LICENSE`. Its legacy display/viewer builds, worker, CMaps, standard fonts, image assets, and WASM decoders are included locally, without CDN access or a Chromium bundle. To update, verify the official npm tarball integrity, replace all matching-version files together, and retest native rendering/search plus byte-range and shutdown checks.
+
+The November5 update to6.5.438 follows the [official release changes](https://github.com/mozilla/pdf.js/releases/tag/v6.5.438), including decoder, range-cancellation and text/search fixes. The official tarball SHA512 is recorded in VERSION.txt and the manifest; SHA256 is `7461aefcd27c4ef0dd76f9ca5760f09466eb6b3f934432670c12132e7b3d6faa`. All bundled upstream files were replaced from that verified package, with the existing custom reader unchanged and the new QuickJS license notices included. Rendering workers remain opt-in upstream; this reader sets only workerSrc and retains the default rendererSrc. Embedded-browser checks show both synthetic pages, highlighted text search and page navigation. These checks do not establish actual WKWebView/WebView2 application acceptance; current full/native/PDF gates remain required.
 
 Each reader owns a `PdfLocalServer` using .NET 10 Kestrel (bundled via the ASP.NET Core framework reference) on IPv4 loopback with an unpredictable route. It binds port zero directly on Mac and Windows without requiring HTTP.sys URL ACLs. Request logging is disabled to avoid recording paths or route tokens. It exposes only the selected book and bundled assets, streams PDF byte ranges, rejects traversal, and stops when the form closes, including application Quit. PDF scripting and external document links are disabled. Documents are not copied, uploaded, or written by the reader. Missing files, invalid references, unavailable engines, password cancellation, and parsing failures have recoverable messages; lifecycle/error events use the existing privacy-preserving diagnostics.
 
@@ -74,3 +133,12 @@ Windows executables must embed `packaging/windows/app.manifest` via `Application
 Compatibility capabilities and remaining interaction checks are recorded in `COMPATIBILITY_CONTROLS.md`. Bundled reader integrity and update procedures are in `PDFJS_MAINTENANCE.md`.
 
 Rendering ownership, the Help → Full Redraw (Diagnostic) option, visual regressions and the next bounded control migration are documented in [RENDERING.md](RENDERING.md).
+
+
+## Native sourcebook reader gate
+
+`--check-pdf-reader <generated-character> <report>` exercises the production SourcebookReader.OpenDocument entry with a fixed synthetic two-page book and an isolated test-user directory. It requires a functional actual WKWebView/WebView2, two loaded pages, nonblank canvas pixels plus expected text, two highlighted search matches, next-page and zoom controls, form removal, released loopback port and unchanged source character. Each asynchronous operation is bounded; the hosted process has180seconds and requires a passing report with at least10 assertions. Windows installs/locates WebView2 before this step. Existing bulk/sensor/focus/preview gates are retained. At gate introduction (293158a), the driver compiled and hosted acceptance was pending. Use its actual current report/process result; the driver's existence does not establish renderer compatibility. No sourcebook preferences or character settings are changed.
+
+The first293158a Windows reader execution opens a functional owned reader, then rejects immediate script invocation before readiness. The startup fixture now yields the main host dispatcher and treats InvalidOperationException as transient only during the initial load poll, retaining its20-second operation deadline and all pixel/search/closure assertions. Subsequent script failures still fail the check. Fresh actual native acceptance remains required; this is a driver-readiness correction, not a claimed production rendering fix.
+
+At05f771c, Windows passes actual reader loading, pixels/text, two-page search, navigation, zoom and form removal. The final port probe hits its two-second observation timeout before the OS returns connection refusal. The native driver now uses the existing headless IPAddress.Loopback probe with a cancelled five-second socket operation, accepting only ConnectionRefused. A timeout or another socket error still fails; the20-second operation and180-second process bounds remain. Fresh full10 acceptance is required.

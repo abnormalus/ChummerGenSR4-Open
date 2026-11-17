@@ -88,7 +88,7 @@ internal static class NativeCreationKnowledgeViewportChecks
             var previousState = nativeWindow.WindowState; var previousSize = owner.Size;
             var beforeWide = character.CaptureSnapshot(); bool dirtyBeforeWide = Field<bool>(editor, "_blnIsDirty");
             var screen = nativeWindow.Screens.ScreenFromWindow(nativeWindow);
-            Size expectedWide = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : default;
+            Size expectedWide = NativeFullscreenGeometry.ExpectedClientSize(nativeWindow);
             var geometryTrace = new List<string>();
             var geometryWriters = new List<string>();
             var geometryClock = System.Diagnostics.Stopwatch.StartNew();

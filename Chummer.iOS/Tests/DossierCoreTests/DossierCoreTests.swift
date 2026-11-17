@@ -103,14 +103,14 @@ final class DossierCoreTests: XCTestCase {
         track.tap(11); XCTAssertEqual(track.damage, 1)
         track.hold(10); XCTAssertEqual(track.state(at: 10), .undamaged)
         track.tap(10); XCTAssertEqual(track.damage, 11)
-        track.hold(5); XCTAssertEqual(track.damage, 5)
-        XCTAssertEqual(track.state(at: 5), .blocked)
-        track.tap(8); XCTAssertEqual(track.damage, 5, "Damage cannot jump over an unavailable box")
+        track.hold(5); XCTAssertEqual(track.damage, 11)
+        XCTAssertEqual(track.state(at: 5), .damaged)
+        track.tap(8); XCTAssertEqual(track.damage, 9, "The first eight boxes cannot be blocked")
         var character = try DossierCharacter(data: sample)
         character.setDamage(track.damage, physical: true)
         let text = String(decoding: character.data(), as: UTF8.self)
         XCTAssertFalse(text.contains("blocked"))
-        XCTAssertEqual(try DossierCharacter(data: character.data()).damage(true), 5)
+        XCTAssertEqual(try DossierCharacter(data: character.data()).damage(true), 9)
         XCTAssertEqual(try DossierCharacter(data: character.data()).damage(false), 1)
     }
     func testInvalidFilesAreRejected() throws {

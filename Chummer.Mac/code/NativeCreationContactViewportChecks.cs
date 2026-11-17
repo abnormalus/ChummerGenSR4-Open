@@ -222,7 +222,7 @@ internal static class NativeCreationContactViewportChecks
                     + FormattableString.Invariant($" [row={row.Frame.Bounds}; viewport={section.Viewport.Viewport}; offset={section.Viewport.Offset}; actual={window.ClientSize}]"));
             }
             var screen = window.Screens.ScreenFromWindow(window);
-            Size expected = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : default;
+            Size expected = NativeFullscreenGeometry.ExpectedClientSize(window);
             TraceGeometry("before-fullscreen");
             var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window, check);
             bool firstFullscreenTheme = true;

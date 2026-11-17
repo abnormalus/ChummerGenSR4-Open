@@ -10,6 +10,7 @@ private struct EquipmentSection: Identifiable {
 
 struct EquipmentPage: View {
     @Binding var character: DossierCharacter
+    var combatOnly = false
     @State private var adding = false
     @State private var editingGear: SheetGear?
     @State private var errorMessage: String?
@@ -24,6 +25,19 @@ struct EquipmentPage: View {
         .init(title: "Spirits / sprites", collection: "spirits", item: "spirit", fields: ["name", "force", "services", "bound"]),
         .init(title: "Vehicles", collection: "vehicles", item: "vehicle", fields: ["name", "handling", "accel", "speed", "body", "armor", "pilot", "sensor"])
     ]
+    private var visibleSections: [EquipmentSection] {
+        sections.filter { section in
+            if section.collection == "weapons" { return false }
+            if combatOnly && !["spells", "powers", "complexforms", "spirits", "vehicles"].contains(section.collection) { return false }
+            switch section.collection {
+            case "spells": return character.isMagician
+            case "powers": return character.isAdept
+            case "complexforms": return character.isTechnomancer
+            case "spirits": return character.isMagician || character.isTechnomancer
+            default: return true
+            }
+        }
+    }
     private var weapons: [SheetRow] { character.rows(collection: "weapons", item: "weapon") }
     private var assignedAmmoPaths: Set<[Int]> { Set(weapons.flatMap { character.ammunition(forWeapon: $0).map(\.path) }) }
     private var weaponSection: some View {
@@ -38,8 +52,8 @@ struct EquipmentPage: View {
                         }
                     } label: {
                         HStack {
-                            Text(weapon["name"]).bold()
-                            Text([weapon["mode"], weapon["damage"], weapon["ap"].isEmpty ? "" : "AP " + weapon["ap"]].filter { !$0.isEmpty && $0 != "0" }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                            Text(weapon["name"]).bold().foregroundStyle(.primary)
+                            Text([weapon["mode"], character.weaponDamage(weapon), weapon["ap"].isEmpty ? "" : "AP " + weapon["ap"]].filter { !$0.isEmpty && $0 != "0" }.joined(separator: " · ")).font(.caption).foregroundStyle(SheetTheme.secondary)
                             Spacer()
                             SourceReference(source: weapon["source"], page: weapon["page"])
                         }
@@ -65,7 +79,7 @@ struct EquipmentPage: View {
                     }
                 }
             }
-            if weapons.isEmpty { Text("No entries").font(.caption).foregroundStyle(.secondary) }
+            if weapons.isEmpty { Text("No entries").font(.caption).foregroundStyle(SheetTheme.secondary) }
         }
     }
     private func fireMenu(weapon: SheetRow, title: String, spend: @escaping (Int) throws -> Void) -> some View {
@@ -80,7 +94,7 @@ struct EquipmentPage: View {
                 }
             }
         } label: {
-            HStack { Text(title); Image(systemName: "chevron.down").font(.caption2) }
+            HStack { Text(title).foregroundStyle(.primary); Image(systemName: "chevron.down").font(.caption2) }
                 .font(.subheadline).frame(minHeight: 44)
         }
         .accessibilityHint("Choose rounds to spend from this ammunition supply")
@@ -100,7 +114,7 @@ struct EquipmentPage: View {
                 HStack {
                     Text("Program / options").frame(maxWidth: .infinity, alignment: .leading)
                     Text("Loaded").frame(width: 60)
-                }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 8).padding(.vertical, 4)
+                }.font(.caption).foregroundStyle(SheetTheme.secondary).padding(.horizontal, 8).padding(.vertical, 4)
                 ForEach(Array(character.programs.enumerated()), id: \.element.id) { index, program in
                     HStack(spacing: 8) {
                         GearTree(gear: program, showChildren: false, banded: false)
@@ -127,11 +141,11 @@ struct EquipmentPage: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Button("Add Equipment", systemImage: "plus.circle") { adding = true }.buttonStyle(.borderedProminent)
-            if !character.notes.pendingEquipment.isEmpty {
+            if !combatOnly { Button("Add Equipment", systemImage: "plus.circle") { adding = true }.buttonStyle(.borderedProminent).foregroundStyle(Color(uiColor: .systemBackground)) }
+            if !combatOnly && !character.notes.pendingEquipment.isEmpty {
                 SheetCard(title: "New equipment awaiting desktop review", rowSpacing: 0) {
                     Text("These entries stay in your dossier. Matching them to desktop Chummer equipment is the next development stage.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(SheetTheme.secondary)
                     ForEach(Array(character.notes.pendingEquipment.enumerated()), id: \.element.id) { index, gear in
                         VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -148,21 +162,26 @@ struct EquipmentPage: View {
                 }
             }
             weaponSection
-            matrixSection
+            if !combatOnly { matrixSection }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 310), alignment: .top)], alignment: .leading, spacing: 16) {
-                ForEach(sections.filter { $0.collection != "weapons" }) { section in
-                    SheetCard(title: section.title, rowSpacing: 0) {
+                ForEach(visibleSections) { section in
+                    SheetCard(title: section.collection == "spirits" ? (character.isTechnomancer ? "Sprites" : "Spirits") : section.title, rowSpacing: 0) {
                         let rows = character.rows(collection: section.collection, item: section.item)
                         if section.collection == "gears" {
                             let gear = character.gear.filter { !$0.isMatrixEquipment && !assignedAmmoPaths.contains($0.path) }
-                            if gear.isEmpty { Text("No entries").font(.caption).foregroundStyle(.secondary) }
+                            if gear.isEmpty { Text("No entries").font(.caption).foregroundStyle(SheetTheme.secondary) }
                             ForEach(Array(gear.enumerated()), id: \.element.id) { index, item in
                                 gearEntry(item, index: index)
                             }
                         } else {
-                            if rows.isEmpty { Text("No entries").font(.caption).foregroundStyle(.secondary) }
+                            if rows.isEmpty { Text("No entries").font(.caption).foregroundStyle(SheetTheme.secondary) }
                             ForEach(rows) { row in
                                 DisclosureGroup {
+                                    if section.collection == "vehicles" {
+                                        DamageTrackView(title: "Vehicle damage", damage: Binding(get: {
+                                            character.vehicleDamage(character.rows(collection: "vehicles", item: "vehicle").first { $0.id == row.id } ?? row)
+                                        }, set: { character.setVehicleDamage($0, index: row.id) }), capacity: character.vehicleCapacity(row))
+                                    }
                                     ForEach(section.fields, id: \.self) { key in
                                         SheetField(title: key.uppercased(), value: Binding(get: {
                                             character.rows(collection: section.collection, item: section.item).first { $0.id == row.id }?[key] ?? ""
@@ -170,7 +189,7 @@ struct EquipmentPage: View {
                                     }
                                 } label: {
                                     HStack {
-                                        Text(row["name"])
+                                        Text(section.collection == "powers" ? character.powerSummary(row) : row["name"]).foregroundStyle(.primary)
                                         Spacer()
                                         SourceReference(source: row["source"], page: row["page"])
                                     }
@@ -290,12 +309,12 @@ private struct GearTree: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(gear["name"]).font(.subheadline.bold())
                         if !inlineOptions.isEmpty {
-                            Text("· " + inlineOptions).font(.caption).foregroundStyle(.secondary)
+                            Text("· " + inlineOptions).font(.caption).foregroundStyle(SheetTheme.secondary)
                         }
                     }.fixedSize(horizontal: true, vertical: false)
                 }
                 if !details.isEmpty {
-                    Text(details).font(.caption).foregroundStyle(.secondary).fixedSize()
+                    Text(details).font(.caption).foregroundStyle(SheetTheme.secondary).fixedSize()
                 }
                 SourceReference(source: gear["source"], page: gear["page"])
             }
@@ -304,10 +323,10 @@ private struct GearTree: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(gear["name"]).font(.subheadline.bold())
                     Spacer(minLength: 8)
-                    if !details.isEmpty { Text(details).font(.caption).foregroundStyle(.secondary) }
+                    if !details.isEmpty { Text(details).font(.caption).foregroundStyle(SheetTheme.secondary) }
                     SourceReference(source: gear["source"], page: gear["page"])
                 }
-                if !inlineOptions.isEmpty { Text(inlineOptions).font(.caption).foregroundStyle(.secondary) }
+                if !inlineOptions.isEmpty { Text(inlineOptions).font(.caption).foregroundStyle(SheetTheme.secondary) }
             }
         }
     }
@@ -319,7 +338,7 @@ private struct SourceReference: View {
     var body: some View {
         if !source.isEmpty {
             Text(source + (page.isEmpty ? "" : " p. " + page))
-                .font(.caption2).foregroundStyle(.secondary).fixedSize()
+                .font(.caption2).foregroundStyle(SheetTheme.secondary).fixedSize()
                 .accessibilityLabel("Source: " + source + (page.isEmpty ? "" : ", page " + page))
         }
     }

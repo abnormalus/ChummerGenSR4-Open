@@ -1,4 +1,4 @@
-# Chummer Dossier for iPhone and iPad
+# SR 4 Dossier for iPhone and iPad
 
 An early native SwiftUI companion inside the Chummer SR4 repository. Open an
 existing `.chum` character, edit a linked sheet, and save a separate XML copy.
@@ -28,7 +28,7 @@ demo export is disabled.
 
 ## First milestone
 
-- Four adaptive native views: character/combat/skills, equipment, history, contacts.
+- Five adaptive native pages: character/skills, combat, equipment, history, contacts.
   iPad uses a compact page menu beside the title instead of a second tab row;
   demo status lives in the title/menu rather than a persistent banner.
   Blue panels follow the SR4 Anniversary sheet's organization. History and contact
@@ -40,10 +40,13 @@ demo export is disabled.
 - Base attribute changes flow into modified attributes and linked skill pools
   using imported modifier offsets. Skill rating/pool edits and simple initiative
   formulas with editable modifiers are supported.
-- Physical/Stun: tap to fill damage through a box; tap the last damaged box to
-  remove one damage. Hold toggles blocking. Damage cannot jump over a blocked gap;
-  blocking within damage truncates the count. Only damage counts are saved.
-  Blocking is session-only; initial capacity uses Body/Willpower sheet formulas.
+- Physical/Stun: tap to fill damage through a box; tap the last marked box to
+  remove one. The first eight boxes are fixed. Hold optional boxes to extend/trim
+  a contiguous tail without erasing damage. Penalties appear every third usable
+  box. Only damage counts persist; capacity adjustments are session-only.
+- Combat includes weapons, applicable powers/spells/forms/spirits and vehicles.
+  Vehicle/drone damage persists in existing Chummer save fields. See
+  [device feedback and verification](DEVICE_FEEDBACK.md) for behavior and limits.
 - History and extended contact data live in versioned supported notes fields.
 - New equipment can be entered freely with a separate recoil adjustment and is
   preserved as pending data in notes. Existing top-level equipment fields can be

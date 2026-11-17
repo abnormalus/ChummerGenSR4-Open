@@ -5,6 +5,8 @@ The early native iPhone/iPad dossier companion is in [Chummer.iOS](Chummer.iOS/R
 It has its own Xcode project and Swift tests. Desktop equipment reconciliation
 is planned and is not yet implemented.
 
+For the supported Mac/Windows build, see [CONTRIBUTING.md](CONTRIBUTING.md). The shared application is `Chummer.Mac.sln`; the historical `Chummer` project is retained as reference.
+
 "Chummer is a character generator for Shadowrun 4th Edition for Mac and PC.
 Not only can you create your character quickly and easily,
 but you can also use Chummer during your character's shadowrunning career,

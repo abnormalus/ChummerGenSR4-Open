@@ -345,33 +345,7 @@ namespace Chummer
 				foreach (string strFile in MacPaths.CustomDataFiles("custom*_" + strFileName))
 				{
 					objXmlFile.Load(strFile);
-					objList = objXmlFile.SelectNodes("/chummer/*");
-					foreach (XmlNode objNode in objList)
-					{
-						// Look for any items with a duplicate name and pluck them from the node so we don't end up with multiple items with the same name.
-						List<XmlNode> lstDelete = new List<XmlNode>();
-						foreach (XmlNode objChild in objNode.ChildNodes)
-						{
-							// Only do this if the child has the name field since this is what we must match on.
-							if (objChild["name"] != null)
-							{
-								XmlNodeList objNodeList = objReturnDocument.SelectNodes("/chummer/" + objChild.ParentNode.Name + "/" + objChild.Name + "[name = \"" + objChild["name"].InnerText + "\"]");
-								if (objNodeList.Count > 0)
-								{
-									lstDelete.Add(objChild);
-								}
-							}
-						}
-						// Remove the offending items from the node we're about to merge in.
-						foreach (XmlNode objRemoveNode in lstDelete)
-						{
-							objNode.RemoveChild(objRemoveNode);
-						}
-
-						// Append the entire child node to the new document.
-						XmlNode objImported = objReturnDocument.ImportNode(objNode, true);
-						objReturnDocument.DocumentElement.AppendChild(objImported);
-					}
+					CustomCatalogMerge.Apply(objReturnDocument, objXmlFile);
 				}
 			}
 

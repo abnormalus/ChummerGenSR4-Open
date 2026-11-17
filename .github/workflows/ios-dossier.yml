@@ -33,3 +33,24 @@ jobs:
           xcodebuild -project ChummerDossier.xcodeproj -scheme ChummerDossier
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath ../artifacts/ios-derived CODE_SIGNING_ALLOWED=NO build
+
+      - name: Native iPhone and iPad interactions
+        run: |
+          python3 - <<'PYTHON'
+          import json, subprocess
+          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
+          available = [d for group in devices.values() for d in group]
+          for family in ['iPhone', 'iPad']:
+              device = next(d for d in available if family in d['name'])
+              subprocess.run(['xcodebuild', 'test', '-project', 'ChummerDossier.xcodeproj', '-scheme', 'ChummerDossier',
+                              '-destination', 'platform=iOS Simulator,id=' + device['udid'],
+                              '-derivedDataPath', '../artifacts/ios-ui-derived',
+                              '-resultBundlePath', '../artifacts/' + family + '.xcresult',
+                              'CODE_SIGN_IDENTITY=-', 'ONLY_ACTIVE_ARCH=YES'], check=True)
+          PYTHON
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-native-results
+          path: artifacts/*.xcresult
+          retention-days: 7

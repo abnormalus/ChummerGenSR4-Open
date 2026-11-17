@@ -35,7 +35,22 @@ public struct SheetGear: Identifiable {
 /// Sheet arithmetic only. Imported totals supply the modifier offset; no catalogs,
 /// cyberlimb averaging, purchase accounting, or advancement rules are executed here.
 public struct DossierCharacter {
-    private var xml: CharacterXML
+    // Each value snapshot owns a fresh cache after an edit. Sharing an unchanged
+    // cache is safe; old snapshots retain both their XML and projections.
+    private final class Cache {
+        var data: Data?
+        var rows: [String: [SheetRow]] = [:]
+        var attributes: [SheetAttribute]?
+        var skills: [SheetSkill]?
+        var gear: [SheetGear]?
+        var programs: [SheetGear]?
+        var notes: (String, DossierNotes)?
+    }
+    private var cache = Cache()
+    public private(set) var revision = UUID()
+    private var xml: CharacterXML {
+        didSet { cache = Cache(); revision = UUID() }
+    }
     public init(data: Data) throws {
         xml = try CharacterXML(data: data)
         _ = try DossierNotes.split(xml.root.value("notes"))
@@ -43,7 +58,10 @@ public struct DossierCharacter {
             _ = try DossierNotes.split(contact.value("notes"))
         }
     }
-    public func data() -> Data { xml.data() }
+    public func data() -> Data {
+        if let data = cache.data { return data }
+        let data = xml.data(); cache.data = data; return data
+    }
     /// Prevent text fields from producing numeric data the desktop cannot load.
     public func exportData() throws -> Data {
         func integer(_ value: String, _ label: String) throws {
@@ -68,6 +86,9 @@ public struct DossierCharacter {
                 }
             }
         }
+        for row in rows(collection: "vehicles", item: "vehicle") {
+            if let damage = row.fields["physicalcmfilled"] { try integer(damage, row["name"] + " damage") }
+        }
         for row in rows(collection: "spirits", item: "spirit") {
             for key in ["force", "services"] where row.fields[key] != nil { try integer(row[key], row["name"] + " " + key) }
             if let bound = row.fields["bound"], !["true", "false"].contains(bound.lowercased()) {
@@ -77,16 +98,18 @@ public struct DossierCharacter {
         return data()
     }
     public func value(_ field: String) -> String { xml.root.value(field) }
-    public mutating func setValue(_ field: String, _ value: String) { xml.root.set(field, value) }
+    public mutating func setValue(_ field: String, _ value: String) { guard self.value(field) != value else { return }; xml.root.set(field, value) }
     public var title: String {
         let alias = value("alias")
         return alias.isEmpty ? (value("name").isEmpty ? "Character Dossier" : value("name")) : alias
     }
     public var attributes: [SheetAttribute] {
-        (xml.root.child("attributes")?.children("attribute") ?? []).map {
+        if let attributes = cache.attributes { return attributes }
+        let attributes = (xml.root.child("attributes")?.children("attribute") ?? []).map {
             let base = Int($0.value("value")) ?? 0
             return SheetAttribute(id: $0.value("name"), base: base, total: Int($0.value("totalvalue")) ?? base)
         }
+        cache.attributes = attributes; return attributes
     }
     public func total(_ attribute: String) -> Int { attributes.first { $0.id == attribute }?.total ?? 0 }
     public mutating func setAttribute(_ id: String, base: Int) {
@@ -109,13 +132,15 @@ public struct DossierCharacter {
         }
     }
     public var skills: [SheetSkill] {
-        rows(collection: "skills", item: "skill").map { row in
+        if let skills = cache.skills { return skills }
+        let skills = rows(collection: "skills", item: "skill").map { row in
             let rating = Int(row["rating"]) ?? 0
             let attr = total(row["attribute"])
             let defaultPool = rating == 0 && row["default"].lowercased() == "true" ? attr - 1 : attr + rating
             return SheetSkill(id: row.id, name: row["name"], attribute: row["attribute"], rating: rating,
                               pool: Int(row["totalvalue"]) ?? defaultPool)
         }
+        cache.skills = skills; return skills
     }
     public mutating func setSkillRating(_ index: Int, rating: Int) {
         guard let prior = skills.first(where: { $0.id == index }) else { return }
@@ -137,10 +162,10 @@ public struct DossierCharacter {
         if link["homenode"].lowercased() == "true" { response += Int(ceil(Double(total("INT")) / 2)) }
         return response
     }
-    private var isTechnomancer: Bool {
+    public var isTechnomancer: Bool {
         value("technomancerenabled").lowercased() == "true" || value("resenabled").lowercased() == "true"
     }
-    private func matrixImprovement(_ type: String) -> Int {
+    func savedImprovement(_ type: String) -> Int {
         let entries = rows(collection: "improvements", item: "improvement").filter {
             $0["improvementttype"] == type && $0["enabled"].lowercased() != "false"
                 && $0["addtorating"].lowercased() != "true"
@@ -168,24 +193,25 @@ public struct DossierCharacter {
             return Int(dossierField("matrixInitiativeOverride"))
         }
         let base: Int
-        if isTechnomancer { base = 2 * total("INT") + 1 + matrixImprovement("LivingPersonaResponse") }
+        if isTechnomancer { base = 2 * total("INT") + 1 + savedImprovement("LivingPersonaResponse") }
         else {
             guard let response = matrixResponse else { return nil }
-            base = total("INT") + response + matrixImprovement("MatrixInitiative")
+            base = total("INT") + response + savedImprovement("MatrixInitiative")
         }
         return base + (Int(dossierField("matrixInitiativeModifier")) ?? 0)
     }
     public var matrixInitiativePasses: Int {
-        (isTechnomancer ? 3 : 1) + matrixImprovement("MatrixInitiativePass")
-            + matrixImprovement("MatrixInitiativePassAdd") + (Int(dossierField("matrixPassesModifier")) ?? 0)
+        (isTechnomancer ? 3 : 1) + savedImprovement("MatrixInitiativePass")
+            + savedImprovement("MatrixInitiativePassAdd") + (Int(dossierField("matrixPassesModifier")) ?? 0)
     }
     public func damage(_ physical: Bool) -> Int { max(0, Int(value(physical ? "physicalcmfilled" : "stuncmfilled")) ?? 0) }
     public mutating func setDamage(_ count: Int, physical: Bool) {
         setValue(physical ? "physicalcmfilled" : "stuncmfilled", String(max(0, count)))
     }
-    public func trackCapacity(_ physical: Bool) -> Int { 8 + Int(ceil(Double(total(physical ? "BOD" : "WIL")) / 2)) }
+    public func trackCapacity(_ physical: Bool) -> Int { max(0, 8 + Int(ceil(Double(total(physical ? "BOD" : "WIL")) / 2)) + savedImprovement(physical ? "PhysicalCM" : "StunCM")) }
 
     public var gear: [SheetGear] {
+        if let gear = cache.gear { return gear }
         func entries(_ elements: [CharacterElement], parent: [Int]) -> [SheetGear] {
             elements.enumerated().map { index, element in
                 let path = parent + [index]
@@ -200,7 +226,8 @@ public struct DossierCharacter {
                                  children: entries(element.child("children")?.children("gear") ?? [], parent: path))
             }
         }
-        return entries(xml.root.child("gears")?.children("gear") ?? [], parent: [])
+        let gear = entries(xml.root.child("gears")?.children("gear") ?? [], parent: [])
+        cache.gear = gear; return gear
     }
 
     public mutating func setGearValue(path: [Int], field: String, value: String) {
@@ -220,27 +247,38 @@ public struct DossierCharacter {
     }
 
     public var programs: [SheetGear] {
-        gear.flatMap { [$0] + $0.descendants }.filter { $0.isProgram }.sorted {
+        if let programs = cache.programs { return programs }
+        let programs = gear.flatMap { [$0] + $0.descendants }.filter { $0.isProgram }.sorted {
             let order = $0["name"].localizedCaseInsensitiveCompare($1["name"])
             return order == .orderedSame ? $0.path.lexicographicallyPrecedes($1.path) : order == .orderedAscending
         }
+        cache.programs = programs; return programs
     }
 
     public func rows(collection: String, item: String) -> [SheetRow] {
-        (xml.root.child(collection)?.children(item) ?? []).enumerated().map { index, element in
+        let key = collection + "/" + item
+        if let rows = cache.rows[key] { return rows }
+        let rows = (xml.root.child(collection)?.children(item) ?? []).enumerated().map { index, element in
             var fields: [String: String] = [:]
             for entry in element.content {
-                if case .element(let child) = entry { fields[child.name] = child.text }
+                if case .element(let child) = entry, !child.content.contains(where: { if case .element = $0 { return true }; return false }) { fields[child.name] = child.text }
             }
             return SheetRow(id: index, fields: fields)
         }
+        cache.rows[key] = rows; return rows
     }
     public mutating func setRowValue(collection: String, item: String, index: Int, field: String, value: String) {
+        guard rows(collection: collection, item: item).first(where: { $0.id == index })?[field] != value else { return }
         xml.root.update(collection) { $0.updateRow(item, index: index) { $0.set(field, value) } }
     }
 
-    public var notes: DossierNotes { (try? DossierNotes.split(value("notes")).1) ?? DossierNotes() }
-    public var plainNotes: String { (try? DossierNotes.split(value("notes")).0) ?? value("notes") }
+    private var splitNotes: (String, DossierNotes) {
+        if let notes = cache.notes { return notes }
+        let notes = (try? DossierNotes.split(value("notes"))) ?? (value("notes"), DossierNotes())
+        cache.notes = notes; return notes
+    }
+    public var notes: DossierNotes { splitNotes.1 }
+    public var plainNotes: String { splitNotes.0 }
     public mutating func setPlainNotes(_ text: String) throws { setValue("notes", try notes.merged(with: text)) }
     public func dossierField(_ key: String) -> String { notes.fields[key] ?? "" }
     public mutating func setDossierField(_ key: String, value: String) throws {

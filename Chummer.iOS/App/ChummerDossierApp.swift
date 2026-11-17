@@ -38,12 +38,26 @@ struct DossierHome: View {
     @State private var libraryAvailable = false
     @State private var savedData: Data?
 
+    private var testTheme: ColorScheme? {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["DOSSIER_UI_FIXTURE"] != nil {
+            return ProcessInfo.processInfo.environment["DOSSIER_UI_THEME"] == "dark" ? .dark : .light
+        }
+        #endif
+        return nil
+    }
     private var libraryURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Dossier/library.json")
+            .appendingPathComponent(libraryPath)
     }
 
 
+    private var libraryPath: String {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["DOSSIER_UI_FIXTURE"] != nil { return "Dossier-UITests/library.json" }
+        #endif
+        return "Dossier/library.json"
+    }
     var body: some View {
         NavigationStack {
             Group {
@@ -52,7 +66,7 @@ struct DossierHome: View {
                         .id(selectedID)
                 } else {
                     ContentUnavailableView {
-                        Label("Chummer Dossier", systemImage: "person.text.rectangle")
+                        Label("SR 4 Dossier", systemImage: "person.text.rectangle")
                     } description: {
                         Text("Your runner, on a familiar sheet. Open an SR4 Chummer character from Files.")
                     } actions: {
@@ -63,7 +77,7 @@ struct DossierHome: View {
                     }
                 }
             }
-            .navigationTitle(character?.title ?? "Chummer Dossier")
+            .navigationTitle(character?.title ?? "SR 4 Dossier")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -79,11 +93,11 @@ struct DossierHome: View {
                         Button("Open Character…", systemImage: "folder") { importing = true }
                     } label: {
                         HStack(spacing: 4) {
-                            Text((character?.title ?? "Chummer Dossier") + (isDemo ? " · Demo" : "")).font(.headline).lineLimit(1)
+                            Text((character?.title ?? "SR 4 Dossier") + (isDemo ? " · Demo" : "")).font(.headline).lineLimit(1)
                             Image(systemName: "chevron.down").font(.caption2)
                         }
                     }
-                    .accessibilityLabel("\(character?.title ?? "Chummer Dossier"), switch character")
+                    .accessibilityLabel("\(character?.title ?? "SR 4 Dossier"), switch character")
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if character != nil && UIDevice.current.userInterfaceIdiom == .pad {
@@ -105,9 +119,10 @@ struct DossierHome: View {
                 }
             }
         }
+        .preferredColorScheme(testTheme)
         .tint(SheetTheme.ink)
         .task { restoreLibrary() }
-        .task(id: character?.data()) {
+        .task(id: character?.revision) {
             do { try await Task.sleep(for: .milliseconds(700)) } catch { return }
             _ = autosave()
         }
@@ -134,6 +149,16 @@ struct DossierHome: View {
         guard !loadedLibrary else { return }
         loadedLibrary = true
         do {
+            #if DEBUG
+            if let encoded = ProcessInfo.processInfo.environment["DOSSIER_UI_FIXTURE"], let data = Data(base64Encoded: encoded) {
+                let opened = try DossierCharacter(data: data)
+                library = DossierLibrary(); libraryAvailable = true
+                selectedID = try library.save(opened, filename: "QA Runner", id: nil, to: libraryURL)
+                character = opened; savedData = data
+                if let name = ProcessInfo.processInfo.environment["DOSSIER_UI_PAGE"], let page = DossierPage(rawValue: name) { selectedPage = page }
+                return
+            }
+            #endif
             library = try DossierLibrary.load(from: libraryURL)
             libraryAvailable = true
             if let entry = library.entries.first(where: { $0.id == library.selectedID }) {
