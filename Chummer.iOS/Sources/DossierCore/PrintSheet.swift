@@ -8,6 +8,9 @@ public struct PrintableSheet {
         public let columns: [String]
         public let weights: [Double]
         public let rows: [[String]]
+        public init(title: String, columns: [String], weights: [Double], rows: [[String]]) {
+            self.title = title; self.columns = columns; self.weights = weights; self.rows = rows
+        }
     }
     public struct Monitor {
         public let title: String
@@ -20,6 +23,9 @@ public struct PrintableSheet {
     public let title: String
     public let sections: [Section]
     public let monitors: [Monitor]
+    public init(title: String, sections: [Section], monitors: [Monitor] = []) {
+        self.title = title; self.sections = sections; self.monitors = monitors
+    }
     public var text: String {
         ([title, "SR 4 Dossier - Character Sheet"] + sections.flatMap { section in
             ["", section.title.uppercased(), section.columns.joined(separator: " | ")] + section.rows.map { $0.joined(separator: " | ") }

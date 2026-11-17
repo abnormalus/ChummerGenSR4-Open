@@ -1,3 +1,6 @@
 
 # Preserve reviewed upstream reader bytes and identical integrity hashes on every OS.
 Chummer.Mac/pdfjs/** -text
+
+# Preserve the embedded official form bytes and show it as a binary resource.
+Chummer.iOS/App/Resources/SR4A-Character-Sheet.pdf binary

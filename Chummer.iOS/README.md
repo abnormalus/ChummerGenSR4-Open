@@ -9,7 +9,7 @@ catalog-based equipment purchasing are outside the first-release scope.
 
 Open `ChummerDossier.xcodeproj` in Xcode, choose the ChummerDossier scheme and an
 available iPhone/iPad simulator, and run. Minimum iOS/iPadOS version: 17. There are
-no external Swift dependencies. Current work uses simulators only.
+no external Swift dependencies. Verification uses simulators; device installs use signed Release builds.
 
 Open a `.chum` through Files. Tap the character's name to switch working copies.
 On iPhone, Character, Combat, Equipment, Background and Contacts are pages; iPad
@@ -48,12 +48,15 @@ and on focus loss/backgrounding. The last selected character restores on launch.
 Failures retain the current sheet and show an error. Imported source files remain
 unchanged. The share icon offers Save Character Copy to export a separate `.chum`
 for desktop Chummer, Share Readable Snapshot for manually sharing current values,
-and Character Sheet / PDF for a printable sheet.
+plus Print full character and Print official character sheet.
 
-The sheet preview offers Save PDF through Files and Print through the system
-AirPrint controls. It uses the existing Chummer section arrangement, not an
-included official fillable SR4A PDF. Long entries continue onto numbered pages
-with repeated headings. Current pools, weapon DV/AP, ammunition, damage, loaded
+Both sheet previews offer Save PDF through Files and Print through the system
+AirPrint controls. Print full character uses the existing Chummer section
+arrangement. Print official character sheet fills the embedded, unmodified SR4A
+two-page template; additional entries, detailed inventory and source references
+continue afterward. Numbered asterisks identify entries too long for a form slot.
+The template and its original attribution remain embedded; no separate import is
+needed. Long continuation entries span numbered pages with repeated headings. Current pools, weapon DV/AP, ammunition, damage, loaded
 programs, source/page references and relevant magical sections are included.
 Printing or sharing creates a snapshot; it does not modify the character or sync
 changes from another app.
@@ -89,7 +92,7 @@ See [specification](SPECIFICATION.md), [device feedback](DEVICE_FEEDBACK.md) and
 ## Before first release
 
 Finish broader accessibility/rotation/lifecycle acceptance and real-printer
-acceptance. An exact official SR4A form overlay would require a suitable template;
-the current generated sheet is ready for PDF export and simulator-tested printing. Review conditional-rule and special-persona handling explicitly;
+acceptance. Both the full sheet and the embedded official SR4A form are available for PDF
+export and simulator-tested printing. Review conditional-rule and special-persona handling explicitly;
 physical screen-lock and provider-level conflict testing remain outstanding. A clean build and the
 five-character audit do not establish every Shadowrun rule or a Stable release.

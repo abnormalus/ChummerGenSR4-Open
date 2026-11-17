@@ -9,13 +9,14 @@ struct GeneratedCharacterSheet: Identifiable {
     let id = UUID()
     let title: String
     let data: Data
+    var previewTitle = "Character Sheet"
 }
 
 /// Uses the same current-value projection as the readable snapshot. Text is
 /// measured and split into lines before drawing; oversized rows continue on the
 /// next page with their section and column headings repeated.
 struct CharacterSheetPDF {
-    static func data(for sheet: PrintableSheet) -> Data {
+    static func data(for sheet: PrintableSheet, startingPage: Int = 1) -> Data {
         let bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [kCGPDFContextTitle as String: sheet.title + " - Character Sheet", kCGPDFContextCreator as String: "SR 4 Dossier"]
@@ -24,7 +25,7 @@ struct CharacterSheetPDF {
             let left: CGFloat = 36, width: CGFloat = 540, bottom: CGFloat = 748
             let font = UIFont.systemFont(ofSize: 9)
             let bold = UIFont.boldSystemFont(ofSize: 9)
-            var y: CGFloat = 0, page = 0
+            var y: CGFloat = 0, page = startingPage - 1
             func draw(_ text: String, x: CGFloat, y: CGFloat, font: UIFont, color: UIColor = .black) {
                 (text as NSString).draw(at: CGPoint(x: x, y: y), withAttributes: [.font: font, .foregroundColor: color])
             }
@@ -165,12 +166,12 @@ struct CharacterSheetPreview: View {
     @State private var errorMessage: String?
     private var filename: String {
         let title = String(sheet.title.prefix(80)).components(separatedBy: CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/:"))).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-        return (title.isEmpty ? "Character" : title) + " - Character Sheet"
+        return (title.isEmpty ? "Character" : title) + " - " + sheet.previewTitle
     }
     var body: some View {
         NavigationStack {
             SheetPDFView(data: sheet.data).ignoresSafeArea(edges: .bottom)
-                .navigationTitle("Character Sheet").navigationBarTitleDisplayMode(.inline)
+                .navigationTitle(sheet.previewTitle).navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
                     ToolbarItemGroup(placement: .primaryAction) {
@@ -189,7 +190,7 @@ struct CharacterSheetPreview: View {
     private func printSheet() {
         let controller = UIPrintInteractionController.shared
         let info = UIPrintInfo(dictionary: nil)
-        info.jobName = sheet.title + " - Character Sheet"; info.outputType = .general
+        info.jobName = sheet.title + " - " + sheet.previewTitle; info.outputType = .general
         controller.printInfo = info; controller.printingItem = sheet.data
         let completion: UIPrintInteractionController.CompletionHandler = { _, _, error in
             if let error { errorMessage = error.localizedDescription }

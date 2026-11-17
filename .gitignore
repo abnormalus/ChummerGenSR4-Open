@@ -62,3 +62,6 @@ artifacts/
 # Local maintenance-tool caches
 __pycache__/
 *.py[cod]
+
+# The embedded blank SR4A form is a shipped app resource.
+!/Chummer.iOS/App/Resources/SR4A-Character-Sheet.pdf

@@ -33,17 +33,28 @@ final class DossierUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Share character"].waitForExistence(timeout: 15))
         return app
     }
+    func testOfficialCharacterSheetPreviewAndExportChoices() {
+        let app = launch(theme: "light")
+        app.buttons["Share character"].tap()
+        XCTAssertTrue(app.buttons["Print full character"].exists)
+        XCTAssertTrue(app.buttons["Print official character sheet"].exists)
+        app.buttons["Print official character sheet"].tap()
+        XCTAssertTrue(app.buttons["Save PDF"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Print"].exists)
+        XCTAssertTrue(app.navigationBars["Official SR4A Sheet"].exists)
+        capture(app, "official-sr4a-preview")
+    }
     func testPDFPaginationWithUnevenLongRows() {
         let app = launch(theme: "light", pdfStress: true)
         app.buttons["Share character"].tap()
-        app.buttons["Character Sheet / PDF"].tap()
+        app.buttons["Print full character"].tap()
         XCTAssertTrue(app.buttons["Save PDF"].waitForExistence(timeout: 10))
         capture(app, "long-row-pdf-preview")
     }
     func testPrintableSheetPreviewSaveAndPrintControls() {
         let app = launch(theme: "light")
         app.buttons["Share character"].tap()
-        app.buttons["Character Sheet / PDF"].tap()
+        app.buttons["Print full character"].tap()
         XCTAssertTrue(app.buttons["Save PDF"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Print"].exists)
         capture(app, "character-sheet-preview")
@@ -58,7 +69,7 @@ final class DossierUITests: XCTestCase {
         app.buttons["Share character"].tap()
         XCTAssertTrue(app.buttons["Save Character Copy"].exists)
         XCTAssertTrue(app.buttons["Share Readable Snapshot"].exists)
-        app.buttons["Character Sheet / PDF"].tap()
+        app.buttons["Print full character"].tap()
         app.buttons["Save PDF"].tap()
         XCTAssertTrue(app.buttons["Export"].waitForExistence(timeout: 5) || app.buttons["Save"].exists)
         capture(app, "pdf-save-picker")

@@ -121,10 +121,15 @@ struct DossierHome: View {
                         if let character {
                             ShareLink(item: character.printableSheet.text) { Label("Share Readable Snapshot", systemImage: "doc.plaintext") }
                         }
-                        Button("Character Sheet / PDF", systemImage: "printer") {
+                        Button("Print full character", systemImage: "printer") {
                             if let character {
                                 generatedSheet = GeneratedCharacterSheet(title: character.title, data: CharacterSheetPDF.data(for: character.printableSheet))
                             }
+                        }
+                        Button("Print official character sheet", systemImage: "doc.richtext") {
+                            do {
+                                if let character { generatedSheet = GeneratedCharacterSheet(title: character.title, data: try SR4AFormPDF.data(for: character), previewTitle: "Official SR4A Sheet") }
+                            } catch { errorMessage = error.localizedDescription }
                         }
                     } label: { Image(systemName: "square.and.arrow.up") }
                     .accessibilityLabel("Share character")
@@ -197,6 +202,7 @@ struct DossierHome: View {
                 if ProcessInfo.processInfo.environment["DOSSIER_UI_EXPORT_PDF"] == "1" {
                     let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                     try CharacterSheetPDF.data(for: opened.printableSheet).write(to: folder.appendingPathComponent("QA-Character-Sheet.pdf"), options: .atomic)
+                    try SR4AFormPDF.data(for: opened).write(to: folder.appendingPathComponent("QA-SR4A-Sheet.pdf"), options: .atomic)
                     try opened.printableSheet.text.write(to: folder.appendingPathComponent("QA-Character-Snapshot.txt"), atomically: true, encoding: .utf8)
                 }
                 character = opened; savedData = input
