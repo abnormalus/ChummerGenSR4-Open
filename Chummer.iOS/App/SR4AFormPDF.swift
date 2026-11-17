@@ -34,15 +34,16 @@ struct SR4AFormPDF {
         }
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
         let firstPages = renderer.pdfData { context in
-            func put(_ value: String, _ x: CGFloat, _ y: CGFloat, _ width: CGFloat, label: String, size: CGFloat = 8) {
+            func put(_ rawValue: String, _ x: CGFloat, _ y: CGFloat, _ width: CGFloat, label: String, size: CGFloat = 8, forceFit: Bool = false) {
+                let value = forceFit ? rawValue.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " ") : rawValue
                 guard !value.isEmpty else { return }
                 var font = UIFont.systemFont(ofSize: size)
-                while (value as NSString).size(withAttributes: [.font: font]).width > width && font.pointSize > 6 {
+                while (value as NSString).size(withAttributes: [.font: font]).width > width && font.pointSize > (forceFit ? 4 : 6) {
                     font = UIFont.systemFont(ofSize: font.pointSize - 0.25)
                 }
                 var shown = value
                 var scale = min(1, width / max(1, (value as NSString).size(withAttributes: [.font: font]).width))
-                if value.contains("\n") || scale < 0.7 {
+                if !forceFit && (value.contains("\n") || scale < 0.7) {
                     let marker = "*" + String(extraFields.count + 1)
                     extraFields.append([marker + " " + label, value]); shown = marker
                     font = UIFont.systemFont(ofSize: 6); scale = 1
@@ -96,7 +97,7 @@ struct SR4AFormPDF {
                     put(value, x, 109, width, label: "Primary ranged weapon details", size: 7)
                 }
             }
-            if let weapon = melee.first {
+            if let weapon = character.primaryMeleeWeapon {
                 put(weapon["name"], 447, 126, 122, label: "Primary melee weapon")
                 put(weapon["reach"], 389, 141, 48, label: "Reach"); put(character.weaponDamage(weapon), 468, 141, 47, label: "Melee DV"); put(character.weaponAP(weapon), 545, 141, 23, label: "Melee AP")
             }
@@ -167,7 +168,7 @@ struct SR4AFormPDF {
             let programNames = character.programs.map { $0["name"] + " " + $0["rating"] + ($0["equipped"].lowercased() == "true" ? " [L]" : "") }.joined(separator: "; ")
             put(programNames, 409, 246, 170, label: "Programs")
             if let vehicle = character.rows(collection: "vehicles", item: "vehicle").first {
-                for (key, x, y, width) in [("name", 401.0, 350.0, 62.0), ("handling", 507, 350, 72), ("accel", 394, 364, 78), ("speed", 504, 364, 75), ("pilot", 387, 378, 84), ("body", 503, 378, 76), ("armor", 397, 392, 74), ("sensor", 507, 392, 72)] { put(vehicle[key], x, y, width, label: "Vehicle " + key) }
+                for (key, x, y, width) in [("name", 401.0, 350.0, 62.0), ("handling", 507, 350, 72), ("accel", 394, 364, 78), ("speed", 504, 364, 75), ("pilot", 387, 378, 84), ("body", 503, 378, 76), ("armor", 397, 392, 74), ("sensor", 507, 392, 72)] { put(vehicle[key], x, y, width, label: "Vehicle " + key, forceFit: key == "name") }
                 put("Damage \(character.vehicleDamage(vehicle))/\(character.vehicleCapacity(vehicle)) " + vehicle["notes"], 393, 406, 186, label: "Vehicle notes")
             }
             table(character.rows(collection: "contacts", item: "contact").map { [$0["name"], $0["loyalty"], $0["connection"]] }, x: [365.6, 490.3, 530.6], y: 488, widths: [121, 37, 49], limit: 9, title: "Contact")

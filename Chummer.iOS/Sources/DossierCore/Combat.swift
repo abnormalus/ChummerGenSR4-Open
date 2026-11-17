@@ -34,6 +34,25 @@ extension DossierCharacter {
         let rating = power["levels"].lowercased() == "true" ? " " + power["rating"] : ""
         return power["name"] + extra + rating
     }
+    /// Select the largest resolved numeric DV, preserving file order on ties.
+    /// An unresolved expression is never ranked by numbers inside its formula.
+    public var primaryMeleeWeapon: SheetRow? {
+        let melee = rows(collection: "weapons", item: "weapon").filter { $0["type"].lowercased() != "ranged" }
+        func damage(_ weapon: SheetRow) -> Double? {
+            let text = weaponDamage(weapon).trimmingCharacters(in: .whitespacesAndNewlines)
+            let number = text.prefix { $0.isNumber || $0 == "." || $0 == "-" }
+            let suffix = text.dropFirst(number.count)
+            guard suffix.isEmpty || suffix.hasPrefix("P") || suffix.hasPrefix("S") else { return nil }
+            return Double(number)
+        }
+        return melee.reduce(nil as SheetRow?) { best, weapon in
+            guard let best else { return weapon }
+            guard let candidate = damage(weapon) else { return best }
+            guard let previous = damage(best) else { return weapon }
+            return candidate > previous ? weapon : best
+        }
+    }
+
     /// Vehicle uses the same persisted field and Body formula as desktop Vehicle.
     public func vehicleCapacity(_ vehicle: SheetRow) -> Int {
         8 + Int(ceil(Double(Int(vehicle["body"]) ?? 0) / 2))

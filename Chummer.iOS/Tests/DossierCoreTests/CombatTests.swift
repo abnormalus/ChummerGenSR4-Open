@@ -5,6 +5,20 @@ final class CombatTests: XCTestCase {
     private func character(_ body: String) throws -> DossierCharacter {
         try DossierCharacter(data: Data(("<character><attributes><attribute><name>STR</name><value>5</value></attribute></attributes>" + body + "</character>").utf8))
     }
+    func testPrimaryMeleeUsesHighestResolvedDamageAndManualOverrides() throws {
+        var runner = try DossierCharacter(data: Data("""
+        <character><attributes><attribute><name>STR</name><value>5</value></attribute></attributes><weapons>
+        <weapon><name>Unarmed Attack</name><type>Melee</type><damage>(STR/2)S</damage></weapon>
+        <weapon><name>Nodachi</name><type>Melee</type><damage>(STR/2+4)P</damage></weapon>
+        <weapon><name>Unknown</name><type>Melee</type><damage>999+UnknownP</damage></weapon>
+        <weapon><name>Gun</name><type>Ranged</type><damage>20P</damage></weapon>
+        </weapons></character>
+        """.utf8))
+        XCTAssertEqual(runner.primaryMeleeWeapon?["name"], "Nodachi")
+        let unarmed = runner.rows(collection: "weapons", item: "weapon")[0]
+        try runner.setWeaponAdjustment(unarmed, field: "damage", value: "10S")
+        XCTAssertEqual(runner.primaryMeleeWeapon?["name"], "Unarmed Attack")
+    }
     func testWoundsUpdatePoolsAndInitiativeWithoutDoubleApplyingImportedPenalty() throws {
         var runner = try DossierCharacter(data: Data("""
         <character><attributes><attribute><name>REA</name><value>4</value></attribute><attribute><name>INT</name><value>4</value></attribute><attribute><name>BOD</name><value>4</value></attribute><attribute><name>WIL</name><value>4</value></attribute></attributes>

@@ -1,7 +1,7 @@
 import XCTest
 
 final class DossierUITests: XCTestCase {
-    private func launch(theme: String, kind: String = "adept", page: String = "Equipment", secondCharacter: Bool = false, damageArchive: String = "", pdfStress: Bool = false) -> XCUIApplication {
+    private func launch(theme: String, kind: String = "adept", page: String = "Equipment", secondCharacter: Bool = false, damageArchive: String = "", pdfStress: Bool = false, longVehicle: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         let fixture = """
         <character><name>QA Runner</name><alias>QA Runner</alias><adept>\(kind == "adept")</adept><magician>\(kind == "magician")</magician><resenabled>\(kind == "technomancer")</resenabled>
@@ -20,7 +20,8 @@ final class DossierUITests: XCTestCase {
         """
         app.launchEnvironment["DOSSIER_UI_EXPORT_PDF"] = "1"
         let stressNotes = String(repeating: "Long contact text spanning pages. ", count: 700) + "END OF LONG CONTACT"
-        let printableFixture = pdfStress ? fixture.replacingOccurrences(of: "<notes></notes>", with: "<notes>" + stressNotes + "</notes>") : fixture
+        var printableFixture = pdfStress ? fixture.replacingOccurrences(of: "<notes></notes>", with: "<notes>" + stressNotes + "</notes>") : fixture
+        if longVehicle { printableFixture = printableFixture.replacingOccurrences(of: "QA Drone", with: "QA Drone - Extended Vehicle Model Name") }
         app.launchEnvironment["DOSSIER_UI_FIXTURE"] = Data(printableFixture.utf8).base64EncodedString()
         if secondCharacter {
             let second = fixture.replacingOccurrences(of: "QA Runner", with: "Second Runner").replacingOccurrences(of: "<attributes>", with: "<age>22</age><attributes>")
@@ -34,7 +35,7 @@ final class DossierUITests: XCTestCase {
         return app
     }
     func testOfficialCharacterSheetPreviewAndExportChoices() {
-        let app = launch(theme: "light")
+        let app = launch(theme: "light", longVehicle: true)
         app.buttons["Share character"].tap()
         XCTAssertTrue(app.buttons["Print full character"].exists)
         XCTAssertTrue(app.buttons["Print official character sheet"].exists)
