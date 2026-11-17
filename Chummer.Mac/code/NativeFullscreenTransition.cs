@@ -23,7 +23,7 @@ internal static class NativeFullscreenTransition
         bool IsActualFullscreen()
         {
             if (screen == null || window.WindowState != WindowState.FullScreen) return false;
-            Size expected = screen.Bounds.Size.ToSize(screen.Scaling);
+            Size expected = NativeFullscreenGeometry.ExpectedClientSize(window);
             if (Math.Abs(window.ClientSize.Width - expected.Width) <= 1 &&
                 Math.Abs(window.ClientSize.Height - expected.Height) <= 1 &&
                 window.FrameSize is { } fullscreenFrame &&

@@ -72,6 +72,7 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
+            QualityDetailsPresentation.Initialize(treQualities, lblQualityBP, lblQualitySource, tipTooltip);
             InitializeWeaponAmmunitionMenus();
             Load += (_, _) => { if (!_packsWorkspace) InitializeInventoryUndo(); };
             treQualities.ShowLines = false;
@@ -2817,38 +2818,10 @@ namespace Chummer
 						if (objCopyLifestyle == null)
 							return;
 
-						MemoryStream objStream = new MemoryStream();
-						XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-						objWriter.Formatting = Formatting.Indented;
-						objWriter.Indentation = 1;
-						objWriter.IndentChar = '\t';
-
-						objWriter.WriteStartDocument();
-
-						// </characters>
-						objWriter.WriteStartElement("character");
-
-						objCopyLifestyle.Save(objWriter);
-
-						// </characters>
-						objWriter.WriteEndElement();
-
-						// Finish the document and flush the Writer and Stream.
-						objWriter.WriteEndDocument();
-						objWriter.Flush();
-						objStream.Flush();
-
-						// Read the stream.
-						StreamReader objReader = new StreamReader(objStream);
-						objStream.Position = 0;
-						XmlDocument objCharacterXML = new XmlDocument();
-
-						// Put the stream into an XmlDocument.
-						string strXML = objReader.ReadToEnd();
-						objCharacterXML.LoadXml(strXML);
-
-						objWriter.Close();
-						objStream.Close();
+						XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+						{
+							objCopyLifestyle.Save(objWriter);
+						});
 
 						GlobalOptions.Instance.Clipboard = objCharacterXML;
 						GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Lifestyle;
@@ -2869,38 +2842,10 @@ namespace Chummer
 
 						if (objCopyArmor != null)
 						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							objCopyArmor.Save(objWriter);
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+							{
+								objCopyArmor.Save(objWriter);
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Armor;
@@ -2914,61 +2859,33 @@ namespace Chummer
 
 						if (objCopyGear != null)
 						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							if (objCopyGear.GetType() == typeof(Commlink))
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
 							{
-								Commlink objCommlink = (Commlink)objCopyGear;
-								objCommlink.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
-							}
-							else if (objCopyGear.GetType() == typeof(OperatingSystem))
-							{
-								OperatingSystem objOS = (OperatingSystem)objCopyGear;
-								objOS.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
-							}
-							else
-							{
-								objCopyGear.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
-							}
+								if (objCopyGear.GetType() == typeof(Commlink))
+								{
+									Commlink objCommlink = (Commlink)objCopyGear;
+									objCommlink.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
+								}
+								else if (objCopyGear.GetType() == typeof(OperatingSystem))
+								{
+									OperatingSystem objOS = (OperatingSystem)objCopyGear;
+									objOS.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
+								}
+								else
+								{
+									objCopyGear.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+								}
 
-							if (objCopyGear.WeaponID != Guid.Empty.ToString())
-							{
-								// Copy any Weapon that comes with the Gear.
-								Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
-								objCopyWeapon.Save(objWriter);
-							}
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+								if (objCopyGear.WeaponID != Guid.Empty.ToString())
+								{
+									// Copy any Weapon that comes with the Gear.
+									Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
+									objCopyWeapon.Save(objWriter);
+								}
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 
@@ -2995,38 +2912,10 @@ namespace Chummer
 							if (objCopyWeapon.Category == "Gear" || objCopyWeapon.Category.StartsWith("Cyberware"))
 								return;
 
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							objCopyWeapon.Save(objWriter);
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+							{
+								objCopyWeapon.Save(objWriter);
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Weapon;
@@ -3040,61 +2929,33 @@ namespace Chummer
 
 						if (objCopyGear != null)
 						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
-							if (objCopyGear.GetType() == typeof(Commlink))
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
 							{
-								Commlink objCommlink = (Commlink)objCopyGear;
-								objCommlink.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
-							}
-							else if (objCopyGear.GetType() == typeof(OperatingSystem))
-							{
-								OperatingSystem objOS = (OperatingSystem)objCopyGear;
-								objOS.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
-							}
-							else
-							{
-								objCopyGear.Save(objWriter);
-								GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
-							}
+								if (objCopyGear.GetType() == typeof(Commlink))
+								{
+									Commlink objCommlink = (Commlink)objCopyGear;
+									objCommlink.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
+								}
+								else if (objCopyGear.GetType() == typeof(OperatingSystem))
+								{
+									OperatingSystem objOS = (OperatingSystem)objCopyGear;
+									objOS.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
+								}
+								else
+								{
+									objCopyGear.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+								}
 
-							if (objCopyGear.WeaponID != Guid.Empty.ToString())
-							{
-								// Copy any Weapon that comes with the Gear.
-								Weapon objCopyGearWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
-								objCopyGearWeapon.Save(objWriter);
-							}
-
-							// </characters>
-							objWriter.WriteEndElement();
-
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
-
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
-
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
-
-							objWriter.Close();
-							objStream.Close();
+								if (objCopyGear.WeaponID != Guid.Empty.ToString())
+								{
+									// Copy any Weapon that comes with the Gear.
+									Weapon objCopyGearWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
+									objCopyGearWeapon.Save(objWriter);
+								}
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 
@@ -3118,136 +2979,8 @@ namespace Chummer
 						if (objCopyGear == null)
 							return;
 
-						MemoryStream objStream = new MemoryStream();
-						XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-						objWriter.Formatting = Formatting.Indented;
-						objWriter.Indentation = 1;
-						objWriter.IndentChar = '\t';
-
-						objWriter.WriteStartDocument();
-
-						// </characters>
-						objWriter.WriteStartElement("character");
-
-						if (objCopyGear.GetType() == typeof(Commlink))
+						XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
 						{
-							Commlink objCommlink = (Commlink)objCopyGear;
-							objCommlink.Save(objWriter);
-							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
-						}
-						else if (objCopyGear.GetType() == typeof(OperatingSystem))
-						{
-							OperatingSystem objOS = (OperatingSystem)objCopyGear;
-							objOS.Save(objWriter);
-							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
-						}
-						else
-						{
-							objCopyGear.Save(objWriter);
-							GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
-						}
-
-						if (objCopyGear.WeaponID != Guid.Empty.ToString())
-						{
-							// Copy any Weapon that comes with the Gear.
-							Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
-							objCopyWeapon.Save(objWriter);
-						}
-
-						// </characters>
-						objWriter.WriteEndElement();
-
-						// Finish the document and flush the Writer and Stream.
-						objWriter.WriteEndDocument();
-						objWriter.Flush();
-						objStream.Flush();
-
-						// Read the stream.
-						StreamReader objReader = new StreamReader(objStream);
-						objStream.Position = 0;
-						XmlDocument objCharacterXML = new XmlDocument();
-
-						// Put the stream into an XmlDocument.
-						string strXML = objReader.ReadToEnd();
-						objCharacterXML.LoadXml(strXML);
-
-						objWriter.Close();
-						objStream.Close();
-
-						GlobalOptions.Instance.Clipboard = objCharacterXML;
-						//Clipboard.SetText(objCharacterXML.OuterXml);
-					}
-					catch
-					{
-					}
-				}
-			}
-
-			// Vehicles Tab.
-			if (tabCharacterTabs.SelectedTab == tabVehicles)
-			{
-				try
-				{
-					if (treVehicles.SelectedNode.Level == 1)
-					{
-						// Copy the selected Vehicle.
-						Vehicle objCopyVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
-
-						MemoryStream objStream = new MemoryStream();
-						XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-						objWriter.Formatting = Formatting.Indented;
-						objWriter.Indentation = 1;
-						objWriter.IndentChar = '\t';
-
-						objWriter.WriteStartDocument();
-
-						// </characters>
-						objWriter.WriteStartElement("character");
-
-						objCopyVehicle.Save(objWriter);
-
-						// </characters>
-						objWriter.WriteEndElement();
-
-						// Finish the document and flush the Writer and Stream.
-						objWriter.WriteEndDocument();
-						objWriter.Flush();
-						objStream.Flush();
-
-						// Read the stream.
-						StreamReader objReader = new StreamReader(objStream);
-						objStream.Position = 0;
-						XmlDocument objCharacterXML = new XmlDocument();
-
-						// Put the stream into an XmlDocument.
-						string strXML = objReader.ReadToEnd();
-						objCharacterXML.LoadXml(strXML);
-
-						objWriter.Close();
-						objStream.Close();
-
-						GlobalOptions.Instance.Clipboard = objCharacterXML;
-						GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Vehicle;
-						//Clipboard.SetText(objCharacterXML.OuterXml);
-					}
-					else
-					{
-						Vehicle objVehicle = new Vehicle(_objCharacter);
-						Gear objCopyGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objVehicle);
-
-						if (objCopyGear != null)
-						{
-							MemoryStream objStream = new MemoryStream();
-							XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-							objWriter.Formatting = Formatting.Indented;
-							objWriter.Indentation = 1;
-							objWriter.IndentChar = '\t';
-
-							objWriter.WriteStartDocument();
-
-							// </characters>
-							objWriter.WriteStartElement("character");
-
 							if (objCopyGear.GetType() == typeof(Commlink))
 							{
 								Commlink objCommlink = (Commlink)objCopyGear;
@@ -3272,26 +3005,70 @@ namespace Chummer
 								Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
 								objCopyWeapon.Save(objWriter);
 							}
+						});
 
-							// </characters>
-							objWriter.WriteEndElement();
+						GlobalOptions.Instance.Clipboard = objCharacterXML;
+						//Clipboard.SetText(objCharacterXML.OuterXml);
+					}
+					catch
+					{
+					}
+				}
+			}
 
-							// Finish the document and flush the Writer and Stream.
-							objWriter.WriteEndDocument();
-							objWriter.Flush();
-							objStream.Flush();
+			// Vehicles Tab.
+			if (tabCharacterTabs.SelectedTab == tabVehicles)
+			{
+				try
+				{
+					if (treVehicles.SelectedNode.Level == 1)
+					{
+						// Copy the selected Vehicle.
+						Vehicle objCopyVehicle = _objFunctions.FindVehicle(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles);
 
-							// Read the stream.
-							StreamReader objReader = new StreamReader(objStream);
-							objStream.Position = 0;
-							XmlDocument objCharacterXML = new XmlDocument();
+						XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+						{
+							objCopyVehicle.Save(objWriter);
+						});
 
-							// Put the stream into an XmlDocument.
-							string strXML = objReader.ReadToEnd();
-							objCharacterXML.LoadXml(strXML);
+						GlobalOptions.Instance.Clipboard = objCharacterXML;
+						GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Vehicle;
+						//Clipboard.SetText(objCharacterXML.OuterXml);
+					}
+					else
+					{
+						Vehicle objVehicle = new Vehicle(_objCharacter);
+						Gear objCopyGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objVehicle);
 
-							objWriter.Close();
-							objStream.Close();
+						if (objCopyGear != null)
+						{
+							XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+							{
+								if (objCopyGear.GetType() == typeof(Commlink))
+								{
+									Commlink objCommlink = (Commlink)objCopyGear;
+									objCommlink.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Commlink;
+								}
+								else if (objCopyGear.GetType() == typeof(OperatingSystem))
+								{
+									OperatingSystem objOS = (OperatingSystem)objCopyGear;
+									objOS.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.OperatingSystem;
+								}
+								else
+								{
+									objCopyGear.Save(objWriter);
+									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Gear;
+								}
+
+								if (objCopyGear.WeaponID != Guid.Empty.ToString())
+								{
+									// Copy any Weapon that comes with the Gear.
+									Weapon objCopyWeapon = _objFunctions.FindWeapon(objCopyGear.WeaponID, _objCharacter.Weapons);
+									objCopyWeapon.Save(objWriter);
+								}
+							});
 
 							GlobalOptions.Instance.Clipboard = objCharacterXML;
 
@@ -3310,38 +3087,10 @@ namespace Chummer
 									if (objCopyWeapon.Category == "Gear" || objCopyWeapon.Category.StartsWith("Cyberware"))
 										return;
 
-									MemoryStream objStream = new MemoryStream();
-									XmlTextWriter objWriter = new XmlTextWriter(objStream, System.Text.Encoding.Unicode);
-									objWriter.Formatting = Formatting.Indented;
-									objWriter.Indentation = 1;
-									objWriter.IndentChar = '\t';
-
-									objWriter.WriteStartDocument();
-
-									// </characters>
-									objWriter.WriteStartElement("character");
-
-									objCopyWeapon.Save(objWriter);
-
-									// </characters>
-									objWriter.WriteEndElement();
-
-									// Finish the document and flush the Writer and Stream.
-									objWriter.WriteEndDocument();
-									objWriter.Flush();
-									objStream.Flush();
-
-									// Read the stream.
-									StreamReader objReader = new StreamReader(objStream);
-									objStream.Position = 0;
-									XmlDocument objCharacterXML = new XmlDocument();
-
-									// Put the stream into an XmlDocument.
-									string strXML = objReader.ReadToEnd();
-									objCharacterXML.LoadXml(strXML);
-
-									objWriter.Close();
-									objStream.Close();
+									XmlDocument objCharacterXML = ClipboardDocument.Create(objWriter =>
+									{
+										objCopyWeapon.Save(objWriter);
+									});
 
 									GlobalOptions.Instance.Clipboard = objCharacterXML;
 									GlobalOptions.Instance.ClipboardContentType = ClipboardContentType.Weapon;
@@ -8451,128 +8200,11 @@ namespace Chummer
 
 		private void cmdCreateStackedFocus_Click(object sender, EventArgs e)
 		{
-			int intFree = 0;
-			List<Gear> lstGear = new List<Gear>();
-			List<Gear> lstStack = new List<Gear>();
-
-			// Run through all of the Foci the character has and count the un-Bonded ones.
-			foreach (Gear objGear in _objCharacter.Gear)
-			{
-				if (objGear.Category == "Foci" || objGear.Category == "Metamagic Foci")
-				{
-					if (!objGear.Bonded)
-					{
-						intFree++;
-						lstGear.Add(objGear);
-					}
-				}
-			}
-
-			// If the character does not have at least 2 un-Bonded Foci, display an error and leave.
-			if (intFree < 2)
-			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_CannotStackFoci"), LanguageManager.Instance.GetString("MessageTitle_CannotStackFoci"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-				return;
-			}
-
-			frmSelectItem frmPickItem = new frmSelectItem();
-
-			// Let the character select the Foci they'd like to stack, stopping when they either click Cancel or there are no more items left in the list.
-			do
-			{
-				frmPickItem.Gear = lstGear;
-				frmPickItem.AllowAutoSelect = false;
-				frmPickItem.Description = LanguageManager.Instance.GetString("String_SelectItemFocus");
-				frmPickItem.ShowDialog(this);
-
-				if (frmPickItem.DialogResult == DialogResult.OK)
-				{
-					// Move the item from the Gear list to the Stack list.
-					foreach (Gear objGear in lstGear)
-					{
-						if (objGear.InternalId == frmPickItem.SelectedItem)
-						{
-							objGear.Bonded = true;
-							lstStack.Add(objGear);
-							lstGear.Remove(objGear);
-							break;
-						}
-					}
-				}
-			} while (lstGear.Count > 0 && frmPickItem.DialogResult != DialogResult.Cancel);
-
-			// Make sure at least 2 Foci were selected.
-			if (lstStack.Count < 2)
-			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_StackedFocusMinimum"), LanguageManager.Instance.GetString("MessageTitle_CannotStackFoci"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-				return;
-			}
-
-			// Make sure the combined Force of the Foci do not exceed 6.
-			if (!_objOptions.AllowHigherStackedFoci)
-			{
-				int intCombined = 0;
-				foreach (Gear objGear in lstStack)
-					intCombined += objGear.Rating;
-				if (intCombined > 6)
-				{
-					foreach (Gear objGear in lstStack)
-						objGear.Bonded = false;
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_StackedFocusForce"), LanguageManager.Instance.GetString("MessageTitle_CannotStackFoci"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-					return;
-				}
-			}
-
-			// Create the Stacked Focus.
-			StackedFocus objStack = new StackedFocus(_objCharacter);
-			objStack.Gear = lstStack;
-			_objCharacter.StackedFoci.Add(objStack);
-
-			// Remove the Gear from the character and replace it with a Stacked Focus item.
-			int intCost = 0;
-			foreach (Gear objGear in lstStack)
-			{
-				intCost += objGear.TotalCost;
-				_objCharacter.Gear.Remove(objGear);
-
-				// Remove the TreeNode from Gear.
-				foreach (TreeNode nodRoot in treGear.Nodes)
-				{
-					foreach (TreeNode nodItem in nodRoot.Nodes)
-					{
-						if (nodItem.Tag.ToString() == objGear.InternalId)
-						{
-							nodRoot.Nodes.Remove(nodItem);
-							break;
-						}
-					}
-				}
-			}
-
-			Gear objStackItem = new Gear(_objCharacter);
-			objStackItem.Category = "Stacked Focus";
-			objStackItem.Name = "Stacked Focus: " + objStack.Name;
-			objStackItem.MinRating = 0;
-			objStackItem.MaxRating = 0;
-			objStackItem.Source = "SM";
-			objStackItem.Page = "84";
-			objStackItem.Cost = intCost.ToString();
-			objStackItem.Avail = "0";
-
-			TreeNode nodStackNode = new TreeNode();
-			nodStackNode.Text = objStackItem.DisplayNameShort;
-			nodStackNode.Tag = objStackItem.InternalId;
-
-			treGear.Nodes[0].Nodes.Add(nodStackNode);
-
-			_objCharacter.Gear.Add(objStackItem);
-
-			objStack.GearId = objStackItem.InternalId;
-
-			_blnIsDirty = true;
-			_objController.PopulateFocusList(treFoci);
-			UpdateCharacterInfo();
-			UpdateWindowTitle();
+            if (!StackedFocusEditorCommand.Run(this, _objCharacter, treGear, () => _objOptions.AllowHigherStackedFoci)) return;
+            _blnIsDirty = true;
+            _objController.PopulateFocusList(treFoci);
+            UpdateCharacterInfo();
+            UpdateWindowTitle();
 		}
 
 		private void cmdAddArmorBundle_Click(object sender, EventArgs e)
@@ -12622,31 +12254,10 @@ namespace Chummer
 
 		#region Additional Common Tab Control Events
 		private void treQualities_AfterSelect(object sender, TreeViewEventArgs e)
-		{
-			// Locate the selected Quality.
-			lblQualitySource.Text = "";
-			tipTooltip.SetToolTip(lblQualitySource, null);
-			try
-			{
-				if (treQualities.SelectedNode.Level == 0)
-					return;
-			}
-			catch
-			{
-				return;
-			}
-
-			Quality objQuality = _objFunctions.FindQuality(treQualities.SelectedNode.Tag.ToString(), _objCharacter.Qualities);
-
-			string strBook = _objOptions.LanguageBookShort(objQuality.Source);
-			string strPage = objQuality.Page;
-			lblQualitySource.Text = strBook + " " + strPage;
-			tipTooltip.SetToolTip(lblQualitySource, _objOptions.LanguageBookLong(objQuality.Source) + " " + LanguageManager.Instance.GetString("String_Page") + " " + objQuality.Page);
-			if (_objCharacter.BuildMethod == CharacterBuildMethod.BP)
-				lblQualityBP.Text = objQuality.BP.ToString() + " " + LanguageManager.Instance.GetString("String_BP");
-			else
-				lblQualityBP.Text = (objQuality.BP * _objOptions.KarmaQuality).ToString() + " " + LanguageManager.Instance.GetString("String_Karma");
-		}
+        {
+            QualityDetailsPresentation.Refresh(_objCharacter, _objCharacter.BuildMethod != CharacterBuildMethod.BP, treQualities.SelectedNode,
+                lblQualityBP, lblQualitySource, tipTooltip);
+        }
 		#endregion
 
 		#region Additional Cyberware Tab Control Events
@@ -16381,26 +15992,15 @@ namespace Chummer
 				objPowerControl.UpdatePointsPerLevel();
 			}
 
-			int intMAG = 0;
-			if (_objCharacter.AdeptEnabled && _objCharacter.MagicianEnabled)
-			{
-				// If both Adept and Magician are enabled, this is a Mystic Adept, so use the MAG amount assigned to this portion.
-				intMAG = _objCharacter.MAGAdept;
-			}
-			else
-			{
-				// The character is just an Adept, so use the full value.
-				intMAG = _objCharacter.MAG.TotalValue;
-			}
-
-			// Add any Power Point Improvements to MAG.
-			intMAG += _objImprovementManager.ValueOf(Improvement.ImprovementType.AdeptPowerPoints);
-
-			string strRemain = (intMAG - decPowerPoints).ToString();
-			while (strRemain.EndsWith("0") && strRemain.Length > 4)
-				strRemain = strRemain.Substring(0, strRemain.Length - 1);
-
-			lblPowerPoints.Text = String.Format("{1} ({0} " + LanguageManager.Instance.GetString("String_Remaining") + ")", strRemain, intMAG);
+			// Pricing stays in Power; preserve reading each row before refreshing it.
+			bool mysticAdept = _objCharacter.AdeptEnabled && _objCharacter.MagicianEnabled;
+			var budget = AdeptPowerPointBudget.Calculate(
+			    mysticAdept, mysticAdept ? 0 : _objCharacter.MAG.TotalValue,
+			    mysticAdept ? _objCharacter.MAGAdept : 0,
+			    _objImprovementManager.ValueOf(Improvement.ImprovementType.AdeptPowerPoints),
+			    decPowerPoints);
+			lblPowerPoints.Text = AdeptPowerPointSummary.Format(budget,
+			    LanguageManager.Instance.GetString("String_Remaining"));
 		}
 
 		/// <summary>
@@ -21462,115 +21062,13 @@ namespace Chummer
 		/// <param name="objVehicle">Vehicle to modify.</param>
 		/// <param name="blnIncrease">True if the Sensor should increase in size, False if it should decrease.</param>
 		private void ChangeVehicleSensor(Vehicle objVehicle, bool blnIncrease)
-		{
-			XmlDocument objXmlDocument = XmlManager.Instance.Load("gear.xml");
-			XmlNode objNewNode;
-			bool blnFound = false;
-
-			Gear objSensor = new Gear(_objCharacter);
-			Gear objNewSensor = new Gear(_objCharacter);
-
-			TreeNode objTreeNode = new TreeNode();
-			List<Weapon> lstWeapons = new List<Weapon>();
-			List<TreeNode> lstWeaponNodes = new List<TreeNode>();
-			foreach (Gear objCurrentGear in objVehicle.Gear)
-			{
-				if (objCurrentGear.Name == "Microdrone Sensor")
-				{
-					if (blnIncrease)
-					{
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Minidrone Sensor\" and category = \"Sensors\"]");
-						objNewSensor.Create(objNewNode, _objCharacter, objTreeNode, 0, lstWeapons, lstWeaponNodes);
-						objSensor = objCurrentGear;
-						blnFound = true;
-					}
-					break;
-				}
-				else if (objCurrentGear.Name == "Minidrone Sensor")
-				{
-					if (blnIncrease)
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Small Drone Sensor\" and category = \"Sensors\"]");
-					else
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Microdrone Sensor\" and category = \"Sensors\"]");
-					objNewSensor.Create(objNewNode, _objCharacter, objTreeNode, 0, lstWeapons, lstWeaponNodes);
-					objSensor = objCurrentGear;
-					blnFound = true;
-					break;
-				}
-				else if (objCurrentGear.Name == "Small Drone Sensor")
-				{
-					if (blnIncrease)
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Medium Drone Sensor\" and category = \"Sensors\"]");
-					else
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Minidrone Sensor\" and category = \"Sensors\"]");
-					objNewSensor.Create(objNewNode, _objCharacter, objTreeNode, 0, lstWeapons, lstWeaponNodes);
-					objSensor = objCurrentGear;
-					blnFound = true;
-					break;
-				}
-				else if (objCurrentGear.Name == "Medium Drone Sensor")
-				{
-					if (blnIncrease)
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Large Drone Sensor\" and category = \"Sensors\"]");
-					else
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Small Drone Sensor\" and category = \"Sensors\"]");
-					objNewSensor.Create(objNewNode, _objCharacter, objTreeNode, 0, lstWeapons, lstWeaponNodes);
-					objSensor = objCurrentGear;
-					blnFound = true;
-					break;
-				}
-				else if (objCurrentGear.Name == "Large Drone Sensor")
-				{
-					if (blnIncrease)
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Vehicle Sensor\" and category = \"Sensors\"]");
-					else
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Medium Drone Sensor\" and category = \"Sensors\"]");
-					objNewSensor.Create(objNewNode, _objCharacter, objTreeNode, 0, lstWeapons, lstWeaponNodes);
-					objSensor = objCurrentGear;
-					blnFound = true;
-					break;
-				}
-				else if (objCurrentGear.Name == "Vehicle Sensor")
-				{
-					if (blnIncrease)
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Extra-Large Vehicle Sensor\" and category = \"Sensors\"]");
-					else
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Large Drone Sensor\" and category = \"Sensors\"]");
-					objNewSensor.Create(objNewNode, _objCharacter, objTreeNode, 0, lstWeapons, lstWeaponNodes);
-					objSensor = objCurrentGear;
-					blnFound = true;
-					break;
-				}
-				else if (objCurrentGear.Name == "Extra-Large Vehicle Sensor")
-				{
-					if (!blnIncrease)
-					{
-						objNewNode = objXmlDocument.SelectSingleNode("/chummer/gears/gear[name = \"Vehicle Sensor\" and category = \"Sensors\"]");
-						objNewSensor.Create(objNewNode, _objCharacter, objTreeNode, 0, lstWeapons, lstWeaponNodes);
-						objSensor = objCurrentGear;
-						blnFound = true;
-					}
-					break;
-				}
-			}
-
-			// If the item was found, update the Vehicle Sensor information.
-			if (blnFound)
-			{
-				objSensor.Name = objNewSensor.Name;
-				objSensor.Rating = objNewSensor.Rating;
-				objSensor.Capacity = objNewSensor.Capacity;
-				objSensor.Signal = objNewSensor.Signal;
-				objSensor.Avail = objNewSensor.Avail;
-				objSensor.Cost = objNewSensor.Cost;
-				objSensor.Source = objNewSensor.Source;
-				objSensor.Page = objNewSensor.Page;
-
-				// Update the name of the item in the TreeView.
-				TreeNode objNode = _objFunctions.FindNode(objSensor.InternalId, treVehicles);
-				objNode.Text = objSensor.DisplayNameShort;
-			}
-		}
+        {
+            var sensor = VehicleSensorCatalog.Apply(_objCharacter, objVehicle, blnIncrease);
+            // Presentation remains editor-owned. Preserve the existing failure
+            // after model mutation if its canonical tree node is missing.
+            if (sensor != null)
+                _objFunctions.FindNode(sensor.InternalId, treVehicles).Text = sensor.DisplayNameShort;
+        }
 
 		/// <summary>
 		/// Update the Reputation fields.

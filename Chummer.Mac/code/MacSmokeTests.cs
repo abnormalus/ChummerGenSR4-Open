@@ -59,10 +59,20 @@ namespace Chummer
             try
             {
                 HeadlessRenderer.Use();
+                Check(NativeFullscreenGeometry.ApplyInsets(new Avalonia.Size(1512, 982), new Avalonia.Thickness(0, 33, 0, 0)) == new Avalonia.Size(1512, 949),
+                    "Fullscreen display contract excludes the recorded camera safe area");
+                Check(NativeFullscreenGeometry.ApplyInsets(new Avalonia.Size(1280, 1024), default) == new Avalonia.Size(1280, 1024),
+                    "Fullscreen display contract retains the complete non-notched display");
+                bool invalidInsets = false;
+                try { NativeFullscreenGeometry.ApplyInsets(new Avalonia.Size(100, 100), new Avalonia.Thickness(0, 101, 0, 0)); }
+                catch (InvalidOperationException) { invalidInsets = true; }
+                Check(invalidInsets, "Fullscreen display contract rejects impossible native insets");
                 MacPaths.Initialize();
                 GlobalOptions.Instance.AutomaticUpdate = false;
                 LanguageManager.Instance.Load("en-us", null);
                 Check(LanguageManager.Instance.Loaded, "English language loaded");
+                ClipboardDocumentChecks.Run(Check);
+                XmlCatalogCacheChecks.Run(Check);
                 CyberwareCallerChecks.RunLookup(Check);
                 ReleaseUpdateChecks.Run();
                 Check(AppDiagnostics.NativeRenderTimerCode(new InvalidOperationException(
@@ -1008,6 +1018,8 @@ namespace Chummer
                 }
                 CritterPowerPromptChecks.Run(character, Check);
                 CreationInputLifecycleChecks.Run(Check);
+                NativeControlObservationChecks.Run(Check);
+                PowerPointSummaryChecks.Run(character, Check);
                 CreationSkillInputChecks.Run(character, Check);
                 CreationSkillGroupSectionChecks.Run(character, Check);
                 var portraitEditorCharacter = new Character();
@@ -1035,6 +1047,7 @@ namespace Chummer
                 SkillDisclosureChecks.Run(character, Check);
                 CareerSkillSpecializationChecks.Run(character, Check);
                 QualitySelectionChecks.Run(character, Check);
+                QualityDetailsChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check);
                 CreationKnowledgeSkillChecks.Run(character, Check, useNativeViewport: true);
                 CreationCommonLayoutChecks.Run(character, Check);
@@ -1044,10 +1057,18 @@ namespace Chummer
                 BuildIdentityChecks.Run(Check);
                 BuildPointPersistenceChecks.Run(character, Check);
                 WeaponFocusBindingChecks.Run(character, Check);
+                ClipboardCopyChecks.Run(character, Check);
+                ClipboardTransferChecks.RunAsync(null, character, Check, () => System.Threading.Tasks.Task.CompletedTask, "Headless").GetAwaiter().GetResult();
                 AccessoryBatchChecks.Run(character, Check);
                 WeaponAmmunitionChecks.Run(character, Check);
                 ArmorPickerChecks.Run(character, Check);
                 VehiclePickerChecks.Run(character, Check);
+                VehicleMovementChecks.Run(Check);
+                VehicleSensorChecks.Run(character, Check);
+                VehicleSensorDeletionChecks.Run(character, Check);
+                StackedFocusCommandChecks.Run(character, Check);
+                StackedFocusProposalChecks.Run(Check);
+                VehicleSensorTransitionChecks.Run(Check);
                 VehicleModPreviewChecks.Run(Check);
                 VehicleModPickerChecks.Run(character, Check);
                 BasicLifestylePromptChecks.Run(character, Check);

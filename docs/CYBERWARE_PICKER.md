@@ -1,6 +1,14 @@
 # Cyberware picker modernization boundary
 
-This isolated stage starts from the Gear tree released in verified Nightly0.2.148. The legacy Cyberware/Bioware picker remains active. No replacement model, native window or acceptance claim exists yet.
+## Accepted integration checkpoint
+
+[PR #42](https://github.com/abnormalus/ChummerGenSR4-Open/pull/42) merged the owned Cyberware/Bioware picker as `6c1d886e0b7ed1a37ff7ba6247a4825522281e51`. Exact source `c594521928b32919c101401760120fee811d9554` passed [CI 40367453035](https://github.com/abnormalus/ChummerGenSR4-Open/actions/runs/40367453035): Mac 1006/Windows 999 native assertions, full headless/all 399 file and memory round trips, both Foundry targets, audit and Windows PDF checks. The PR records verification of both artifact digests and visual review of all 48 current-batch frames per OS. The owned adapter is connected and its legacy Designer/resx path is retired. Release/package/download verification is a separate gate; this is not a Stable promotion.
+
+The development stages below are historical evidence, including failures and corrections. Their statements that the adapter is unconnected or native acceptance is pending describe those earlier sources, not the merged implementation.
+
+## Development history
+
+The historical baseline below starts from the Gear tree released in verified Nightly 0.2.148, before the connected adapter was implemented.
 
 ## Contract observed in source
 
