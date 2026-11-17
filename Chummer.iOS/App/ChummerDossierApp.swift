@@ -29,6 +29,7 @@ struct DossierHome: View {
     @State private var importing = false
     @State private var exporting = false
     @State private var exportFile: CharacterFile?
+    @State private var generatedSheet: GeneratedCharacterSheet?
     @State private var isDemo = false
     @State private var errorMessage: String?
     @Environment(\.scenePhase) private var scenePhase
@@ -111,12 +112,24 @@ struct DossierHome: View {
                         } label: { Image(systemName: selectedPage.icon) }
                         .accessibilityLabel("\(selectedPage.rawValue), choose dossier page")
                     }
-                    Button("Save Copy", systemImage: "square.and.arrow.up") {
-                        do {
-                            if let character { exportFile = CharacterFile(data: try character.exportData()); exporting = true }
-                        } catch { errorMessage = error.localizedDescription }
-                    }
-                        .disabled(character == nil || isDemo)
+                    Menu {
+                        Button("Save Character Copy", systemImage: "doc") {
+                            do {
+                                if let character { exportFile = CharacterFile(data: try character.exportData()); exporting = true }
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                        if let character {
+                            ShareLink(item: character.printableSheet.text) { Label("Share Readable Snapshot", systemImage: "doc.plaintext") }
+                        }
+                        Button("Character Sheet / PDF", systemImage: "printer") {
+                            if let character {
+                                generatedSheet = GeneratedCharacterSheet(title: character.title, data: CharacterSheetPDF.data(for: character.printableSheet))
+                            }
+                        }
+                    } label: { Image(systemName: "square.and.arrow.up") }
+                    .accessibilityLabel("Share character")
+                    .accessibilityHint("Save a character copy or open the printable PDF sheet")
+                    .disabled(character == nil || isDemo)
                 }
             }
         }
@@ -131,6 +144,7 @@ struct DossierHome: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { _ = autosave() }
         }
+        .sheet(item: $generatedSheet) { CharacterSheetPreview(sheet: $0) }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.chummerCharacter, .xml]) { result in
             do { openCharacter(try result.get()) } catch { errorMessage = error.localizedDescription }
         }
@@ -167,7 +181,9 @@ struct DossierHome: View {
             #if DEBUG
             if let name = ProcessInfo.processInfo.environment["DOSSIER_UI_PAGE"], let page = DossierPage(rawValue: name) { selectedPage = page }
             if ProcessInfo.processInfo.environment["DOSSIER_UI_RESTORE"] != "1", let encoded = ProcessInfo.processInfo.environment["DOSSIER_UI_FIXTURE"], let data = Data(base64Encoded: encoded) {
-                let opened = try DossierCharacter(data: data)
+                let fixtureName = ProcessInfo.processInfo.environment["DOSSIER_UI_PDF_INPUT"]
+                let input = try fixtureName.map { try Data(contentsOf: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(($0 as NSString).lastPathComponent)) } ?? data
+                let opened = try DossierCharacter(data: input)
                 library = DossierLibrary(); libraryAvailable = true
                 selectedID = try library.save(opened, filename: "QA Runner", id: nil, to: libraryURL)
                 if let second = ProcessInfo.processInfo.environment["DOSSIER_UI_SECOND_FIXTURE"], let bytes = Data(base64Encoded: second) {
@@ -178,7 +194,12 @@ struct DossierHome: View {
                     try Data("damaged test archive".utf8).write(to: libraryURL)
                     if damage == "both" { try Data("damaged test backup".utf8).write(to: libraryURL.appendingPathExtension("backup")) }
                 }
-                character = opened; savedData = data
+                if ProcessInfo.processInfo.environment["DOSSIER_UI_EXPORT_PDF"] == "1" {
+                    let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    try CharacterSheetPDF.data(for: opened.printableSheet).write(to: folder.appendingPathComponent("QA-Character-Sheet.pdf"), options: .atomic)
+                    try opened.printableSheet.text.write(to: folder.appendingPathComponent("QA-Character-Snapshot.txt"), atomically: true, encoding: .utf8)
+                }
+                character = opened; savedData = input
                 return
             }
             #endif

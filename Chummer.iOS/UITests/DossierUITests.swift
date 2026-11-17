@@ -1,7 +1,7 @@
 import XCTest
 
 final class DossierUITests: XCTestCase {
-    private func launch(theme: String, kind: String = "adept", page: String = "Equipment", secondCharacter: Bool = false, damageArchive: String = "") -> XCUIApplication {
+    private func launch(theme: String, kind: String = "adept", page: String = "Equipment", secondCharacter: Bool = false, damageArchive: String = "", pdfStress: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         let fixture = """
         <character><name>QA Runner</name><alias>QA Runner</alias><adept>\(kind == "adept")</adept><magician>\(kind == "magician")</magician><resenabled>\(kind == "technomancer")</resenabled>
@@ -18,7 +18,10 @@ final class DossierUITests: XCTestCase {
         <improvements><improvement><improvementttype>InitiativePass</improvementttype><val>3</val><enabled>True</enabled><unique>initiativepass</unique></improvement></improvements>
         </character>
         """
-        app.launchEnvironment["DOSSIER_UI_FIXTURE"] = Data(fixture.utf8).base64EncodedString()
+        app.launchEnvironment["DOSSIER_UI_EXPORT_PDF"] = "1"
+        let stressNotes = String(repeating: "Long contact text spanning pages. ", count: 700) + "END OF LONG CONTACT"
+        let printableFixture = pdfStress ? fixture.replacingOccurrences(of: "<notes></notes>", with: "<notes>" + stressNotes + "</notes>") : fixture
+        app.launchEnvironment["DOSSIER_UI_FIXTURE"] = Data(printableFixture.utf8).base64EncodedString()
         if secondCharacter {
             let second = fixture.replacingOccurrences(of: "QA Runner", with: "Second Runner").replacingOccurrences(of: "<attributes>", with: "<age>22</age><attributes>")
             app.launchEnvironment["DOSSIER_UI_SECOND_FIXTURE"] = Data(second.utf8).base64EncodedString()
@@ -27,8 +30,45 @@ final class DossierUITests: XCTestCase {
         app.launchEnvironment["DOSSIER_UI_THEME"] = theme
         app.launchEnvironment["DOSSIER_UI_PAGE"] = page
         app.launch()
-        XCTAssertTrue(app.buttons["Save Copy"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["Share character"].waitForExistence(timeout: 15))
         return app
+    }
+    func testPDFPaginationWithUnevenLongRows() {
+        let app = launch(theme: "light", pdfStress: true)
+        app.buttons["Share character"].tap()
+        app.buttons["Character Sheet / PDF"].tap()
+        XCTAssertTrue(app.buttons["Save PDF"].waitForExistence(timeout: 10))
+        capture(app, "long-row-pdf-preview")
+    }
+    func testPrintableSheetPreviewSaveAndPrintControls() {
+        let app = launch(theme: "light")
+        app.buttons["Share character"].tap()
+        app.buttons["Character Sheet / PDF"].tap()
+        XCTAssertTrue(app.buttons["Save PDF"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Print"].exists)
+        capture(app, "character-sheet-preview")
+        app.buttons["Print"].tap()
+        let printer = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Printer")).firstMatch
+        XCTAssertTrue(printer.waitForExistence(timeout: 5) || app.staticTexts["Printer"].exists)
+        capture(app, "system-print-options")
+        // Never choose a printer or submit a print job during simulator tests.
+    }
+    func testPDFSavePickerAndReadableSnapshotSharing() {
+        let app = launch(theme: "dark")
+        app.buttons["Share character"].tap()
+        XCTAssertTrue(app.buttons["Save Character Copy"].exists)
+        XCTAssertTrue(app.buttons["Share Readable Snapshot"].exists)
+        app.buttons["Character Sheet / PDF"].tap()
+        app.buttons["Save PDF"].tap()
+        XCTAssertTrue(app.buttons["Export"].waitForExistence(timeout: 5) || app.buttons["Save"].exists)
+        capture(app, "pdf-save-picker")
+        if app.buttons["Cancel"].exists { app.buttons["Cancel"].tap() }
+        XCTAssertTrue(app.buttons["Save PDF"].waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+        app.buttons["Share character"].tap()
+        app.buttons["Share Readable Snapshot"].tap()
+        XCTAssertTrue(app.buttons["Copy"].waitForExistence(timeout: 5) || app.staticTexts["Copy"].exists)
+        capture(app, "readable-snapshot-share")
     }
     private func go(_ page: String, in app: XCUIApplication) {
         let chooser = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "choose dossier page")).firstMatch

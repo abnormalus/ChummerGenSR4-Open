@@ -46,7 +46,17 @@ The Skills header has a Pool > 0 filter; augmentation ratings appear beside name
 Edits autosave to app-owned working copies after a short pause, before switching,
 and on focus loss/backgrounding. The last selected character restores on launch.
 Failures retain the current sheet and show an error. Imported source files remain
-unchanged. Save Copy exports a separate `.chum` for desktop Chummer.
+unchanged. The share icon offers Save Character Copy to export a separate `.chum`
+for desktop Chummer, Share Readable Snapshot for manually sharing current values,
+and Character Sheet / PDF for a printable sheet.
+
+The sheet preview offers Save PDF through Files and Print through the system
+AirPrint controls. It uses the existing Chummer section arrangement, not an
+included official fillable SR4A PDF. Long entries continue onto numbered pages
+with repeated headings. Current pools, weapon DV/AP, ammunition, damage, loaded
+programs, source/page references and relevant magical sections are included.
+Printing or sharing creates a snapshot; it does not modify the character or sync
+changes from another app.
 
 A previous-save backup recovers an unreadable working archive with a notice that
 recent edits may be missing. Damaged archives are retained before repair. If both
@@ -78,7 +88,8 @@ See [specification](SPECIFICATION.md), [device feedback](DEVICE_FEEDBACK.md) and
 
 ## Before first release
 
-Finish printable SR4A sheet/PDF export and broader accessibility/rotation/lifecycle
-acceptance. Review conditional-rule and special-persona handling explicitly;
+Finish broader accessibility/rotation/lifecycle acceptance and real-printer
+acceptance. An exact official SR4A form overlay would require a suitable template;
+the current generated sheet is ready for PDF export and simulator-tested printing. Review conditional-rule and special-persona handling explicitly;
 physical screen-lock and provider-level conflict testing remain outstanding. A clean build and the
 five-character audit do not establish every Shadowrun rule or a Stable release.

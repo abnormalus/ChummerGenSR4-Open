@@ -1,5 +1,7 @@
 // !$*UTF8*$!
 { archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+B81700000000000000000001 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterSheetPDF.swift; sourceTree = "<group>"; };
+B81700000000000000000002 = { isa = PBXBuildFile; fileRef = B81700000000000000000001; };
 D32BCE2221844737C8E835B0 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChummerDossierApp.swift; sourceTree = "<group>"; };
 D72C95A06E1F2B4E2471F532 = { isa = PBXBuildFile; fileRef = D32BCE2221844737C8E835B0; };
 2634E578FD60B0B5C933B861 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DossierView.swift; sourceTree = "<group>"; };
@@ -12,13 +14,13 @@ D72C95A06E1F2B4E2471F532 = { isa = PBXBuildFile; fileRef = D32BCE2221844737C8E83
 A17A55E70000000000000001 = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 A17A55E70000000000000002 = { isa = PBXBuildFile; fileRef = A17A55E70000000000000001; };
 38A007151ABE87CC01A5B6E9 = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChummerDossier.app; sourceTree = BUILT_PRODUCTS_DIR; };
-3A2A88DEEFF3D1D23E496597 = { isa = PBXGroup; path = App; sourceTree = "<group>"; children = (A17A55E70000000000000001, D32BCE2221844737C8E835B0, 2634E578FD60B0B5C933B861, 924ECEC3B64200D96249A752, 234A135302792B6AD5234FF6, 59BD0A3FF43B32849B319E64); };
+3A2A88DEEFF3D1D23E496597 = { isa = PBXGroup; path = App; sourceTree = "<group>"; children = (B81700000000000000000001, A17A55E70000000000000001, D32BCE2221844737C8E835B0, 2634E578FD60B0B5C933B861, 924ECEC3B64200D96249A752, 234A135302792B6AD5234FF6, 59BD0A3FF43B32849B319E64); };
 FBDC4F23F93125BBEEAE800C = { isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (AA1700000000000000000002, 38A007151ABE87CC01A5B6E9); };
 B28B7AF69320201D1CF206EB = { isa = PBXGroup; sourceTree = "<group>"; children = (AA1700000000000000000003, 3A2A88DEEFF3D1D23E496597, FBDC4F23F93125BBEEAE800C); };
 582681C2EAE02B3F3D399C0C = { isa = XCLocalSwiftPackageReference; relativePath = "."; };
 94A0426E8D3203DA5468CCF0 = { isa = XCSwiftPackageProductDependency; package = 582681C2EAE02B3F3D399C0C; productName = DossierCore; };
 1C25D3719CB905525B1D275B = { isa = PBXBuildFile; productRef = 94A0426E8D3203DA5468CCF0; };
-BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; runOnlyForDeploymentPostprocessing = 0; files = (D72C95A06E1F2B4E2471F532, 9CCE0358A502C517BC8B8F99, 43D7FF737D7C09415C376498, 381D94A603791C0B09AEB3BD); };
+BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; runOnlyForDeploymentPostprocessing = 0; files = (B81700000000000000000002, D72C95A06E1F2B4E2471F532, 9CCE0358A502C517BC8B8F99, 43D7FF737D7C09415C376498, 381D94A603791C0B09AEB3BD); };
 7561BFB015D8F536760CB671 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; runOnlyForDeploymentPostprocessing = 0; files = (1C25D3719CB905525B1D275B); };
 0189424A5A60FED329FA868E = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; runOnlyForDeploymentPostprocessing = 0; files = (A17A55E70000000000000002); };
 0E8A3AD980EC179856012B7E = { isa = PBXNativeTarget; buildConfigurationList = C57128001CE614BF8549D6BB; buildPhases = (BCE16DD0260827ECF338C787, 7561BFB015D8F536760CB671, 0189424A5A60FED329FA868E); buildRules = (); dependencies = (); name = ChummerDossier; packageProductDependencies = (94A0426E8D3203DA5468CCF0); productName = ChummerDossier; productReference = 38A007151ABE87CC01A5B6E9; productType = "com.apple.product-type.application"; };
