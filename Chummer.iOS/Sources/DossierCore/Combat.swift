@@ -23,8 +23,10 @@ extension DossierCharacter {
 
     /// Resolve the base expression, retaining suffixes and the original saved formula.
     /// Unsupported expressions stay visible rather than displaying a guessed number.
-    /// Ammo, limb-specific strength and optional house-rule adjustments remain desktop rules.
+    /// Saved loaded-ammo and installed-modifier bonuses are included. Limb-specific
+    /// strength and optional house rules can be entered as explicit sheet overrides.
     public func weaponDamage(_ weapon: SheetRow) -> String {
+        if !weaponAdjustment(weapon, field: "damage").isEmpty { return weaponAdjustment(weapon, field: "damage") }
         let raw = weapon["damage"]
         let suffixes = ["P or S", "P", "S"]
         guard let suffix = suffixes.first(where: { raw.range(of: $0, options: .backwards) != nil }),
@@ -54,7 +56,20 @@ extension DossierCharacter {
                 if improvement["improvementttype"] == "UnarmedDVPhysical" { type = "P" }
             }
         }
-        return String(Int(ceil(result)) + bonus) + type + raw[split.upperBound...]
+        bonus += installedWeaponMods(weapon).reduce(0) { $0 + (Int($1.value("dvbonus")) ?? 0) }
+        var extra = String(raw[split.upperBound...])
+        var replacement: String?
+        for adjustment in loadedWeaponBonuses(weapon) {
+            if let damageType = adjustment.child("damagetype") { type = ""; extra = damageType.text }
+            bonus += Int(adjustment.value("damage")) ?? 0
+            if let replace = adjustment.child("damagereplace") { replacement = replace.text }
+        }
+        if let replacement {
+            // Replacement DV ignores base/mod DV, as in desktop CalculatedDamage.
+            return evaluatedReplacementDamage(replacement) ?? raw
+        }
+        let multiplier = weapon["name"] == "Unarmed Attack (Smashing Blow)" ? 2 : 1
+        return String((Int(ceil(result)) + bonus) * multiplier) + type + extra
     }
 }
 
@@ -104,3 +119,69 @@ private struct DamageExpression {
     }
 }
 
+
+extension DossierCharacter {
+    /// Manual table adjustments use supported notes and never change catalog base stats.
+    private func weaponAdjustmentKey(_ weapon: SheetRow, field: String) -> String {
+        let identity = weapon["guid"].isEmpty ? "row-\(weapon.id)" : weapon["guid"]
+        return "weapon." + identity + "." + field
+    }
+    public func weaponAdjustment(_ weapon: SheetRow, field: String) -> String {
+        dossierField(weaponAdjustmentKey(weapon, field: field))
+    }
+    public mutating func setWeaponAdjustment(_ weapon: SheetRow, field: String, value: String) throws {
+        try setDossierField(weaponAdjustmentKey(weapon, field: field), value: value.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+    public func activeAmmoSlot(for weapon: SheetRow) -> Int {
+        let slot = Int(weaponAdjustment(weapon, field: "ammoSlot")) ?? 1
+        return (1...4).contains(slot) ? slot : 1
+    }
+    public func loadedAmmunition(for weapon: SheetRow, slot: Int? = nil) -> SheetGear? {
+        let selected = slot ?? activeAmmoSlot(for: weapon)
+        let key = "ammoloaded" + (selected == 1 ? "" : String(selected))
+        let guid = weapon[key]
+        guard !guid.isEmpty, guid != "00000000-0000-0000-0000-000000000000" else { return nil }
+        return gear.flatMap { [$0] + $0.descendants }.first { $0["guid"].caseInsensitiveCompare(guid) == .orderedSame }
+    }
+    private func installedWeaponMods(_ weapon: SheetRow) -> [CharacterElement] {
+        (equipmentElement(collection: "weapons", item: "weapon", index: weapon.id)?.child("weaponmods")?.children("weaponmod") ?? [])
+            .filter { $0.value("installed").lowercased() == "true" }
+    }
+    private func loadedWeaponBonuses(_ weapon: SheetRow) -> [CharacterElement] {
+        guard let ammo = loadedAmmunition(for: weapon), let node = gearElement(at: ammo.path) else { return [] }
+        let child = node.child("children")?.children("gear").compactMap { $0.child("weaponbonus") }.first
+        return [node.child("weaponbonus"), child].compactMap { $0 }.filter {
+            !(weapon["damage"].contains("(f)") && $0.xml.contains("(f)"))
+        }
+    }
+    private func evaluatedReplacementDamage(_ damage: String) -> String? {
+        let tags = ["P or S", "P", "S"]
+        guard let tag = tags.first(where: { damage.range(of: $0, options: .backwards) != nil }),
+              let range = damage.range(of: tag, options: .backwards) else { return nil }
+        var parser = DamageExpression(String(damage[..<range.lowerBound]))
+        guard let number = parser.evaluate(), number.isFinite, abs(number) < 1_000_000 else { return nil }
+        return String(Int(ceil(number))) + tag + damage[range.upperBound...]
+    }
+    public func weaponAP(_ weapon: SheetRow) -> String {
+        if !weaponAdjustment(weapon, field: "ap").isEmpty { return weaponAdjustment(weapon, field: "ap") }
+        let base = weapon["ap"]
+        guard base == "-" || Int(base) != nil else { return base }
+        var total = Int(base) ?? 0
+        var replacement: String?
+        // Desktop AP uses the loaded parent ammunition bonus; child damage plugins
+        // are handled separately by its damage routine.
+        if let ammo = loadedAmmunition(for: weapon), let bonus = gearElement(at: ammo.path)?.child("weaponbonus"),
+           !(weapon["damage"].contains("(f)") && bonus.xml.contains("(f)")) {
+            if weapon["damage"].contains("(f)") && ammo["name"].contains("Flechette") { total -= 5 }
+            else {
+                total += Int(bonus.value("ap")) ?? 0
+                replacement = bonus.child("apreplace")?.text
+            }
+        }
+        if weapon["name"] == "Unarmed Attack" || weapon["category"] == "Cyberware" {
+            total += savedImprovement("UnarmedAP")
+        }
+        total += installedWeaponMods(weapon).reduce(0) { $0 + (Int($1.value("apbonus")) ?? 0) }
+        return replacement ?? (total == 0 ? "-" : (total > 0 ? "+" : "") + String(total))
+    }
+}

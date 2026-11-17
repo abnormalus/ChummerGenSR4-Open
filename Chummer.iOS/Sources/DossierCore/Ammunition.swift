@@ -48,6 +48,49 @@ extension DossierCharacter {
               weapon["type"].lowercased() == "ranged" else { throw AmmunitionError.invalidSelection }
         let key = "ammoremaining" + (slot == 1 ? "" : String(slot))
         guard let remaining = Int(weapon[key]), remaining >= rounds else { throw AmmunitionError.insufficientRounds }
-        setRowValue(collection: "weapons", item: "weapon", index: weaponIndex, field: key, value: String(remaining - rounds))
+        var next = self
+        next.setRowValue(collection: "weapons", item: "weapon", index: weaponIndex, field: key, value: String(remaining - rounds))
+        try next.setWeaponAdjustment(weapon, field: "ammoSlot", value: String(slot))
+        self = next
+    }
+}
+
+extension DossierCharacter {
+    /// Exchange rounds between an existing reserve and magazine atomically. Loading
+    /// sets the desired magazine count; any old rounds return to their original lot.
+    /// The count is a manual sheet entry, not a catalog-capacity or action-cost rule.
+    public mutating func reloadAmmunition(weaponIndex: Int, path: [Int], slot: Int, rounds: Int) throws {
+        guard (1...4).contains(slot), (1...Int(Int32.max)).contains(rounds),
+              let weapon = rows(collection: "weapons", item: "weapon").first(where: { $0.id == weaponIndex }),
+              let reserve = ammunition(forWeapon: weapon).first(where: { $0.path == path }),
+              UUID(uuidString: reserve["guid"]) != nil, reserve["guid"] != "00000000-0000-0000-0000-000000000000" else { throw AmmunitionError.invalidSelection }
+        var next = self
+        try next.unloadAmmunition(weaponIndex: weaponIndex, slot: slot)
+        guard let available = next.gear(at: path), let quantity = Decimal(string: available["qty"], locale: Locale(identifier: "en_US_POSIX")) else {
+            throw AmmunitionError.invalidSelection
+        }
+        guard quantity >= Decimal(rounds) else { throw AmmunitionError.insufficientRounds }
+        next.setGearValue(path: path, field: "qty", value: NSDecimalNumber(decimal: quantity - Decimal(rounds)).stringValue)
+        let suffix = slot == 1 ? "" : String(slot)
+        next.setRowValue(collection: "weapons", item: "weapon", index: weaponIndex, field: "ammoloaded" + suffix, value: reserve["guid"])
+        next.setRowValue(collection: "weapons", item: "weapon", index: weaponIndex, field: "ammoremaining" + suffix, value: String(rounds))
+        try next.setWeaponAdjustment(weapon, field: "ammoSlot", value: String(slot))
+        self = next
+    }
+    public mutating func unloadAmmunition(weaponIndex: Int, slot: Int) throws {
+        guard (1...4).contains(slot),
+              let weapon = rows(collection: "weapons", item: "weapon").first(where: { $0.id == weaponIndex }),
+              weapon["type"].lowercased() == "ranged" else { throw AmmunitionError.invalidSelection }
+        let suffix = slot == 1 ? "" : String(slot)
+        let remaining = Int(weapon["ammoremaining" + suffix]) ?? 0
+        if remaining > 0 {
+            guard let original = loadedAmmunition(for: weapon, slot: slot),
+                  let quantity = Decimal(string: original["qty"], locale: Locale(identifier: "en_US_POSIX")) else {
+                throw AmmunitionError.invalidSelection
+            }
+            setGearValue(path: original.path, field: "qty", value: NSDecimalNumber(decimal: quantity + Decimal(remaining)).stringValue)
+        }
+        setRowValue(collection: "weapons", item: "weapon", index: weaponIndex, field: "ammoremaining" + suffix, value: "0")
+        setRowValue(collection: "weapons", item: "weapon", index: weaponIndex, field: "ammoloaded" + suffix, value: "00000000-0000-0000-0000-000000000000")
     }
 }

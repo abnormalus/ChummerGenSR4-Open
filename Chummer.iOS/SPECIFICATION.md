@@ -12,7 +12,7 @@ purchase accounting, or complete character-building rules engine.
 Use the SR4 Anniversary two-page character sheet as the visual/content reference.
 Add dossier page 15 (history, portrait, appearance, dates, facts) and page 8
 (contacts). Use SR4 attributes, Connection/Loyalty, initiative, skills/pools,
-professional rating and notes in contact cards. Reference PDFs are read-only
+notes in contact cards; optional statistics start collapsed behind Stats. Reference PDFs are read-only
 design references, not instructions or bundled assets. Preserve familiar page
 organization on iPad and usable editing on iPhone. Never silently truncate lists.
 
@@ -58,33 +58,28 @@ bonuses); surface manual modifiers and verify representative characters.
 
 Three states: empty, crossed for damage, solid for blocked/unavailable. Tap an
 available box to set damage through it; tap the last damaged box to remove one.
-Hold to toggle blocking. Blocked taps do nothing. Tracks are independent.
+The first eight boxes are fixed. Hold an optional box to extend or trim the contiguous tail without erasing marked damage. Blocked taps do nothing. Tracks are independent.
 Save only `physicalcmfilled` and `stuncmfilled`, never block states.
 
-Chummer stores counts rather than arbitrary marks. The first implementation keeps
-damage contiguous, disallows crossing blocked gaps, and truncates damage when
-holding within its damaged prefix. Verify this interaction on-device.
+Chummer stores counts rather than arbitrary marks. Keep damage contiguous.
+Show -1/-2/-3/... in every third usable box and a single shared explanation.
 
-## Equipment and desktop reconciliation
+## First-release scope: at-table companion
 
-Mobile accepts incomplete names, category, provisional stats and separate explicit
-adjustments. New entries receive stable UUIDs and remain pending until resolved.
-Desktop must process them before normal equipment loading: incomplete weapon nodes
-cannot safely be passed to the existing loader.
+The November 17 clarification supersedes the earlier equipment-reconciliation goal.
+Existing characters can be edited manually like a paper sheet: attributes, ratings,
+pools, money and equipment values. Do not spend karma/nuyen automatically, enforce
+advancement costs, or require a character builder to approve those edits.
 
-1. Search the matching catalog and enabled custom data. Prefer exact identity;
-   normalize spelling/case, then rank fuzzy candidates by name/category/stats.
-2. Review uncertain/conflicting matches. `ares alp` in ranged weapons should
-   suggest Ares Alpha; brand alone must not force a match.
-3. Dialog supports select/search, keep custom, defer and cancellation. Show old/new
-   names and base stats. Never discard unresolved data.
-4. Correct catalog-owned base data while retaining attachments, quantities, ammo,
-   equipped state, notes, nicknames and explicit adjustments (including recoil,
-   damage, AP or capacity). Difference from catalog is not itself an error.
-5. Construct complete equipment using desktop ownership paths. Preserve instance
-   identity, prevent duplicate imports, and record resolution/snapshots for mobile.
-   Reconciliation must not charge money/karma. Unchanged items must not repeatedly
-   prompt. Deferred/cancelled work must preserve pending entries and character.
+Character creation, automated advancement, equipment purchases and catalog/fuzzy
+matching are deferred. The first-release interface has no Add Equipment purchase
+flow. Retain legacy pending-equipment data in supported notes and show it as
+unlisted equipment notes; never silently discard earlier entries.
+
+Manual weapon damage/AP overrides are distinct from saved base fields and live in
+the existing dossier notes envelope, keyed by instance GUID (row fallback for
+minimal imports without GUIDs). Empty overrides restore calculation. Editing a
+nested gear/program item must update that exact source path, not its parent.
 
 ## At-table equipment controls
 
@@ -101,6 +96,11 @@ suggested by saved SS/SA/BF/FA modes; keep 1/2/3/6/9/15 available as other round
 These are expenditure shortcuts, not attack/action legality enforcement. Firing a
 loaded magazine reduces its saved remaining count only; reserve spending reduces
 the selected gear quantity only. Never double-deduct or go below zero.
+
+Reload sets a manually entered magazine count, returns existing rounds to their
+original reserve, and takes new rounds once. Unload returns remaining rounds.
+Check capacity and action costs at the table. Switching the selected magazine
+updates displayed ammunition modifiers; the selection lives in supported notes.
 
 ## Storage
 
@@ -120,7 +120,7 @@ when contacts are reordered by desktop. Block states are excluded.
 - Independent formula examples, manual modifiers and documented complex-rule
   limits; linked fields update coherently.
 - Native damage tap/hold exclusivity, independent tracks and accessible actions.
-- New typo resolves through desktop review; ambiguous, custom, deferred and
-  cancelled paths preserve data. Recoil adjustment survives. Reopen is idempotent.
+- Manual edits and reload/fire/unload survive production desktop load/save and
+  mobile reimport; no automatic karma/nuyen charges. Failed reload is atomic.
 - Phone/tablet simulator/device builds and native visual/input checks. File
   conflicts, unsaved edits, malformed imports and cancelled dialogs are covered.

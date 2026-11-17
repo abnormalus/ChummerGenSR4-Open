@@ -21,9 +21,9 @@ final class MatrixInitiativeTests: XCTestCase {
         let restored = try DossierCharacter(data: character.exportData())
         XCTAssertEqual(restored.matrixInitiative, 13)
     }
-    func testMissingResponseIsNotInventedAndTechnomancerUsesLivingPersona() throws {
+    func testMissingCommlinkUsesDesktopIntuitionBaselineAndTechnomancerUsesLivingPersona() throws {
         var character = try DossierCharacter(data: Data("<character><attributes><attribute><name>INT</name><value>4</value><totalvalue>4</totalvalue></attribute></attributes></character>".utf8))
-        XCTAssertNil(character.matrixInitiative)
+        XCTAssertEqual(character.matrixInitiative, 4)
         character.setValue("resenabled", "True")
         XCTAssertEqual(character.matrixInitiative, 9)
         XCTAssertEqual(character.matrixInitiativePasses, 3)

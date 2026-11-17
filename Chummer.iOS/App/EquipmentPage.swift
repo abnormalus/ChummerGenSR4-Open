@@ -11,8 +11,8 @@ private struct EquipmentSection: Identifiable {
 struct EquipmentPage: View {
     @Binding var character: DossierCharacter
     var combatOnly = false
-    @State private var adding = false
     @State private var editingGear: SheetGear?
+    @State private var reloadingWeapon: SheetRow?
     @State private var errorMessage: String?
     private let sections: [EquipmentSection] = [
         .init(title: "Weapons", collection: "weapons", item: "weapon", fields: ["name", "damage", "ap", "mode", "rc", "ammo"]),
@@ -50,10 +50,26 @@ struct EquipmentPage: View {
                                 weapons.first { $0.id == weapon.id }?[key] ?? ""
                             }, set: { character.setRowValue(collection: "weapons", item: "weapon", index: weapon.id, field: key, value: $0) }))
                         }
+                        SheetField(title: "Shown damage override (optional)", value: weaponAdjustment(weapon, field: "damage"))
+                        SheetField(title: "Shown AP override (optional)", value: weaponAdjustment(weapon, field: "ap"))
+                        Text("Leave overrides blank to calculate from the saved weapon, loaded ammunition and modifiers.")
+                            .font(.caption).foregroundStyle(SheetTheme.secondary)
+                        if weapon["type"].lowercased() == "ranged" {
+                            Button("Reload / change ammo…", systemImage: "arrow.triangle.2.circlepath") { reloadingWeapon = weapon }
+                                .frame(minHeight: 44)
+                            Menu("Active magazine: \(character.activeAmmoSlot(for: weapon))") {
+                                ForEach(1...4, id: \.self) { slot in
+                                    Button("Use magazine \(slot)") {
+                                        do { try character.setWeaponAdjustment(weapon, field: "ammoSlot", value: String(slot)) }
+                                        catch { errorMessage = error.localizedDescription }
+                                    }
+                                }
+                            }.frame(minHeight: 44)
+                        }
                     } label: {
                         HStack {
                             Text(weapon["name"]).bold().foregroundStyle(.primary)
-                            Text([weapon["mode"], character.weaponDamage(weapon), weapon["ap"].isEmpty ? "" : "AP " + weapon["ap"]].filter { !$0.isEmpty && $0 != "0" }.joined(separator: " · ")).font(.caption).foregroundStyle(SheetTheme.secondary)
+                            Text([weapon["mode"], character.weaponDamage(weapon), character.weaponAP(weapon).isEmpty ? "" : "AP " + character.weaponAP(weapon)].filter { !$0.isEmpty && $0 != "0" }.joined(separator: " · ")).font(.caption).foregroundStyle(SheetTheme.secondary)
                             Spacer()
                             SourceReference(source: weapon["source"], page: weapon["page"])
                         }
@@ -62,7 +78,7 @@ struct EquipmentPage: View {
                         ForEach(1...4, id: \.self) { slot in
                             let suffix = slot == 1 ? "" : String(slot)
                             if (Int(weapon["ammoremaining" + suffix]) ?? 0) > 0 {
-                                fireMenu(weapon: weapon, title: "Loaded magazine \(slot) · \(weapon["ammoremaining" + suffix]) rounds") { rounds in
+                                fireMenu(weapon: weapon, title: "Magazine \(slot) · \(character.loadedAmmunition(for: weapon, slot: slot)?["name"] ?? "Ammunition") · \(weapon["ammoremaining" + suffix]) rounds") { rounds in
                                     try character.spendLoadedAmmunition(weaponIndex: weapon.id, slot: slot, rounds: rounds)
                                 }.sheetRow(slot).padding(.leading, 12)
                             }
@@ -82,6 +98,12 @@ struct EquipmentPage: View {
             if weapons.isEmpty { Text("No entries").font(.caption).foregroundStyle(SheetTheme.secondary) }
         }
     }
+    private func weaponAdjustment(_ weapon: SheetRow, field: String) -> Binding<String> {
+        Binding(get: { character.weaponAdjustment(weapon, field: field) }, set: {
+            do { try character.setWeaponAdjustment(weapon, field: field, value: $0) }
+            catch { errorMessage = error.localizedDescription }
+        })
+    }
     private func fireMenu(weapon: SheetRow, title: String, spend: @escaping (Int) throws -> Void) -> some View {
         Menu {
             let suggested = character.suggestedFireCounts(for: weapon)
@@ -93,6 +115,8 @@ struct EquipmentPage: View {
                     Button("Fire \(count)") { do { try spend(count) } catch { errorMessage = error.localizedDescription } }
                 }
             }
+            Divider()
+            Button("Reload / change ammo…", systemImage: "arrow.triangle.2.circlepath") { reloadingWeapon = weapon }
         } label: {
             HStack { Text(title).foregroundStyle(.primary); Image(systemName: "chevron.down").font(.caption2) }
                 .font(.subheadline).frame(minHeight: 44)
@@ -117,7 +141,7 @@ struct EquipmentPage: View {
                 }.font(.caption).foregroundStyle(SheetTheme.secondary).padding(.horizontal, 8).padding(.vertical, 4)
                 ForEach(Array(character.programs.enumerated()), id: \.element.id) { index, program in
                     HStack(spacing: 8) {
-                        GearTree(gear: program, showChildren: false, banded: false)
+                        GearTree(gear: program, showChildren: false, banded: false, edit: { editingGear = $0 })
                         Toggle(isOn: Binding(get: {
                             character.programs.first { $0.id == program.id }?["equipped"].lowercased() == "true"
                         }, set: { loaded in
@@ -134,29 +158,19 @@ struct EquipmentPage: View {
         }
     }
     private func gearEntry(_ gear: SheetGear, index: Int) -> some View {
-        GearTree(gear: gear, shaded: index.isMultiple(of: 2), hiddenPaths: assignedAmmoPaths)
-            .contextMenu { Button("Edit Gear", systemImage: "pencil") { editingGear = gear } }
-            .accessibilityAction(named: "Edit Gear") { editingGear = gear }
+        GearTree(gear: gear, shaded: index.isMultiple(of: 2), hiddenPaths: assignedAmmoPaths, edit: { editingGear = $0 })
     }
 
     var body: some View {
         VStack(spacing: 16) {
-            if !combatOnly { Button("Add Equipment", systemImage: "plus.circle") { adding = true }.buttonStyle(.borderedProminent).foregroundStyle(Color(uiColor: .systemBackground)) }
             if !combatOnly && !character.notes.pendingEquipment.isEmpty {
-                SheetCard(title: "New equipment awaiting desktop review", rowSpacing: 0) {
-                    Text("These entries stay in your dossier. Matching them to desktop Chummer equipment is the next development stage.")
-                        .font(.caption).foregroundStyle(SheetTheme.secondary)
-                    ForEach(Array(character.notes.pendingEquipment.enumerated()), id: \.element.id) { index, gear in
+                SheetCard(title: "Unlisted equipment notes", rowSpacing: 0) {
+                    ForEach(Array(character.notes.pendingEquipment.enumerated()), id: \.element.id) { index, entry in
                         VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            VStack(alignment: .leading) { Text(gear.name).bold(); Text(gear.category).font(.caption) }
-                            Spacer()
-                            Button("Remove", role: .destructive) {
-                                do { try character.removePendingEquipment(gear.id) } catch { errorMessage = error.localizedDescription }
-                            }
-                        }
-                        if !gear.stats.isEmpty { Text(gear.stats.keys.sorted().map { "\($0): \(gear.stats[$0] ?? "")" }.joined(separator: " · ")).font(.caption) }
-                        if !gear.adjustments.isEmpty { Text("Adjustments: " + gear.adjustments.keys.sorted().map { "\($0): \(gear.adjustments[$0] ?? "")" }.joined(separator: " · ")).font(.caption) }
+                            Text(entry.name).bold()
+                            Text(([entry.category] + entry.stats.keys.sorted().map { $0 + ": " + (entry.stats[$0] ?? "") }
+                                + entry.adjustments.keys.sorted().map { $0 + ": " + (entry.adjustments[$0] ?? "") }).joined(separator: " · "))
+                                .font(.caption).foregroundStyle(SheetTheme.secondary)
                         }.sheetRow(index)
                     }
                 }
@@ -200,70 +214,80 @@ struct EquipmentPage: View {
                 }
             }
         }
+        .sheet(item: $reloadingWeapon) { weapon in
+            ReloadMagazineView(character: $character, weaponIndex: weapon.id)
+        }
         .sheet(item: $editingGear) { gear in
             NavigationStack {
                 Form {
                     ForEach(["name", "rating", "qty", "notes"], id: \.self) { key in
                         SheetField(title: key.uppercased(), value: Binding(get: {
-                            character.rows(collection: "gears", item: "gear").first { $0.id == gear.path[0] }?[key] ?? ""
-                        }, set: { character.setRowValue(collection: "gears", item: "gear", index: gear.path[0], field: key, value: $0) }), multiline: key == "notes")
+                            character.gear(at: gear.path)?[key] ?? ""
+                        }, set: { character.setGearValue(path: gear.path, field: key, value: $0) }), multiline: key == "notes")
                     }
                 }
                 .navigationTitle("Edit Gear").navigationBarTitleDisplayMode(.inline)
                 .toolbar { Button("Done") { editingGear = nil } }
             }
         }
-        .sheet(isPresented: $adding) { AddEquipmentView { gear in
-            do { try character.addEquipment(gear); adding = false } catch { errorMessage = error.localizedDescription }
-        } }
         .alert("Couldn't save equipment", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
     }
 }
 
-private struct AddEquipmentView: View {
+/// Loading is a manual sheet operation on existing ammunition, never a purchase.
+private struct ReloadMagazineView: View {
+    @Binding var character: DossierCharacter
+    let weaponIndex: Int
     @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var category = "Ranged weapon"
-    @State private var damage = ""
-    @State private var ap = ""
-    @State private var recoilAdjustment = ""
-    @State private var notes = ""
-    let save: (PendingEquipment) -> Void
+    @State private var path: [Int] = []
+    @State private var slot = 1
+    @State private var rounds = 1
+    @State private var errorMessage: String?
+    private var weapon: SheetRow? { character.rows(collection: "weapons", item: "weapon").first { $0.id == weaponIndex } }
     var body: some View {
         NavigationStack {
             Form {
-                Section("Equipment") {
-                    TextField("Name, e.g. ares alp", text: $name)
-                    Picker("Category", selection: $category) {
-                        ForEach(["Ranged weapon", "Melee weapon", "Armor", "Gear", "Commlink", "Augmentation", "Vehicle"], id: \.self) { Text($0) }
+                if let weapon {
+                    Section("Magazine") {
+                        Picker("Slot", selection: $slot) {
+                            ForEach(1...4, id: \.self) { Text("Magazine \($0)").tag($0) }
+                        }
+                        Picker("Ammunition", selection: $path) {
+                            ForEach(character.ammunition(forWeapon: weapon)) { ammo in
+                                Text(ammo["name"] + " · " + ammo["qty"] + " reserve").tag(ammo.path)
+                            }
+                        }
+                        TextField("Rounds to load", value: $rounds, format: .number).keyboardType(.numberPad)
+                        Text("Enter the desired magazine count. Existing rounds return to their original reserve. Check capacity and actions at the table.")
+                            .font(.caption)
                     }
-                    TextField("Notes", text: $notes, axis: .vertical)
+                    Section {
+                        Button("Load Magazine") {
+                            do { try character.reloadAmmunition(weaponIndex: weaponIndex, path: path, slot: slot, rounds: rounds); dismiss() }
+                            catch { errorMessage = error.localizedDescription }
+                        }.disabled(path.isEmpty || rounds < 1)
+                        Button("Unload Magazine") {
+                            do { try character.unloadAmmunition(weaponIndex: weaponIndex, slot: slot); dismiss() }
+                            catch { errorMessage = error.localizedDescription }
+                        }
+                    }
                 }
-                if category.contains("weapon") {
-                    Section("Base stats (optional)") {
-                        TextField("Damage", text: $damage)
-                        TextField("Armor penetration", text: $ap)
-                    }
-                    Section("Keep these adjustments") {
-                        TextField("Recoil adjustment", text: $recoilAdjustment)
-                    }
-                }
-                Section { Text("You can enter an incomplete name. Desktop equipment matching will be added in the next development stage.") }
             }
-            .navigationTitle("Add Equipment").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Add") {
-                    var stats = ["notes": notes]
-                    if !damage.isEmpty { stats["damage"] = damage }
-                    if !ap.isEmpty { stats["ap"] = ap }
-                    save(PendingEquipment(name: name.trimmingCharacters(in: .whitespacesAndNewlines), category: category,
-                                          stats: stats, adjustments: recoilAdjustment.isEmpty ? [:] : ["rc": recoilAdjustment]))
-                }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+            .navigationTitle("Reload").navigationBarTitleDisplayMode(.inline)
+            .toolbar { Button("Cancel") { dismiss() } }
+        }
+        .onAppear {
+            if let weapon {
+                slot = character.activeAmmoSlot(for: weapon)
+                path = character.loadedAmmunition(for: weapon)?.path ?? character.ammunition(forWeapon: weapon).first?.path ?? []
+                rounds = max(1, Int(String(weapon["ammo"].prefix(while: { $0.isNumber }))) ?? 1)
             }
         }
+        .alert("Couldn't change ammunition", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
     }
 }
 
@@ -274,6 +298,7 @@ private struct GearTree: View {
     var showChildren = true
     var banded = true
     var hiddenPaths: Set<[Int]> = []
+    var edit: ((SheetGear) -> Void)?
     private var options: String {
         gear.children.filter { $0["category"] == "Program Options" }.map {
             $0["name"] + ((Int($0["rating"]) ?? 0) > 0 ? " \($0["rating"])" : "")
@@ -292,10 +317,14 @@ private struct GearTree: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if banded { summary.sheetRow(shaded ? 0 : 1) } else { summary }
+            Group {
+                if banded { summary.sheetRow(shaded ? 0 : 1) } else { summary }
+            }
+            .contextMenu { if let edit { Button("Edit Gear", systemImage: "pencil") { edit(gear) } } }
+            .accessibilityAction(named: "Edit Gear") { edit?(gear) }
             if showChildren {
                 ForEach(Array(gear.children.filter { $0["category"] != "Program Options" && !$0.isProgram && !hiddenPaths.contains($0.path) }.enumerated()), id: \.element.id) { index, child in
-                    GearTree(gear: child, shaded: index.isMultiple(of: 2), hiddenPaths: hiddenPaths).padding(.leading, 12)
+                    GearTree(gear: child, shaded: index.isMultiple(of: 2), hiddenPaths: hiddenPaths, edit: edit).padding(.leading, 12)
                 }
             }
         }

@@ -195,7 +195,7 @@ public struct DossierCharacter {
         let base: Int
         if isTechnomancer { base = 2 * total("INT") + 1 + savedImprovement("LivingPersonaResponse") }
         else {
-            guard let response = matrixResponse else { return nil }
+            let response = matrixResponse ?? 0
             base = total("INT") + response + savedImprovement("MatrixInitiative")
         }
         return base + (Int(dossierField("matrixInitiativeModifier")) ?? 0)
@@ -228,6 +228,30 @@ public struct DossierCharacter {
         }
         let gear = entries(xml.root.child("gears")?.children("gear") ?? [], parent: [])
         cache.gear = gear; return gear
+    }
+
+    public func gear(at path: [Int]) -> SheetGear? {
+        var entries = gear
+        var found: SheetGear?
+        for index in path {
+            guard entries.indices.contains(index) else { return nil }
+            found = entries[index]; entries = entries[index].children
+        }
+        return found
+    }
+    // Read nested saved values without flattening presentation text or changing XML.
+    func equipmentElement(collection: String, item: String, index: Int) -> CharacterElement? {
+        let elements = xml.root.child(collection)?.children(item) ?? []
+        return elements.indices.contains(index) ? elements[index] : nil
+    }
+    func gearElement(at path: [Int]) -> CharacterElement? {
+        var entries = xml.root.child("gears")?.children("gear") ?? []
+        var found: CharacterElement?
+        for index in path {
+            guard entries.indices.contains(index) else { return nil }
+            found = entries[index]; entries = entries[index].child("children")?.children("gear") ?? []
+        }
+        return found
     }
 
     public mutating func setGearValue(path: [Int], field: String, value: String) {

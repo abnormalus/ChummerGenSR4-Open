@@ -1,98 +1,71 @@
 # SR 4 Dossier for iPhone and iPad
 
-An early native SwiftUI companion inside the Chummer SR4 repository. Open an
-existing `.chum` character, edit a linked sheet, and save a separate XML copy.
-Desktop Chummer remains the authority for full Shadowrun rules.
+A native at-table companion for existing SR4 Chummer characters. Use it like an
+editable character sheet: change values manually, reference your runner's abilities,
+and track combat state. Character creation, automatic advancement costs and
+catalog-based equipment purchasing are outside the first-release scope.
 
-## Run
+## Use
 
-1. Install full Xcode, finish first-launch setup, and install iOS support.
-2. Open `ChummerDossier.xcodeproj`, select **ChummerDossier**, and choose an iPhone
-   or iPad simulator. The minimum deployment target is iOS/iPadOS 17.
-   The first layout and interaction targets are **iPhone 15** and **11-inch iPad Air**,
-   in portrait and landscape.
-3. Run and open an existing SR4 `.chum` character from Files.
-4. Tap the character name and small chevron to switch between imported characters
-   or open another file. There is no character tab strip.
-5. Edits autosave to private on-device working copies after a short pause, before
-   switching characters, and when the app loses focus or backgrounds (including
-   screen lock). The last character restores on launch. Save failures keep the
-   current character open and show an error.
-6. Use **Save Copy** to export changes for desktop Chummer. Imported source files
-   are not overwritten; local autosave and desktop export are separate.
+Open `ChummerDossier.xcodeproj` in Xcode, choose the ChummerDossier scheme and an
+available iPhone/iPad simulator, and run. Minimum iOS/iPadOS version: 17. There are
+no external Swift dependencies. Current work uses simulators only.
 
-There are no external Swift dependencies. `DossierCore` is a local package.
-Physical-device signing requires selecting your development team in Xcode.
-The synthetic demo is for exploring the sheet, not a complete desktop character;
-demo export is disabled.
+Open a `.chum` through Files. Tap the character's name to switch working copies.
+On iPhone, Character, Combat, Equipment, Background and Contacts are pages; iPad
+uses the compact toolbar page menu. Contacts show Connection/Loyalty and hide
+optional statistics behind Stats. Professional Rating is omitted.
 
-## First milestone
+- Manually edit attributes, skill ratings/pools, money, contacts and existing
+  equipment values. No karma/nuyen is spent automatically. Long-press gear or
+  a program to edit that exact instance, including nested items.
+- Combat shows initiative/passes, health, weapons, applicable abilities and vehicles.
+  Complex Forms appear for technomancers; spells/spirits for magicians; adept
+  powers for adepts. Technomancers use the spirit collection for sprites.
+- Health uses contiguous damage counts. First eight boxes are fixed; hold optional
+  boxes to adjust the tail without erasing marked damage. Penalties are labelled
+  every third usable box. Vehicle damage uses Chummer's existing saved field.
+- Loaded magazines and shared reserves remain separate. Fire spends from the
+  selected supply once. Use an ammunition menu to reload/change ammunition or
+  unload a magazine. Loading takes a manually entered round count; capacity and
+  action costs are checked at the table.
+- Supported weapon formulas use imported attributes, saved enabled bonuses,
+  installed mods and loaded ammunition. Optional shown-DV/AP overrides let you
+  write a table ruling without changing base stats; blank restores calculation.
+- Programs are alphabetical with Loaded checkboxes. Source/page citations support
+  lookups; sourcebook content is not included. Earlier unlisted equipment entries
+  remain visible as notes; no unfinished Add Equipment purchase flow is exposed.
 
-- Five adaptive native pages: character/skills, combat, equipment, history, contacts.
-  iPad uses a compact page menu beside the title instead of a second tab row;
-  demo status lives in the title/menu rather than a persistent banner.
-  Blue panels follow the SR4 Anniversary sheet's organization. History and contact
-  content follows dossier pages 15 and 8, adapted to SR4. This is an initial layout,
-  not finished artwork or an exact PDF reproduction.
-- UTF-8/UTF-16 import. Unedited documents retain original bytes; edited documents
-  serialize as UTF-8. Unknown fields, attributes, comments, CDATA and element order
-  are retained. Whitespace, quote style and entity spelling are not byte guarantees.
-- Base attribute changes flow into modified attributes and linked skill pools
-  using imported modifier offsets. Skill rating/pool edits and simple initiative
-  formulas with editable modifiers are supported.
-- Physical/Stun: tap to fill damage through a box; tap the last marked box to
-  remove one. The first eight boxes are fixed. Hold optional boxes to extend/trim
-  a contiguous tail without erasing damage. Penalties appear every third usable
-  box. Only damage counts persist; capacity adjustments are session-only.
-- Combat includes weapons, applicable powers/spells/forms/spirits and vehicles.
-  Vehicle/drone damage persists in existing Chummer save fields. See
-  [device feedback and verification](DEVICE_FEEDBACK.md) for behavior and limits.
-- History and extended contact data live in versioned supported notes fields.
-- New equipment can be entered freely with a separate recoil adjustment and is
-  preserved as pending data in notes. Existing top-level equipment fields can be
-  edited. Numeric export checks reject text in known numeric fields.
+## Save and exchange
 
-## Remaining work
+Edits autosave to app-owned working copies after a short pause, before switching,
+and on focus loss/backgrounding. The last selected character restores on launch.
+Failures retain the current sheet and show an error. Imported source files remain
+unchanged. Save Copy exports a separate `.chum` for desktop Chummer.
 
-The target behavior is recorded in [SPECIFICATION.md](SPECIFICATION.md).
-
-- **Desktop equipment matching/review is not implemented.** Pending entries do
-  not yet become desktop equipment; no incomplete weapon nodes are injected.
-- Complete field/formula mapping: primary equipment links, matrix initiative,
-  effective commlink totals, nested-gear editing, skill-group/defaulting transitions,
-  modifiers and missing snapshots. Nested gear/programs are now displayed in their
-  saved hierarchy, including ratings, device base stats, upgrades and program options.
-- Actual desktop load/save/mobile reimport verification. Swift XML round trips
-  alone do not prove desktop acceptance.
-- Portrait editing, pending-equipment editing, deleting existing equipment,
-  overflow/print layout, zoom/page mode, PDF export, and native visual/input QA.
-- Native lifecycle/lock and relaunch acceptance checks remain pending. Local
-  working copies are not cloud sync; source-file conflict detection, library
-  removal/renaming, import deduplication and multiwindow editing remain open.
-  The app uses one window to prevent independent library writers.
-
-Programs appear alphabetically with Loaded checkboxes. Weapons show matching
-ammunition with tap-to-spend menus; loaded magazines and reserves are separate.
-Saved equipment source codes/pages support at-table lookup without sourcebooks.
-Matrix initiative/passes are provisional, with editable adjustments.
-
-No user character or reference PDF is bundled. Desktop behavior and packaging
-are unchanged. No advancement enforcement, purchases or automatic karma charges.
+Unknown XML, child equipment and human notes are retained. Extra sheet fields live
+in the supported dossier notes envelope. Desktop Chummer recalculates derived
+rules values when it loads/saves: imported snapshots and manual sheet calculations
+are not a replacement for its complete rules engine. Advanced cyberlimb, optional
+house-rule, program-load and situational effects require explicit table adjustments.
+No automatic advancement or purchase accounting runs in this companion.
 
 ## Verify
 
-With full Xcode selected, or `DEVELOPER_DIR` set to its developer directory:
+Run `CHUMMER_FIXTURE_ROOT=/absolute/path/to/Chummer.Mac/assets/saves swift test` from
+this directory. The shared Xcode scheme also runs native UI regressions on an
+available simulator and retains screenshots. The CI workflow chooses one phone
+and one tablet. Debug-only synthetic fixtures use an isolated archive.
 
-```sh
-CHUMMER_FIXTURE_ROOT="$PWD/../Chummer.Mac/assets/saves" swift test
-xcodebuild -project ChummerDossier.xcodeproj -scheme ChummerDossier \
-  -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-```
+The opt-in [desktop oracle](scripts/DesktopAudit/README.md) compares independent
+production-engine values and verifies manual-edit/ammunition desktop round trips.
+Private fixtures and output reports stay local, outside tracked source.
+See [specification](SPECIFICATION.md), [device feedback](DEVICE_FEEDBACK.md) and
+[verification history](VERIFICATION.md) for scope, evidence and known limits.
 
-The tests cover linked values, manual offsets, independent value snapshots,
-damage behavior, metadata, unsupported XML, numeric validation and the repository
-character corpus. CI runs core tests and builds the simulator app. Native gesture,
-VoiceOver, phone/tablet visual review and desktop round trips are separate gates.
+## Before first release
 
-See [local Xcode verification](VERIFICATION.md) for the passing XCTest/corpus and
-simulator build results, and the remaining first-boot simulator limitation.
+Finish printable SR4A sheet/PDF export, save recovery/conflict handling, and
+broader accessibility/rotation/lifecycle acceptance. Review wounded-character,
+conditional-rule and special-persona handling explicitly. A clean build and the
+five-character audit do not establish every Shadowrun rule or a Stable release.

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+    <RepoRoot>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)', 'Chummer.Mac.sln'))</RepoRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="ChummerMac"><HintPath>$(RepoRoot)/Chummer.Mac/bin/Release/net10.0/ChummerMac.dll</HintPath></Reference>
+    <Reference Include="Majorsilence.Forms"><HintPath>$(RepoRoot)/Chummer.Mac/bin/Release/net10.0/Majorsilence.Forms.dll</HintPath></Reference>
+    <Reference Include="Majorsilence.Forms.Headless"><HintPath>$(RepoRoot)/Chummer.Mac/bin/Release/net10.0/Majorsilence.Forms.Headless.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

@@ -228,3 +228,37 @@ outputs stayed under /tmp, outside the repository. SDK setup/build logs are reta
 - Evidence: /tmp/chummer-full-tests.log, /tmp/chummer-roundtrip/{prepare,desktop,verify}.log,
   /tmp/chummer-private-results/{prepare,verify,verify-controls}.log and per-case
   desktop outputs/unedited controls. Initial failed evidence is retained.
+
+## November 17 at-table companion acceptance
+
+The current scope is a manually editable at-table sheet, without automatic
+advancement charges or a purchase/catalog workflow. Existing pending equipment
+remains preserved and visible as notes.
+
+- Full core suite: 37 XCTest cases, eight optional phases skipped, zero failures;
+  all 399 repository characters checked read-only. Optional private audit and
+  integration phases were also run separately and pass.
+- Independent desktop-engine comparison for five private characters initially
+  identified three differences: loaded-ammo damage/AP and the no-active-commlink
+  Matrix baseline. After corrections, the compared attributes, existing skill
+  pools, initiative/passes, condition capacities and weapon DV/AP have zero
+  differences. Advanced options and missing/desktop-added skills remain outside
+  this representative comparison.
+- Production desktop load/save followed by mobile reimport preserves manual
+  attribute/rating edits, a reloaded magazine, its reserve and an explicit DV
+  override. Karma and nuyen remain unchanged; original files were read-only.
+- Reload/fire/unload tests verify conservation, returning old rounds to their
+  original reserve, separate magazine counts, active-slot selection, failed-load
+  atomicity, installed-mod bonuses and avoiding duplicate flechette bonuses.
+- Five native UI scenarios pass on both iPhone 15 and iPad Air simulators:
+  character-specific sections, combat/vehicle controls, compact contacts/no
+  purchase flow, light/dark equipment/powers, and reload/fire/unload. Synthetic
+  screenshots were retained and inspected for the changed layout. No physical
+  device was used for this batch.
+
+Current reports, xcresult bundles and private audit outputs are retained under
+ignored `artifacts/table-companion/`. The reproducible oracle is documented in
+`scripts/DesktopAudit/README.md`. No private character files or signing details
+are committed. This acceptance does not establish all optional rules, automatic
+wound/situational adjustments, finished printing, recovery/conflict handling or
+Stable readiness.
