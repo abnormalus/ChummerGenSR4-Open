@@ -59,3 +59,28 @@ Keep one verified Stable package set and one verified Nightly package set locall
 Every published source revision must have a distinct user-visible release/build identifier tied to its exact source commit. Rebuilds of identical source retain that version, with module IDs/runtime details available as supplemental evidence. About, diagnostics, BUILD.txt and platform package metadata must agree. A fixed assembly version plus an opaque module ID is insufficient for bug reporting. Keep the module ID as supplemental evidence, identify channel explicitly, and mark development/dirty builds honestly instead of attributing them to an unchanged release. Increment release/build versions automatically in the publishing process; preserve any assembly identity required for compatibility. Add automated checks for missing or inconsistent metadata before publishing.
 
 The shared implementation and verification policy are documented in [BUILD_IDENTITY.md](BUILD_IDENTITY.md). The legacy assembly identity stays fixed for compatibility, while reported release/file versions identify the actual release. Nightly packaging requires a clean checkout and full Git history.
+
+## Installed-package acceptance before publication
+
+The desktop workflow now builds candidate packages on pull requests as well as
+master. A separate Mac/Windows matrix downloads those exact candidate artifacts,
+checks SHA256SUMS and BUILD/source identity, and runs the packaged executable rather
+than a build-tree substitute. Mac additionally verifies the extracted app signature.
+Each packaged application must pass headless checks and the unchanged native bulk,
+sensor, focus and real sourcebook-reader process/report/count gates.
+
+On a disposable Windows host, `scripts/test-installed-package.ps1` verifies the
+previous public Nightly checksum, installs it, upgrades to the candidate MSI, checks
+the per-user path, shortcut and registry marker, repairs the same candidate version,
+and uninstalls it. External character/settings sentinel files must survive upgrade,
+repair and uninstall. The test refuses an existing installation and only runs when
+GITHUB_ACTIONS is true. Reports, process logs, MSI logs and synthetic captures are
+retained for 14 days on success or failure. Failed tests do not publish Nightly.
+
+The lifecycle script is prepared and syntax-checked locally; its actual hosted
+Mac/Windows result is required before claiming package acceptance. The previous
+Nightly must exist for upgrade coverage. This gate verifies that published baseline
+to candidate upgrade and same-package repair, not every historical installer or
+same-version independently rebuilt MSI. Stable promotion still needs the successful
+candidate/installed-package evidence and an explicit, provenance-preserving release
+promotion. A test script's presence alone is not acceptance.

@@ -59,6 +59,14 @@ namespace Chummer
             try
             {
                 HeadlessRenderer.Use();
+                Check(NativeFullscreenGeometry.ApplyInsets(new Avalonia.Size(1512, 982), new Avalonia.Thickness(0, 33, 0, 0)) == new Avalonia.Size(1512, 949),
+                    "Fullscreen display contract excludes the recorded camera safe area");
+                Check(NativeFullscreenGeometry.ApplyInsets(new Avalonia.Size(1280, 1024), default) == new Avalonia.Size(1280, 1024),
+                    "Fullscreen display contract retains the complete non-notched display");
+                bool invalidInsets = false;
+                try { NativeFullscreenGeometry.ApplyInsets(new Avalonia.Size(100, 100), new Avalonia.Thickness(0, 101, 0, 0)); }
+                catch (InvalidOperationException) { invalidInsets = true; }
+                Check(invalidInsets, "Fullscreen display contract rejects impossible native insets");
                 MacPaths.Initialize();
                 GlobalOptions.Instance.AutomaticUpdate = false;
                 LanguageManager.Instance.Load("en-us", null);

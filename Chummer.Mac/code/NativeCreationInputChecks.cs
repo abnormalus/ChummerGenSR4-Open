@@ -169,7 +169,7 @@ internal static class NativeCreationInputChecks
                     check(normalContactsFit, "Native normal creation column exposes populated contact and enemy fields and commands in " + theme.Key + (normalContactsFit ? "" : ContactGeometry()));
                 }
                 var screen = window.Screens.ScreenFromWindow(window);
-                Size fullscreenSize = screen != null ? screen.Bounds.Size.ToSize(screen.Scaling) : window.ClientSize;
+                Size fullscreenSize = NativeFullscreenGeometry.ExpectedClientSize(window);
                 var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window, check);
                 bool firstFullscreenTheme = true;
                 foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })

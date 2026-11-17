@@ -269,7 +269,6 @@ jobs:
     uses: ./.github/workflows/dependency-audit.yml
   package:
     needs: [validate, dependency-audit]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -287,11 +286,40 @@ jobs:
           name: nightly-assets
           path: artifacts/nightly/assets
           if-no-files-found: error
+  package-acceptance:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: nightly-assets
+          path: artifacts/candidate
+      - name: Ensure native Windows browser runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/ensure-webview2.ps1
+      - name: Verify installed candidate and package lifecycle
+        shell: pwsh
+        run: ./scripts/test-installed-package.ps1 -Assets artifacts/candidate -ExpectedSource '${{ github.sha }}' -Output artifacts/package-acceptance
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: package-acceptance-${{ matrix.os }}
+          path: artifacts/package-acceptance
+          if-no-files-found: error
+          retention-days: 14
   publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     concurrency:
       group: chummer-release-assets
       cancel-in-progress: false
-    needs: package
+    needs: [package, package-acceptance]
     runs-on: ubuntu-latest
     permissions:
       contents: write

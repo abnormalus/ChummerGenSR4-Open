@@ -93,3 +93,32 @@ The human subsequently authorized same-draft CI fixes between batches: “Allow 
 The human requests a large bundled portrait library after the current modernization updates are complete. They explicitly permit sharing the supplied diaz.png portrait. Do not spend agent resources researching, generating, collecting or implementing the library until everything else is done. This is a later deliverable, not scope for the current layout and portrait-reopen correction. Preserve the existing ability to import individual portraits.
 
 Native fullscreen acceptance uses a test-driver reconciliation helper: preserve an already completed fullscreen client and frame matching the actual screen, otherwise normalize and recognize native completion throughout the wait. Contact, knowledge and creation-input fixtures retain strict actual-screen, stable-geometry and complete-row checks. Normalization and the first check share the existing20-second budget. That historical acceptance used a300-second suite deadline and minimum825 assertions, with report/exit gates. The current workflow owns the expanded suite minimum; retain its operation, deadline, report and exit checks rather than reusing the historical count. This driver correction passed both-platform exact-source CI and master release; it is not a production fullscreen fix.
+
+
+## November 16 verification and release readiness
+
+The PR44 source `8a89b10091b3b2dabc17ee062da4a78511cf3ab9` was independently checked
+from a clean checkout with SDK10.0.401 on the new Mac. Locked restore, Release build,
+source/PDF/archival/identity/runner safeguards, current dependency/PDF.js audits and
+the full399-character headless suite pass. The full suite completed in115.1 seconds.
+Native sensors17, focus66 and actual sourcebook reader10 pass. All four private
+characters additionally pass production desktop load/save/reload and mobile reimport
+with independently loaded unedited controls; no private files are committed.
+
+The original bulk driver failed on a camera-housing display: it required physical
+screen height982 while AppKit provided a949-point fullscreen content area. The
+corrected driver obtains NSScreen.safeAreaInsets from the actual NSWindow's display
+and derives the expected safe rectangle independently of measured window dimensions.
+On this display it expects950points and observes949, within the existing one-point
+rounding tolerance. The same correction applies to input/contact/knowledge fixtures
+and transition reconciliation. No production layout, tolerance, operation budget,
+assertion minimum or process deadline is changed. Full native bulk1078 then passes
+in115.9seconds. Non-notched/Windows expectations remain full screen. AppKit specifies
+this standard behavior: https://developer.apple.com/documentation/appkit/nsscreen/safeareainsets
+
+A packaged-executable/Windows installer lifecycle gate now supplements build-tree
+native checks, with candidate identity/checksum checks, prior-Nightly upgrade,
+same-version repair, uninstall and user-data preservation. Its new exact-source
+hosted results are pending; do not call modernization merged/released or Stable
+accepted until the current PR/master and package gates actually complete. The iOS
+companion remains a separate draft milestone and does not define desktop completion.
