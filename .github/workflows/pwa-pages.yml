@@ -2,7 +2,7 @@ name: PWA nightly and stable
 
 on:
   push:
-    branches: [master, codex/pwa-dossier]
+    branches: [master]
     paths: ['Chummer.PWA/**', '.github/workflows/pwa-pages.yml']
   pull_request:
     paths: ['Chummer.PWA/**', '.github/workflows/pwa-pages.yml']
@@ -40,11 +40,11 @@ jobs:
           EVENT: ${{ github.event_name }}
           REQUESTED: ${{ inputs.channel }}
           TAG: ${{ inputs.release_tag }}
-          PR_SHA: ${{ github.sha }}
+          EVENT_SHA: ${{ github.sha }}
         run: |
           channel="${REQUESTED:-nightly}"
-          ref='codex/pwa-dossier'
-          if [ "$EVENT" = pull_request ]; then ref="$PR_SHA"; fi
+          ref='master'
+          if [ "$EVENT" = pull_request ] || [ "$EVENT" = push ]; then ref="$EVENT_SHA"; fi
           if [ "$channel" = stable ]; then
             if ! [[ "$TAG" =~ ^pwa-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo 'Stable requires an explicit reviewed pwa-vX.Y.Z tag.' >&2

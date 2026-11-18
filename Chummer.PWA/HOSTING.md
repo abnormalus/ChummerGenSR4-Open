@@ -6,7 +6,7 @@ Private character snapshots remain in user-owned private repositories, never Pag
 
 ## Channels
 
-- `/nightly/`: `codex/pwa-dossier`, on relevant pushes and daily at 10:20 UTC.
+- `/nightly/`: `master`, on relevant pushes and daily at 10:20 UTC.
 - `/stable/`: reserved until release acceptance. Publish manually through the
   **PWA nightly and stable** workflow, choosing `stable` and a reviewed `pwa-vX.Y.Z` tag.
   A development branch cannot be selected for stable publication.
@@ -33,7 +33,7 @@ until the transferred characters have been verified.
 
 ## Rollback
 
-Select a previously verified source revision on the nightly branch, or explicitly
+Revert the relevant PWA change on `master` to restore a previous Nightly, or
 run stable with a prior reviewed release tag. The other channel is preserved. Uploaded
 candidate artifacts retain source SHA metadata in `build-info.json`. Neither deployment
 nor rollback changes locally stored character XML.
