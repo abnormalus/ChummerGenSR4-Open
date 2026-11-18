@@ -44,3 +44,11 @@ source references. PDF generation is local and works offline after the assets ar
 
 Primary armor uses the highest combined ballistic/impact value among equipped armor,
 falling back to owned armor when none is marked equipped (ballistic breaks ties).
+
+Open refreshes the linked repository on every visit and lists `.chum` files in all
+folders. Search matches filenames, folder paths and loaded character names/aliases.
+Embedded raster portraits load progressively, with initials when absent or unreadable.
+The first 100 entries receive previews per refresh to bound download/decode work;
+all characters remain selectable. Preview metadata and resized images stay in memory
+and are cleared on disconnect. Opening downloads the latest file as a separate local
+working copy, preserving existing edits. A new browser session needs reconnection.

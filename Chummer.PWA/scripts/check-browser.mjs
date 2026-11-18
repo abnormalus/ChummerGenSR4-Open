@@ -23,4 +23,36 @@ try{
  await page.getByRole('button',{name:'Export',exact:true}).click();
  for(const name of ['Print full character','Print official character sheet'])if(!await page.getByRole('button',{name,exact:true}).isVisible())throw Error('Missing '+name);
  console.log('PASS real UI autosave and export options');
+ await page.getByRole('button',{name:'Close export',exact:true}).click();
+ const {demo}=await import('../dist/core.mjs');
+ const sample=new TextDecoder().decode(demo),icon=(await readFile('Chummer.PWA/dist/assets/icon.png')).toString('base64');
+ const portraitSample=sample.replace('</character>','<mugshot>'+icon+'</mugshot></character>');
+ let expanded=false,treeReads=0;
+ await page.route('https://api.github.com/**',async route=>{
+  const path=new URL(route.request().url()).pathname;let json;
+  if(path==='/repos/test/private')json={id:99,private:true,permissions:{push:true},default_branch:'main'};
+  else if(path.includes('/git/trees/')){treeReads++;json={tree:[{path:'Nightjar.chum',type:'blob',mode:'100644',sha:'portrait'},...(expanded?[{path:'Archive/Willow.chum',type:'blob',mode:'100644',sha:'second'}]:[])]};}
+  else{const first=path.endsWith('/portrait')||path.endsWith('/Nightjar.chum');const xml=first?portraitSample:sample.replace('<alias>Nightjar</alias>','<alias>Willow test</alias>');json={sha:first?'portrait':'second',encoding:'base64',size:xml.length,content:Buffer.from(xml).toString('base64')};}
+  await route.fulfill({json});
+ });
+ await page.getByRole('button',{name:'Open',exact:true}).click();
+ await page.getByLabel('New or existing repository',{exact:true}).fill('test/private');
+ await page.getByLabel('Token',{exact:true}).fill('synthetic-test-token');
+ await page.getByRole('button',{name:'Connect',exact:true}).click();
+ await page.locator('.character-choice img').waitFor();
+ if(!await page.getByRole('dialog').getByText('Nightjar',{exact:true}).isVisible())throw Error('Missing character alias');
+ await page.getByRole('button',{name:'Close character browser',exact:true}).click();
+ expanded=true;
+ await page.getByRole('button',{name:'Open',exact:true}).click();
+ await page.locator('.character-choice').nth(1).waitFor();
+ if(treeReads<2)throw Error('Open did not refresh repository');
+ await page.getByLabel('Find a repository character',{exact:true}).fill('archive');
+ await page.locator('.character-choice').click();
+ if(await page.getByLabel('Runner',{exact:true}).inputValue()!=='Willow test')throw Error('Wrong repository character opened');
+ const local=await page.getByRole('option',{name:'Nightjar',exact:true}).getAttribute('value');
+ await page.getByLabel('Character',{exact:true}).selectOption(local);
+ await page.waitForFunction(()=>document.querySelector('input[aria-label="Runner"]')?.value==='Nightjar');
+ if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='5.75')throw Error('Opening repository character overwrote local edits');
+ console.log('PASS Open refreshes all characters, shows portrait, searches folders and preserves local edits');
+
 }finally{await browser.close();await new Promise(done=>server.close(done));}
