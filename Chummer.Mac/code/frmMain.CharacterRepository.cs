@@ -132,15 +132,20 @@ public partial class frmMain
         return characterRepository != null;
     }
 
-    private static Window RepositoryDialog(string title, StackPanel content) => new()
+    private static Window RepositoryDialog(string title, StackPanel content)
     {
-        Title = title,
-        Width = 530,
-        SizeToContent = SizeToContent.Height,
-        WindowStartupLocation = WindowStartupLocation.CenterOwner,
-        CanResize = false,
-        Content = content
-    };
+        var window = new Window
+        {
+            Title = title,
+            Width = 530,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = content
+        };
+        NativeControlPresentation.AddTheme(window.Styles);
+        return window;
+    }
 
     private static StackPanel RepositoryPanel() => new() { Margin = new Thickness(20), Spacing = 10 };
 
@@ -150,7 +155,7 @@ public partial class frmMain
         TextWrapping = Avalonia.Media.TextWrapping.Wrap
     };
 
-    private async Task ConnectRepositoryAsync(bool renewing)
+    internal async Task ConnectRepositoryAsync(bool renewing)
     {
         var panel = RepositoryPanel();
         var dialog = RepositoryDialog(renewing ? "Renew GitHub Token" : "Connect Character Repository", panel);
@@ -158,6 +163,9 @@ public partial class frmMain
         var name = new TextBox { Text = savedRepository?.Name, PlaceholderText = "owner/repository", IsReadOnly = renewing };
         var folder = new TextBox { Text = savedRepository?.Folder ?? "characters", IsReadOnly = renewing };
         var token = new TextBox { PasswordChar = '●', PlaceholderText = "Paste the new token" };
+        Avalonia.Automation.AutomationProperties.SetName(name, "GitHub repository");
+        Avalonia.Automation.AutomationProperties.SetName(folder, "Character folder");
+        Avalonia.Automation.AutomationProperties.SetName(token, "GitHub token");
         var create = new Button { Content = "Create private repository in GitHub" };
         var authorize = new Button { Content = renewing ? "Open GitHub to create a replacement token" : "Create fine-grained token in GitHub" };
         var connect = new Button { Content = renewing ? "Verify and save new token" : "Verify and connect", IsDefault = true };
