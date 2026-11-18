@@ -7,7 +7,7 @@ Updates to `master` automatically run **Nightly desktop builds**. It checks the 
 To rebuild manually, go to **GitHub → Actions → Nightly desktop builds → Run workflow**, select `master`, and run it. No local signing keys, upload commands, or personal tokens are required: the publish job uses GitHub's repository-scoped workflow token. If Actions are disabled in the fork, enable them once from its Actions tab.
 
 Desktop validation is selected independently for macOS and Windows. A platform
-can reuse its results when its last five executed validations on `master` passed,
+can reuse its results when its last five installed-package checks on `master` passed,
 its latest pass is less than seven days old, and the current checkout has the
 same desktop inputs as that pass. Docs, iOS, and PWA-only changes can qualify.
 Changes to desktop code, shared dependencies, tooling, and release workflows
@@ -15,8 +15,9 @@ require fresh validation. Skips do not count as passes. The Actions run summary
 shows each platform's decision.
 
 Monday's scheduled workflow and manual runs always exercise both platforms.
-The weekly run does not publish. Any new Nightly package still goes through
-installed-package verification before publication.
+The weekly run does not publish. Native checks and fixture smoke tests run once
+against the candidate package for each selected platform. Any new Nightly runs
+installed-package verification on both platforms before publication.
 
 Assets have stable names: `ChummerSR4-macOS-arm64.zip`, `ChummerSR4-Windows-x64.msi`, `BUILD.txt`, and `SHA256SUMS.txt`. The moving `Nightly` tag points to the source commit. Checksums and build metadata make it easy to identify a tester's version.
 
@@ -28,7 +29,10 @@ On an Apple Silicon Mac with .NET 10, Python 3, and Homebrew `msitools` installe
 bash scripts/package-nightly.sh /absolute/path/to/new-output
 ```
 
-This builds both platforms, runs character checks, packages both downloads, verifies every MSI file, and generates checksums. It uses the same scripts as GitHub Actions. With an authenticated GitHub CLI, publish those assets with:
+This builds both platforms, packages both downloads, verifies every MSI file, and
+generates checksums. It uses the same packaging scripts as GitHub Actions. After
+the exact packages pass installed acceptance on both platforms, publish those
+assets with an authenticated GitHub CLI:
 
 ```sh
 GH_REPO=abnormalus/ChummerGenSR4-Open SOURCE_SHA="$(git rev-parse HEAD)" bash scripts/publish-nightly.sh /absolute/path/to/new-output/assets

@@ -14,7 +14,7 @@ NOW = dt.datetime(2026, 11, 18, tzinfo=dt.timezone.utc)
 def example(count=5):
     runs = [{"event": "push", "head_branch": "master", "head_sha": f"{i:040x}", "id": i}
             for i in range(count)]
-    jobs = {run["id"]: [{"name": f"validate ({platform})", "conclusion": "success",
+    jobs = {run["id"]: [{"name": f"package-acceptance ({platform})", "conclusion": "success",
                          "completed_at": (NOW - dt.timedelta(days=1)).isoformat()}
                         for platform in planner.PLATFORMS] for run in runs}
     return runs, jobs
