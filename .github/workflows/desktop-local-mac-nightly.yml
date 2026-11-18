@@ -1,0 +1,127 @@
+name: Nightly with a locally tested Mac package
+on:
+  workflow_dispatch:
+    inputs:
+      mac_sha256:
+        description: SHA-256 printed by package-local-mac-nightly.sh
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  dependency-audit:
+    if: github.ref == 'refs/heads/master'
+    uses: ./.github/workflows/dependency-audit.yml
+  stage-mac:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # GitHub limits draft release visibility to credentials with write access.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify locally accepted Mac package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAC_SHA256: ${{ inputs.mac_sha256 }}
+        run: |
+          mkdir -p artifacts/mac
+          gh release download "mac-candidate-$GITHUB_SHA" --dir artifacts/mac \
+            --pattern ChummerSR4-macOS-arm64.zip --pattern mac-acceptance.json
+          python3 scripts/build_identity.py --output artifacts/identity.json
+          python3 scripts/verify-local-mac-nightly.py artifacts/mac/ChummerSR4-macOS-arm64.zip \
+            artifacts/mac/mac-acceptance.json artifacts/identity.json --expected-sha256 "$MAC_SHA256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: local-mac-acceptance
+          path: artifacts/mac
+          if-no-files-found: error
+  package:
+    needs: [dependency-audit, stage-mac]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/download-artifact@v8
+        with:
+          name: local-mac-acceptance
+          path: artifacts/mac
+      - name: Build and verify Windows installer
+        run: |
+          mkdir -p artifacts/assets
+          cp artifacts/mac/ChummerSR4-macOS-arm64.zip artifacts/assets/
+          python3 scripts/build_identity.py --output artifacts/identity.json
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y msitools wixl
+          release_version="$(python3 -c 'import json; print(json.load(open("artifacts/identity.json"))["informationalVersion"])')"
+          file_version="$(python3 -c 'import json; print(json.load(open("artifacts/identity.json"))["fileVersion"])')"
+          dotnet publish Chummer.Mac/Chummer.Mac.csproj -c Release -r win-x64 --self-contained true \
+            -p:RestoreLockedMode=true -p:UsedAvaloniaProducts= \
+            "-p:ChummerReleaseVersion=$release_version" "-p:ChummerFileVersion=$file_version" -o artifacts/windows
+          cp artifacts/identity.json artifacts/windows/build-identity.json
+          python3 scripts/write-build-revision.py artifacts/windows/source-revision.txt
+          python3 packaging/windows/build-msi.py artifacts/windows artifacts/assets/ChummerSR4-Windows-x64.msi
+          python3 packaging/windows/verify-msi.py artifacts/windows artifacts/assets/ChummerSR4-Windows-x64.msi
+          rm artifacts/assets/ChummerSR4-Windows-x64.wxs
+          printf 'Chummer SR4 %s\nChannel: Nightly\nSource commit: %s\nMac: Apple Silicon, macOS 15+\nWindows: x64, Windows 10/11; PDF reader requires WebView2\n' \
+            "$release_version" "$GITHUB_SHA" > artifacts/assets/BUILD.txt
+          (cd artifacts/assets && sha256sum BUILD.txt ChummerSR4-macOS-arm64.zip ChummerSR4-Windows-x64.msi > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nightly-assets
+          path: artifacts/assets
+          if-no-files-found: error
+  windows-package-acceptance:
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: nightly-assets
+          path: artifacts/candidate
+      - name: Ensure native Windows browser runtime
+        shell: pwsh
+        run: ./scripts/ensure-webview2.ps1
+      - name: Verify installed candidate and package lifecycle
+        shell: pwsh
+        run: ./scripts/test-installed-package.ps1 -Assets artifacts/candidate -ExpectedSource '${{ github.sha }}' -Output artifacts/package-acceptance
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: package-acceptance-windows
+          path: artifacts/package-acceptance
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    if: github.ref == 'refs/heads/master'
+    needs: [package, windows-package-acceptance]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: chummer-release-assets
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          name: nightly-assets
+          path: assets
+      - name: Publish Nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: bash scripts/publish-nightly.sh assets

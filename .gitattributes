@@ -4,3 +4,5 @@ Chummer.Mac/pdfjs/** -text
 
 # Preserve the embedded official form bytes and show it as a binary resource.
 Chummer.iOS/App/Resources/SR4A-Character-Sheet.pdf binary
+
+Chummer.PWA/dist/assets/SR4A-Character-Sheet.pdf binary

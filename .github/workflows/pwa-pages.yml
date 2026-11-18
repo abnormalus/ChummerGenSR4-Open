@@ -1,0 +1,159 @@
+name: PWA nightly and stable
+
+on:
+  push:
+    branches: [master]
+    paths: ['Chummer.PWA/**', '.github/workflows/pwa-pages.yml']
+  pull_request:
+    paths: ['Chummer.PWA/**', '.github/workflows/pwa-pages.yml']
+  schedule:
+    - cron: '20 10 * * *'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel to publish
+        type: choice
+        options: [nightly, stable]
+        default: nightly
+      release_tag:
+        description: 'Stable only: reviewed pwa-vX.Y.Z tag (never a development branch)'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pwa-pr-{0}', github.event.pull_request.number) || inputs.channel == 'stable' && 'pwa-stable' || 'pwa-pages' }}
+  cancel-in-progress: ${{ inputs.channel != 'stable' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      channel: ${{ steps.select.outputs.channel }}
+      source_sha: ${{ steps.identity.outputs.sha }}
+    steps:
+      - id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          REQUESTED: ${{ inputs.channel }}
+          TAG: ${{ inputs.release_tag }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          channel="${REQUESTED:-nightly}"
+          ref='master'
+          if [ "$EVENT" = pull_request ] || [ "$EVENT" = push ]; then ref="$EVENT_SHA"; fi
+          if [ "$channel" = stable ]; then
+            if ! [[ "$TAG" =~ ^pwa-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo 'Stable requires an explicit reviewed pwa-vX.Y.Z tag.' >&2
+              exit 1
+            fi
+            ref="refs/tags/$TAG"
+          fi
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.select.outputs.ref }}
+          persist-credentials: false
+      - id: identity
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser verification tools
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --only-shell chromium
+      - name: Verify XML, sync rules, PDFs and app exports
+        run: node Chummer.PWA/scripts/check-browser.mjs
+      - name: Package application assets only
+        env:
+          CHANNEL: ${{ steps.select.outputs.channel }}
+          SOURCE_SHA: ${{ steps.identity.outputs.sha }}
+        run: |
+          mkdir candidate
+          cp -R Chummer.PWA/dist/. candidate/
+          test -f candidate/assets/SR4A-Character-Sheet.pdf
+          test -z "$(find candidate -iname '*.chum' -print -quit)"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const channel=process.env.CHANNEL,sha=process.env.SOURCE_SHA;
+          const manifest=JSON.parse(fs.readFileSync('candidate/manifest.webmanifest'));
+          manifest.name='SR 4 Dossier'+(channel==='nightly'?' Nightly':'');
+          manifest.short_name=channel==='nightly'?'SR4 Nightly':'SR4 Dossier';
+          fs.writeFileSync('candidate/manifest.webmanifest',JSON.stringify(manifest));
+          fs.writeFileSync('candidate/build-info.json',JSON.stringify({channel,sha,builtAt:new Date().toISOString()}));
+          const sw=fs.readFileSync('candidate/sw.js','utf8').replace("PREFIX+'v3'","PREFIX+'"+sha+"'");
+          fs.writeFileSync('candidate/sw.js',sw);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pwa-candidate
+          path: candidate
+          retention-days: 7
+
+  publish:
+    concurrency:
+      group: pwa-pages-publish
+      cancel-in-progress: false
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: pwa-candidate
+          path: candidate
+      - name: Preserve the other channel and assemble Pages
+        env:
+          CHANNEL: ${{ needs.build.outputs.channel }}
+          SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+        run: |
+          if git ls-remote --exit-code --heads origin pwa-pages >/dev/null; then
+            git fetch origin pwa-pages
+            git worktree add site FETCH_HEAD
+          else
+            mkdir site
+            git -C site init
+            git -C site checkout --orphan pwa-pages
+            git -C site remote add origin "$(git remote get-url origin)"
+            git -C site config http.https://github.com/.extraheader "$(git config --get http.https://github.com/.extraheader)"
+          fi
+          rm -rf "site/$CHANNEL"
+          cp -R candidate "site/$CHANNEL"
+          touch site/.nojekyll
+          if [ ! -f site/stable/index.html ]; then
+            mkdir -p site/stable
+            printf '%s\n' '<!doctype html><html lang="en"><meta charset="utf-8"><title>SR4 Dossier Stable</title><h1>Stable release is not available yet</h1><p>The companion is in development. Stable will be published after release verification.</p><a href="../nightly/">Open nightly preview</a></html>' > site/stable/index.html
+          fi
+          printf '%s\n' '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SR 4 Dossier</title><style>body{max-width:38em;margin:12vh auto;padding:24px;font:18px/1.6 system-ui;background:#102023;color:#e4efec}a{color:#80d2cc;display:block;margin:20px 0}</style><h1>SR 4 Dossier</h1><p>Shadowrun 4 at-table companion. Characters stay on your device or in your own private repository.</p><a href="nightly/">Open nightly</a><a href="stable/">Stable releases</a><p>Moving from the earlier preview? Export your .chum files there and import them here, or download your repository snapshots.</p></html>' > site/index.html
+          git -C site config user.name 'github-actions[bot]'
+          git -C site config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C site add .
+          if ! git -C site diff --cached --quiet; then
+            git -C site commit -m "Publish $CHANNEL $SOURCE_SHA"
+            git -C site push origin HEAD:refs/heads/pwa-pages
+          fi
+          mkdir public
+          cp -R site/. public/
+          rm -rf public/.git
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deploy
+        uses: actions/deploy-pages@v4
