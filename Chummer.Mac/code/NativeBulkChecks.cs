@@ -87,6 +87,7 @@ internal static class NativeBulkChecks
             await NativeControlChecks.RunAsync(Check);
             await NativeRenderingChecks.RunAsync(Check);
             await NativeDropDownChecks.RunAsync(Check);
+            await NativeRepositoryDialogChecks.RunAsync(main, Check);
             // Exercise the actual export modal rather than only reading constructor state.
             using (var foundryDialog = new FoundryExportDialog(new[] { character }))
             {
