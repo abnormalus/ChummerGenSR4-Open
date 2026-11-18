@@ -30,7 +30,7 @@ results="$output/results"
 python3 scripts/run-bounded.py --label headless --log-file "$results/headless.log" --timeout 600 -- \
     "$exe" --smoke-test "$results/characters" "$root/Chummer.Mac/assets/saves"
 for gate in bulk sensor-transactions focus-command pdf-reader; do
-    python3 scripts/run-bounded.py --label "$gate" --log-file "$results/$gate.log" --timeout 300 -- \
+    /usr/bin/caffeinate -diu python3 scripts/run-bounded.py --label "$gate" --log-file "$results/$gate.log" --timeout 300 -- \
         "$exe" "--check-$gate" "$results/characters/creation.chum" "$results/$gate.json"
 done
 python3 scripts/verify-local-mac-nightly.py "$zip" "$output/mac-acceptance.json" "$output/identity.json" --local-results "$results"
