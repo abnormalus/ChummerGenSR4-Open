@@ -8380,34 +8380,24 @@ namespace Chummer
 
 		private void tsCyberwareAddAsPlugin_Click(object sender, EventArgs e)
 		{
-			// Make sure a parent items is selected, then open the Select Cyberware window.
-			try
-			{
-				if (treCyberware.SelectedNode.Level == 0)
-				{
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_SelectCyberware"), LanguageManager.Instance.GetString("MessageTitle_SelectCyberware"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-					return;
-				}
-			}
-			catch
-			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_SelectCyberware"), LanguageManager.Instance.GetString("MessageTitle_SelectCyberware"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-				return;
-			}
+            TreeNode parent = treCyberware.SelectedNode;
+            if (parent == null || parent.Level == 0 || parent.Parent == treCyberware.Nodes[1])
+            {
+                MessageBox.Show(LanguageManager.Instance.GetString("Message_SelectCyberware"), LanguageManager.Instance.GetString("MessageTitle_SelectCyberware"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
 
-			if (treCyberware.SelectedNode.Parent == treCyberware.Nodes[1])
-			{
-				MessageBox.Show(LanguageManager.Instance.GetString("Message_SelectCyberware"), LanguageManager.Instance.GetString("MessageTitle_SelectCyberware"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-				return;
-			}
-			
-			bool blnAddAgain = PickCyberware();
-			if (blnAddAgain)
-			{
-				treCyberware.SelectedNode = treCyberware.SelectedNode.Parent;
-				tsCyberwareAddAsPlugin_Click(sender, e);
-			}
-		}
+            // Keep the host selected for the next enhancement. A rejected
+            // purchase leaves the host selected too, so its parent is never
+            // mistaken for the intended target of Add More.
+            bool addAgain;
+            do
+            {
+                addAgain = PickCyberware();
+                treCyberware.SelectedNode = parent;
+            }
+            while (addAgain);
+        }
 
 		private void tsWeaponAddAccessory_Click(object sender, EventArgs e)
 		{

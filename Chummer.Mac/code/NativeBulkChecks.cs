@@ -33,7 +33,7 @@ internal static class NativeBulkChecks
         foreach (var editor in Application.OpenForms.OfType<frmCreate>().ToArray())
             editor.GetType().GetField("_blnIsDirty", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(editor, false);
     }
-    internal static async Task RunAsync(frmMain main, string path, string report, bool sensorTransactionsOnly = false, bool focusCommandOnly = false, bool pdfReaderOnly = false)
+    internal static async Task RunAsync(frmMain main, string path, string report, string command)
     {
         var checks = new List<string>();
         bool passed = false;
@@ -60,24 +60,31 @@ internal static class NativeBulkChecks
             if (!character.Load(false)) throw new InvalidDataException("Unable to load generated check character.");
             // Additional caller coverage runs in its own bounded process. The
             // original bulk suite, assertion gate and shutdown deadline remain.
-            if (pdfReaderOnly)
+            if (command == "--check-pdf-reader")
             {
                 await NativeSourcebookReaderChecks.RunAsync(main, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
                 Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native sourcebook checks preserve the source character file");
                 passed = true;
                 return;
             }
-            if (focusCommandOnly)
+            if (command == "--check-focus-command")
             {
                 await NativeFocusCommandChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
                 Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native focus commands preserve the source character file");
                 passed = true;
                 return;
             }
-            if (sensorTransactionsOnly)
+            if (command == "--check-sensor-transactions")
             {
                 await NativeSensorTransactionChecks.RunAsync(main, character, Check);
                 Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native sensor transactions preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-cyberware")
+            {
+                await NativeCybereyeEnhancementChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native Cybereye checks preserve the source character file");
                 passed = true;
                 return;
             }
@@ -130,6 +137,7 @@ internal static class NativeBulkChecks
             await NativeCyberwareOptionChecks.RunAsync(main, character, Check);
             await NativeCyberwareGradeChecks.RunAsync(main, character, Check);
             await NativeCyberwarePurchaseChecks.RunAsync(main, character, Check);
+            await NativeCybereyeEnhancementChecks.RunAsync(main, character, Check);
             await NativeNumberPromptChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeStartingMoneyChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeCalendarStartChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);

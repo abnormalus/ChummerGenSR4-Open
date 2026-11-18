@@ -47,7 +47,7 @@ def plan(runs, load_jobs, changed, now):
         for platform, results in history.items():
             if len(results) == REQUIRED_PASSES:
                 continue
-            job = jobs.get(f"validate ({platform})")
+            job = jobs.get(f"package-acceptance ({platform})")
             # A skipped lane contributed no test result.
             if job is not None and job["conclusion"] != "skipped":
                 results.append((commit, job))

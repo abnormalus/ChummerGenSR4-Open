@@ -52,7 +52,7 @@ function Check-Identity([string]$Exe, [string]$Root) {
     Check ($manifest.sourceCommit -eq $ExpectedSource -and -not $manifest.dirty) 'Installed package has the expected clean source identity'
     $actual = & $Exe --version-json | ConvertFrom-Json
     if ($LASTEXITCODE -ne 0) { throw 'Installed version command failed.' }
-    Check ($actual.sourceCommit -eq $ExpectedSource -and $actual.version -eq $manifest.informationalVersion -and $actual.channel -eq $manifest.channel) 'Installed executable agrees with its package manifest'
+    Check ($actual.sourceCommit -eq $ExpectedSource -and $actual.version -eq $manifest.informationalVersion -and $actual.fileVersion -eq $manifest.fileVersion -and $actual.channel -eq $manifest.channel) 'Installed executable agrees with its package manifest'
 }
 function Native-Gate([string]$Exe, [string]$Flag, [string]$Name, [int]$Minimum, [int]$Seconds) {
     $report = Join-Path $Output "$Name.json"
@@ -107,13 +107,20 @@ try {
         $exe = Join-Path $root 'ChummerMac'
         Check-Identity $exe $root
     } else { throw 'Unsupported acceptance host.' }
-    Run-Process $exe @('--smoke-test', (Join-Path $Output 'checks')) 'installed-headless' 600
+    $fixtureRoot = Join-Path $PSScriptRoot '../Chummer.Mac/assets/saves'
+    Run-Process $exe @('--smoke-test', (Join-Path $Output 'checks'), $fixtureRoot) 'installed-headless' 600
     Check (Test-Path (Join-Path $Output 'checks/creation.chum')) 'Installed application generated its synthetic character'
     Native-Gate $exe '--check-bulk' 'installed-native-bulk' 1069 300
     Native-Gate $exe '--check-sensor-transactions' 'installed-native-sensors' 17 180
     Native-Gate $exe '--check-focus-command' 'installed-native-focus' 66 180
     Native-Gate $exe '--check-pdf-reader' 'installed-native-reader' 10 180
     if ($IsWindows) {
+        $pdf = Join-Path $Output 'native-character.pdf'
+        Run-Process $exe @('--export-pdf', (Join-Path $Output 'checks/career.chum'), $pdf) 'installed-native-character-pdf' 90
+        Check (Test-Path $pdf) 'Installed Windows preview produces a PDF'
+        $bytes = [IO.File]::ReadAllBytes($pdf)
+        $content = [Text.Encoding]::Latin1.GetString($bytes)
+        Check ($bytes.Length -ge 1000 -and $content.StartsWith('%PDF-') -and $content -match '/Type\s*/Page\b') 'Installed Windows preview exports a valid PDF'
         Run-Process 'msiexec.exe' @('/x', $msi, '/qn', '/norestart', '/l*v', (Join-Path $Output 'uninstall.log')) 'uninstall'
         $installed = $false
         Check (-not (Test-Path $exe) -and -not (Test-Path $shortcut)) 'Uninstall removes the application and Start menu shortcut'
