@@ -1,6 +1,7 @@
 import copy
 from datetime import datetime, timezone, timedelta
 import importlib.util
+import hashlib
 import json
 import pathlib
 import tempfile
@@ -20,22 +21,26 @@ class FakeGitHub:
 
     def add(self, tag='Nightly', stamp='2026-10-15T01:00:00Z', data=b'old package'):
         self.files[tag] = {'old.zip': data}
-        self.items[tag] = {'tag_name': tag, 'draft': False, 'body': 'Original build source: `' + SOURCE + '`.\nOriginal notes', 'assets': [{'id': 1, 'name': 'old.zip', 'size': len(data), 'updated_at': stamp}]}
+        self.items[tag] = {'id': tag, 'tag_name': tag, 'draft': False, 'body': 'Original build source: `' + SOURCE + '`.\nOriginal notes', 'assets': [{'id': 1, 'name': 'old.zip', 'size': len(data), 'updated_at': stamp}]}
 
     def gh(self, *args):
         self.calls.append(args)
-        if args[0] == 'api': return json.dumps([list(self.items.values())]).encode()
+        if args[0] == 'api':
+            if '/assets?' in args[1]:
+                tag = args[1].split('/releases/')[1].split('/')[0]
+                return json.dumps([self.items[tag]['assets']]).encode()
+            return json.dumps([list(self.items.values())]).encode()
         command, tag = args[1:3]
         if command == 'download':
             dest = pathlib.Path(args[args.index('--dir') + 1])
             names = [args[i+1] for i, a in enumerate(args) if a == '--pattern'] or list(self.files[tag])
             for name in names:
                 data = self.files[tag][name]
-                if tag.startswith('archive-2026-') and self.corrupt == ('metadata' if name == 'ARCHIVE.json' else 'asset'):
+                if tag == m.ARCHIVED and self.corrupt == ('metadata' if name == 'ARCHIVE.json' else 'asset'):
                     data = b'corrupt'
                 (dest / name).write_bytes(data)
         elif command == 'create':
-            self.items[tag] = {'tag_name': tag, 'draft': True, 'body': '', 'assets': []}; self.files[tag] = {}
+            self.items[tag] = {'id': tag, 'tag_name': tag, 'draft': True, 'body': '', 'assets': []}; self.files[tag] = {}
         elif command == 'upload':
             for arg in args[3:args.index('--repo')]:
                 path = pathlib.Path(arg); name = path.name
@@ -66,22 +71,22 @@ class Tests(unittest.TestCase):
 
     def archive(self): m.archive('owner/repo', self.incoming)
 
-    def daily(self): return self.remote.items['archive-2026-10-14']
+    def archived(self): return self.remote.items[m.ARCHIVED]
 
-    def manifest(self): return json.loads(self.remote.files['archive-2026-10-14']['ARCHIVE.json'])
+    def manifest(self): return json.loads(self.remote.files[m.ARCHIVED]['ARCHIVE.json'])
 
     def test_verified_archive_and_original_provenance(self):
         self.archive()
         create = next(c for c in self.remote.calls if c[:2] == ('release', 'create'))
         self.assertEqual(create[create.index('--target')+1], 'publishing-head')
-        self.assertFalse(self.daily()['draft'])
+        self.assertFalse(self.archived()['draft'])
         record = next(iter(self.manifest()['builds'].values()))
         self.assertEqual(record['source'], SOURCE)
         self.assertEqual(record['assets'][0]['originalName'], 'old.zip')
         self.assertIn('Original notes', record['releaseNotes'])
-        self.assertEqual(self.remote.files['archive-2026-10-14'][record['assets'][0]['name']], b'old package')
+        self.assertEqual(self.remote.files[m.ARCHIVED][record['assets'][0]['name']], b'old package')
 
-    def test_same_day_appends_without_clobbering_builds(self):
+    def test_appends_without_clobbering_builds(self):
         self.archive()
         first = copy.deepcopy(self.manifest()['builds'])
         self.remote.add(stamp='2026-10-15T02:00:00Z', data=b'second package')
@@ -110,7 +115,7 @@ class Tests(unittest.TestCase):
         self.remote.corrupt = 'asset'
         with self.assertRaises(ValueError): self.archive()
         self.remote.corrupt = None; self.archive()
-        self.assertFalse(self.daily()['draft'])
+        self.assertFalse(self.archived()['draft'])
 
     def test_corrupt_metadata_does_not_publish(self):
         self.remote.corrupt = 'metadata'
@@ -119,7 +124,7 @@ class Tests(unittest.TestCase):
 
     def test_migration_deletes_old_heading_only_after_verification(self):
         self.remote.add('archive-20261015-010000-abcdef123456')
-        m.consolidate('owner/repo')
+        m.consolidate('owner/repo', retire_sources=True)
         self.assertNotIn('archive-20261015-010000-abcdef123456', self.remote.items)
         self.assertIn('Nightly', self.remote.items)
         edit = next(i for i,c in enumerate(self.remote.calls) if c[:2] == ('release', 'edit'))
@@ -129,13 +134,60 @@ class Tests(unittest.TestCase):
 
     def test_failed_migration_keeps_old_release(self):
         tag = 'archive-20261015-010000-abcdef123456'; self.remote.add(tag); self.remote.corrupt = 'asset'
-        with self.assertRaises(ValueError): m.consolidate('owner/repo')
+        with self.assertRaises(ValueError): m.consolidate('owner/repo', retire_sources=True)
         self.assertIn(tag, self.remote.items)
 
-    def test_local_midnight_starts_new_group(self):
+    def test_different_days_use_one_release(self):
         self.archive()
         self.remote.add(stamp='2026-10-15T05:01:00Z'); self.archive()
-        self.assertIn('archive-2026-10-15', self.remote.items)
+        self.assertEqual(set(self.remote.items), {'Nightly', m.ARCHIVED})
+        self.assertEqual(len(self.manifest()['builds']), 2)
+
+    def add_daily_archive(self, tag='archive-2026-10-14'):
+        key = '010000Z-abcdef123456'
+        name = key + '--old.zip'
+        payload = b'prior verified build'
+        record = {'timestamp': '2026-10-15T01:00:00+00:00', 'localTime': '2026-10-14T20:00:00-05:00',
+                  'source': SOURCE, 'originalTag': 'Nightly', 'releaseNotes': 'Original notes',
+                  'assets': [{'name': name, 'originalName': 'old.zip', 'size': len(payload),
+                              'sha256': hashlib.sha256(payload).hexdigest()}]}
+        manifest = {'tag': tag, 'schema': 1, 'timezone': 'America/Chicago', 'builds': {key: record}}
+        self.remote.add(tag)
+        files = {name: payload, 'ARCHIVE.json': json.dumps(manifest).encode(),
+                 'SHA256SUMS-ARCHIVE.txt': m.sums_text(manifest).encode()}
+        self.remote.files[tag] = files
+        self.remote.items[tag]['assets'] = [{'name': file, 'size': len(data)} for file, data in files.items()]
+        return name, record
+
+    def test_copy_daily_build_preserves_provenance_and_allows_retirement_retry(self):
+        tag = 'archive-2026-10-14'
+        old, original = self.add_daily_archive(tag)
+        m.consolidate('owner/repo')
+        self.assertIn(tag, self.remote.items)
+        record = next(iter(self.manifest()['builds'].values()))
+        self.assertEqual(record['releaseNotes'], original['releaseNotes'])
+        self.assertEqual(record['source'], original['source'])
+        name = record['assets'][0]['name']
+        self.assertTrue(name.startswith('20261015-010000Z-'))
+        self.assertEqual(self.remote.files[m.ARCHIVED][name], self.remote.files[tag][old])
+        m.consolidate('owner/repo', retire_sources=True)
+        self.assertNotIn(tag, self.remote.items)
+
+    def test_bad_daily_checksum_keeps_every_source_release(self):
+        tag = 'archive-2026-10-14'
+        old, _ = self.add_daily_archive(tag)
+        self.remote.add('archive-20261013-010000-abcdef123456')
+        self.remote.files[tag][old] = b'x' * len(self.remote.files[tag][old])
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            m.consolidate('owner/repo', retire_sources=True)
+        self.assertIn(tag, self.remote.items)
+        self.assertIn('archive-20261013-010000-abcdef123456', self.remote.items)
+        self.assertFalse(any(call[:2] == ('release', 'delete') for call in self.remote.calls))
+
+    def test_asset_limit_is_checked_before_upload(self):
+        with patch.object(m, 'ASSET_LIMIT', 2):
+            with self.assertRaisesRegex(ValueError, 'asset limit'): self.archive()
+        self.assertNotIn(m.ARCHIVED, self.remote.items)
 
     def test_real_chicago_day_and_daylight_saving(self):
         try:
@@ -144,8 +196,10 @@ class Tests(unittest.TestCase):
             self.skipTest('Windows unit-test host has no IANA timezone database; archive job runs on Ubuntu')
         before = GROUPING(datetime.fromisoformat('2026-10-15T04:59:00+00:00'), 'abc', zone)
         after = GROUPING(datetime.fromisoformat('2026-10-15T05:01:00+00:00'), 'abc', zone)
-        self.assertEqual(before[0], 'archive-2026-10-14')
-        self.assertEqual(after[0], 'archive-2026-10-15')
+        self.assertEqual(before[0], m.ARCHIVED)
+        self.assertEqual(after[0], m.ARCHIVED)
+        self.assertTrue(before[2].startswith('2026-10-14'))
+        self.assertTrue(after[2].startswith('2026-10-15'))
         first = GROUPING(datetime.fromisoformat('2026-11-01T06:30:00+00:00'), 'abc', zone)
         second = GROUPING(datetime.fromisoformat('2026-11-01T07:30:00+00:00'), 'abc', zone)
         self.assertEqual(first[0], second[0]); self.assertNotEqual(first[1], second[1])
@@ -159,7 +213,7 @@ class Tests(unittest.TestCase):
         self.archive()
         manifest = self.manifest(); key = next(iter(manifest['builds']))
         manifest['builds'][key]['source'] = 'b' * 40
-        self.remote.files['archive-2026-10-14']['ARCHIVE.json'] = json.dumps(manifest).encode()
+        self.remote.files[m.ARCHIVED]['ARCHIVE.json'] = json.dumps(manifest).encode()
         with self.assertRaises(ValueError): self.archive()
 
 

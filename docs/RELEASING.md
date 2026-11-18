@@ -75,22 +75,31 @@ machine. The standard hosted workflow remains available.
 
 ## Archived builds
 
-Before replacing Nightly, the publisher preserves its downloads in one **Archive — YYYY-MM-DD** prerelease per America/Chicago calendar day. Downloads from each build share a UTC timestamp and identity prefix, so names cannot collide even when daylight saving repeats a local time. The release body lists local build times, source commits and download links in a table.
+Before replacing Nightly, the publisher saves its downloads under the single
+**Archived** prerelease. Asset filenames include the UTC date, time, and build
+identifier. The release notes list local build times in America/Chicago,
+source commits, and grouped download links. `ARCHIVE.json` retains each build's
+original filenames, release notes, source revision, and hashes.
+`SHA256SUMS-ARCHIVE.txt` verifies the renamed downloads.
 
-Every original asset is preserved byte-for-byte under its prefixed filename, including BUILD.txt and its original checksum file. ARCHIVE.json retains original names, source commits, original release notes and SHA-256 hashes. SHA256SUMS-ARCHIVE.txt validates the renamed downloads directly. Original checksum files still refer to the original filenames; use the daily checksum file for the grouped assets.
+Use **Consolidate downloads in Archived** to migrate dated and timestamped
+releases. The workflow checks each existing daily manifest and checksum file,
+copies the builds, and downloads the new copies to verify their bytes. With
+**Remove the old archive release entries** selected, it retires the old release
+entries only after all copies pass validation. Original Git tags remain.
+Old asset URLs for retired releases stop resolving. Download the same build
+from **Archived** using its original filename and source in the index.
 
-Each copied build and its uploaded metadata are downloaded again and hash-verified before publication proceeds. A failure leaves Nightly and the original archive release available. Retries reuse verified build assets and reject conflicting content. Daily archives append builds rather than overwrite them. Archive tags stay fixed; actual application source revisions are recorded separately for each build.
-
-The **Consolidate daily download archives** workflow safely migrates the old timestamped archive releases. It runs when the archival scripts change or can be started manually from Actions. It removes each old release heading only after its daily copy and metadata are verified; original Git tags remain. It never removes Nightly. Consolidation and Nightly publication share a release-assets concurrency lock to prevent concurrent metadata edits.
-
-The Nightly Assets section contains only the current packages and metadata. Superseded filenames are removed from Nightly only after verified archival and successful replacement uploads. GitHub does not provide nested release categories; daily releases keep the main Releases page compact while preserving individual builds.
+Migration and Nightly publication share the release-assets lock. GitHub limits
+a release to 1,000 assets. If Archived reaches that limit, the script stops
+before writing the new build or removing a source release.
 
 ## Recover a previous package set
 
 A failed validation leaves the prior published packages available. A failure during publication needs separate inspection: asset upload, moving-tag update and release-note publication are individual GitHub operations, so do not assume the current Nightly assets form one complete build after an interrupted publish.
 
 1. Record the failing build's About/BUILD.txt source identity and retain its diagnostics. For an interrupted publish, inspect the workflow stage and current Nightly asset names before retrying; do not remove the remaining downloads or daily archive.
-2. Select one prior build from the daily archive's table. Match its source commit and shared UTC timestamp/identity prefix in ARCHIVE.json. Download that build's packages and BUILD.txt together. Preserve current character files and settings separately before trying an older application; this procedure does not establish that every older version can read newer saved data.
+2. Select one prior build from the Archived release table. Match its source commit and shared UTC timestamp/identity prefix in ARCHIVE.json. Download that build's packages and BUILD.txt together. Preserve current character files and settings separately before trying an older application; this procedure does not establish that every older version can read newer saved data.
 3. Verify every selected download against its ARCHIVE.json SHA-256 and original filename mapping. If downloading the entire daily archive, verify all its renamed assets with SHA256SUMS-ARCHIVE.txt. The archived original SHA256SUMS.txt refers to original names and cannot directly check prefixed downloads. A matching tag or filename alone does not verify bytes.
 4. Use the verified Mac ZIP or Windows MSI for the required platform. Installer replacement behavior depends on version; the documented same-version replacement does not establish that a Windows downgrade succeeds. Keep user data outside the installation tree and verify application startup, identity, a copied character and settings/source/PDF associations before retaining this package as the working version.
 5. Record the selected source and evidence. Restoring local packages does not change Nightly or Stable. Republishing, moving a release tag or promoting a channel requires separate authorization and exact-source package/platform verification. The publisher deliberately refuses an obsolete SOURCE_SHA once master advances; do not bypass that guard to restore an older Nightly.
@@ -99,7 +108,7 @@ Archive integrity and retry/conflict safeguards have offline tests in `scripts/t
 
 ## Local retention
 
-Keep one verified Stable package set and one verified Nightly package set locally. Use temporary directories for intermediate builds and remove their generated bundles/publish folders after validation, provided they are not running. Do not delete logs, screenshots, character exports, source files or installed/running applications as part of build cleanup. Replace a retained channel only after verifying the replacement checksums. Older releases remain in GitHub daily archives; local per-iteration bundles are unnecessary.
+Keep one verified Stable package set and one verified Nightly package set locally. Use temporary directories for intermediate builds and remove their generated bundles/publish folders after validation, provided they are not running. Do not delete logs, screenshots, character exports, source files or installed/running applications as part of build cleanup. Replace a retained channel only after verifying the replacement checksums. Older builds remain in the GitHub Archived release; local per-iteration bundles are unnecessary.
 
 ## Required release identity
 

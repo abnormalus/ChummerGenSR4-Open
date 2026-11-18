@@ -1,12 +1,11 @@
-name: Consolidate daily download archives
+name: Consolidate downloads in Archived
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - scripts/archive-nightly.py
-      - scripts/tests/test_archive_nightly.py
-      - .github/workflows/archive-maintenance.yml
+    inputs:
+      retire_source_releases:
+        description: Remove the old archive release entries after verifying every replacement
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -14,14 +13,22 @@ concurrency:
   cancel-in-progress: false
 jobs:
   consolidate:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
       - name: Verify archival safeguards
         run: python3 scripts/tests/test_archive_nightly.py
-      - name: Consolidate verified archives by local calendar day
+      - name: Consolidate verified archive downloads
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
-        run: python3 scripts/archive-nightly.py --consolidate
+          RETIRE_SOURCES: ${{ inputs.retire_source_releases }}
+        run: |
+          args=(--consolidate)
+          if [[ "$RETIRE_SOURCES" == "true" ]]; then
+            args+=(--retire-source-releases)
+          fi
+          python3 scripts/archive-nightly.py "${args[@]}"
