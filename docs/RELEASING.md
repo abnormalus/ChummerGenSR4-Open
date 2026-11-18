@@ -6,6 +6,18 @@ Updates to `master` automatically run **Nightly desktop builds**. It checks the 
 
 To rebuild manually, go to **GitHub → Actions → Nightly desktop builds → Run workflow**, select `master`, and run it. No local signing keys, upload commands, or personal tokens are required: the publish job uses GitHub's repository-scoped workflow token. If Actions are disabled in the fork, enable them once from its Actions tab.
 
+Desktop validation is selected independently for macOS and Windows. A platform
+can reuse its results when its last five executed validations on `master` passed,
+its latest pass is less than seven days old, and the current checkout has the
+same desktop inputs as that pass. Docs, iOS, and PWA-only changes can qualify.
+Changes to desktop code, shared dependencies, tooling, and release workflows
+require fresh validation. Skips do not count as passes. The Actions run summary
+shows each platform's decision.
+
+Monday's scheduled workflow and manual runs always exercise both platforms.
+The weekly run does not publish. Any new Nightly package still goes through
+installed-package verification before publication.
+
 Assets have stable names: `ChummerSR4-macOS-arm64.zip`, `ChummerSR4-Windows-x64.msi`, `BUILD.txt`, and `SHA256SUMS.txt`. The moving `Nightly` tag points to the source commit. Checksums and build metadata make it easy to identify a tester's version.
 
 ## Local fallback
