@@ -86,9 +86,22 @@ jobs:
           manifest.short_name=channel==='nightly'?'SR4 Nightly':'SR4 Dossier';
           fs.writeFileSync('candidate/manifest.webmanifest',JSON.stringify(manifest));
           fs.writeFileSync('candidate/build-info.json',JSON.stringify({channel,sha,builtAt:new Date().toISOString()}));
+          // Stamp the complete module graph so browser HTTP caches cannot mix releases.
+          for(const path of fs.readdirSync('candidate',{recursive:true})){
+            if(!/\.(mjs|js)$/.test(path))continue;
+            const file='candidate/'+path;
+            const source=fs.readFileSync(file,'utf8').replace('./style.css','./style.css?v='+sha).replace(/(['"])(\.{1,2}\/[^'"]+\.mjs)\1/g,(_,quote,url)=>quote+url+'?v='+sha+quote);
+            fs.writeFileSync(file,source);
+          }
+          const html=fs.readFileSync('candidate/index.html','utf8').replace('./app.mjs','./app.mjs?v='+sha).replace('./style.css','./style.css?v='+sha);
+          fs.writeFileSync('candidate/index.html',html);
           const sw=fs.readFileSync('candidate/sw.js','utf8').replace("PREFIX+'v3'","PREFIX+'"+sha+"'");
           fs.writeFileSync('candidate/sw.js',sw);
           NODE
+      - name: Verify packaged module graph and offline reload
+        env:
+          PWA_TEST_DIST: candidate
+        run: node Chummer.PWA/scripts/check-browser.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pwa-candidate

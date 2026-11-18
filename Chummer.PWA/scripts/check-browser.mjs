@@ -2,8 +2,8 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {chromium} from 'playwright';
-const root=resolve('Chummer.PWA');
-const server=createServer(async(req,res)=>{try{const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);let file=resolve(root,'.'+pathname);if(!file.startsWith(root+sep))throw Error('Invalid path');if(pathname.endsWith('/'))file=resolve(file,'index.html');const bytes=await readFile(file);res.setHeader('Content-Type',({'.html':'text/html','.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.pdf':'application/pdf','.json':'application/json','.webmanifest':'application/manifest+json'}[extname(file)]||'application/octet-stream'));res.end(bytes);}catch{res.writeHead(404);res.end();}});
+const root=resolve('Chummer.PWA'),dist=resolve(process.env.PWA_TEST_DIST||'Chummer.PWA/dist');
+const server=createServer(async(req,res)=>{try{const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);const base=pathname.startsWith('/dist/')?dist:root;let file=resolve(base,pathname.startsWith('/dist/')?'./'+pathname.slice(6):'.'+pathname);if(!file.startsWith(base+sep)&&file!==base)throw Error('Invalid path');if(pathname.endsWith('/'))file=resolve(file,'index.html');const bytes=await readFile(file);res.setHeader('Content-Type',({'.html':'text/html','.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.pdf':'application/pdf','.json':'application/json','.webmanifest':'application/manifest+json'}[extname(file)]||'application/octet-stream'));res.end(bytes);}catch{res.writeHead(404);res.end();}});
 await new Promise(done=>server.listen(0,'127.0.0.1',done));
 const browser=await chromium.launch();
 try{
@@ -13,6 +13,8 @@ try{
   await page.waitForFunction(()=>/ALL .* PASSED|\nFAILED$/.test(document.querySelector('pre')?.textContent||''),{},{timeout:120000});
   const result=await page.locator('pre').innerText();console.log(result);if(!result.includes(success)||result.includes('FAIL '))throw Error('Browser verification failed');
  }
+ // Simulate an older unversioned script remaining in the browser HTTP cache.
+ if(process.env.PWA_TEST_DIST)await page.route('**/dist/*.mjs',route=>route.fulfill({contentType:'text/javascript',body:'throw new Error("Stale unversioned module")'}));
  // Assert public exports and persisted manual edits are reachable through the real UI.
  await page.goto(`http://127.0.0.1:${server.address().port}/dist/`);
  await page.getByRole('button',{name:'Try sample',exact:true}).click();
@@ -55,5 +57,16 @@ try{
  await page.waitForFunction(()=>document.querySelector('input[aria-label="Runner"]')?.value==='Nightjar');
  if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='5.75')throw Error('Opening repository character overwrote local edits');
  console.log('PASS Open refreshes all characters, shows portrait, searches folders and preserves local edits');
+ if(process.env.PWA_TEST_DIST){
+  await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));
+  await page.reload();await page.getByRole('button',{name:'Open',exact:true}).waitFor();
+  await page.context().setOffline(true);
+  await page.reload();await page.getByRole('button',{name:'Open',exact:true}).click();
+  await page.locator('#repository').waitFor();
+  if(await page.locator('header').evaluate(node=>getComputedStyle(node).display)!=='flex')throw Error('Offline stylesheet missing');
+  await page.context().setOffline(false);
+  console.log('PASS versioned assets bypass stale scripts and reload offline with styles and working Open');
+ }
+
 
 }finally{await browser.close();await new Promise(done=>server.close(done));}
