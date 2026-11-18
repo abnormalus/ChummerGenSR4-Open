@@ -1,7 +1,7 @@
 # SR 4 Dossier PWA — first preview
 
 Buildless offline-capable at-table companion. Serve `dist/` over HTTPS or localhost.
-No dependencies, analytics, CDN scripts or hosted character database.
+No analytics, CDN scripts or hosted character database. PDF libraries and fonts are bundled.
 
 Implemented: multiple `.chum` working copies in IndexedDB, compact character selector,
 five sections, local autosave, XML export, manual identity/attributes/skills/notes,
@@ -41,3 +41,6 @@ GitHub Pages hosting and channel promotion are documented in HOSTING.md.
 Both PDF print options are available under Export. The official sheet embeds the original
 blank two-page form and appends the complete readable snapshot, including overflow and
 source references. PDF generation is local and works offline after the assets are cached.
+
+Primary armor uses the highest combined ballistic/impact value among equipped armor,
+falling back to owned armor when none is marked equipped (ballistic breaks ties).
