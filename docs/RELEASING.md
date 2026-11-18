@@ -26,6 +26,37 @@ Windows installation is per user, under `%LOCALAPPDATA%\Programs\ChummerSR4`, wi
 
 Mac builds are ad-hoc signed development previews, not Apple-notarized releases. Developer ID signing and notarization can be added later with repository secrets. Do not label Nightly as a stable release until native usability and installer checks are complete on both platforms.
 
+## When GitHub cannot assign a Mac runner
+
+Use a clean, full checkout of the exact current GitHub `master` commit on a
+trusted Apple Silicon Mac with the .NET 10 SDK and Python 3. The local script
+builds and signs the app, extracts the final ZIP, and runs the installed Mac
+smoke and native checks. Run it in an active Mac desktop session.
+
+```sh
+bash scripts/package-local-mac-nightly.sh /absolute/path/to/new-output
+```
+
+Stage the exact ZIP and acceptance report in a draft GitHub release with an
+authenticated GitHub CLI. Keep the release as a draft and give its tag the
+source commit suffix so the workflow can select it unambiguously.
+
+```sh
+source_sha="$(git rev-parse HEAD)"
+gh release create "mac-candidate-$source_sha" --draft --target "$source_sha" \
+  --repo abnormalus/ChummerGenSR4-Open \
+  /absolute/path/to/new-output/ChummerSR4-macOS-arm64.zip \
+  /absolute/path/to/new-output/mac-acceptance.json
+```
+
+Run **Nightly with a locally tested Mac package** on `master` with the SHA-256
+printed by the local script. The workflow checks the staged ZIP and acceptance
+report against the source commit and supplied digest, builds the Windows MSI,
+and runs the installed Windows lifecycle gate. Publication uses the normal
+archive and checksum checks, and skips the update if master advances. This
+manual workflow trusts the release operator to run the Mac checks on a trusted
+machine. The standard hosted workflow remains available.
+
 ## Archived builds
 
 Before replacing Nightly, the publisher preserves its downloads in one **Archive — YYYY-MM-DD** prerelease per America/Chicago calendar day. Downloads from each build share a UTC timestamp and identity prefix, so names cannot collide even when daylight saving repeats a local time. The release body lists local build times, source commits and download links in a table.
