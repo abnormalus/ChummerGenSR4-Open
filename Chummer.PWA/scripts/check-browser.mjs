@@ -48,6 +48,7 @@ try{
  if(treeReads<2)throw Error('Open did not refresh repository');
  await page.getByLabel('Find a repository character',{exact:true}).fill('archive');
  await page.locator('.character-choice').click();
+ await page.locator('#open-repository').waitFor({state:'hidden'});
  if(await page.getByLabel('Runner',{exact:true}).inputValue()!=='Willow test')throw Error('Wrong repository character opened');
  const local=await page.getByRole('option',{name:'Nightjar',exact:true}).getAttribute('value');
  await page.getByLabel('Character',{exact:true}).selectOption(local);
