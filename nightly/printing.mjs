@@ -1,7 +1,7 @@
-import {PDFDocument,rgb} from './vendor/pdf-lib.mjs';
-import fontkit from './vendor/fontkit.mjs';
-import {value,child,children,truth} from './core.mjs';
-import {printSections,printSkills,native,named,primaryArmor} from './print-data.mjs';
+import {PDFDocument,rgb} from './vendor/pdf-lib.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
+import fontkit from './vendor/fontkit.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
+import {value,child,children,truth} from './core.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
+import {printSections,printSkills,native,named,primaryArmor} from './print-data.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
 const BLACK=rgb(0,0,0),GREY=rgb(.89,.92,.91),MUTED=rgb(.3,.35,.34);
 const text=value=>String(value??'').replace(/\t/g,'    ').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');
 async function asset(path){const r=await fetch(new URL(path,import.meta.url));if(!r.ok)throw Error('Printing resource unavailable. Open the app online once to cache its print resources.');return new Uint8Array(await r.arrayBuffer());}

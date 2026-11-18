@@ -1,7 +1,7 @@
-import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs';
-import * as db from './storage.mjs';
-import {GitHub} from './github.mjs';
-import {characterPreview,matchesCharacter} from './repository-browser.mjs';
+import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
+import * as db from './storage.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
+import {GitHub} from './github.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
+import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=false,client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -58,7 +58,7 @@ function printCharacter(official){
   $('print-status').textContent='Preparing PDF…';
   for(const id of ['print-full','print-official'])$(id).disabled=true;
   try{
-   await flush();const {characterPDF}=await import('./printing.mjs');const bytes=await characterPDF(snapshot,{official});
+   await flush();const {characterPDF}=await import('./printing.mjs?v=a10e660738c04c2f14f94a95938d130ecb5bc4fc');const bytes=await characterPDF(snapshot,{official});
    if(printURL)URL.revokeObjectURL(printURL);
    printURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
    const filename=snapshot.title.replace(/[^\p{L}\p{N} ._-]/gu,'_')+(official?' - Official SR4A':' - Full character')+'.pdf';
@@ -111,4 +111,4 @@ $('search').oninput=remoteList;
 $('disconnect').onclick=()=>{client=undefined;clearPreviews();$('token').value='';status('GitHub disconnected. Local characters retained.');};
 $('sync').onclick=run(async()=>{if(!client)throw new Error('Connect to a private repository first.');if(!character)throw new Error('Import a character first.');await flush();const captured=record,revision=character.revision,bytes=character.bytes(true);status('Syncing snapshot…');const result=await client.sync(captured,bytes);await flush();if(result.pull){if(record.id!==captured.id||character.revision!==revision)throw new Error('Edits arrived during sync. Local edits retained; sync again to resolve.');const replacement=new Character(result.pull);await db.save({...record,bytes:result.pull,title:replacement.title,remote:result.remote});character=replacement;record={...record,bytes:result.pull,title:replacement.title,remote:result.remote};}else{const updated=await db.acknowledge(captured.id,result.remote);if(record.id===captured.id)record=updated;}records=await db.all();render();status('Repository snapshot saved · Local edits retained');if($('open-repository').open)await refreshCharacters();});
 document.addEventListener('focusout',()=>run(flush)());document.addEventListener('visibilitychange',()=>{if(document.hidden)run(flush)();});window.addEventListener('online',()=>status('Online · Local copies available'));window.addEventListener('offline',()=>status('Offline · Editing local copies'));
-try{records=await db.all();const selected=await db.setting('selected');record=records.find(r=>r.id===selected)||records[0];if(record)character=new Character(record.bytes);render();status('Saved on this device'+(navigator.onLine?'':' · Offline'));if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>status('Local storage ready; offline app caching unavailable.',true));}catch(error){status(error.message,true);}
+try{records=await db.all();const selected=await db.setting('selected');record=records.find(r=>r.id===selected)||records[0];if(record)character=new Character(record.bytes);render();status('Saved on this device'+(navigator.onLine?'':' · Offline'));if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(()=>status('Local storage ready; offline app caching unavailable.',true));}catch(error){status(error.message,true);}
