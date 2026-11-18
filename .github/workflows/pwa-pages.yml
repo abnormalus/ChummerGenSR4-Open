@@ -24,8 +24,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('pwa-pr-{0}', github.event.pull_request.number) || 'pwa-pages' }}
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pwa-pr-{0}', github.event.pull_request.number) || inputs.channel == 'stable' && 'pwa-stable' || 'pwa-pages' }}
+  cancel-in-progress: ${{ inputs.channel != 'stable' }}
 
 jobs:
   build:
@@ -96,6 +96,9 @@ jobs:
           retention-days: 7
 
   publish:
+    concurrency:
+      group: pwa-pages-publish
+      cancel-in-progress: false
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-24.04
