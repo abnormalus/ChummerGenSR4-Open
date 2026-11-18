@@ -14,9 +14,16 @@ It uses the same default `characters/` directory and GitHub file revision as the
    opens **Renew GitHub Token** with the existing repository and folder filled in.
    The GitHub link prefills the owner and **Contents: Read and write**. Select the
    same repository in GitHub, then paste the replacement into Chummer.
-3. Use **Open from Repository…** to open a separate local working copy. Use
-   **Save to Repository…** to save locally and upload a snapshot. If the remote file
-   changed, open it in a separate working copy to compare before resolving the conflict.
+3. Use **Open from Repository…** to open a linked working copy. Use
+   **Save to Repository…** to link an existing local character for the first time.
+   Ordinary **Save** then syncs the current revision to GitHub without a success popup.
+   **Save As** creates a local copy and switches the editor to that copy.
+4. In **Options → Global**, enable or disable **Autosave characters** and set its
+   interval in minutes. Autosave is enabled by default at five minutes. It saves
+   pending edits to the current local file or linked GitHub destination and waits
+   for you to choose a destination for an untitled character. Failed saves show an
+   alert and keep pending edits available. Repeated autosave failures alert once
+   per open character until a save succeeds.
 
 The sections below describe the production requirements. Browser OAuth pairing,
 in-app restore, and live desktop-to-companion round trips are still pending.
@@ -37,8 +44,8 @@ field preservation during an edit still needs verification.
   Select/open a character through the normal desktop loader and unsaved-edit guard.
 - Add **Save to Repository…** to File for the active character. For a new association,
   choose a remote filename; subsequent saves show the linked repository and file.
-  Explicit success/failure and last-synced status must be visible. Local Save and
-  Save As remain available and independent.
+  Linked saves run quietly when successful and display errors on failure.
+  Save As creates a local copy. Saves for unlinked characters stay local.
 
 ## Shared data and conflict contract
 

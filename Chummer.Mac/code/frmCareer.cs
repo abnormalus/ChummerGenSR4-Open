@@ -22927,8 +22927,12 @@ namespace Chummer
 		/// <summary>
 		/// Save the Character.
 		/// </summary>
-		internal bool SaveCharacter()
-		{
+        internal bool SaveCharacter() =>
+            (MdiParent as frmMain)?.SaveLinkedCharacter(this, _objCharacter, CaptureRepositorySave,
+                CompleteRepositorySave) ?? SaveCharacterLocally();
+
+        private bool SaveCharacterLocally(Action<Exception> onError = null)
+        {
 			bool blnSaved = false;
 
 			// If the Character does not have a file name, trigger the Save As menu item instead.
@@ -22936,8 +22940,9 @@ namespace Chummer
 				blnSaved = SaveCharacterAs();
 			else
 			{
-				if (!CharacterFileDialogs.TrySave(this, _objCharacter, _objCharacter.FileName)) return false;
+				if (!CharacterFileDialogs.TrySave(this, _objCharacter, _objCharacter.FileName, onError)) return false;
 				_blnIsDirty = false;
+                (MdiParent as frmMain)?.ClearAutosaveFailure(this);
 				blnSaved = true;
 				GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
 			}
@@ -22949,14 +22954,15 @@ namespace Chummer
 		/// <summary>
 		/// Save the Character using the Save As dialogue box.
 		/// </summary>
-		internal bool SaveCharacterAs()
+		internal bool SaveCharacterAs(Func<string> chooseSavePath = null)
 		{
 			bool blnSaved = false;
 
-            string path = CharacterFileDialogs.ChooseSavePath(this, _objCharacter);
-            if (path == null) return false;
+            string path = chooseSavePath == null ? CharacterFileDialogs.ChooseSavePath(this, _objCharacter) : chooseSavePath();
+            if (path == null || !CharacterFileDialogs.CanSaveLocalCopy(this, path)) return false;
             if (!CharacterFileDialogs.TrySave(this, _objCharacter, path)) return false;
             _blnIsDirty = false;
+            (MdiParent as frmMain)?.ClearAutosaveFailure(this);
             blnSaved = true;
             GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
 

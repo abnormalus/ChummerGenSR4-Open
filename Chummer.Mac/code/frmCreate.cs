@@ -17620,54 +17620,93 @@ namespace Chummer
 		/// </summary>
         internal bool SaveCharacter()
         {
+            if (MdiParent is not frmMain main) return SaveCharacterLocally();
+            bool finalizing = chkCharacterCreated.Checked;
+            PreparedCreationSave prepared = null;
+            TreeNode lifestyleNode = null;
+            return main.SaveLinkedCharacter(this, _objCharacter, () =>
+            {
+                if (!finalizing) return CaptureRepositorySave();
+                return TryPrepareCreationSave(out prepared, out lifestyleNode) ? prepared.Character.CaptureSnapshot() : null;
+            }, () =>
+            {
+                if (prepared != null)
+                {
+                    prepared.Character.FileName = _objCharacter.FileName;
+                    CommitCreationSave(prepared, lifestyleNode);
+                }
+                FinishCreationSave(false);
+            }, () => chkCharacterCreated.Checked == finalizing) ?? SaveCharacterLocally();
+        }
+
+        private bool SaveCharacterLocally(Action<Exception> onError = null)
+        {
             return string.IsNullOrEmpty(_objCharacter.FileName)
-                ? SaveCharacterAs() : SaveCharacterToPath(_objCharacter.FileName, false);
+                ? SaveCharacterAs() : SaveCharacterToPath(_objCharacter.FileName, false, onError);
         }
 
         internal bool SaveCharacterAs(bool blnEscapeAfterSave = false, Func<string> chooseSavePath = null)
         {
             string path = chooseSavePath == null ? CharacterFileDialogs.ChooseSavePath(this, _objCharacter) : chooseSavePath();
-            return path != null && SaveCharacterToPath(path, blnEscapeAfterSave);
+            return path != null && CharacterFileDialogs.CanSaveLocalCopy(this, path) &&
+                SaveCharacterToPath(path, blnEscapeAfterSave);
         }
 
-        private bool SaveCharacterToPath(string path, bool escapeAfterSave)
+        private bool SaveCharacterToPath(string path, bool escapeAfterSave, Action<Exception> onError = null)
         {
             if (chkCharacterCreated.Checked)
             {
-                PreparedCreationSave prepared;
-                TreeNode lifestyleNode;
-                try
+                if (!TryPrepareCreationSave(out var prepared, out var lifestyleNode)) return false;
+                if (!CharacterFileDialogs.TrySave(this, prepared.Character, path)) return false;
+                CommitCreationSave(prepared, lifestyleNode);
+            }
+            else if (!CharacterFileDialogs.TrySave(this, _objCharacter, path, onError)) return false;
+            FinishCreationSave(escapeAfterSave);
+            return true;
+        }
+
+        private bool TryPrepareCreationSave(out PreparedCreationSave prepared, out TreeNode lifestyleNode)
+        {
+            prepared = null;
+            lifestyleNode = null;
+            try
+            {
+                if (MessageBox.Show(LanguageManager.Instance.GetString("Message_ConfirmCreate"),
+                    LanguageManager.Instance.GetString("MessageTitle_ConfirmCreate"), MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) != DialogResult.Yes ||
+                    !ValidateCharacter(false, out var selection, out lifestyleNode))
                 {
-                    if (MessageBox.Show(LanguageManager.Instance.GetString("Message_ConfirmCreate"),
-                        LanguageManager.Instance.GetString("MessageTitle_ConfirmCreate"), MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question) != DialogResult.Yes ||
-                        !ValidateCharacter(false, out var selection, out lifestyleNode))
-                    {
-                        chkCharacterCreated.Checked = false;
-                        return false;
-                    }
-                    prepared = new PreparedCreationSave(_objCharacter, selection, DateTime.Now);
-                }
-                catch (Exception error) when (error is IOException || error is UnauthorizedAccessException ||
-                    error is ArgumentException || error is NotSupportedException || error is InvalidOperationException)
-                {
-                    CharacterFileDialogs.ShowError(this, "Save Character", error);
+                    chkCharacterCreated.Checked = false;
                     return false;
                 }
-                if (!CharacterFileDialogs.TrySave(this, prepared.Character, path)) return false;
-                // Preparation failures are recoverable before writing. Once durable,
-                // a UI follow-up error must not be reported as a rejected disk write.
-                prepared.CommitToOwner();
-                if (lifestyleNode != null)
-                {
-                    treLifestyles.Nodes[0].Nodes.Add(lifestyleNode);
-                    treLifestyles.Nodes[0].Expand();
-                }
+                prepared = new PreparedCreationSave(_objCharacter, selection, DateTime.Now);
+                return true;
             }
-            else if (!CharacterFileDialogs.TrySave(this, _objCharacter, path)) return false;
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException ||
+                error is ArgumentException || error is NotSupportedException || error is InvalidOperationException)
+            {
+                CharacterFileDialogs.ShowError(this, "Save Character", error);
+                return false;
+            }
+        }
+
+        private void CommitCreationSave(PreparedCreationSave prepared, TreeNode lifestyleNode)
+        {
+            // Publish the prepared transition only after its snapshot is durable.
+            prepared.CommitToOwner();
+            if (lifestyleNode != null)
+            {
+                treLifestyles.Nodes[0].Nodes.Add(lifestyleNode);
+                treLifestyles.Nodes[0].Expand();
+            }
+        }
+
+        private void FinishCreationSave(bool escapeAfterSave)
+        {
             _blnIsDirty = false;
+            (MdiParent as frmMain)?.ClearAutosaveFailure(this);
             GlobalOptions.Instance.AddToMRUList(_objCharacter.FileName);
-            if (escapeAfterSave) return true;
+            if (escapeAfterSave) return;
             UpdateWindowTitle(false);
             if (chkCharacterCreated.Checked)
             {
@@ -17676,7 +17715,6 @@ namespace Chummer
                 GlobalOptions.Instance.MainForm.LoadCharacter(_objCharacter.FileName, false);
                 Close();
             }
-            return true;
         }
 
 		/// <summary>

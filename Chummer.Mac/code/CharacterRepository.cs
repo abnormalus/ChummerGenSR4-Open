@@ -91,13 +91,13 @@ internal sealed class CharacterRepository
         if (!response.IsSuccessStatusCode)
         {
             if (method == HttpMethod.Put && (int)response.StatusCode >= 500)
-                throw new IOException("GitHub did not confirm the upload. Your local copy is saved. Check the remote file before retrying.");
+                throw new IOException("GitHub did not confirm the upload. Your edits are still open. Check the remote file before retrying.");
             throw new IOException(response.StatusCode switch
             {
                 HttpStatusCode.Forbidden => "GitHub denied the request. Check token permissions, organization approval, and rate limits.",
                 HttpStatusCode.NotFound => "GitHub could not find the repository or file, or the token cannot access it.",
                 HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity =>
-                    "GitHub rejected the save. The remote file may have changed, or the branch may restrict writes. Your local copy is saved.",
+                    "GitHub rejected the save. The remote file may have changed, or the branch may restrict writes. Your edits are still open.",
                 _ => $"GitHub returned HTTP {(int)response.StatusCode}."
             });
         }
@@ -165,7 +165,7 @@ internal sealed class CharacterRepository
         if (current != expected?.Sha)
             throw new IOException(expected == null
                 ? "A remote file already uses that name. Choose another filename."
-                : "The remote file changed or was removed. Your local copy is saved. Open the remote version separately to review it.");
+                : "The remote file changed or was removed. Your edits are still open. Open the remote version separately to review it.");
         var payload = new Dictionary<string, string>
         {
             ["message"] = "Save Chummer character",
@@ -182,7 +182,7 @@ internal sealed class CharacterRepository
         }
         catch (Exception error) when (error is HttpRequestException or OperationCanceledException or JsonException)
         {
-            throw new IOException("GitHub did not confirm the upload. Your local copy is saved. Check the remote file before retrying.", error);
+            throw new IOException("GitHub did not confirm the upload. Your edits are still open. Check the remote file before retrying.", error);
         }
     }
 }

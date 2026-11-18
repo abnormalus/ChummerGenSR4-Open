@@ -90,7 +90,19 @@ public partial class frmMain
         connect.Click += async (_, _) => await Run("Connect Character Repository",
             () => ConnectRepositoryAsync(false));
         open.Click += async (_, _) => await Run("Open from Repository", OpenRepositoryAsync, true);
-        save.Click += async (_, _) => await Run("Save to Repository", SaveRepositoryAsync, true);
+        save.Click += async (_, _) =>
+        {
+            switch (ActiveMdiChild)
+            {
+                case frmCreate creation when HasRepositoryLink(creation.RepositoryLocalFile):
+                    creation.SaveCharacter();
+                    return;
+                case frmCareer career when HasRepositoryLink(career.RepositoryLocalFile):
+                    career.SaveCharacter();
+                    return;
+            }
+            await Run("Save to Repository", SaveRepositoryAsync, true);
+        };
         MdiChildActivate += (_, _) => Refresh();
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
         timer.Tick += async (_, _) => await RemindIfExpiredAsync();
@@ -405,9 +417,104 @@ public partial class frmMain
         {
             throw new IOException("GitHub saved the snapshot, but Chummer could not record its revision locally. Open the remote working copy before uploading again.", error);
         }
-        if (!IsDisposed)
-            MessageBox.Show($"Uploaded the saved snapshot to {repository.Name}/{remote}.\nLast synced {result.LastSynced.ToLocalTime():g}.",
-                "Save to Repository", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    internal static bool HasRepositoryLink(string local) =>
+        !string.IsNullOrEmpty(local) && File.Exists(RepositoryRevisionPath(local));
+
+    internal bool? SaveLinkedCharacter(Form editor, Character character, Func<byte[]?> capture, Action complete, Func<bool>? stillCurrent = null)
+    {
+        if (!HasRepositoryLink(character.FileName)) return null;
+        var save = SaveLinkedCharacterAsync(editor, character, capture, complete, automatic: false, stillCurrent);
+        if (!save.IsCompleted) Majorsilence.Forms.Backends.Platform.Backend.RunModalLoop(save);
+        return save.GetAwaiter().GetResult();
+    }
+
+    private async Task<bool> SaveLinkedCharacterAsync(Form editor, Character character, Func<byte[]?> capture,
+        Action complete, bool automatic, Func<bool>? stillCurrent = null)
+    {
+        string original = character.FileName;
+        if (repositoryBusy)
+        {
+            if (!automatic) ReportSaveProblem(editor, "A repository operation is already in progress. Retry Save when it finishes.", false);
+            return false;
+        }
+
+        repositoryBusy = true;
+        try
+        {
+            var revision = JsonSerializer.Deserialize<RepositoryRevision>(File.ReadAllText(RepositoryRevisionPath(original)))
+                ?? throw new IOException("Chummer could not read the character's repository link. Reopen it from GitHub or use Save As.");
+            if (savedRepository == null || revision.RepositoryId != savedRepository.Id || revision.Branch != savedRepository.Branch)
+                throw new IOException("Reconnect this character's repository to sync it, or use Save As for a local copy.");
+
+            byte[] baseline = character.CaptureSnapshot();
+            byte[]? bytes = capture();
+            if (bytes == null) return false;
+            var result = await SaveLinkedSnapshotAsync(revision, bytes, automatic);
+            if (result == null) return false;
+
+            // Keep a private working copy for reopening without replacing the
+            // user's original local file.
+            string cacheRoot = Path.Combine(MacPaths.UserDirectory, "saves", "repository");
+            string relative = Path.GetRelativePath(cacheRoot, original);
+            bool inCache = !Path.IsPathRooted(relative) && relative != ".." &&
+                !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+            string cache = inCache ? original : Path.Combine(cacheRoot, Guid.NewGuid().ToString("N"), Path.GetFileName(original));
+            try
+            {
+                CharacterFileDialogs.WriteSnapshot(cache, bytes);
+                WriteRepositoryRevision(cache, result);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                throw new IOException("GitHub saved the character, but Chummer could not update its working copy. Reopen the character from GitHub.", error);
+            }
+
+            if (editor.IsDisposed || character.FileName != original) return false;
+            character.FileName = cache;
+            bool unchanged = (stillCurrent?.Invoke() ?? true) && character.CaptureSnapshot().SequenceEqual(baseline);
+            if (unchanged)
+            {
+                complete();
+                ClearAutosaveFailure(editor);
+            }
+            else if (!automatic) ReportSaveProblem(editor, "GitHub saved the earlier revision. Newer edits are still open. Save again to sync them.", false);
+            return unchanged;
+        }
+        catch (Exception error) when (error is IOException or HttpRequestException or OperationCanceledException or
+            UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or FormatException or System.Xml.XmlException)
+        {
+            string message = error is HttpRequestException or OperationCanceledException
+                ? "GitHub is unavailable. Your edits are still open. Retry Save or use Save As for a local copy."
+                : error.Message;
+            ReportSaveProblem(editor, message, automatic);
+            return false;
+        }
+        finally { repositoryBusy = false; }
+    }
+
+    private async Task<RepositoryRevision?> SaveLinkedSnapshotAsync(RepositoryRevision revision, byte[] bytes, bool automatic)
+    {
+        if (RepositoryTokenExpired)
+        {
+            if (automatic) throw new RepositoryTokenExpiredException();
+            if (!await RenewRepositoryAsync()) return null;
+        }
+
+        try { return await characterRepository!.SaveAsync(revision.Path, revision, bytes); }
+        catch (RepositoryTokenExpiredException)
+        {
+            ExpireRepositoryToken();
+            if (automatic || IsDisposed) throw;
+            if (!await RenewRepositoryAsync()) return null;
+            try { return await characterRepository!.SaveAsync(revision.Path, revision, bytes); }
+            catch (RepositoryTokenExpiredException)
+            {
+                ExpireRepositoryToken();
+                throw;
+            }
+        }
     }
 
     private static string RepositoryRevisionPath(string local)
@@ -436,12 +543,12 @@ public partial class frmCreate
 {
     internal string RepositoryLocalFile => _objCharacter.FileName;
     internal bool SaveRepositoryWorkingCopy() =>
-        (!(_blnIsDirty || chkCharacterCreated.Checked) && File.Exists(RepositoryLocalFile)) || SaveCharacter();
+        (!(_blnIsDirty || chkCharacterCreated.Checked) && File.Exists(RepositoryLocalFile)) || SaveCharacterLocally();
 }
 
 public partial class frmCareer
 {
     internal string RepositoryLocalFile => _objCharacter.FileName;
     internal bool SaveRepositoryWorkingCopy() =>
-        (!_blnIsDirty && File.Exists(RepositoryLocalFile)) || SaveCharacter();
+        (!_blnIsDirty && File.Exists(RepositoryLocalFile)) || SaveCharacterLocally();
 }

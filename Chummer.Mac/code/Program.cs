@@ -13,7 +13,7 @@ namespace Chummer
         // Native verification flags must also be excluded from frmMain's file
         // opening path; otherwise startup prompts before the driver can run.
         internal static bool IsNativeVerificationArgument(string argument) =>
-            argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command" || argument == "--check-pdf-reader" || argument == "--check-cyberware";
+            argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command" || argument == "--check-pdf-reader" || argument == "--check-cyberware" || argument == "--check-repository-saving";
 
         /// <summary>
         /// The main entry point for the application.
@@ -38,7 +38,9 @@ namespace Chummer
             }
             bool nativeCheck = args.Length >= 3 && IsNativeVerificationArgument(args[0]);
             if (nativeCheck)
-                MacPaths.TestUserDirectory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(args[2])), args[0] == "--check-pdf-reader" ? "native-pdf-reader-user" : args[0] == "--check-bulk" ? "native-bulk-user" : args[0] == "--check-focus-command" ? "native-focus-command-user" : args[0] == "--check-cyberware" ? "native-cyberware-user" : "native-sensor-transactions-user");
+                MacPaths.TestUserDirectory = System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(args[2])),
+                    "native-" + args[0].Substring("--check-".Length) + "-user");
             AppDiagnostics.Initialize();
             try
             {

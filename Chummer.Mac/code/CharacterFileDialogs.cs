@@ -74,7 +74,7 @@ namespace Chummer
             return path;
         }
 
-        internal static bool TrySave(Form owner, Character character, string path)
+        internal static bool TrySave(Form owner, Character character, string path, Action<Exception> onError = null)
         {
             string previousPath = character.FileName;
             try
@@ -86,12 +86,34 @@ namespace Chummer
                 return true;
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException ||
-                                          error is ArgumentException || error is NotSupportedException)
+                                          error is ArgumentException || error is NotSupportedException ||
+                                          error is InvalidOperationException || error is FormatException ||
+                                          error is System.Xml.XmlException)
             {
                 character.FileName = previousPath;
-                ShowError(owner, "Save Character", error);
+                if (onError == null) ShowError(owner, "Save Character", error);
+                else onError(error);
                 return false;
             }
+        }
+
+        internal static bool CanSaveLocalCopy(Form owner, string path)
+        {
+            if (!frmMain.HasRepositoryLink(path)) return true;
+            ShowError(owner, "Save Character", new IOException("Choose an unlinked filename for your local copy."));
+            return false;
+        }
+
+        internal static void WriteSnapshot(string path, byte[] bytes)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
+            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllBytes(temporary, bytes);
+                File.Move(temporary, path, overwrite: true);
+            }
+            finally { File.Delete(temporary); }
         }
 
         internal static void ShowError(Form owner, string title, Exception error)
