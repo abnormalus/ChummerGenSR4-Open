@@ -1,6 +1,6 @@
 const PREFIX='sr4-dossier-'+encodeURIComponent(self.registration.scope)+'-';
-const CACHE=PREFIX+'9a9a8331e253adde2bf7c9e362280a47d0b2e217';
-const ASSETS=['./','./index.html','./style.css','./app.mjs','./core.mjs','./storage.mjs','./github.mjs','./manifest.webmanifest','./assets/icon.png','./printing.mjs','./print-data.mjs','./vendor/pdf-lib.mjs','./vendor/fontkit.mjs','./vendor/pako.mjs','./assets/SR4A-Character-Sheet.pdf','./assets/DejaVuSans.ttf'];
+const CACHE=PREFIX+'1d41d3dc543fe3b0464d2bff9ffb75faaab99b27';
+const ASSETS=['./','./index.html','./style.css','./app.mjs','./core.mjs','./storage.mjs','./github.mjs','./repository-browser.mjs','./manifest.webmanifest','./assets/icon.png','./printing.mjs','./print-data.mjs','./vendor/pdf-lib.mjs','./vendor/fontkit.mjs','./vendor/pako.mjs','./assets/SR4A-Character-Sheet.pdf','./assets/DejaVuSans.ttf'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(PREFIX)&&key!==CACHE).map(key=>caches.delete(key))))));
 // Only application assets are cached. GitHub responses and character snapshots never enter this cache.
