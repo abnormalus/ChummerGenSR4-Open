@@ -4,6 +4,8 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  schedule:
+    - cron: "40 10 * * 1"
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,12 +13,35 @@ concurrency:
   group: desktop-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      platforms: ${{ steps.history.outputs.platforms }}
+      run_desktop: ${{ steps.history.outputs.run_desktop }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: history
+        name: Check desktop inputs and previous passing tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/tests/test_plan_desktop_validation.py
+          python3 scripts/plan-desktop-validation.py
   validate:
+    needs: plan
+    if: needs.plan.outputs.run_desktop == 'true'
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: ${{ fromJSON(needs.plan.outputs.platforms) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -266,6 +291,8 @@ jobs:
           name: diagnostics-${{ matrix.os }}
           path: artifacts/checks
   dependency-audit:
+    needs: plan
+    if: needs.plan.outputs.run_desktop == 'true'
     uses: ./.github/workflows/dependency-audit.yml
   package:
     needs: [validate, dependency-audit]
@@ -315,7 +342,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   publish:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     concurrency:
       group: chummer-release-assets
       cancel-in-progress: false
