@@ -12,7 +12,19 @@ export class GitHub {
   }
   async verify() { const info=await this.api('');if(!info.private)throw new Error('Choose a private repository for character storage.');if(info.archived||!info.permissions?.push)throw new Error('This repository does not allow character saves.');this.id=info.id;this.branch=info.default_branch;return info; }
   path(path){return path.split('/').map(encodeURIComponent).join('/');}
-  async list(){await this.verify();try{const rows=await this.api('/contents/characters');if(!Array.isArray(rows))throw new Error('characters must be a folder.');return rows.filter(row=>row.type==='file'&&/\.chum$/i.test(row.name));}catch(e){if(e.status===404)return [];throw e;}}
+  async list(){
+    await this.verify();
+    let tree;try{tree=await this.api('/git/trees/'+encodeURIComponent(this.branch)+'?recursive=1');}catch(error){if(error.status===404||error.status===409)return [];throw error;}
+    let entries=tree.tree;
+    if(!Array.isArray(entries))throw new Error('GitHub returned an unreadable character list.');
+    if(tree.truncated){
+      // Recurse individual trees if GitHub's recursive response reached its size limit.
+      const walk=async(sha,prefix='')=>{const part=await this.api('/git/trees/'+encodeURIComponent(sha));if(part.truncated)throw new Error('GitHub could not return a complete folder listing.');const output=[];for(const entry of part.tree){const path=prefix+entry.path;if(entry.type==='tree')output.push(...await walk(entry.sha,path+'/'));else output.push({...entry,path});}return output;};
+      entries=await walk(tree.sha);
+    }
+    return entries.filter(row=>row.type==='blob'&&row.mode!=='120000'&&/\.chum$/i.test(row.path)).map(row=>({...row,name:row.path.split('/').at(-1)})).sort((a,b)=>a.name.localeCompare(b.name)||a.path.localeCompare(b.path));
+  }
+  async readBlob(sha){const blob=await this.api('/git/blobs/'+encodeURIComponent(sha));if(blob.size>MAX_BYTES)throw new Error('Character exceeds 32 MB.');if(blob.encoding!=='base64')throw new Error('GitHub returned an unsupported character encoding.');return unbase64(blob.content);}
   async read(path){try{const file=await this.api('/contents/'+this.path(path));if(file.size>MAX_BYTES)throw new Error('Character exceeds 32 MB.');let data=file;if(file.encoding!=='base64')data=await this.api('/git/blobs/'+file.sha);return {sha:file.sha,bytes:unbase64(data.content)};}catch(e){if(e.status===404)return null;throw e;}}
   async sync(record, bytes){
     await this.verify(); const hash=await fingerprint(bytes),base=record.remote;

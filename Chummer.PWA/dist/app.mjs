@@ -1,6 +1,7 @@
 import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs';
 import * as db from './storage.mjs';
 import {GitHub} from './github.mjs';
+import {characterPreview,matchesCharacter} from './repository-browser.mjs';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=false,client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -71,10 +72,43 @@ function printCharacter(official){
 $('print-full').onclick=run(()=>printCharacter(false));
 $('print-official').onclick=run(()=>printCharacter(true));
 $('github').onclick=run(async()=>{$('repo').value=await db.setting('repository')||'';$('repository').showModal();});
-function remoteList(){const target=$('remote');target.replaceChildren();for(const item of remoteRows.filter(r=>r.name.toLowerCase().includes($('search').value.toLowerCase())))target.append(button(item.name,async()=>{if(!client)throw new Error('Connect first.');const file=await client.read(item.path);if(!file)throw new Error('Character was removed.');await add(file.bytes,item.name,{repoId:client.id,path:item.path,sha:file.sha,hash:await fingerprint(file.bytes)});$('repository').close();}));if(!remoteRows.length)target.append(el('p','No .chum files in the characters folder yet.','muted'));}
-$('connect').onclick=run(async()=>{const next=new GitHub($('repo').value,$('token').value);await next.verify();client=next;$('token').value='';await db.setting('repository',next.repository);remoteRows=await client.list();remoteList();status('Connected to private repository '+next.repository);});
+let browseGeneration=0,previewCache=new Map(),choiceViews=new Map();
+function clearPreviews(){browseGeneration++;for(const preview of previewCache.values())if(preview.image)URL.revokeObjectURL(preview.image);previewCache.clear();choiceViews.clear();remoteRows=[];$('remote').replaceChildren();}
+function remoteList(){
+ const target=$('remote');target.replaceChildren();choiceViews.clear();const filtered=remoteRows.filter(item=>matchesCharacter(item,$('search').value));
+ for(const item of filtered){
+  const b=button('',async()=>{const active=client;if(!active)throw new Error('Connect first.');b.disabled=true;try{const file=await active.read(item.path);if(!file)throw new Error('Character was removed. Refresh the list.');if(client!==active)throw new Error('Repository connection changed. Open again.');await add(file.bytes,item.name,{repoId:active.id,path:item.path,sha:file.sha,hash:await fingerprint(file.bytes)});$('open-repository').close();}finally{b.disabled=false;}});b.className='character-choice';
+  paintChoice(b,item);choiceViews.set(item.path,b);target.append(b);
+ }
+ if(!filtered.length)target.append(el('p',remoteRows.length?'No matching characters.':'No .chum characters found in this repository.','muted'));
+}
+function paintChoice(b,item){b.replaceChildren();
+  if(item.preview?.image){const image=el('img');image.src=item.preview.image;image.alt='';image.width=56;image.height=56;image.loading='lazy';b.append(image);}else b.append(el('span',(item.preview?.title||item.name).slice(0,2).toUpperCase(),'portrait-placeholder'));
+  const label=el('span',undefined,'character-label');label.append(el('strong',item.preview?.title||item.name.replace(/\.chum$/i,'')));if(item.preview?.name&&item.preview.name!==item.preview.title)label.append(el('span',item.preview.name));label.append(el('small',item.path));b.append(label);
+}
+async function refreshCharacters(){
+ if(!client)return;const active=client,generation=++browseGeneration;$('refresh-characters').disabled=true;$('repository-status').textContent='Refreshing repository…';remoteRows=[];$('remote').replaceChildren();
+ try{
+  const found=await active.list();if(generation!==browseGeneration||active!==client)return;
+  const valid=new Set(found.map(item=>active.id+':'+item.sha));for(const [key,preview] of previewCache)if(!valid.has(key)){if(preview.image)URL.revokeObjectURL(preview.image);previewCache.delete(key);}
+  remoteRows=found.map(item=>({...item,preview:previewCache.get(active.id+':'+item.sha)}));remoteList();$('repository-status').textContent=found.length+' characters · '+active.repository;
+  let next=0;const workers=Array.from({length:Math.min(3,found.length)},async()=>{while(next<Math.min(remoteRows.length,100)&&generation===browseGeneration&&$('open-repository').open){const item=remoteRows[next++];if(item.preview)continue;let preview;try{if(item.size>MAX_BYTES)continue;preview=await characterPreview(await active.readBlob(item.sha));}catch(error){if(error.status===401||error.status===403||error.status===429){next=remoteRows.length;$('repository-status').textContent='Character list loaded. Portrait previews paused; '+error.message;}continue;}
+    if(generation!==browseGeneration||active!==client||!$('open-repository').open){if(preview.image)URL.revokeObjectURL(preview.image);return;}
+    const key=active.id+':'+item.sha,cached=previewCache.get(key);if(cached){if(preview.image)URL.revokeObjectURL(preview.image);preview=cached;}else previewCache.set(key,preview);item.preview=preview;if($('search').value)remoteList();else if(choiceViews.has(item.path))paintChoice(choiceViews.get(item.path),item);
+   }});await Promise.all(workers);
+ }catch(error){if(generation===browseGeneration){$('repository-status').textContent=error.message;throw error;}}
+ finally{if(generation===browseGeneration)$('refresh-characters').disabled=false;}
+}
+async function openRepository(){
+ await flush();if(!client){$('repo').value=await db.setting('repository')||'';status('Connect to your private repository to browse its characters.');$('repository').showModal();return;}
+ $('search').value='';$('open-repository').showModal();await refreshCharacters();
+}
+$('open').onclick=run(openRepository);
+$('refresh-characters').onclick=run(refreshCharacters);
+$('open-repository').addEventListener('close',()=>{browseGeneration++;$('refresh-characters').disabled=false;});
+$('connect').onclick=run(async()=>{const next=new GitHub($('repo').value,$('token').value);await next.verify();clearPreviews();client=next;$('token').value='';await db.setting('repository',next.repository);$('repository').close();status('Connected to private repository '+next.repository);await openRepository();});
 $('search').oninput=remoteList;
-$('disconnect').onclick=()=>{client=undefined;remoteRows=[];$('token').value='';$('remote').replaceChildren();status('GitHub disconnected. Local characters retained.');};
-$('sync').onclick=run(async()=>{if(!client)throw new Error('Connect to a private repository first.');if(!character)throw new Error('Import a character first.');await flush();const captured=record,revision=character.revision,bytes=character.bytes(true);status('Syncing snapshot…');const result=await client.sync(captured,bytes);await flush();if(result.pull){if(record.id!==captured.id||character.revision!==revision)throw new Error('Edits arrived during sync. Local edits retained; sync again to resolve.');const replacement=new Character(result.pull);await db.save({...record,bytes:result.pull,title:replacement.title,remote:result.remote});character=replacement;record={...record,bytes:result.pull,title:replacement.title,remote:result.remote};}else{const updated=await db.acknowledge(captured.id,result.remote);if(record.id===captured.id)record=updated;}records=await db.all();render();status('Repository snapshot saved · Local edits retained');remoteRows=await client.list();remoteList();});
+$('disconnect').onclick=()=>{client=undefined;clearPreviews();$('token').value='';status('GitHub disconnected. Local characters retained.');};
+$('sync').onclick=run(async()=>{if(!client)throw new Error('Connect to a private repository first.');if(!character)throw new Error('Import a character first.');await flush();const captured=record,revision=character.revision,bytes=character.bytes(true);status('Syncing snapshot…');const result=await client.sync(captured,bytes);await flush();if(result.pull){if(record.id!==captured.id||character.revision!==revision)throw new Error('Edits arrived during sync. Local edits retained; sync again to resolve.');const replacement=new Character(result.pull);await db.save({...record,bytes:result.pull,title:replacement.title,remote:result.remote});character=replacement;record={...record,bytes:result.pull,title:replacement.title,remote:result.remote};}else{const updated=await db.acknowledge(captured.id,result.remote);if(record.id===captured.id)record=updated;}records=await db.all();render();status('Repository snapshot saved · Local edits retained');if($('open-repository').open)await refreshCharacters();});
 document.addEventListener('focusout',()=>run(flush)());document.addEventListener('visibilitychange',()=>{if(document.hidden)run(flush)();});window.addEventListener('online',()=>status('Online · Local copies available'));window.addEventListener('offline',()=>status('Offline · Editing local copies'));
 try{records=await db.all();const selected=await db.setting('selected');record=records.find(r=>r.id===selected)||records[0];if(record)character=new Character(record.bytes);render();status('Saved on this device'+(navigator.onLine?'':' · Offline'));if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>status('Local storage ready; offline app caching unavailable.',true));}catch(error){status(error.message,true);}
