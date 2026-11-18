@@ -1,0 +1,56 @@
+name: iOS dossier
+
+on:
+  pull_request:
+    paths: ['Chummer.iOS/**', '.github/workflows/ios-dossier.yml', 'Chummer.Mac/assets/saves/**']
+  push:
+    branches: [master]
+    paths: ['Chummer.iOS/**', '.github/workflows/ios-dossier.yml', 'Chummer.Mac/assets/saves/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-and-simulator:
+    runs-on: macos-15
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Chummer.iOS
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Core tests and real character fixtures
+        env:
+          CHUMMER_FIXTURE_ROOT: ${{ github.workspace }}/Chummer.Mac/assets/saves
+        run: swift test
+      - name: Build iPhone and iPad app for simulator
+        run: >-
+          xcodebuild -project ChummerDossier.xcodeproj -scheme ChummerDossier
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath ../artifacts/ios-derived CODE_SIGNING_ALLOWED=NO build
+
+      - name: Native iPhone and iPad interactions
+        run: |
+          python3 - <<'PYTHON'
+          import json, subprocess
+          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
+          available = [d for group in devices.values() for d in group]
+          for family in ['iPhone', 'iPad']:
+              device = next(d for d in available if family in d['name'])
+              subprocess.run(['xcodebuild', 'test', '-project', 'ChummerDossier.xcodeproj', '-scheme', 'ChummerDossier',
+                              '-destination', 'platform=iOS Simulator,id=' + device['udid'],
+                              '-derivedDataPath', '../artifacts/ios-ui-derived',
+                              '-resultBundlePath', '../artifacts/' + family + '.xcresult',
+                              'CODE_SIGN_IDENTITY=-', 'ONLY_ACTIVE_ARCH=YES'], check=True)
+          PYTHON
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-native-results
+          path: artifacts/*.xcresult
+          retention-days: 7

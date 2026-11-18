@@ -1,0 +1,51 @@
+// !$*UTF8*$!
+{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+B81700000000000000000003 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SR4AFormPDF.swift; sourceTree = "<group>"; };
+B81700000000000000000004 = { isa = PBXBuildFile; fileRef = B81700000000000000000003; };
+B81700000000000000000005 = { isa = PBXFileReference; lastKnownFileType = image.pdf; path = Resources/SR4A-Character-Sheet.pdf; sourceTree = "<group>"; };
+B81700000000000000000006 = { isa = PBXBuildFile; fileRef = B81700000000000000000005; };
+B81700000000000000000001 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterSheetPDF.swift; sourceTree = "<group>"; };
+B81700000000000000000002 = { isa = PBXBuildFile; fileRef = B81700000000000000000001; };
+D32BCE2221844737C8E835B0 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChummerDossierApp.swift; sourceTree = "<group>"; };
+D72C95A06E1F2B4E2471F532 = { isa = PBXBuildFile; fileRef = D32BCE2221844737C8E835B0; };
+2634E578FD60B0B5C933B861 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DossierView.swift; sourceTree = "<group>"; };
+9CCE0358A502C517BC8B8F99 = { isa = PBXBuildFile; fileRef = 2634E578FD60B0B5C933B861; };
+924ECEC3B64200D96249A752 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentPage.swift; sourceTree = "<group>"; };
+43D7FF737D7C09415C376498 = { isa = PBXBuildFile; fileRef = 924ECEC3B64200D96249A752; };
+234A135302792B6AD5234FF6 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetComponents.swift; sourceTree = "<group>"; };
+381D94A603791C0B09AEB3BD = { isa = PBXBuildFile; fileRef = 234A135302792B6AD5234FF6; };
+59BD0A3FF43B32849B319E64 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+A17A55E70000000000000001 = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+A17A55E70000000000000002 = { isa = PBXBuildFile; fileRef = A17A55E70000000000000001; };
+38A007151ABE87CC01A5B6E9 = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChummerDossier.app; sourceTree = BUILT_PRODUCTS_DIR; };
+3A2A88DEEFF3D1D23E496597 = { isa = PBXGroup; path = App; sourceTree = "<group>"; children = (B81700000000000000000003, B81700000000000000000005, B81700000000000000000001, A17A55E70000000000000001, D32BCE2221844737C8E835B0, 2634E578FD60B0B5C933B861, 924ECEC3B64200D96249A752, 234A135302792B6AD5234FF6, 59BD0A3FF43B32849B319E64); };
+FBDC4F23F93125BBEEAE800C = { isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (AA1700000000000000000002, 38A007151ABE87CC01A5B6E9); };
+B28B7AF69320201D1CF206EB = { isa = PBXGroup; sourceTree = "<group>"; children = (AA1700000000000000000003, 3A2A88DEEFF3D1D23E496597, FBDC4F23F93125BBEEAE800C); };
+582681C2EAE02B3F3D399C0C = { isa = XCLocalSwiftPackageReference; relativePath = "."; };
+94A0426E8D3203DA5468CCF0 = { isa = XCSwiftPackageProductDependency; package = 582681C2EAE02B3F3D399C0C; productName = DossierCore; };
+1C25D3719CB905525B1D275B = { isa = PBXBuildFile; productRef = 94A0426E8D3203DA5468CCF0; };
+BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; runOnlyForDeploymentPostprocessing = 0; files = (B81700000000000000000004, B81700000000000000000002, D72C95A06E1F2B4E2471F532, 9CCE0358A502C517BC8B8F99, 43D7FF737D7C09415C376498, 381D94A603791C0B09AEB3BD); };
+7561BFB015D8F536760CB671 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; runOnlyForDeploymentPostprocessing = 0; files = (1C25D3719CB905525B1D275B); };
+0189424A5A60FED329FA868E = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; runOnlyForDeploymentPostprocessing = 0; files = (B81700000000000000000006, A17A55E70000000000000002); };
+0E8A3AD980EC179856012B7E = { isa = PBXNativeTarget; buildConfigurationList = C57128001CE614BF8549D6BB; buildPhases = (BCE16DD0260827ECF338C787, 7561BFB015D8F536760CB671, 0189424A5A60FED329FA868E); buildRules = (); dependencies = (); name = ChummerDossier; packageProductDependencies = (94A0426E8D3203DA5468CCF0); productName = ChummerDossier; productReference = 38A007151ABE87CC01A5B6E9; productType = "com.apple.product-type.application"; };
+98F54143AB4E86B28C3AFEE0 = { isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1600; }; buildConfigurationList = 862894B703A6DEDF96A9DD6C; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = B28B7AF69320201D1CF206EB; packageReferences = (582681C2EAE02B3F3D399C0C); productRefGroup = FBDC4F23F93125BBEEAE800C; projectDirPath = ""; projectRoot = ""; targets = (0E8A3AD980EC179856012B7E, AA1700000000000000000008); };
+89E1FD6268CC0F221A2BE178 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; }; name = Debug; };
+E6DE6C99132752C914FEF632 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; name = Release; };
+862894B703A6DEDF96A9DD6C = { isa = XCConfigurationList; buildConfigurations = (89E1FD6268CC0F221A2BE178, E6DE6C99132752C914FEF632); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+7082CC0B6FC1282FCEABD07A = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = App/Info.plist; CURRENT_PROJECT_VERSION = 4; MARKETING_VERSION = 0.1.3; PRODUCT_BUNDLE_IDENTIFIER = org.chummer.sr4.dossier; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; TARGETED_DEVICE_FAMILY = "1,2"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
+639A7CA24D39909E713B47F7 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = App/Info.plist; CURRENT_PROJECT_VERSION = 4; MARKETING_VERSION = 0.1.3; PRODUCT_BUNDLE_IDENTIFIER = org.chummer.sr4.dossier; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; TARGETED_DEVICE_FAMILY = "1,2"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
+C57128001CE614BF8549D6BB = { isa = XCConfigurationList; buildConfigurations = (7082CC0B6FC1282FCEABD07A, 639A7CA24D39909E713B47F7); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+
+AA1700000000000000000001 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DossierUITests.swift; sourceTree = "<group>"; };
+AA1700000000000000000002 = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DossierUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+AA1700000000000000000003 = { isa = PBXGroup; path = UITests; sourceTree = "<group>"; children = (AA1700000000000000000001); };
+AA1700000000000000000004 = { isa = PBXBuildFile; fileRef = AA1700000000000000000001; };
+AA1700000000000000000005 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (AA1700000000000000000004); runOnlyForDeploymentPostprocessing = 0; };
+AA1700000000000000000006 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+AA1700000000000000000007 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+AA170000000000000000000C = { isa = PBXTargetDependency; target = 0E8A3AD980EC179856012B7E; };
+AA1700000000000000000008 = { isa = PBXNativeTarget; buildConfigurationList = AA1700000000000000000009; buildPhases = (AA1700000000000000000005, AA1700000000000000000006, AA1700000000000000000007); buildRules = (); dependencies = (AA170000000000000000000C); name = DossierUITests; productName = DossierUITests; productReference = AA1700000000000000000002; productType = "com.apple.product-type.bundle.ui-testing"; };
+AA1700000000000000000009 = { isa = XCConfigurationList; buildConfigurations = (AA170000000000000000000A, AA170000000000000000000B); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+AA170000000000000000000A = { isa = XCBuildConfiguration; name = Debug; buildSettings = { CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = org.chummer.sr4.dossier.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = ChummerDossier; }; };
+AA170000000000000000000B = { isa = XCBuildConfiguration; name = Release; buildSettings = { CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = org.chummer.sr4.dossier.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = ChummerDossier; }; };
+}; rootObject = 98F54143AB4E86B28C3AFEE0; }
