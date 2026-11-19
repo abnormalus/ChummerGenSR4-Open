@@ -15,9 +15,22 @@ try{
  }
  // Simulate an older unversioned script remaining in the browser HTTP cache.
  if(process.env.PWA_TEST_DIST)await page.route('**/dist/*.mjs',route=>route.fulfill({contentType:'text/javascript',body:'throw new Error("Stale unversioned module")'}));
+ await page.clock.install();
  // Assert public exports and persisted manual edits are reachable through the real UI.
  await page.goto(`http://127.0.0.1:${server.address().port}/dist/`);
+ if(!await page.getByRole('button',{name:'Install app',exact:true}).isVisible())throw Error('Missing initial install button');
  await page.getByRole('button',{name:'Try sample',exact:true}).click();
+ const skillHeader=page.getByRole('group',{name:'Skill filters',exact:true});
+ if(await skillHeader.getByRole('button',{name:'Active',exact:true}).getAttribute('aria-pressed')!=='true'||await skillHeader.getByRole('button',{name:'Pool > 0',exact:true}).getAttribute('aria-pressed')!=='true')throw Error('Wrong skill defaults');
+ await skillHeader.getByRole('button',{name:'Combat',exact:true}).click();
+ if(await page.getByLabel('Perception rating',{exact:true}).count())throw Error('Combat includes physical skills');
+ await skillHeader.getByRole('button',{name:'Knowledge',exact:true}).click();
+ if(await page.getByLabel('Pistols rating',{exact:true}).count())throw Error('Knowledge includes combat');
+ await skillHeader.getByRole('button',{name:'Active',exact:true}).click();
+ for(const width of [390,820]){await page.setViewportSize({width,height:1000});const fits=await skillHeader.evaluate(node=>node.scrollWidth<=node.clientWidth+1);if(!fits)throw Error('Skill filters overflow at '+width);}
+ await page.setViewportSize({width:1280,height:900});
+ console.log('PASS skill header defaults, category controls and phone/tablet fit');
+
  await page.getByLabel('Essence',{exact:true}).fill('5.75');
  await page.getByRole('button',{name:'Combat',exact:true}).click();
  await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();
@@ -29,12 +42,18 @@ try{
  const {demo}=await import('../dist/core.mjs');
  const sample=new TextDecoder().decode(demo),icon=(await readFile('Chummer.PWA/dist/assets/icon.png')).toString('base64');
  const portraitSample=sample.replace('</character>','<mugshot>'+icon+'</mugshot></character>');
- let expanded=false,treeReads=0;
+ let expanded=false,treeReads=0,writes=0;
+ const remoteFiles=new Map([['Nightjar.chum',{xml:portraitSample,sha:'portrait'}],['Archive/Willow.chum',{xml:sample.replace('<alias>Nightjar</alias>','<alias>Willow test</alias>'),sha:'second'}]]);
+ const blobs=new Map([...remoteFiles.values()].map(v=>[v.sha,v.xml]));
  await page.route('https://api.github.com/**',async route=>{
-  const path=new URL(route.request().url()).pathname;let json;
+  const request=route.request(),path=decodeURIComponent(new URL(request.url()).pathname);let json;
   if(path==='/repos/test/private')json={id:99,private:true,permissions:{push:true},default_branch:'main'};
-  else if(path.includes('/git/trees/')){treeReads++;json={tree:[{path:'Nightjar.chum',type:'blob',mode:'100644',sha:'portrait'},...(expanded?[{path:'Archive/Willow.chum',type:'blob',mode:'100644',sha:'second'}]:[])]};}
-  else{const first=path.endsWith('/portrait')||path.endsWith('/Nightjar.chum');const xml=first?portraitSample:sample.replace('<alias>Nightjar</alias>','<alias>Willow test</alias>');json={sha:first?'portrait':'second',encoding:'base64',size:xml.length,content:Buffer.from(xml).toString('base64')};}
+  else if(path.includes('/git/trees/')){treeReads++;json={tree:[...remoteFiles.entries()].filter(([name])=>expanded||!name.startsWith('Archive/')).map(([name,file])=>({path:name,type:'blob',mode:'100644',sha:file.sha}))};}
+  else if(path.includes('/git/blobs/')){const sha=path.split('/').at(-1),xml=blobs.get(sha);if(!xml)return route.fulfill({status:404,json:{}});json={sha,encoding:'base64',size:xml.length,content:Buffer.from(xml).toString('base64')};}
+  else if(path.includes('/contents/')){const key=path.split('/contents/')[1],existing=remoteFiles.get(key);
+   if(request.method()==='PUT'){const body=request.postDataJSON();if((existing?.sha||undefined)!==body.sha)return route.fulfill({status:409,json:{}});const xml=Buffer.from(body.content,'base64').toString(),sha='saved-'+(++writes);remoteFiles.set(key,{xml,sha});blobs.set(sha,xml);json={content:{sha}};}
+   else{if(!existing)return route.fulfill({status:404,json:{}});json={sha:existing.sha,encoding:'base64',size:existing.xml.length,content:Buffer.from(existing.xml).toString('base64')};}
+  }else return route.fulfill({status:404,json:{}});
   await route.fulfill({json});
  });
  await page.getByRole('button',{name:'Open',exact:true}).click();
@@ -57,6 +76,56 @@ try{
  await page.waitForFunction(()=>document.querySelector('input[aria-label="Runner"]')?.value==='Nightjar');
  if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='5.75')throw Error('Opening repository character overwrote local edits');
  console.log('PASS Open refreshes all characters, shows portrait, searches folders and preserves local edits');
+ const countBefore=await page.locator('#characters option').count();
+ await page.getByRole('button',{name:'Open',exact:true}).click();
+ await page.getByLabel('Find a repository character',{exact:true}).fill('archive');
+ await page.locator('.character-choice').click();await page.locator('#open-repository').waitFor({state:'hidden'});
+ await page.getByLabel('Essence',{exact:true}).fill('4.25');
+ await page.getByLabel('Character',{exact:true}).selectOption(local);
+ await page.waitForFunction(()=>document.querySelector('input[aria-label="Runner"]')?.value==='Nightjar');
+ await page.getByRole('button',{name:'Open',exact:true}).click();
+ await page.getByLabel('Find a repository character',{exact:true}).fill('archive');
+ await page.locator('.character-choice').click();await page.locator('#open-repository').waitFor({state:'hidden'});
+ if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='4.25')throw Error('Reopening overwrote unsynced edits');
+ await page.getByRole('button',{name:'Close',exact:true}).click();
+ await page.getByRole('button',{name:'Install app',exact:true}).waitFor();
+ await page.reload();await page.getByRole('button',{name:'Resume Willow test',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('input[aria-label="Runner"]')?.value==='Willow test');
+ if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='4.25')throw Error('Close lost pending edits');
+ if(await page.locator('#characters option').count()!==countBefore)throw Error('Repeated Open duplicated a character');
+ console.log('PASS install entry, close saves pending edits, closed state survives reload and reopening avoids duplicates');
+
+
+ // Reconnect after reload; connection tokens are intentionally memory-only.
+ await page.getByRole('button',{name:'GitHub',exact:true}).click();
+ await page.getByLabel('Token',{exact:true}).fill('synthetic-test-token');
+ await page.getByRole('button',{name:'Connect',exact:true}).click();
+ await page.locator('.character-choice').first().waitFor();
+ await page.getByRole('button',{name:'Close character browser',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('GitHub up to date'));
+ await page.context().setOffline(true);
+ await page.getByLabel('Essence',{exact:true}).fill('4.5');
+ await page.getByRole('button',{name:'Combat',exact:true}).click();await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();
+ const writesOffline=writes;await page.clock.fastForward(60000);if(writes!==writesOffline)throw Error('Autosync wrote while offline');
+ await page.context().setOffline(false);
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('GitHub up to date'));
+ if(!remoteFiles.get('Archive/Willow.chum').xml.includes('<totaless>4.5</totaless>'))throw Error('Online catch-up lost offline edit');
+ await page.clock.fastForward(60000);if(writes!==writesOffline+1)throw Error('Clean minute tick uploaded again');
+ console.log('PASS minute autosync skips unchanged data and catches up immediately after offline edits');
+ function externalEdit(path,sha){const file=remoteFiles.get(path);const xml=file.xml.replace(/<karma>.*?<\/karma>/,'<karma>99</karma>');remoteFiles.set(path,{xml,sha});blobs.set(sha,xml);}
+ async function localEditAndConflict(path,essence,sha){externalEdit(path,sha);await page.getByRole('button',{name:'Character',exact:true}).click();await page.getByLabel('Essence',{exact:true}).fill(essence);await page.getByRole('button',{name:'Combat',exact:true}).click();await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();await page.clock.fastForward(60000);await page.locator('#sync-conflict').waitFor();}
+ await localEditAndConflict('Archive/Willow.chum','4.75','external-1');
+ await page.getByLabel('New character name',{exact:true}).fill('Willow backup');
+ await page.getByRole('button',{name:'Save as new name',exact:true}).click();await page.locator('#sync-conflict').waitFor({state:'hidden'});
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('GitHub up to date'));
+ const backup=[...remoteFiles.keys()].find(key=>key.includes('Willow backup-'));if(!backup||remoteFiles.get('Archive/Willow.chum').sha!=='external-1')throw Error('Save-as conflict overwrote original');
+ await localEditAndConflict(backup,'4.9','external-2');await page.getByRole('button',{name:'Overwrite GitHub',exact:true}).click();await page.locator('#sync-conflict').waitFor({state:'hidden'});
+ if(!remoteFiles.get(backup).xml.includes('<totaless>4.9</totaless>'))throw Error('Explicit overwrite failed');
+ await localEditAndConflict(backup,'5','external-3');const beforeDelete=writes;
+ await page.getByRole('button',{name:'Delete local copy',exact:true}).click();await page.locator('#delete-local-confirm').getByRole('button',{name:'Delete local copy',exact:true}).click();await page.locator('#sync-conflict').waitFor({state:'hidden'});
+ if(remoteFiles.get(backup).sha!=='external-3'||writes!==beforeDelete)throw Error('Delete local changed GitHub');
+ if(await page.getByRole('button',{name:'Resume Willow backup',exact:true}).count())throw Error('Deleted local copy remains');
+ console.log('PASS conflict save-as preserves original, explicit overwrite saves local data, Delete local copy leaves GitHub untouched');
  if(process.env.PWA_TEST_DIST){
   await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));
   await page.reload();await page.getByRole('button',{name:'Open',exact:true}).waitFor();
