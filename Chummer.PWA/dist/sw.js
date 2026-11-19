@@ -1,6 +1,6 @@
 const PREFIX='sr4-dossier-'+encodeURIComponent(self.registration.scope)+'-';
 const CACHE=PREFIX+'v3';
-const ASSETS=['./','./index.html','./style.css','./app.mjs','./core.mjs','./storage.mjs','./github.mjs','./repository-browser.mjs','./install.mjs','./identity.mjs','./autosync.mjs','./skill-filters.mjs','./manifest.webmanifest','./assets/icon.png','./assets/icon-192.png','./assets/icon-512.png','./printing.mjs','./print-data.mjs','./vendor/pdf-lib.mjs','./vendor/fontkit.mjs','./vendor/pako.mjs','./assets/SR4A-Character-Sheet.pdf','./assets/DejaVuSans.ttf'];
+const ASSETS=['./','./index.html','./style.css','./app.mjs','./core.mjs','./storage.mjs','./github.mjs','./repository-browser.mjs','./install.mjs','./identity.mjs','./autosync.mjs','./skill-filters.mjs','./weapons.mjs','./weapon-ranges.mjs','./manifest.webmanifest','./assets/icon.png','./assets/icon-192.png','./assets/icon-512.png','./printing.mjs','./print-data.mjs','./vendor/pdf-lib.mjs','./vendor/fontkit.mjs','./vendor/pako.mjs','./assets/SR4A-Character-Sheet.pdf','./assets/DejaVuSans.ttf'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(path=>new Request(path,{cache:'reload'}))))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(PREFIX)&&key!==CACHE).map(key=>caches.delete(key))))));
 // Only application assets are cached. GitHub responses and character snapshots never enter this cache.
