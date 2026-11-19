@@ -165,7 +165,7 @@ try{
  if(!await combat.getByText('Visual',{exact:true}).isVisible()||await combat.getByText('Audio',{exact:true}).count())throw Error('Perception sensory differences missing or duplicated');
  await combat.getByRole('navigation').getByRole('button',{name:'Combat',exact:true}).click();
  await combat.getByRole('button',{name:'Reload Ares Predator IV',exact:true}).click();await combat.getByRole('dialog').getByRole('button',{name:'Load',exact:true}).click();await combat.getByRole('dialog').waitFor({state:'hidden'});
- await combat.getByRole('button',{name:'Fire Ares Predator IV',exact:true}).click();await combat.getByRole('button',{name:'Fire 2',exact:true}).click();await combat.getByRole('dialog').waitFor({state:'hidden'});
+ await combat.getByRole('button',{name:'Fire 2 from Ares Predator IV',exact:true}).click();await combat.waitForFunction(()=>[...document.querySelectorAll('button')].some(n=>n.getAttribute('aria-label')==='Select magazine 1 for Ares Predator IV'&&n.textContent.includes('13 rounds')));
  if(!await combat.getByRole('button',{name:'Select magazine 1 for Ares Predator IV',exact:true}).innerText().then(t=>t.includes('13 rounds')))throw Error('Fire failed');
  if(!await combat.getByText('Regular Rounds · Reserve 15',{exact:true}).first().isVisible())throw Error('Reserve missing under weapon or double spent');
  await combat.getByRole('button',{name:'Use Grenade: Flash-Bang',exact:true}).click();await combat.waitForFunction(()=>[...document.querySelectorAll('.weapon-details > summary')].some(n=>n.textContent.includes('Grenade: Flash-Bang')&&n.textContent.includes('×1')));
@@ -178,7 +178,7 @@ try{
  await combat.getByText('Fixed hardpoint',{exact:true}).click();
  await combat.getByRole('button',{name:'Reload Mounted test gun',exact:true}).click();
  await combat.getByLabel('Ammunition reserve',{exact:true}).selectOption('1');await combat.getByRole('dialog').getByRole('button',{name:'Load',exact:true}).click();await combat.getByRole('dialog').waitFor({state:'hidden'});
- await combat.getByRole('button',{name:'Fire Mounted test gun',exact:true}).click();await combat.getByRole('button',{name:'Fire 1',exact:true}).click();await combat.getByRole('dialog').waitFor({state:'hidden'});
+ await combat.getByRole('button',{name:'Fire 1 from Mounted test gun',exact:true}).click();await combat.waitForFunction(()=>[...document.querySelectorAll('button')].some(n=>n.getAttribute('aria-label')==='Select magazine 1 for Mounted test gun'&&n.textContent.includes('14 rounds')));
  if(!await combat.getByRole('button',{name:'Select magazine 1 for Mounted test gun',exact:true}).innerText().then(t=>t.includes('14 rounds')))throw Error('Fixed mount firing failed');
  await combat.reload();await combat.getByRole('navigation').getByRole('button',{name:'Combat',exact:true}).click();await combat.locator('.vehicle-details > summary').click();
  if(await combat.getByRole('button',{name:'Test Rover physical damage 4',exact:true}).getAttribute('class')!=='filled')throw Error('Vehicle damage not saved');
