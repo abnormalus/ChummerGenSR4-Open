@@ -34,6 +34,15 @@ try{
  await page.getByLabel('Essence',{exact:true}).fill('5.75');
  await page.getByRole('navigation',{name:'Dossier sections'}).getByRole('button',{name:'Combat',exact:true}).click();
  await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();
+ const third=page.getByRole('button',{name:'Physical damage 3',exact:true});
+ if((await third.innerText()).replace(/\s/g,'')!=='3−1')throw Error('Condition cell lost number or corner penalty');
+ const gun=page.locator('.weapon-details').filter({hasText:'Ares Predator IV'});
+ if(!(await gun.locator('summary').first().innerText()).includes('5P · Pool 9'))throw Error('Missing Combat weapon pool');
+ await gun.locator('summary').first().click();
+ for(const band of ['0–5 m','6–20 m','21–40 m','41–60 m'])if(!await gun.getByText(band,{exact:true}).isVisible())throw Error('Missing range '+band);
+ await gun.locator('summary').first().click();
+ console.log('PASS Combat weapon pool, expandable detail and all four ranges, numbered condition penalties');
+
  await page.getByRole('button',{name:'Refresh app',exact:true}).click();await page.waitForURL(/refresh=/);if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='5.75')throw Error('Autosave failed');
  await page.getByRole('button',{name:'Export',exact:true}).click();
  for(const name of ['Print full character','Print official character sheet'])if(!await page.getByRole('button',{name,exact:true}).isVisible())throw Error('Missing '+name);
