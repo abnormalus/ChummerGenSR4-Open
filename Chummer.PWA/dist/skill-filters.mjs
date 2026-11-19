@@ -16,3 +16,6 @@ export function filteredSkills(character,category='Active',positive=true){
   return true;
  }).sort((a,b)=>a.name.localeCompare(b.name));
 }
+
+export const perceptionSense=skill=>skill.name.match(/^Perception \(([^)]+)\)$/)?.[1]||'';
+export function perceptionDifferences(character,base){return character.skills.filter(s=>perceptionSense(s)&&s.pool!==base.pool).map(s=>({name:perceptionSense(s),pool:s.pool}));}
