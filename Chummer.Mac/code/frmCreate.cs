@@ -127,7 +127,7 @@ namespace Chummer
 			SetTooltips();
 			MoveControls();
             InitializeCreationContactControllerLifetime();
-            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); InitializeCreationContactPresentation(); InitializeCreationLifestyleMonths(); };
+            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); InitializeCreationContactPresentation(); InitializeCreationLifestyleMonths(); InitializeCreationVehicleInputs(); };
 		}
 
 		/// <summary>
@@ -18061,7 +18061,7 @@ namespace Chummer
 		/// <summary>
 		/// Refresh the currently-selected Vehicle.
 		/// </summary>
-		private void RefreshSelectedVehicle()
+		private void RefreshSelectedVehicleDetails()
 		{
             cmdDeleteVehicle.Enabled = !WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode);
             WeaponInventoryViews.Refresh(_objCharacter, treVehicles, true);
