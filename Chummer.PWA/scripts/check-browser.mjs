@@ -34,13 +34,13 @@ try{
  await page.getByLabel('Essence',{exact:true}).fill('5.75');
  await page.getByRole('navigation',{name:'Dossier sections'}).getByRole('button',{name:'Combat',exact:true}).click();
  await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();
- await page.reload();if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='5.75')throw Error('Autosave failed');
+ await page.getByRole('button',{name:'Refresh app',exact:true}).click();await page.waitForURL(/refresh=/);if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='5.75')throw Error('Autosave failed');
  await page.getByRole('button',{name:'Export',exact:true}).click();
  for(const name of ['Print full character','Print official character sheet'])if(!await page.getByRole('button',{name,exact:true}).isVisible())throw Error('Missing '+name);
- console.log('PASS real UI autosave and export options');
+ console.log('PASS Refresh app preserves pending edits and export options');
  await page.getByRole('button',{name:'Close export',exact:true}).click();
  const {demo}=await import('../dist/core.mjs');
- const sample=new TextDecoder().decode(demo),icon=(await readFile('Chummer.PWA/dist/assets/icon.png')).toString('base64');
+ const sample=new TextDecoder().decode(demo).replace('</skills>','<skill><name>Japanese</name><knowledge>True</knowledge><skillcategory>Language</skillcategory><attribute>INT</attribute><rating>0</rating><totalvalue>0</totalvalue></skill></skills>'),icon=(await readFile('Chummer.PWA/dist/assets/icon.png')).toString('base64');
  const portraitSample=sample.replace('</character>','<mugshot>'+icon+'</mugshot></character>');
  let expanded=false,treeReads=0,writes=0;
  const remoteFiles=new Map([['Nightjar.chum',{xml:portraitSample,sha:'portrait'}],['Archive/Willow.chum',{xml:sample.replace('<alias>Nightjar</alias>','<alias>Willow test</alias>').replace('</character>','<magician>True</magician></character>'),sha:'second'}]]);
@@ -86,6 +86,9 @@ try{
  await page.getByRole('button',{name:'Open',exact:true}).click();
  await page.getByLabel('Find a repository character',{exact:true}).fill('archive');
  await page.locator('.character-choice').click();await page.locator('#open-repository').waitFor({state:'hidden'});
+ await page.getByRole('group',{name:'Skill filters'}).getByRole('button',{name:'Knowledge',exact:true}).click();
+ if(await page.getByLabel('Japanese rating',{exact:true}).inputValue()!=='N')throw Error('Native language is not N');
+ await page.getByRole('group',{name:'Skill filters'}).getByRole('button',{name:'Active',exact:true}).click();
  await page.getByLabel('Essence',{exact:true}).fill('4.25');
  await page.getByLabel('Character',{exact:true}).selectOption(local);
  await page.waitForFunction(()=>document.querySelector('input[aria-label="Runner"]')?.value==='Nightjar');

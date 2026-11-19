@@ -5,7 +5,7 @@ import {characterPreview,matchesCharacter} from './repository-browser.mjs';
 import {installController} from './install.mjs';
 import {existingCharacter,sameRemote} from './identity.mjs';
 import {AutoSync} from './autosync.mjs';
-import {filteredSkills,magicSkillsApply} from './skill-filters.mjs';
+import {filteredSkills,magicSkillsApply,skillRating} from './skill-filters.mjs';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=true,skillCategory='Active',client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -35,6 +35,37 @@ async function installApp(){const result=await installer.request();if(result.kin
 let closing=false;
 async function closeCharacter(){if(!character||closing)return;closing=true;$('main').inert=true;document.querySelector('header').inert=true;try{await flush();await db.setting('selected','');record=undefined;character=undefined;page='Character';render();status('Character closed · Changes saved on this device');void syncer.tick();}finally{closing=false;$('main').inert=false;document.querySelector('header').inert=false;}}
 $('close-character').onclick=run(closeCharacter);
+// Explicit refresh keeps local dossiers intact and activates a fully cached update.
+$('refresh-app').onclick=run(async()=>{
+ const header=document.querySelector('header'),main=$('main');header.inert=true;main.inert=true;
+ try{
+  await flush();
+  if(!navigator.onLine)throw Error('Changes saved on this device. Connect to the internet to refresh the app.');
+  status('Changes saved · Checking for the latest app version…');
+  if('serviceWorker' in navigator){
+   const registration=await navigator.serviceWorker.getRegistration();
+   if(registration){
+    await registration.update();
+    const worker=registration.installing;
+    if(worker)await new Promise((resolve,reject)=>{
+     const timeout=setTimeout(()=>{cleanup();reject(Error('Update timed out. Changes are saved; please try Refresh app again.'));},45000);
+     function cleanup(){clearTimeout(timeout);worker.removeEventListener('statechange',changed);}
+     function changed(){if(worker.state==='installed'){cleanup();resolve();}else if(worker.state==='redundant'){cleanup();reject(Error('App update failed. Changes are saved; please try again.'));}}
+     worker.addEventListener('statechange',changed);changed();
+    });
+    if(registration.waiting)await new Promise((resolve,reject)=>{
+     const timeout=setTimeout(()=>{cleanup();reject(Error('Update activation timed out. Changes are saved; please try again.'));},15000);
+     function cleanup(){clearTimeout(timeout);navigator.serviceWorker.removeEventListener('controllerchange',changed);}
+     function changed(){cleanup();resolve();}
+     navigator.serviceWorker.addEventListener('controllerchange',changed);
+     registration.waiting.postMessage({type:'SKIP_WAITING'});
+    });
+   }
+  }
+  // Revalidate the document as well as its versioned module graph.
+  const latest=new URL(location.href);latest.searchParams.set('refresh',Date.now());location.replace(latest.href);
+ }finally{header.inert=false;main.inert=false;}
+});
 function render(){
   const picker=$('characters');picker.replaceChildren();if(!record){const placeholder=el('option','Choose a saved character…');placeholder.value='';placeholder.selected=true;picker.append(placeholder);}for(const r of records){const option=el('option',r.title);option.value=r.id;option.selected=r.id===record?.id;picker.append(option);}
   $('export').disabled=!character;$('close-character').hidden=!character;$('main').replaceChildren();const nav=document.querySelector('nav');nav.replaceChildren();
@@ -54,7 +85,7 @@ function render(){
     const filter=button('Pool > 0',()=>{positive=!positive;render();});filter.setAttribute('aria-pressed',positive);controls.append(filter);
     for(const category of ['Combat','Active','Knowledge',...(magicSkillsApply(character)?['Magic']:[])]){const b=button(category,()=>{skillCategory=category;render();});b.setAttribute('aria-pressed',skillCategory===category);controls.append(b);}
     const skills=section('Skills',controls);skills.querySelector('h2').classList.add('skills-heading');
-    for(const skill of filteredSkills(character,skillCategory,positive)){row(skills,skill.name,input(skill.rating,v=>character.setSkillRating(skill.index,v),skill.name+' rating'),'Pool '+skill.pool);}
+    for(const skill of filteredSkills(character,skillCategory,positive)){row(skills,skill.name,input(skillRating(skill),v=>character.setSkillRating(skill.index,value(skill.node,'skillcategory')==='Language'&&v.trim().toUpperCase()==='N'?0:v),skill.name+' rating'),'Pool '+skill.pool);}
 
   }
   if(page==='Combat'){
