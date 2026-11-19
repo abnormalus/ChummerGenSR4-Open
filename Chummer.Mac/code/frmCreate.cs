@@ -12321,6 +12321,9 @@ namespace Chummer
 				RefreshSelectedLifestyle();
 				UpdateCharacterInfo();
 			}
+
+			_blnIsDirty = true;
+			UpdateWindowTitle();
 		}
 
 		private void treLifestyles_ItemDrag(object sender, ItemDragEventArgs e)
