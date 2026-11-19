@@ -167,7 +167,7 @@ try{
  await combat.getByRole('button',{name:'Reload Ares Predator IV',exact:true}).click();await combat.getByRole('dialog').getByRole('button',{name:'Load',exact:true}).click();await combat.getByRole('dialog').waitFor({state:'hidden'});
  await combat.getByRole('button',{name:'Fire Ares Predator IV',exact:true}).click();await combat.getByRole('button',{name:'Fire 2',exact:true}).click();await combat.getByRole('dialog').waitFor({state:'hidden'});
  if(!await combat.getByRole('button',{name:'Select magazine 1 for Ares Predator IV',exact:true}).innerText().then(t=>t.includes('13 rounds')))throw Error('Fire failed');
- if(!await combat.getByText('Regular Rounds · Reserve 15',{exact:true}).isVisible())throw Error('Reserve missing under weapon or double spent');
+ if(!await combat.getByText('Regular Rounds · Reserve 15',{exact:true}).first().isVisible())throw Error('Reserve missing under weapon or double spent');
  await combat.getByRole('button',{name:'Use Grenade: Flash-Bang',exact:true}).click();await combat.waitForFunction(()=>[...document.querySelectorAll('.weapon-details > summary')].some(n=>n.textContent.includes('Grenade: Flash-Bang')&&n.textContent.includes('×1')));
  if(!await combat.locator('.weapon-details').filter({hasText:'Grenade: Flash-Bang'}).locator('summary').first().innerText().then(t=>t.includes('×1')))throw Error('Grenade Use failed');
  await combat.reload();await combat.getByRole('navigation').getByRole('button',{name:'Combat',exact:true}).click();
