@@ -127,7 +127,7 @@ namespace Chummer
 			SetTooltips();
 			MoveControls();
             InitializeCreationContactControllerLifetime();
-            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); InitializeCreationContactPresentation(); InitializeCreationLifestyleMonths(); InitializeCreationVehicleInputs(); };
+            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); InitializeCreationContactPresentation(); InitializeCreationLifestyleMonths(); InitializeCreationVehicleInputs(); InitializeCreationGearInputs(); };
 		}
 
 		/// <summary>
@@ -16936,7 +16936,7 @@ namespace Chummer
 		/// <summary>
 		/// Refresh the information for the currently displayed Gear.
 		/// </summary>
-		public void RefreshSelectedGear()
+		private void RefreshSelectedGearDetails()
 		{
 			bool blnClear = false;
 			try
@@ -20426,7 +20426,7 @@ namespace Chummer
 			lblGearCapacity.Left = lblGearCapacityLabel.Left + intWidth + 6;
 			nudGearQty.Left = lblGearQtyLabel.Left + intWidth + 6;
 
-			lblGearAvailLabel.Left = nudGearRating.Left + 52;
+			lblGearAvailLabel.Left = nudGearRating.Left + (Avalonia.Application.Current == null ? nudGearRating.Width : GearRatingInputWidth) + 4;
 			lblGearAvail.Left = lblGearAvailLabel.Left + lblGearAvailLabel.Width + 6;
 			lblGearCostLabel.Left = lblGearAvail.Left + 75;
 			lblGearCost.Left = lblGearCostLabel.Left + lblGearCostLabel.Width + 6;

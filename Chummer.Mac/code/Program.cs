@@ -13,7 +13,7 @@ namespace Chummer
         // Native verification flags must also be excluded from frmMain's file
         // opening path; otherwise startup prompts before the driver can run.
         internal static bool IsNativeVerificationArgument(string argument) =>
-            argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command" || argument == "--check-pdf-reader" || argument == "--check-cyberware" || argument == "--check-repository-saving" || argument == "--check-inventory-copy" || argument == "--check-vehicle-inputs" || argument == "--check-lifestyle-months" || argument == "--check-weapon-deletion";
+            argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command" || argument == "--check-pdf-reader" || argument == "--check-cyberware" || argument == "--check-repository-saving" || argument == "--check-inventory-copy" || argument == "--check-gear-inputs" || argument == "--check-vehicle-inputs" || argument == "--check-lifestyle-months" || argument == "--check-weapon-deletion";
 
         /// <summary>
         /// The main entry point for the application.
