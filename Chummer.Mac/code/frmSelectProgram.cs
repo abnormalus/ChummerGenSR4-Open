@@ -26,6 +26,7 @@ namespace Chummer
 		public frmSelectProgram(Character objCharacter)
         {
             InitializeComponent();
+            Load += (_, _) => NativeEditorTree.Attach(this, trePrograms, "NativetrePrograms", Text);
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 			MoveControls();

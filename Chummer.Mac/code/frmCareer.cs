@@ -73,16 +73,75 @@ namespace Chummer
             QualityDetailsPresentation.Initialize(treQualities, lblQualityBP, lblQualitySource, tipTooltip);
             InitializeWeaponAmmunitionMenus();
             Load += (_, _) => InitializeInventoryUndo();
+            Load += (_, _) =>
+            {
+                NativeCareerList.Attach(this, lstKarma, "NativeCareerKarma", "Karma expenses",
+                    () => lstKarma_DoubleClick(lstKarma, EventArgs.Empty),
+                    column => lstKarma_ColumnClick(lstKarma, new ColumnClickEventArgs(column)), followSourceBounds: true);
+                NativeCareerList.Attach(this, lstNuyen, "NativeCareerNuyen", "Nuyen expenses",
+                    () => lstNuyen_DoubleClick(lstNuyen, EventArgs.Empty),
+                    column => lstNuyen_ColumnClick(lstNuyen, new ColumnClickEventArgs(column)), followSourceBounds: true);
+                NativeCareerList.Attach(this, lstCalendar, "NativeCareerCalendar", "Calendar",
+                    () => lstCalendar_DoubleClick(lstCalendar, EventArgs.Empty));
+            };
             treQualities.ShowLines = false;
             splitMain.Dock = DockStyle.Fill;
             tabCharacterTabs.Dock = DockStyle.Fill;
             tabInfo.Dock = DockStyle.Fill;
             tabStreetGearTabs.Dock = DockStyle.Fill;
             Action detailChanged = () => { _blnIsDirty = true; UpdateCharacterInfo(); UpdateWindowTitle(); };
-            PromptDetails.Attach(this, _objCharacter, treQualities,
+            var editQualityDetail = PromptDetails.Attach(this, _objCharacter, treQualities,
                 id => _objFunctions.FindQuality(id, _objCharacter.Qualities), null, detailChanged, cmsQuality);
-            PromptDetails.Attach(this, _objCharacter, treGear, null,
+            Load += (_, _) => NativeEditorTree.Attach(this, treQualities, "NativeCareerQualities",
+                        LanguageManager.Instance.GetString("String_Qualities"), RefreshSelectedQuality,
+                        () => cmdDeleteQuality_Click(treQualities, EventArgs.Empty), editQualityDetail,
+                        node => NativeEditorTree.QualityForeground(node, id => _objFunctions.FindQuality(id, _objCharacter.Qualities)));
+            Load += (_, _) =>
+            {
+                NativeEditorTree.Attach(this, treCyberware, "NativeCareerCyberware",
+                    "Cyberware", delete: () => treCyberware_KeyDown(treCyberware, new KeyEventArgs(Keys.Delete)));
+                NativeEditorTree.Attach(this, treSpells, "NativeCareerSpells",
+                    "Spells", delete: () => treSpells_KeyDown(treSpells, new KeyEventArgs(Keys.Delete)));
+                NativeEditorTree.Attach(this, treMartialArts, "NativeCareerMartialArts",
+                    "Martial Arts", delete: () => treMartialArts_KeyDown(treMartialArts, new KeyEventArgs(Keys.Delete)));
+                NativeEditorTree.Attach(this, treFoci, "NativeCareerFoci",
+                    "Foci");
+                NativeEditorTree.Attach(this, treMetamagic, "NativeCareerMetamagic",
+                    "Metamagic", delete: () => treMetamagic_KeyDown(treMetamagic, new KeyEventArgs(Keys.Delete)));
+                NativeEditorTree.Attach(this, treCritterPowers, "NativeCareerCritterPowers",
+                    "Critter Powers", delete: () => treCritterPowers_KeyDown(treCritterPowers, new KeyEventArgs(Keys.Delete)));
+                NativeEditorTree.Attach(this, treComplexForms, "NativeCareerComplexForms",
+                    "Complex Forms", delete: () => treComplexForms_KeyDown(treComplexForms, new KeyEventArgs(Keys.Delete)));
+            };
+            var editGearDetail = PromptDetails.Attach(this, _objCharacter, treGear, null,
                 id => _objFunctions.FindGear(id, _objCharacter.Gear), detailChanged, cmsGear, cmsGearPlugin);
+            Load += (_, _) =>
+            {
+                NativeEditorTree.Attach(this, treWeapons, "NativeCareerWeapons", "Weapons",
+                    delete: () => treWeapons_KeyDown(treWeapons, new KeyEventArgs(Keys.Delete)),
+                    drag: new NativeTreeDrag(treWeapons, PrepareWeaponsDrag, DragWeaponsOver, DragWeaponsDrop,
+                        () => _objFunctions.ClearNodeBackground(treWeapons, null)));
+                NativeEditorTree.Attach(this, treArmor, "NativeCareerArmor", "Armor",
+                    delete: () => treArmor_KeyDown(treArmor, new KeyEventArgs(Keys.Delete)),
+                    drag: new NativeTreeDrag(treArmor, PrepareArmorDrag, DragArmorOver, DragArmorDrop,
+                        () => _objFunctions.ClearNodeBackground(treArmor, null)));
+                NativeEditorTree.Attach(this, treLifestyles, "NativeCareerLifestyles", "Lifestyles",
+                    delete: () => treLifestyles_KeyDown(treLifestyles, new KeyEventArgs(Keys.Delete)), editDetail: () => treLifestyles_DoubleClick(treLifestyles, EventArgs.Empty),
+                    drag: new NativeTreeDrag(treLifestyles, PrepareLifestylesDrag, DragLifestylesOver, DragLifestylesDrop,
+                        () => _objFunctions.ClearNodeBackground(treLifestyles, null)));
+                NativeEditorTree.Attach(this, treGear, "NativeCareerGear", "Gear",
+                    delete: () => treGear_KeyDown(treGear, new KeyEventArgs(Keys.Delete)), editDetail: editGearDetail,
+                    drag: new NativeTreeDrag(treGear, PrepareGearDrag, DragGearOver, DragGearDrop,
+                        () => { _objFunctions.ClearNodeBackground(treGear, null); _objDragButton = MouseButtons.None; }));
+                NativeEditorTree.Attach(this, treVehicles, "NativeCareerVehicles", "Vehicles",
+                    delete: () => treVehicles_KeyDown(treVehicles, new KeyEventArgs(Keys.Delete)),
+                    drag: new NativeTreeDrag(treVehicles, PrepareVehiclesDrag, DragVehiclesOver, DragVehiclesDrop,
+                        () => { _objFunctions.ClearNodeBackground(treVehicles, null); _objDragButton = MouseButtons.None; _blnDraggingGear = false; }));
+                NativeEditorTree.Attach(this, treImprovements, "NativeCareerImprovements", "Improvements",
+                    delete: () => treImprovements_KeyDown(treImprovements, new KeyEventArgs(Keys.Delete)), editDetail: () => treImprovements_DoubleClick(treImprovements, EventArgs.Empty),
+                    drag: new NativeTreeDrag(treImprovements, PrepareImprovementsDrag, DragImprovementsOver, DragImprovementsDrop,
+                        () => _objFunctions.ClearNodeBackground(treImprovements, null)));
+            };
             GearStacks.Attach(this, _objCharacter, treGear, id => _objFunctions.FindGear(id, _objCharacter.Gear),
                 () => { RefreshSelectedGear(); detailChanged(); }, true, cmsGear, cmsGearPlugin);
 			_tsCredstickDeposit = new ToolStripMenuItem("Deposit Nuyen") { Tag = "Menu_CredstickDeposit" };
@@ -14512,6 +14571,7 @@ namespace Chummer
 							treQualities.SelectedNode.ForeColor = SystemColors.WindowText;
 					}
 					treQualities.SelectedNode.ToolTipText = objQuality.Notes;
+                    treQualities.Invalidate();
 				}
 			}
 			catch
@@ -16651,7 +16711,9 @@ namespace Chummer
 		#endregion
 
 		#region Additional Common Tab Control Events
-		private void treQualities_AfterSelect(object sender, TreeViewEventArgs e)
+		private void treQualities_AfterSelect(object sender, TreeViewEventArgs e) => RefreshSelectedQuality();
+
+        private void RefreshSelectedQuality()
         {
             QualityDetailsPresentation.Refresh(_objCharacter, true, treQualities.SelectedNode,
                 lblQualityBP, lblQualitySource, tipTooltip);
@@ -16706,23 +16768,29 @@ namespace Chummer
 		}
 
 		private void treWeapons_ItemDrag(object sender, ItemDragEventArgs e)
-		{
-            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
+        {
+            if (PrepareWeaponsDrag(e.Button))
+                DoDragDrop(e.Item, DragDropEffects.Move);
+        }
+
+        private bool PrepareWeaponsDrag(MouseButtons button)
+        {
+            if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return false;
 			try
 			{
 				if (treWeapons.SelectedNode.Level != 1 && treWeapons.SelectedNode.Level != 0)
-					return;
+					return false;
 
 				// Do not allow the root element to be moved.
 				if (treWeapons.SelectedNode.Tag.ToString() == "Node_SelectedWeapons")
-					return;
+					return false;
 			}
 			catch
 			{
-				return;
+				return false;
 			}
 			_intDragLevel = treWeapons.SelectedNode.Level;
-			DoDragDrop(e.Item, DragDropEffects.Move);
+			return true;
 		}
 
 		private void treWeapons_DragEnter(object sender, DragEventArgs e)
@@ -16731,10 +16799,14 @@ namespace Chummer
 		}
 
 		private void treWeapons_DragDrop(object sender, DragEventArgs e)
-		{
+        {
+            var source = (TreeView)sender;
+            DragWeaponsDrop(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragWeaponsDrop(TreeNode nodDestination, DragEventArgs e)
+        {
             if (WeaponInventoryViews.IsAmmunition(treWeapons.SelectedNode)) return;
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
             if (WeaponInventoryViews.IsAmmunition(nodDestination)) { e.Effect = DragDropEffects.None; return; }
 
 			int intNewIndex = 0;
@@ -16761,9 +16833,13 @@ namespace Chummer
 		}
 
 		private void treWeapons_DragOver(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragWeaponsOver(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragWeaponsOver(TreeNode objNode, DragEventArgs e)
+        {
             if (WeaponInventoryViews.IsAmmunition(objNode)) { e.Effect = DragDropEffects.None; return; }
 
 			if (objNode == null)
@@ -16810,18 +16886,24 @@ namespace Chummer
 		}
 
 		private void treArmor_ItemDrag(object sender, ItemDragEventArgs e)
-		{
+        {
+            if (PrepareArmorDrag(e.Button))
+                DoDragDrop(e.Item, DragDropEffects.Move);
+        }
+
+        private bool PrepareArmorDrag(MouseButtons button)
+        {
 			try
 			{
 				if (treArmor.SelectedNode.Level != 1)
-					return;
+					return false;
 			}
 			catch
 			{
-				return;
+				return false;
 			}
 			_intDragLevel = treArmor.SelectedNode.Level;
-			DoDragDrop(e.Item, DragDropEffects.Move);
+			return true;
 		}
 
 		private void treArmor_DragEnter(object sender, DragEventArgs e)
@@ -16830,9 +16912,13 @@ namespace Chummer
 		}
 
 		private void treArmor_DragDrop(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragArmorDrop(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragArmorDrop(TreeNode nodDestination, DragEventArgs e)
+        {
 
 			int intNewIndex = 0;
 			try
@@ -16855,9 +16941,13 @@ namespace Chummer
 		}
 
 		private void treArmor_DragOver(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragArmorOver(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragArmorOver(TreeNode objNode, DragEventArgs e)
+        {
 
 			if (objNode == null)
 				return;
@@ -16950,18 +17040,24 @@ namespace Chummer
 		}
 
 		private void treLifestyles_ItemDrag(object sender, ItemDragEventArgs e)
-		{
+        {
+            if (PrepareLifestylesDrag(e.Button))
+                DoDragDrop(e.Item, DragDropEffects.Move);
+        }
+
+        private bool PrepareLifestylesDrag(MouseButtons button)
+        {
 			try
 			{
 				if (treLifestyles.SelectedNode.Level != 1)
-					return;
+					return false;
 			}
 			catch
 			{
-				return;
+				return false;
 			}
 			_intDragLevel = treLifestyles.SelectedNode.Level;
-			DoDragDrop(e.Item, DragDropEffects.Move);
+			return true;
 		}
 
 		private void treLifestyles_DragEnter(object sender, DragEventArgs e)
@@ -16970,9 +17066,13 @@ namespace Chummer
 		}
 
 		private void treLifestyles_DragDrop(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragLifestylesDrop(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragLifestylesDrop(TreeNode nodDestination, DragEventArgs e)
+        {
 
 			int intNewIndex = 0;
 			try
@@ -16995,9 +17095,13 @@ namespace Chummer
 		}
 
 		private void treLifestyles_DragOver(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragLifestylesOver(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragLifestylesOver(TreeNode objNode, DragEventArgs e)
+        {
 
 			if (objNode == null)
 				return;
@@ -17462,32 +17566,38 @@ namespace Chummer
 		}
 
 		private void treGear_ItemDrag(object sender, ItemDragEventArgs e)
-		{
+        {
+            if (PrepareGearDrag(e.Button))
+                DoDragDrop(e.Item, DragDropEffects.Move);
+        }
+
+        private bool PrepareGearDrag(MouseButtons button)
+        {
 			try
 			{
-				if (e.Button == MouseButtons.Left)
+				if (button == MouseButtons.Left)
 				{
 					if (treGear.SelectedNode.Level != 1 && treGear.SelectedNode.Level != 0)
-						return;
+						return false;
 					_objDragButton = MouseButtons.Left;
 				}
 				else
 				{
 					if (treGear.SelectedNode.Level == 0)
-						return;
+						return false;
 					_objDragButton = MouseButtons.Right;
 				}
 
 				// Do not allow the root element to be moved.
 				if (treGear.SelectedNode.Tag.ToString() == "Node_SelectedGear")
-					return;
+					return false;
 			}
 			catch
 			{
-				return;
+				return false;
 			}
 			_intDragLevel = treGear.SelectedNode.Level;
-			DoDragDrop(e.Item, DragDropEffects.Move);
+			return true;
 		}
 
 		private void treGear_DragEnter(object sender, DragEventArgs e)
@@ -17496,9 +17606,13 @@ namespace Chummer
 		}
 
 		private void treGear_DragDrop(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragGearDrop(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragGearDrop(TreeNode nodDestination, DragEventArgs e)
+        {
 
 			int intNewIndex = 0;
 			try
@@ -17563,9 +17677,13 @@ namespace Chummer
 		}
 
 		private void treGear_DragOver(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragGearOver(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragGearOver(TreeNode objNode, DragEventArgs e)
+        {
 
 			if (objNode == null)
 				return;
@@ -17898,8 +18016,14 @@ namespace Chummer
 		}
 
 		private void treVehicles_ItemDrag(object sender, ItemDragEventArgs e)
-		{
-            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
+        {
+            if (PrepareVehiclesDrag(e.Button))
+                DoDragDrop(e.Item, DragDropEffects.Move);
+        }
+
+        private bool PrepareVehiclesDrag(MouseButtons button)
+        {
+            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return false;
 			try
 			{
 				if (treVehicles.SelectedNode.Level != 1)
@@ -17909,21 +18033,21 @@ namespace Chummer
 					Gear objGear = _objFunctions.FindVehicleGear(treVehicles.SelectedNode.Tag.ToString(), _objCharacter.Vehicles, out objVehicle);
 					if (objGear != null)
 					{
-						_objDragButton = e.Button;
+						_objDragButton = button;
 						_blnDraggingGear = true;
 					}
 					else
 					{
-						return;
+						return false;
 					}
 				}
 			}
 			catch
 			{
-				return;
+				return false;
 			}
 			_intDragLevel = treVehicles.SelectedNode.Level;
-			DoDragDrop(e.Item, DragDropEffects.Move);
+			return true;
 		}
 
 		private void treVehicles_DragEnter(object sender, DragEventArgs e)
@@ -17932,10 +18056,18 @@ namespace Chummer
 		}
 
 		private void treVehicles_DragDrop(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
-            if (WeaponInventoryViews.IsAmmunition(nodDestination)) { e.Effect = DragDropEffects.None; return; }
+        {
+            var source = (TreeView)sender;
+            DragVehiclesDrop(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragVehiclesDrop(TreeNode nodDestination, DragEventArgs e)
+        {
+            if (WeaponInventoryViews.IsAmmunition(nodDestination) || (_blnDraggingGear && (nodDestination == null || nodDestination.Level < 2)))
+            {
+                e.Effect = DragDropEffects.None;
+                return;
+            }
 
 			int intNewIndex = 0;
 			try
@@ -17968,9 +18100,13 @@ namespace Chummer
 		}
 
 		private void treVehicles_DragOver(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragVehiclesOver(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragVehiclesOver(TreeNode objNode, DragEventArgs e)
+        {
             if (WeaponInventoryViews.IsAmmunition(objNode)) { e.Effect = DragDropEffects.None; return; }
 
 			if (objNode == null)
@@ -19527,19 +19663,25 @@ namespace Chummer
 		}
 
 		private void treImprovements_ItemDrag(object sender, ItemDragEventArgs e)
-		{
+        {
+            if (PrepareImprovementsDrag(e.Button))
+                DoDragDrop(e.Item, DragDropEffects.Move);
+        }
+
+        private bool PrepareImprovementsDrag(MouseButtons button)
+        {
 			try
 			{
 				// Do not allow the root element to be moved.
 				if (treImprovements.SelectedNode.Tag.ToString() == "Node_SelectedImprovements")
-					return;
+					return false;
 			}
 			catch
 			{
-				return;
+				return false;
 			}
 			_intDragLevel = treImprovements.SelectedNode.Level;
-			DoDragDrop(e.Item, DragDropEffects.Move);
+			return true;
 		}
 
 		private void treImprovements_DragEnter(object sender, DragEventArgs e)
@@ -19548,9 +19690,13 @@ namespace Chummer
 		}
 
 		private void treImprovements_DragDrop(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode nodDestination = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragImprovementsDrop(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragImprovementsDrop(TreeNode nodDestination, DragEventArgs e)
+        {
 
 			int intNewIndex = 0;
 			try
@@ -19576,9 +19722,13 @@ namespace Chummer
 		}
 
 		private void treImprovements_DragOver(object sender, DragEventArgs e)
-		{
-			Point pt = ((TreeView)sender).PointToClient(new Point(e.X, e.Y));
-			TreeNode objNode = ((TreeView)sender).GetNodeAt(pt);
+        {
+            var source = (TreeView)sender;
+            DragImprovementsOver(source.GetNodeAt(source.PointToClient(new Point(e.X, e.Y))), e);
+        }
+
+        private void DragImprovementsOver(TreeNode objNode, DragEventArgs e)
+        {
 
 			if (objNode == null)
 				return;

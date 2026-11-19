@@ -205,7 +205,7 @@ namespace Chummer
 			// Locate the currently selected Lifestyle.
 			foreach (Lifestyle objCharacterLifestyle in _objCharacter.Lifestyles)
 			{
-				if (objCharacterLifestyle.Name == treLifestyles.SelectedNode.Tag.ToString())
+				if (objCharacterLifestyle.InternalId == treLifestyles.SelectedNode.Tag.ToString())
 				{
 					objLifestyle = objCharacterLifestyle;
 					break;
@@ -411,7 +411,7 @@ namespace Chummer
 				}
 			}
 			_objCharacter.Vehicles.Remove(objVehicle);
-			if (intNewIndex > _objCharacter.Weapons.Count)
+			if (intNewIndex > _objCharacter.Vehicles.Count)
 				_objCharacter.Vehicles.Add(objVehicle);
 			else
 				_objCharacter.Vehicles.Insert(intNewIndex, objVehicle);
@@ -438,6 +438,10 @@ namespace Chummer
 		/// <param name="objDestination">Destination Node.</param>
 		public void MoveVehicleGearParent(int intNewIndex, TreeNode objDestination, TreeView treVehicles, ContextMenuStrip cmsVehicleGear)
 		{
+			// Mounted gear can only move onto a vehicle location or another piece of gear.
+			if (objDestination == null || objDestination.Level < 2)
+				return;
+
 			// The item cannot be dropped onto itself.
 			if (objDestination == treVehicles.SelectedNode)
 				return;

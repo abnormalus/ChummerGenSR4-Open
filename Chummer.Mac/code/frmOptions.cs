@@ -31,7 +31,9 @@ namespace Chummer
 		public frmOptions()
 		{
 			InitializeComponent();
+            Load += (_, _) => NativeEditorTree.Attach(this, treSourcebook, "NativetreSourcebook", Text);
             AddCharacterAutosaveOptions();
+            Load += (_, _) => InitializePreferenceSpinners();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 
 			// Populate the Build Method list.

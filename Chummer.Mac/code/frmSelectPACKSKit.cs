@@ -29,6 +29,7 @@ namespace Chummer
 		public frmSelectPACKSKit(Character objCharacter)
 		{
 			InitializeComponent();
+            Load += (_, _) => NativeEditorTree.Attach(this, treContents, "NativetreContents", Text);
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 		}

@@ -42,6 +42,12 @@ The quality-detail presentation follow-up in draft PR44 passed source-specific a
 
 ## Rendering priority
 
+### Next push target
+
+The 38 desktop tree and list presentations are implemented locally. The batch covers Creation and Career, Preferences, six picker and print dialogs, and conditional editor tabs. The [compatibility inventory](COMPATIBILITY_CONTROLS.md) tracks each field and the focused test commands. The combined native suite runs those checks through the regular desktop entry point.
+
+Before pushing, account for every field, run the combined-source Mac and Windows checks and review the changed surfaces in both themes. Use the existing publication cadence. Record any field that misses acceptance and report it as outstanding.
+
 The requested Add Quality window and career specialty disclosures are released. Gear and Cyberware shopping-control migrations have the acceptance recorded above. Preserve selection, filtering, source links, accept/cancel, caller accounting and existing creation/career behavior when choosing the next section after the current draft is verified.
 
 Repeated repaint defects justify examining shared invalidation/caching behavior before adding more screen-specific refresh calls. Prioritize the frequently affected item lists and changing detail values. The first shared repaint corrections and session-only full-redraw diagnostic are implemented and documented in [RENDERING.md](RENDERING.md). Use the cached-versus-complete frame checks as acceptance coverage for the next bounded standard-control migration. Prefer event-driven correctness and standard controls over continuously repainting the whole window to hide defects.

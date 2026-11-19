@@ -81,6 +81,65 @@ internal static class NativeBulkChecks
                 passed = true;
                 return;
             }
+            if (command == "--check-compact-spinners")
+            {
+                await NativeCompactSpinnerChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Spinner verification preserves the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-inventory-trees")
+            {
+                await NativeInventoryTreeChecks.RunAsync(main, character, Check);
+                await NativeInventoryEnhancementChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native inventory tree checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-career-lists")
+            {
+                await NativeCareerListChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native career list checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-character-trees")
+            {
+                await NativeCharacterTreeChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native character tree checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-dialog-trees")
+            {
+                await NativeDialogTreeChecks.RunAsync(character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native dialog tree checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-quality-trees")
+            {
+                string snapshots = Path.GetDirectoryName(Path.GetFullPath(report))!;
+                await NativeQualityPickerChecks.CheckEditorTreeAsync(main, character, false, Check, snapshots);
+                await NativeQualityPickerChecks.CheckEditorTreeAsync(main, character, true, Check, snapshots);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native quality tree checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-gear-inputs")
+            {
+                await NativeGearInputChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native carried gear checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-vehicle-inputs")
+            {
+                await NativeVehicleInputChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native vehicle checks preserve the source character file");
+                passed = true;
+                return;
+            }
             if (command == "--check-lifestyle-months")
             {
                 await NativeLifestyleMonthsChecks.RunAsync(main, character, Check);
@@ -157,6 +216,13 @@ internal static class NativeBulkChecks
             await NativeCharacterDetailsChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeWeaponPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeArmorPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+            await NativeQualityPickerChecks.CheckEditorTreeAsync(main, character, false, Check);
+            await NativeQualityPickerChecks.CheckEditorTreeAsync(main, character, true, Check);
+            await NativeDialogTreeChecks.RunAsync(character, Check);
+            await NativeCharacterTreeChecks.RunAsync(main, character, Check);
+            await NativeCareerListChecks.RunAsync(main, character, Check);
+            await NativeCompactSpinnerChecks.RunAsync(main, character, Check);
+            await NativeInventoryTreeChecks.RunAsync(main, character, Check);
             await NativeQualityPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeAccessoryPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeArmorModPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);

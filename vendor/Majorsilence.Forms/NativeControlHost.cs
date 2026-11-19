@@ -13,7 +13,7 @@ namespace Majorsilence.Forms
     /// embedded (via <see cref="HostedSurface"/>) and when it runs standalone, as long as the backend
     /// implements <see cref="INativeControlHostBackend"/>; otherwise the host renders as an empty
     /// placeholder. The native element draws above the Majorsilence scene and does not scroll its content
-    /// into a clip region beyond the host's bounds, so keep it inside non-scrolling areas for now.
+    /// into a clip region beyond the host's bounds.
     /// </summary>
     public class NativeControlHost : Control
     {
@@ -111,7 +111,9 @@ namespace Majorsilence.Forms
             var clip = bounds;
             for (var parent = Parent; parent is not null and not ControlAdapter; parent = parent.Parent) {
                 var pp = parent.GetPositionInForm ();
-                var vp = parent.DisplayRectangle;
+                var vp = parent is ScrollableControl { AutoScroll: true } scroll
+                    ? scroll.GetContentViewport ()
+                    : parent.DisplayRectangle;
                 clip = Rectangle.Intersect (clip, new Rectangle (pp.X + vp.X, pp.Y + vp.Y, vp.Width, vp.Height));
             }
 
