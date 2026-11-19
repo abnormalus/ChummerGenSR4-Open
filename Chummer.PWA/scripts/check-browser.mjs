@@ -43,7 +43,7 @@ try{
  const sample=new TextDecoder().decode(demo),icon=(await readFile('Chummer.PWA/dist/assets/icon.png')).toString('base64');
  const portraitSample=sample.replace('</character>','<mugshot>'+icon+'</mugshot></character>');
  let expanded=false,treeReads=0,writes=0;
- const remoteFiles=new Map([['Nightjar.chum',{xml:portraitSample,sha:'portrait'}],['Archive/Willow.chum',{xml:sample.replace('<alias>Nightjar</alias>','<alias>Willow test</alias>'),sha:'second'}]]);
+ const remoteFiles=new Map([['Nightjar.chum',{xml:portraitSample,sha:'portrait'}],['Archive/Willow.chum',{xml:sample.replace('<alias>Nightjar</alias>','<alias>Willow test</alias>').replace('</character>','<magician>True</magician></character>'),sha:'second'}]]);
  const blobs=new Map([...remoteFiles.values()].map(v=>[v.sha,v.xml]));
  await page.route('https://api.github.com/**',async route=>{
   const request=route.request(),path=decodeURIComponent(new URL(request.url()).pathname);let json;
@@ -71,6 +71,12 @@ try{
  await page.locator('.character-choice').click();
  await page.locator('#open-repository').waitFor({state:'hidden'});
  if(await page.getByLabel('Runner',{exact:true}).inputValue()!=='Willow test')throw Error('Wrong repository character opened');
+ await page.getByRole('button',{name:'Magic',exact:true}).click();
+ await page.getByRole('button',{name:'Pool > 0',exact:true}).click();
+ await page.getByLabel('Astral Combat rating',{exact:true}).waitFor();
+ await page.setViewportSize({width:390,height:1000});if(!await page.getByLabel('Skill filters',{exact:true}).evaluate(node=>node.scrollWidth<=node.clientWidth+1))throw Error('Magic filters overflow phone');
+ await page.getByRole('button',{name:'Pool > 0',exact:true}).click();await page.getByRole('button',{name:'Active',exact:true}).click();await page.setViewportSize({width:1280,height:900});
+
  const local=await page.getByRole('option',{name:'Nightjar',exact:true}).getAttribute('value');
  await page.getByLabel('Character',{exact:true}).selectOption(local);
  await page.waitForFunction(()=>document.querySelector('input[aria-label="Runner"]')?.value==='Nightjar');
