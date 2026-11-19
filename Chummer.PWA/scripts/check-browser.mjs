@@ -183,5 +183,16 @@ try{
  await combat.reload();await combat.getByRole('navigation').getByRole('button',{name:'Combat',exact:true}).click();await combat.locator('.vehicle-details > summary').click();
  if(await combat.getByRole('button',{name:'Test Rover physical damage 4',exact:true}).getAttribute('class')!=='filled')throw Error('Vehicle damage not saved');
  console.log('PASS fixed hardpoint reload/fire and persisted vehicle condition monitor');
+ await combat.getByRole('button',{name:'GitHub',exact:true}).click();
+ if(await combat.getByLabel('Save token on this device',{exact:true}).isChecked())throw Error('Token storage must default off');
+ await combat.getByLabel('Token',{exact:true}).fill('synthetic-remember-test');await combat.getByLabel('Save token on this device',{exact:true}).check();await combat.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+ await combat.reload();await combat.getByRole('button',{name:'GitHub',exact:true}).click();
+ if(await combat.getByLabel('Token',{exact:true}).inputValue()!=='synthetic-remember-test')throw Error('Opt-in token not restored');
+ await combat.getByLabel('Save token on this device',{exact:true}).uncheck();await combat.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();await combat.reload();await combat.getByRole('button',{name:'GitHub',exact:true}).click();
+ if(await combat.getByLabel('Token',{exact:true}).inputValue()!=='')throw Error('Unchecking did not forget token');
+ await combat.getByLabel('Token',{exact:true}).fill('synthetic-disconnect-test');await combat.getByLabel('Save token on this device',{exact:true}).check();await combat.getByRole('button',{name:'Disconnect',exact:true}).click();await combat.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();await combat.reload();await combat.getByRole('button',{name:'GitHub',exact:true}).click();
+ if(await combat.getByLabel('Token',{exact:true}).inputValue()!==''||await combat.getByLabel('Save token on this device',{exact:true}).isChecked())throw Error('Disconnect did not forget token');
+ console.log('PASS opt-in token restore, unchecked default, explicit forget and Disconnect forget');
+
  console.log('PASS reload, Fire 2, grenade Use, reserve placement, persistence and differing Perception senses');await combatContext.close();
 }finally{await browser.close();await new Promise(done=>server.close(done));}
