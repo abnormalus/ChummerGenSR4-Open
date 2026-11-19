@@ -1,4 +1,4 @@
-import {value,truth} from './core.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {value,truth} from './core.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
 const KNOWLEDGE=new Set(['Academic','Interest','Interests','Language','Professional','Street']);
 export function knowledgeSkill(skill){return truth(value(skill.node,'knowledge'))||KNOWLEDGE.has(value(skill.node,'skillcategory'));}
 export const nativeLanguage=skill=>skill.rating===0&&value(skill.node,'skillcategory')==='Language';
@@ -16,3 +16,6 @@ export function filteredSkills(character,category='Active',positive=true){
   return true;
  }).sort((a,b)=>a.name.localeCompare(b.name));
 }
+
+export const perceptionSense=skill=>skill.name.match(/^Perception \(([^)]+)\)$/)?.[1]||'';
+export function perceptionDifferences(character,base){return character.skills.filter(s=>perceptionSense(s)&&s.pool!==base.pool).map(s=>({name:perceptionSense(s),pool:s.pool}));}

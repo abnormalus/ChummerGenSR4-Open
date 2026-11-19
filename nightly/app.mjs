@@ -1,12 +1,12 @@
-import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import * as db from './storage.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import {GitHub} from './github.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import {installController} from './install.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import {existingCharacter,sameRemote} from './identity.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty} from './weapons.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import {AutoSync} from './autosync.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
-import {filteredSkills,magicSkillsApply,skillRating} from './skill-filters.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import * as db from './storage.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {GitHub} from './github.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {installController} from './install.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {existingCharacter,sameRemote} from './identity.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty,isGrenade,grenadeLots,ammunition,fireCounts,setActiveSlot,fireWeapon,reloadWeapon,useGrenade} from './weapons.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {AutoSync} from './autosync.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {filteredSkills,magicSkillsApply,skillRating,perceptionSense,perceptionDifferences} from './skill-filters.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=true,skillCategory='Active',client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -86,48 +86,67 @@ function render(){
     const filter=button('Pool > 0',()=>{positive=!positive;render();});filter.setAttribute('aria-pressed',positive);controls.append(filter);
     for(const category of ['Combat','Active','Knowledge',...(magicSkillsApply(character)?['Magic']:[])]){const b=button(category,()=>{skillCategory=category;render();});b.setAttribute('aria-pressed',skillCategory===category);controls.append(b);}
     const skills=section('Skills',controls);skills.querySelector('h2').classList.add('skills-heading');
-    for(const skill of filteredSkills(character,skillCategory,positive)){row(skills,skill.name,input(skillRating(skill),v=>character.setSkillRating(skill.index,value(skill.node,'skillcategory')==='Language'&&v.trim().toUpperCase()==='N'?0:v),skill.name+' rating'),'Pool '+skill.pool);}
+    for(const skill of filteredSkills(character,skillCategory,positive)){if(perceptionSense(skill)&&character.skills.some(s=>s.name==='Perception'))continue;row(skills,skill.name,input(skillRating(skill),v=>character.setSkillRating(skill.index,value(skill.node,'skillcategory')==='Language'&&v.trim().toUpperCase()==='N'?0:v),skill.name+' rating'),'Pool '+skill.pool);if(skill.name==='Perception')for(const sense of perceptionDifferences(character,skill)){const line=row(skills,sense.name,'Pool '+sense.pool);line.classList.add('skill-sense');}}
 
   }
   if(page==='Combat'){
     const init=section('Initiative'),summary=el('div',undefined,'summary');init.append(summary);for(const [name,n] of [['Physical',`${character.initiative} / ${character.passes} IP`],['Matrix',`${character.matrix} / ${character.matrixPasses} IP`],...(character.magician?[['Astral',character.astral]]:[])]){const item=el('div',name);item.append(el('strong',n));summary.append(item);}
     for(const physical of [true,false]){const s=section(physical?'Physical condition':'Stun condition'),boxes=el('div',undefined,'monitor');s.append(boxes);for(let n=1;n<=character.capacity(physical);n++){const b=button(String(n),async()=>{character.set(physical?'physicalcmfilled':'stuncmfilled',character.damage(physical)===n?n-1:n);await flush();render();});b.className=n<=character.damage(physical)?'filled':'';const penalty=conditionPenalty(character,physical,n);if(penalty){const corner=el('span','−'+Math.abs(penalty),'wound-penalty');corner.setAttribute('aria-hidden','true');b.append(corner);}b.setAttribute('aria-label',`${physical?'Physical':'Stun'} damage ${n}`);if(penalty)b.setAttribute('aria-description',`Wound penalty ${penalty}`);boxes.append(b);}}
     $('main').append(el('p',`Wound modifier ${character.wounds}. Tap a box to set damage; tap the last filled box to heal one.`, 'muted'));
-    weapons();if(character.magician||character.adept)list(character.magician?'Spells':'Adept powers',character.magician?'spells':'powers',character.magician?'spell':'power');if(character.magician)list('Spirits','spirits','spirit');list('Vehicles','vehicles','vehicle');
+    weapons();if(character.magician||character.adept)list(character.magician?'Spells':'Adept powers',character.magician?'spells':'powers',character.magician?'spell':'power');if(character.magician)list('Spirits','spirits','spirit');vehicles();
   }
   if(page==='Equipment'){
     weapons();const programNodes=new Set(character.programs.map(r=>r.node));if(programNodes.size){const programs=section('Programs · Loaded');for(const {node} of character.programs){const check=el('input');check.type='checkbox';check.checked=truth(value(node,'equipped'));check.setAttribute('aria-label','Loaded '+value(node,'name'));check.onchange=run(async()=>{character.setNode(node,'equipped',check.checked?'True':'False');await flush();});row(programs,value(node,'name')+(value(node,'rating')?' '+value(node,'rating'):''),check,source(node));}}
-    const gear=section('Gear');for(const {node,depth} of character.gear.filter(r=>!programNodes.has(r.node))){row(gear,'　'.repeat(depth)+value(node,'name')+(value(node,'rating')&&value(node,'rating')!=='0'?' '+value(node,'rating'):''),value(node,'qty')&&'×'+value(node,'qty'),source(node));}
-    list('Armor','armors','armor');list('Augmentations','cyberwares','cyberware');if(character.technomancer)list('Complex forms','complexforms','complexform');
+    const assignedAmmo=new Set(character.rows('weapons','weapon').flatMap(w=>[...ammunition(character,w),...grenadeLots(character,w)]));const gear=section('Gear');for(const {node,depth} of character.gear.filter(r=>!programNodes.has(r.node)&&!assignedAmmo.has(r.node))){const gearRow=row(gear,'　'.repeat(depth)+value(node,'name')+(value(node,'rating')&&value(node,'rating')!=='0'?' '+value(node,'rating'):''),value(node,'qty')&&'×'+value(node,'qty'),source(node));if(isGrenade(node)){const use=button('Use',()=>weaponChange(()=>useGrenade(character,node)));use.setAttribute('aria-label','Use '+value(node,'name'));use.disabled=Number(value(node,'qty'))<1;gearRow.prepend(use);}}
+    vehicles();list('Armor','armors','armor');list('Augmentations','cyberwares','cyberware');if(character.technomancer)list('Complex forms','complexforms','complexform');
   }
   if(page==='Background'){for(const [key,title] of [['background','Background'],['notes','Table notes']]){const s=section(title),area=el('textarea');area.value=key==='notes'?character.plainNotes:character.get(key);area.setAttribute('aria-label',title);area.oninput=()=>{key==='notes'?character.setPlainNotes(area.value):character.set(key,area.value);schedule();};area.onblur=run(flush);s.append(area);}}
   if(page==='Contacts'){for(const node of character.rows('contacts','contact')){let expanded=false;const more=button('Stats',()=>{expanded=!expanded;details.hidden=!expanded;more.setAttribute('aria-expanded',expanded);});more.setAttribute('aria-expanded','false');const s=section(value(node,'name')||'Contact',more);for(const key of ['connection','loyalty'])row(s,key[0].toUpperCase()+key.slice(1),input(value(node,key),v=>character.setNode(node,key,v),key));if(value(node,'notes'))s.append(el('div',value(node,'notes'),'prose'));const details=el('div');details.hidden=true;for(const item of [...node.children].filter(c=>!['name','connection','loyalty','notes','professionalrating','guid'].includes(c.tagName)&&!c.children.length&&c.textContent))row(details,item.tagName,item.textContent);s.append(details);}}
 }
 function list(title,collection,item){const rows=character.rows(collection,item);if(!rows.length)return;const s=section(title);for(const node of rows)row(s,value(node,'name')+(value(node,'extra')?' ('+value(node,'extra')+')':'')+(value(node,'rating')?' '+value(node,'rating'):''),'',source(node));}
-function weapons(){
- const nodes=character.rows('weapons','weapon');if(!nodes.length)return;const s=section('Weapons');
- function label(key){return ({rc:'Recoil compensation',ap:'Armor penetration',ammo:'Capacity',useskill:'Skill',spec:'Specialization',spec2:'Alternate specialization',rangemultiply:'Range multiplier',rangebonus:'Range bonus (%)',dvbonus:'Damage bonus',dicepool:'Dice pool modifier',weaponmods:'Modifications',weaponbonus:'Weapon bonuses',source:'Source',page:'Page'})[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,x=>x.toUpperCase());}
- function savedFields(parent,node,skip=new Set()){
-  for(const field of node.children){if(skip.has(field.tagName)||['guid','sourceid','weaponguid','ammoloaded','ammoloaded2','ammoloaded3','ammoloaded4'].includes(field.tagName)||!field.textContent.trim())continue;
-   if(!field.children.length)row(parent,label(field.tagName),field.textContent);
-   else{const group=el('details',undefined,'weapon-extra'),heading=el('summary',value(field,'name')||label(field.tagName));group.append(heading);savedFields(group,field);parent.append(group);}
-  }
+async function weaponChange(action,index,weapon){const opened=[...document.querySelectorAll('details[data-key][open]')].map(n=>n.dataset.key);action();await flush();render();for(const n of document.querySelectorAll('details[data-key]'))if(opened.includes(n.dataset.key))n.open=true;if(weapon){const key='weapon-'+(value(weapon,'guid')||value(weapon,'name'));const detail=[...document.querySelectorAll('details[data-key]')].find(n=>n.dataset.key===key);if(detail)detail.open=true;}if(index!==undefined){const detail=$('main').querySelectorAll('.weapon-details')[index];if(detail)detail.open=true;}}
+function weaponDialog(title,build){const dialog=el('dialog'),heading=el('h2',title),error=el('p',undefined,'error');error.setAttribute('role','status');const close=button('Close',()=>dialog.close());dialog.append(heading);const action=(name,fn)=>button(name,async()=>{try{await fn();dialog.close();}catch(e){error.textContent=e.message;}});build(dialog,action);dialog.append(error,close);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();}
+function reloadDialog(weapon,index,selected){weaponDialog('Reload '+value(weapon,'name'),(dialog,action)=>{
+ const slot=el('select');slot.setAttribute('aria-label','Magazine');for(let n=1;n<=4;n++){const option=el('option','Magazine '+n);option.value=n;slot.append(option);}slot.value=activeSlot(character,weapon);
+ const reserve=el('select');reserve.setAttribute('aria-label','Ammunition reserve');const lots=ammunition(character,weapon);for(const [n,ammo] of lots.entries()){const option=el('option',value(ammo,'name')+' · Reserve '+value(ammo,'qty'));option.value=n;reserve.append(option);}if(selected)reserve.value=lots.indexOf(selected);
+ const count=el('input');count.type='number';count.min='1';count.step='1';count.setAttribute('aria-label','Rounds to load');const capacity=value(weapon,'ammo').match(/^(\d+)/);count.value=capacity?capacity[1]:'1';
+ for(const [label,control] of [['Magazine',slot],['Ammunition',reserve],['Rounds to load',count]]){const field=el('label',label);field.append(control);dialog.append(field);}
+ const load=action('Load',()=>weaponChange(()=>reloadWeapon(character,weapon,Number(slot.value),lots[Number(reserve.value)],Number(count.value)),index,weapon));load.disabled=!lots.length;
+ dialog.append(load,action('Unload',()=>weaponChange(()=>reloadWeapon(character,weapon,Number(slot.value),null,0),index,weapon)));
+});}
+function fireDialog(weapon,index){weaponDialog('Fire '+value(weapon,'name'),(dialog,action)=>{const slot=activeSlot(character,weapon),ammo=loadedAmmo(character,weapon,slot),remaining=integer(value(weapon,'ammoremaining'+(slot===1?'':slot)));dialog.append(el('p',`Magazine ${slot} · ${ammo?value(ammo,'name'):'Ammo type not saved'} · ${remaining} rounds`));const actions=el('div',undefined,'actions');for(const count of fireCounts(weapon)){const fire=action('Fire '+count,()=>weaponChange(()=>fireWeapon(character,weapon,slot,count),index,weapon));fire.disabled=remaining<count;actions.append(fire);}if(!actions.children.length)dialog.append(el('p','No firing mode saved for this weapon.'));dialog.append(actions);});}
+function weapons(nodes=character.rows('weapons','weapon'),parent){
+ if(!nodes.length)return;const s=parent||section('Weapons');
+ const labels={rc:'Recoil compensation',reach:'Reach',notes:'Notes',dvbonus:'Damage bonus',apbonus:'AP bonus',dicepool:'Pool modifier',rcbonus:'Recoil bonus',fullburst:'Full burst',suppressive:'Suppressive fire',damage:'Damage',ap:'AP',pool:'Pool modifier',damagetype:'Damage type',damagereplace:'Damage replacement',apreplace:'AP replacement'};
+ function fields(parent,node,allowed){for(const key of allowed){const text=value(node,key);if(text&&text!=='0'&&text!=='False')row(parent,labels[key]||key,text);}}
+ for(const [localIndex,node] of nodes.entries()){const index=parent?undefined:localIndex;
+  const details=el('details',undefined,'weapon-details');details.dataset.key='weapon-'+(value(node,'guid')||value(node,'name'));const summary=el('summary'),pool=weaponPool(character,node),name=el('span',value(node,'weaponname')||value(node,'name'),'name'),grenades=grenadeLots(character,node);
+  function quick(label,fn){const b=button(label,fn);const handler=b.onclick;b.onclick=e=>{e.preventDefault();e.stopPropagation();return handler(e);};return b;}
+  if(grenades.length){const use=quick('Use',()=>weaponChange(()=>useGrenade(character,grenades.find(n=>Number(value(n,'qty'))>=1)),index));use.setAttribute('aria-label','Use '+value(node,'name'));use.disabled=!grenades.some(n=>Number(value(n,'qty'))>=1);summary.append(use);}
+  summary.append(name,el('span',[character.weaponDamage(node),...(page==='Combat'?['Pool '+pool.text]:[]),value(node,'mode'),value(node,'ap')&&'AP '+value(node,'ap'),grenades.length?'×'+grenades.reduce((n,g)=>n+Number(value(g,'qty')||0),0):''].filter(Boolean).join(' · '),'weapon-stats'));if(source(node))summary.append(el('small',source(node)));
+  const ranged=value(node,'type').toLowerCase()==='ranged'&&value(node,'requireammo').toLowerCase()!=='false'&&value(node,'ammo')!=='0'&&!grenades.length;
+  if(ranged){const fire=quick('Fire',()=>fireDialog(node,index));fire.setAttribute('aria-label','Fire '+value(node,'name'));summary.append(fire);const reload=quick('Reload',()=>reloadDialog(node,index));reload.setAttribute('aria-label','Reload '+value(node,'name'));summary.append(reload);}details.append(summary);
+  if(page!=='Combat')row(details,'Dice pool',pool.text);details.append(el('p',pool.description,'muted weapon-note'));
+  const bands=weaponRanges(character,node);if(bands.length)row(details,'Range (m)',bands.map(b=>b.text.match(/–([\d.]+)/)?.[1]||b.text).join('/'),'Short / Medium / Long / Extreme');
+  fields(details,node,['rc','reach','notes']);if(ranged&&value(node,'ammo'))row(details,'Capacity',value(node,'ammo'));
+  if(ranged){const active=activeSlot(character,node);for(let slot=1;slot<=4;slot++){const suffix=slot===1?'':slot,ammo=loadedAmmo(character,node,slot),remaining=value(node,'ammoremaining'+suffix);if(slot!==active&&!ammo&&(!remaining||remaining==='0'))continue;const chosen=slot;const select=button(`${ammo?value(ammo,'name'):'Ammo type not saved'} · ${remaining||'0'} rounds${slot===active?' · Active':''}`,()=>weaponChange(()=>setActiveSlot(character,node,chosen),index));select.setAttribute('aria-label','Select magazine '+slot+' for '+value(node,'name'));row(details,'Magazine '+slot,select);if(ammo){const bonus=ammo.querySelector('weaponbonus');if(bonus)fields(details,bonus,['damage','ap','pool','damagetype','damagereplace','apreplace']);}}}
+  for(const mod of attachments(node).filter(n=>truth(value(n,'installed')))){const rating=value(mod,'rating');row(details,value(mod,'name')+(rating&&rating!=='0'?' '+rating:''),[value(mod,'dicepool')?'Pool '+value(mod,'dicepool'):'',value(mod,'dvbonus')&&value(mod,'dvbonus')!=='0'?'DV '+value(mod,'dvbonus'):'',value(mod,'apbonus')&&value(mod,'apbonus')!=='0'?'AP '+value(mod,'apbonus'):''].filter(Boolean).join(' · '),source(mod));}
+  s.append(details);
+  for(const ammo of ammunition(character,node)){const load=button('Load',()=>reloadDialog(node,index,ammo));load.setAttribute('aria-label','Load '+value(ammo,'name')+' into '+value(node,'name'));const r=row(s,value(ammo,'name')+' · Reserve '+value(ammo,'qty'),load,source(ammo));r.classList.add('weapon-ammo');}
  }
- for(const node of nodes){
-  const details=el('details',undefined,'weapon-details'),summary=el('summary'),pool=weaponPool(character,node),name=el('span',value(node,'weaponname')||value(node,'name'),'name');
-  summary.append(name,el('span',[character.weaponDamage(node),...(page==='Combat'?['Pool '+pool.text]:[]),value(node,'mode'),value(node,'ap')&&'AP '+value(node,'ap')].filter(Boolean).join(' · '),'weapon-stats'));if(source(node))summary.append(el('small',source(node)));details.append(summary);
-  row(details,'Dice pool',pool.text,pool.description);
-  const bands=weaponRanges(character,node);if(bands.length){row(details,'Range bands','Metres');for(const band of bands)row(details,band.label,band.text);}else row(details,'Range',value(node,'type').toLowerCase()==='melee'?'Melee · Reach '+(value(node,'reach')||'0'):'No range bands available for '+(value(node,'range')||value(node,'category')||'this weapon'));
-  if(value(node,'type').toLowerCase()==='ranged'){
-   const active=activeSlot(character,node);
-   for(let slot=1;slot<=4;slot++){const suffix=slot===1?'':slot,ammo=loadedAmmo(character,node,slot),remaining=value(node,'ammoremaining'+suffix);if(slot!==active&&!ammo&&(!remaining||remaining==='0'))continue;
-    row(details,`Magazine ${slot}${slot===active?' · Active':''}`,`${ammo?value(ammo,'name'):'Ammo type not saved'} · ${remaining||'0'} rounds`,ammo?source(ammo):'');
-    if(ammo){const fields=el('details',undefined,'weapon-extra');fields.append(el('summary','Loaded ammo details'));savedFields(fields,ammo,new Set(['name','guid','qty']));details.append(fields);}
-   }
-  }
-  const mods=attachments(node);row(details,'Modifications / accessories',mods.length?String(mods.length):'None saved');
-  for(const mod of mods){const group=el('details',undefined,'weapon-extra');group.append(el('summary',[value(mod,'name'),value(mod,'rating')&&value(mod,'rating')!=='0'?value(mod,'rating'):'',truth(value(mod,'installed'))?'Installed':'Not installed',source(mod)].filter(Boolean).join(' · ')));savedFields(group,mod,new Set(['name','rating','installed','source','page']));details.append(group);}
-  savedFields(details,node,new Set(['name','weaponname','accessories','weaponmods','ammoremaining','ammoremaining2','ammoremaining3','ammoremaining4']));s.append(details);
+}
+function vehicles(){
+ const nodes=character.rows('vehicles','vehicle');if(!nodes.length)return;const sectionNode=section('Vehicles');
+ for(const [index,vehicle] of nodes.entries()){
+  const details=el('details',undefined,'vehicle-details');details.dataset.key='vehicle-'+(value(vehicle,'guid')||index);details.append(el('summary',value(vehicle,'vehiclename')||value(vehicle,'name')));if(value(vehicle,'vehiclename'))row(details,'Model',value(vehicle,'name'),source(vehicle));else if(source(vehicle))details.append(el('p',source(vehicle),'muted weapon-note'));
+  const capacity=Math.max(0,8+Math.ceil(integer(value(vehicle,'body'))/2)),damage=Math.max(0,integer(value(vehicle,'physicalcmfilled'))),monitor=el('div',undefined,'monitor');row(details,'Physical condition',`${damage}/${capacity}`);for(let n=1;n<=capacity;n++){const box=button(String(n),()=>weaponChange(()=>character.setNode(vehicle,'physicalcmfilled',damage===n?n-1:n)));box.setAttribute('aria-label',`${value(vehicle,'vehiclename')||value(vehicle,'name')} physical damage ${n}`);box.className=n<=damage?'filled':'';monitor.append(box);}details.append(monitor);
+  for(const [key,title] of [['handling','Handling'],['accel','Acceleration'],['speed','Speed'],['pilot','Pilot'],['body','Body'],['armor','Armor'],['sensor','Sensor'],['devicerating','Device rating'],['response','Response'],['system','System'],['firewall','Firewall'],['signal','Signal'],['seats','Seats']])if(value(vehicle,key))row(details,title,value(vehicle,key));
+  const mods=[...vehicle.querySelectorAll(':scope > mods > mod, :scope > weaponmounts > weaponmount')];
+  for(const [mi,mod] of mods.entries()){const group=el('details',undefined,'weapon-extra');group.dataset.key=details.dataset.key+'-mount-'+mi;group.append(el('summary',value(mod,'name')+(value(mod,'rating')&&value(mod,'rating')!=='0'?' '+value(mod,'rating'):'')));if(source(mod))group.append(el('p',source(mod),'muted weapon-note'));for(const key of ['extra','slots','response','system','firewall','signal','pilot','control','flexibility','visibility','size','notes'])if(value(mod,key)&&value(mod,key)!=='0')row(group,key,value(mod,key));const mounted=[...mod.querySelectorAll('weapon')];if(mounted.length)weapons(mounted,group);else if(/mount|hardpoint|turret/i.test(value(mod,'name')))row(group,'Weapon','No weapon mounted');details.append(group);}
+  const mounted=[...vehicle.querySelectorAll(':scope > weapons > weapon')];if(mounted.length){row(details,'Mounted weapons','Manual Gunnery pools');weapons(mounted,details);}
+  const allWeapons=[...vehicle.querySelectorAll('weapon')],assigned=new Set(allWeapons.flatMap(w=>ammunition(character,w)));
+  const cargo=[...vehicle.querySelectorAll('gear')].filter(n=>!assigned.has(n));if(cargo.length){row(details,'Cargo / accessories',String(cargo.length));for(const gear of cargo)row(details,value(gear,'name')+(value(gear,'rating')&&value(gear,'rating')!=='0'?' '+value(gear,'rating'):''),value(gear,'qty')?'×'+value(gear,'qty'):'',source(gear));}
+  if(value(vehicle,'notes'))details.append(el('p',value(vehicle,'notes'),'prose'));sectionNode.append(details);
  }
 }
 $('characters').onchange=run(async e=>{const id=e.target.value;try{await select(id);}catch(error){e.target.value=record.id;throw error;}});
@@ -145,7 +164,7 @@ function printCharacter(official){
   $('print-status').textContent='Preparing PDF…';
   for(const id of ['print-full','print-official'])$(id).disabled=true;
   try{
-   await flush();const {characterPDF}=await import('./printing.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41');const bytes=await characterPDF(snapshot,{official});
+   await flush();const {characterPDF}=await import('./printing.mjs?v=9118072a45515f30414799bbdbbd68a7da265197');const bytes=await characterPDF(snapshot,{official});
    if(printURL)URL.revokeObjectURL(printURL);
    printURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
    const filename=snapshot.title.replace(/[^\p{L}\p{N} ._-]/gu,'_')+(official?' - Official SR4A':' - Full character')+'.pdf';

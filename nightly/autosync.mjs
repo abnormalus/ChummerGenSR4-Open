@@ -1,4 +1,4 @@
-import {fingerprint} from './core.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {fingerprint} from './core.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
 // The working-copy bytes and remote hash form a durable outbox, including across reloads.
 export class AutoSync {
  constructor({client,flush,list,acknowledge,validate,onAck,onConflict,report,online=()=>navigator.onLine}){Object.assign(this,{client,flush,list,acknowledge,validate,onAck,onConflict,report,online});this.running=null;}
