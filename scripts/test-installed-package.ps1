@@ -110,6 +110,7 @@ try {
     $fixtureRoot = Join-Path $PSScriptRoot '../Chummer.Mac/assets/saves'
     Run-Process $exe @('--smoke-test', (Join-Path $Output 'checks'), $fixtureRoot) 'installed-headless' 600
     Check (Test-Path (Join-Path $Output 'checks/creation.chum')) 'Installed application generated its synthetic character'
+    Native-Gate $exe '--check-lifestyle-months' 'installed-native-lifestyle-months' 10 60
     Native-Gate $exe '--check-bulk' 'installed-native-bulk' 1069 300
     Native-Gate $exe '--check-sensor-transactions' 'installed-native-sensors' 17 180
     Native-Gate $exe '--check-focus-command' 'installed-native-focus' 66 180

@@ -81,6 +81,13 @@ internal static class NativeBulkChecks
                 passed = true;
                 return;
             }
+            if (command == "--check-lifestyle-months")
+            {
+                await NativeLifestyleMonthsChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native lifestyle checks preserve the source character file");
+                passed = true;
+                return;
+            }
             if (command == "--check-inventory-copy")
             {
                 ClipboardCopyChecks.Run(character, Check);
