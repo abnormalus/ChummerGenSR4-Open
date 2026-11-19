@@ -1,4 +1,4 @@
-import {base64, unbase64, fingerprint, MAX_BYTES} from './core.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {base64, unbase64, fingerprint, MAX_BYTES} from './core.mjs?v=59d6cb1eae38263f90c30a58806bd28e97496e73';
 export class GitHub {
   constructor(repository, token, request = (...args) => globalThis.fetch(...args)) {
     const match=repository.trim().replace(/^https:\/\/github.com\//,'').replace(/\/$/,'').match(/^([\w.-]+)\/([\w.-]+)$/);

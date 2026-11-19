@@ -1,4 +1,4 @@
-import {Character,fingerprint} from './core.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {Character,fingerprint} from './core.mjs?v=59d6cb1eae38263f90c30a58806bd28e97496e73';
 export const sameRemote=(a,b)=>!!a&&!!b&&a.repoId===b.repoId&&a.path===b.path;
 export async function existingCharacter(records,{bytes,filename,remote,activeId}){
  const ordered=[...records].sort((a,b)=>Number(b.id===activeId)-Number(a.id===activeId)||(b.updatedAt||0)-(a.updatedAt||0));

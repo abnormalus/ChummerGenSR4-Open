@@ -17,3 +17,5 @@
 .vehicle-details{border-bottom:1px solid var(--line)}.vehicle-details>summary{cursor:pointer;font-weight:600;min-height:44px;padding:10px 12px}.vehicle-details .monitor{padding:10px;display:flex;flex-wrap:wrap;gap:4px}.vehicle-details .row{flex-wrap:wrap}
 
 .weapon-fire-actions{display:inline-flex;flex-wrap:wrap;gap:3px}.weapon-details>summary .fire-button{font-size:11px;line-height:1.3;padding:4px 6px;min-height:28px;background:#f8e7e5;border-color:#dcb4af;color:#7e302c}.weapon-details>summary .fire-button:hover{background:#f0d0cc}.weapon-details>summary .fire-button:disabled{opacity:.45}@media(prefers-color-scheme:dark){.weapon-details>summary .fire-button{background:#3d292b;border-color:#765054;color:#f0b7b4}.weapon-details>summary .fire-button:hover{background:#533235}}
+
+.remember-token{display:flex;align-items:center;gap:8px}.remember-token input[type=checkbox]{display:inline-block;width:18px;height:18px;margin:0}
