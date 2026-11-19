@@ -20,3 +20,5 @@ export const save = record => transaction(['characters','backups'], (tx) => {
 });
 // Apply network acknowledgements to the latest working copy, never the uploaded snapshot.
 export const acknowledge = (id, remote) => transaction(['characters'], (tx,done)=>{const store=tx.objectStore('characters'),r=store.get(id);r.onsuccess=()=>{if(!r.result)return;const latest={...r.result,remote};store.put(latest,id);done(latest);};});
+
+export const remove = id => transaction(['characters','backups','settings'],tx=>{const store=tx.objectStore('characters'),r=store.get(id);r.onsuccess=()=>{if(r.result)tx.objectStore('backups').put(r.result,id);store.delete(id);};const selected=tx.objectStore('settings').get('selected');selected.onsuccess=()=>{if(selected.result===id)tx.objectStore('settings').put('','selected');};});

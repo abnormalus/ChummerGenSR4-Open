@@ -2,30 +2,60 @@ import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.m
 import * as db from './storage.mjs';
 import {GitHub} from './github.mjs';
 import {characterPreview,matchesCharacter} from './repository-browser.mjs';
+import {installController} from './install.mjs';
+import {existingCharacter,sameRemote} from './identity.mjs';
+import {AutoSync} from './autosync.mjs';
+import {filteredSkills,magicSkillsApply} from './skill-filters.mjs';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
-let records=[],record,character,page='Character',positive=false,client,remoteRows=[],saving=Promise.resolve(),timer;
-function status(text,error=false){$('status').textContent=text;$('status').className=error?'error':'';}
+let records=[],record,character,page='Character',positive=true,skillCategory='Active',client,remoteRows=[],saving=Promise.resolve(),timer;
+let syncNote='',persistedModel,persistedRevision=0,currentConflict;
+const conflicts=new Map(),pendingConflicts=new Set();
+function status(text,error=false){$('status').textContent=text+(syncNote?' · '+syncNote:'');$('status').className=error?'error':'';if(conflicts.size)$('status').append(document.createTextNode(' '),button('Resolve conflict',()=>showConflict(conflicts.keys().next().value)));}
+
 function run(fn){return async(...args)=>{try{await fn(...args);}catch(error){status(error.message,true);}};}
 function button(text,fn){const b=el('button',text);b.type='button';b.onclick=run(fn);return b;}
 function section(title,action){const s=el('section'),h=el('h2',title);if(action)h.append(action);s.append(h);$('main').append(s);return s;}
 function row(parent,name,detail,source){const r=el('div',undefined,'row');r.append(el('span',name,'name'));if(detail instanceof Node)r.append(detail);else if(detail)r.append(el('span',detail));if(source)r.append(el('small',source));parent.append(r);return r;}
 function source(node){return [value(node,'source'),value(node,'page')&&'p. '+value(node,'page')].filter(Boolean).join(' ');}
 function input(text,change,label){const i=el('input');i.type='text';i.value=text;i.setAttribute('aria-label',label);i.oninput=()=>{change(i.value);schedule();};i.onchange=run(async()=>{await flush();});return i;}
-function schedule(){status('Saving on this device…');clearTimeout(timer);timer=setTimeout(()=>run(flush)(),200);}
-async function flush(){clearTimeout(timer);if(!record||!character)return;const snapshot={...record,title:character.title,bytes:character.bytes(),updatedAt:Date.now()};record=snapshot;const operation=saving.then(()=>db.save(snapshot));saving=operation.catch(()=>{});await operation;records=records.map(r=>r.id===snapshot.id?snapshot:r);status('Saved on this device'+(navigator.onLine?'':' · Offline'));}
+function schedule(){syncNote=client?'GitHub: waiting to sync':'GitHub: connect to sync';status('Saving on this device…');clearTimeout(timer);timer=setTimeout(()=>run(flush)(),200);}
+async function flush(){clearTimeout(timer);if(!record||!character)return;const model=character,revision=model.revision;const snapshot={...record,title:model.title,bytes:model.bytes(),updatedAt:Date.now()};if(revision>0&&(persistedModel!==model||persistedRevision!==revision))syncNote=client?'GitHub: waiting to sync':'GitHub: connect to sync';record=snapshot;const operation=saving.then(()=>db.save(snapshot));saving=operation.catch(()=>{});await operation;if(character===model){persistedModel=model;persistedRevision=revision;}records=records.map(r=>r.id===snapshot.id?snapshot:r);status('Saved on this device'+(navigator.onLine?'':' · Offline'));}
 async function select(id){await flush();const next=records.find(r=>r.id===id);if(!next)return;character=new Character(next.bytes);record=next;await db.setting('selected',id);render();}
-async function add(bytes,filename,remote){const model=new Character(bytes);await flush();const next={id:crypto.randomUUID(),filename,title:model.title,bytes,updatedAt:Date.now(),...(remote?{remote}:{})};await db.save(next);records.push(next);record=next;character=model;await db.setting('selected',next.id);render();status('Imported · Saved on this device');navigator.storage?.persist?.();}
+async function add(bytes,filename,remote){
+ const model=new Character(bytes);await flush();
+ const existing=await existingCharacter(records,{bytes,filename,remote,activeId:record?.id});
+ if(existing){await select(existing.id);if(remote&&!record.remote){record={...record,remote};await db.save(record);records=records.map(r=>r.id===record.id?record:r);}status('Switched to saved local character · Edits retained');return;}
+ const next={id:crypto.randomUUID(),filename,title:model.title,bytes,sourceHash:await fingerprint(bytes),updatedAt:Date.now(),...(remote?{remote}:{})};
+ await db.save(next);records.push(next);record=next;character=model;await db.setting('selected',next.id);render();syncNote=client?'GitHub: waiting to sync':'GitHub: connect to sync';status('Imported · Saved on this device');navigator.storage?.persist?.();
+}
+const installer=installController(window,navigator,updateInstallButtons);
+function updateInstallButtons(){for(const b of document.querySelectorAll('[data-install]')){b.textContent=installer.installed()?'Installed':'Install app';b.disabled=installer.installed();}}
+async function installApp(){const result=await installer.request();if(result.kind==='guide'){$('install-steps').replaceChildren(...result.steps.map(step=>el('li',step)));$('install-help').showModal();}else status(result.kind==='installed'?'This app is already installed.':result.kind==='accepted'?'Installation accepted. Open SR 4 Dossier from your Home screen or desktop.':'Installation dismissed. You can try again from the start page.');}
+let closing=false;
+async function closeCharacter(){if(!character||closing)return;closing=true;$('main').inert=true;document.querySelector('header').inert=true;try{await flush();await db.setting('selected','');record=undefined;character=undefined;page='Character';render();status('Character closed · Changes saved on this device');void syncer.tick();}finally{closing=false;$('main').inert=false;document.querySelector('header').inert=false;}}
+$('close-character').onclick=run(closeCharacter);
 function render(){
-  const picker=$('characters');picker.replaceChildren();for(const r of records){const option=el('option',r.title);option.value=r.id;option.selected=r.id===record?.id;picker.append(option);}
-  $('export').disabled=!character;$('main').replaceChildren();const nav=document.querySelector('nav');nav.replaceChildren();
-  if(!character){const box=el('div',undefined,'empty'),icon=el('img');icon.src='./assets/icon.png';icon.alt='';box.append(icon,el('h1','SR 4 Dossier'),el('p','Your runner, ready for the table. Import a Chummer character or try a sample.'));box.append(button('Import .chum',()=>$('file').click()),document.createTextNode(' '),button('Try sample',()=>add(demo,'Nightjar.chum')));$('main').append(box);return;}
+  const picker=$('characters');picker.replaceChildren();if(!record){const placeholder=el('option','Choose a saved character…');placeholder.value='';placeholder.selected=true;picker.append(placeholder);}for(const r of records){const option=el('option',r.title);option.value=r.id;option.selected=r.id===record?.id;picker.append(option);}
+  $('export').disabled=!character;$('close-character').hidden=!character;$('main').replaceChildren();const nav=document.querySelector('nav');nav.replaceChildren();
+  if(!character){
+   const box=el('div',undefined,'empty'),icon=el('img');icon.src='./assets/icon.png';icon.alt='';box.append(icon,el('h1','SR 4 Dossier'),el('p','Your runner, ready for the table. Open a saved character or import a Chummer file.'));
+   const actions=el('div',undefined,'home-actions');const install=button('Install app',installApp);install.dataset.install='';actions.append(install,button('Open from GitHub',openRepository),button('Import .chum',()=>$('file').click()),button('Try sample',()=>add(demo,'Nightjar.chum')));box.append(actions);$('main').append(box);updateInstallButtons();
+   if(records.length){const saved=section('Saved on this device');for(const r of [...records].sort((a,b)=>b.updatedAt-a.updatedAt)){const b=button('Resume '+r.title,()=>select(r.id));b.className='saved-character';saved.append(b);}}
+   return;
+  }
   for(const name of ['Character','Combat','Equipment','Background','Contacts']){const b=button(name,async()=>{await flush();page=name;render();window.scrollTo(0,0);});b.className=page===name?'active':'';nav.append(b);}
   if(page==='Character'){
     const identity=section('Dossier');for(const [key,label] of [['alias','Runner'],['name','Name'],['metatype','Metatype']]){const i=input(character.get(key),v=>character.set(key,v),label);i.className='wide';row(identity,label,i);}
     const stats=section('Attributes'),grid=el('div',undefined,'attributes');stats.append(grid);for(const a of character.attributes){const label=el('label',a.id);label.append(input(a.total,v=>character.setAttribute(a.id,'total',v),a.id+' total'));grid.append(label);}
     row(stats,'Essence',input(character.essence,v=>character.set('totaless',v),'Essence'));for(const key of ['karma','nuyen'])row(stats,key==='karma'?'Karma':'Nuyen',input(character.get(key)||'0',v=>character.set(key,v),key));
-    const filter=button('Pool > 0',()=>{positive=!positive;render();});filter.setAttribute('aria-pressed',positive);const skills=section('Skills',filter);for(const skill of character.skills.filter(s=>!positive||s.pool>0).sort((a,b)=>a.name.localeCompare(b.name))){row(skills,skill.name,input(skill.rating,v=>character.setSkillRating(skill.index,v),skill.name+' rating'),'Pool '+skill.pool);}
+    if(skillCategory==='Magic'&&!magicSkillsApply(character))skillCategory='Active';
+    const controls=el('div',undefined,'skills-filters');controls.setAttribute('role','group');controls.setAttribute('aria-label','Skill filters');
+    const filter=button('Pool > 0',()=>{positive=!positive;render();});filter.setAttribute('aria-pressed',positive);controls.append(filter);
+    for(const category of ['Combat','Active','Knowledge',...(magicSkillsApply(character)?['Magic']:[])]){const b=button(category,()=>{skillCategory=category;render();});b.setAttribute('aria-pressed',skillCategory===category);controls.append(b);}
+    const skills=section('Skills',controls);skills.querySelector('h2').classList.add('skills-heading');
+    for(const skill of filteredSkills(character,skillCategory,positive)){row(skills,skill.name,input(skill.rating,v=>character.setSkillRating(skill.index,v),skill.name+' rating'),'Pool '+skill.pool);}
+
   }
   if(page==='Combat'){
     const init=section('Initiative'),summary=el('div',undefined,'summary');init.append(summary);for(const [name,n] of [['Physical',`${character.initiative} / ${character.passes} IP`],['Matrix',`${character.matrix} / ${character.matrixPasses} IP`],...(character.magician?[['Astral',character.astral]]:[])]){const item=el('div',name);item.append(el('strong',n));summary.append(item);}
@@ -77,7 +107,7 @@ function clearPreviews(){browseGeneration++;for(const preview of previewCache.va
 function remoteList(){
  const target=$('remote');target.replaceChildren();choiceViews.clear();const filtered=remoteRows.filter(item=>matchesCharacter(item,$('search').value));
  for(const item of filtered){
-  const b=button('',async()=>{const active=client;if(!active)throw new Error('Connect first.');b.disabled=true;try{const file=await active.read(item.path);if(!file)throw new Error('Character was removed. Refresh the list.');if(client!==active)throw new Error('Repository connection changed. Open again.');await add(file.bytes,item.name,{repoId:active.id,path:item.path,sha:file.sha,hash:await fingerprint(file.bytes)});$('open-repository').close();}finally{b.disabled=false;}});b.className='character-choice';
+  const b=button('',async()=>{const active=client;if(!active)throw new Error('Connect first.');b.disabled=true;try{const existing=records.find(r=>r.id===record?.id&&sameRemote(r.remote,{repoId:active.id,path:item.path}))||[...records].sort((a,b)=>b.updatedAt-a.updatedAt).find(r=>sameRemote(r.remote,{repoId:active.id,path:item.path}));if(existing){await select(existing.id);$('open-repository').close();status('Switched to saved local character · Edits retained');return;}const file=await active.read(item.path);if(!file)throw new Error('Character was removed. Refresh the list.');if(client!==active)throw new Error('Repository connection changed. Open again.');await add(file.bytes,item.name,{repoId:active.id,path:item.path,sha:file.sha,hash:await fingerprint(file.bytes)});$('open-repository').close();}finally{b.disabled=false;}});b.className='character-choice';
   paintChoice(b,item);choiceViews.set(item.path,b);target.append(b);
  }
  if(!filtered.length)target.append(el('p',remoteRows.length?'No matching characters.':'No .chum characters found in this repository.','muted'));
@@ -106,9 +136,39 @@ async function openRepository(){
 $('open').onclick=run(openRepository);
 $('refresh-characters').onclick=run(refreshCharacters);
 $('open-repository').addEventListener('close',()=>{browseGeneration++;$('refresh-characters').disabled=false;});
-$('connect').onclick=run(async()=>{const next=new GitHub($('repo').value,$('token').value);await next.verify();clearPreviews();client=next;$('token').value='';await db.setting('repository',next.repository);$('repository').close();status('Connected to private repository '+next.repository);await openRepository();});
+$('connect').onclick=run(async()=>{const next=new GitHub($('repo').value,$('token').value);await next.verify();clearPreviews();client=next;$('token').value='';await db.setting('repository',next.repository);$('repository').close();status('Connected to private repository '+next.repository);await openRepository();void syncer.tick();});
 $('search').oninput=remoteList;
-$('disconnect').onclick=()=>{client=undefined;clearPreviews();$('token').value='';status('GitHub disconnected. Local characters retained.');};
-$('sync').onclick=run(async()=>{if(!client)throw new Error('Connect to a private repository first.');if(!character)throw new Error('Import a character first.');await flush();const captured=record,revision=character.revision,bytes=character.bytes(true);status('Syncing snapshot…');const result=await client.sync(captured,bytes);await flush();if(result.pull){if(record.id!==captured.id||character.revision!==revision)throw new Error('Edits arrived during sync. Local edits retained; sync again to resolve.');const replacement=new Character(result.pull);await db.save({...record,bytes:result.pull,title:replacement.title,remote:result.remote});character=replacement;record={...record,bytes:result.pull,title:replacement.title,remote:result.remote};}else{const updated=await db.acknowledge(captured.id,result.remote);if(record.id===captured.id)record=updated;}records=await db.all();render();status('Repository snapshot saved · Local edits retained');if($('open-repository').open)await refreshCharacters();});
+$('disconnect').onclick=()=>{client=undefined;clearPreviews();$('token').value='';syncNote='GitHub: connect to sync';status('GitHub disconnected. Local characters retained.');};
+function acceptAck(latest){records=records.map(r=>r.id===latest.id?latest:r);if(record?.id===latest.id)record={...record,remote:latest.remote};conflicts.delete(latest.id);pendingConflicts.delete(latest.id);}
+function flagConflict(item,error){const existing=conflicts.has(item.id);conflicts.set(item.id,{id:item.id,repoId:error.repoId||item.remote?.repoId||client?.id,path:error.path||item.remote?.path||item.pendingRemotePath||`characters/${item.id}.chum`,message:error.message});if(!existing)pendingConflicts.add(item.id);syncNote='GitHub conflict · Local edits retained';status('Saved on this device',true);queueMicrotask(showNextConflict);}
+const syncer=new AutoSync({client:()=>client,flush,list:db.all,acknowledge:db.acknowledge,validate:bytes=>new Character(bytes).bytes(true),onAck:acceptAck,onConflict:flagConflict,report:(message,error=false)=>{syncNote=message;status('Saved on this device',error);}});
+function showNextConflict(){if(!document.querySelector('dialog[open]')&&pendingConflicts.size)void showConflict(pendingConflicts.values().next().value);}
+async function showConflict(id){
+ const issue=conflicts.get(id),item=records.find(r=>r.id===id);if(!issue||!item)return;
+ if(document.querySelector('dialog[open]'))return;
+ currentConflict={...issue,expectedSha:undefined};pendingConflicts.delete(id);$('conflict-name').value=item.title+' (copy)';$('conflict-description').textContent=`${item.title} · ${issue.path}. Keep both by saving under a new name, overwrite GitHub with your local changes, or delete only the local copy.`;$('conflict-state').textContent='Checking the current GitHub version…';$('conflict-overwrite').disabled=true;$('sync-conflict').showModal();
+ const active=client,context=currentConflict;
+ try{if(!active||active.id!==issue.repoId)throw new Error('Reconnect this character’s GitHub repository to overwrite it.');const remote=await active.read(issue.path);if(currentConflict!==context)return;context.expectedSha=remote?.sha||null;$('conflict-state').textContent=remote?'Your local edits and GitHub cannot be combined automatically.':'The GitHub file was deleted. Overwrite GitHub will recreate it.';$('conflict-overwrite').disabled=false;}catch(error){if(currentConflict===context)$('conflict-state').textContent=error.message;}
+}
+for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('close',()=>queueMicrotask(showNextConflict));
+$('conflict-later').onclick=()=>$('sync-conflict').close();
+async function resolveConflict(work){const context=currentConflict;if(!context)return;for(const id of ['conflict-new','conflict-overwrite','conflict-delete','conflict-later'])$(id).disabled=true;try{await syncer.exclusive(async()=>{await flush();await work(context);});}catch(error){$('conflict-state').textContent=error.message;syncNote='GitHub: waiting to sync';status('Saved locally · '+error.message,true);if(error.conflict){context.expectedSha=undefined;$('conflict-state').textContent+=' Close this dialog and review the new GitHub version before overwriting.';}}finally{for(const id of ['conflict-new','conflict-delete','conflict-later'])$(id).disabled=false;$('conflict-overwrite').disabled=context.expectedSha===undefined;}}
+$('conflict-overwrite').onclick=()=>resolveConflict(async context=>{
+ if(!client||client.id!==context.repoId)throw new Error('Reconnect the original repository first.');if(!navigator.onLine)throw new Error('You are offline. Local changes remain saved.');
+ const latest=(await db.all()).find(r=>r.id===context.id);if(!latest)throw new Error('This local copy no longer exists.');const bytes=new Character(latest.bytes).bytes(true),remote=await client.overwrite(context.path,bytes,context.expectedSha);acceptAck(await db.acknowledge(context.id,remote));syncNote='GitHub up to date';$('sync-conflict').close();status('Conflict resolved using local copy');
+});
+$('conflict-new').onclick=()=>resolveConflict(async context=>{
+ const name=$('conflict-name').value.trim();if(!name)throw new Error('Enter a new character name.');const latest=(await db.all()).find(r=>r.id===context.id);if(!latest)throw new Error('This local copy no longer exists.');
+ const model=new Character(latest.bytes);model.set('alias',name);const bytes=model.bytes(true),folder=context.path.includes('/')?context.path.slice(0,context.path.lastIndexOf('/')+1):'',stem=name.replace(/[^\p{L}\p{N} _.-]/gu,'_').slice(0,80)||'character',path=folder+stem+'-'+crypto.randomUUID().slice(0,8)+'.chum';
+ const next={...latest,title:model.title,filename:path.split('/').at(-1),bytes,remote:undefined,pendingRepoId:context.repoId,pendingRemotePath:path,sourceHash:await fingerprint(bytes),updatedAt:Date.now()};await db.save(next);records=records.map(r=>r.id===next.id?next:r);if(record?.id===next.id){record=next;character=model;}render();conflicts.delete(next.id);pendingConflicts.delete(next.id);$('sync-conflict').close();syncNote='GitHub: waiting to sync';status('Saved under the new name locally');
+ if(client&&client.id===context.repoId&&navigator.onLine){const remote=await client.saveNew(path,bytes);acceptAck(await db.acknowledge(next.id,remote));syncNote='GitHub up to date';status('Saved under the new name · Original GitHub file retained');}
+});
+$('conflict-delete').onclick=()=>{$('delete-local-state').textContent='';$('delete-local-confirm').showModal();};
+$('delete-local-no').onclick=()=>$('delete-local-confirm').close();
+$('delete-local-yes').onclick=run(async()=>{const context=currentConflict;if(!context)return;try{await syncer.exclusive(async()=>{await flush();await db.remove(context.id);records=records.filter(r=>r.id!==context.id);conflicts.delete(context.id);pendingConflicts.delete(context.id);if(record?.id===context.id){record=undefined;character=undefined;}render();$('delete-local-confirm').close();$('sync-conflict').close();status('Local copy deleted · GitHub file retained');});}catch(error){$('delete-local-state').textContent=error.message;}});
+$('sync').onclick=run(()=>syncer.exclusive(async()=>{const attempted=record;try{if(!client)throw new Error('Connect to a private repository first.');if(!character)throw new Error('Import a character first.');await flush();const captured=record,revision=character.revision,bytes=character.bytes(true);status('Syncing snapshot…');const result=await client.sync(captured,bytes);await flush();if(result.pull){if(record?.id!==captured.id||character.revision!==revision)throw new Error('Edits arrived during sync. Local edits retained; sync again to resolve.');const replacement=new Character(result.pull);await db.save({...record,bytes:result.pull,title:replacement.title,remote:result.remote});character=replacement;record={...record,bytes:result.pull,title:replacement.title,remote:result.remote};}else{const updated=await db.acknowledge(captured.id,result.remote);if(updated)acceptAck(updated);}records=await db.all();render();status('Repository snapshot saved · Local edits retained');if($('open-repository').open)await refreshCharacters();}catch(error){if(attempted&&(error.conflict||error.status===409))flagConflict(attempted,error);else throw error;}}));
+setInterval(()=>void syncer.tick(),60000);
+window.addEventListener('online',()=>void syncer.tick());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void syncer.tick();});
 document.addEventListener('focusout',()=>run(flush)());document.addEventListener('visibilitychange',()=>{if(document.hidden)run(flush)();});window.addEventListener('online',()=>status('Online · Local copies available'));window.addEventListener('offline',()=>status('Offline · Editing local copies'));
-try{records=await db.all();const selected=await db.setting('selected');record=records.find(r=>r.id===selected)||records[0];if(record)character=new Character(record.bytes);render();status('Saved on this device'+(navigator.onLine?'':' · Offline'));if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(()=>status('Local storage ready; offline app caching unavailable.',true));}catch(error){status(error.message,true);}
+try{records=await db.all();if(records.length)syncNote='GitHub: reconnect to sync';const selected=await db.setting('selected');record=selected===undefined?records[0]:records.find(r=>r.id===selected);if(record)character=new Character(record.bytes);render();status('Saved on this device'+(navigator.onLine?'':' · Offline'));if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(()=>status('Local storage ready; offline app caching unavailable.',true));}catch(error){status(error.message,true);}

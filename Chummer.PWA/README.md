@@ -52,3 +52,25 @@ The first 100 entries receive previews per refresh to bound download/decode work
 all characters remain selectable. Preview metadata and resized images stay in memory
 and are cleared on disconnect. Opening downloads the latest file as a separate local
 working copy, preserving existing edits. A new browser session needs reconnection.
+
+The start page includes Install app, with a native prompt when available and platform
+instructions otherwise (Safari Add to Home Screen on iPhone/iPad). Close saves local
+edits before returning to the start page; saved dossiers remain available through Resume.
+A closed selection stays closed after reload. Browser windows are not forcibly closed.
+Repository files already present locally switch to their working copy, retaining unsynced
+edits. Reimporting known file contents also reuses the local copy; distinct files are not
+merged solely because their filenames match. Close saves locally first and requests a sync when connected.
+
+Autosync checks for changed working copies every minute while open and connected,
+including closed dossiers. The stored bytes and last-synced hash persist pending work
+across reloads. Online and foreground events trigger a catch-up attempt. Tokens remain
+memory-only, so reconnecting GitHub is required after restarting the app. Browser
+suspension can delay timers; the status distinguishes local saves from GitHub sync.
+Conflicts offer Save as new name, Overwrite GitHub, Delete local copy, and Later.
+Overwrite requires the reviewed remote SHA and refuses a newer intervening change;
+Delete local copy leaves GitHub untouched. No background merge of character XML occurs.
+
+Skills default to Active with Pool > 0 enabled. Compact header buttons select Combat,
+Active, Knowledge (including languages), or Magic for magicians and adepts. Categories
+use the saved SR4 skill category and knowledge flag. Active includes combat and magical
+active skills. The pool toggle applies independently of the selected category.
