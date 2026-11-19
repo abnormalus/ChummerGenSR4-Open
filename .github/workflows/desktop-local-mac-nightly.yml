@@ -66,6 +66,7 @@ jobs:
           dotnet publish Chummer.Mac/Chummer.Mac.csproj -c Release -r win-x64 --self-contained true \
             -p:RestoreLockedMode=true -p:UsedAvaloniaProducts= \
             "-p:ChummerReleaseVersion=$release_version" "-p:ChummerFileVersion=$file_version" -o artifacts/windows
+          mv artifacts/windows/ChummerMac.exe artifacts/windows/Chummer.exe
           cp artifacts/identity.json artifacts/windows/build-identity.json
           python3 scripts/write-build-revision.py artifacts/windows/source-revision.txt
           python3 packaging/windows/build-msi.py artifacts/windows artifacts/assets/ChummerSR4-Windows-x64.msi

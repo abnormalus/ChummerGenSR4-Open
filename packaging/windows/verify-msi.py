@@ -47,7 +47,7 @@ def main():
     parser.add_argument('publish', type=pathlib.Path)
     parser.add_argument('msi', type=pathlib.Path)
     args = parser.parse_args()
-    manifest = manifest_resources(args.publish / 'ChummerMac.exe')
+    manifest = manifest_resources(args.publish / 'Chummer.exe')
     assert b'8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a' in manifest.lower(), 'Windows compatibility manifest missing'
     assert b'PerMonitorV2' in manifest and b'asInvoker' in manifest, 'DPI or standard-user manifest declaration missing'
     summary = subprocess.check_output(['msiinfo', 'suminfo', str(args.msi)], text=True)

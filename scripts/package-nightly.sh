@@ -25,6 +25,7 @@ chummer_file_version="$(python3 -c 'import json,sys;print(json.load(open(sys.arg
 if [[ "$chummer_platform" != macos ]]; then
     "$chummer_dotnet" publish Chummer.Mac/Chummer.Mac.csproj -c Release -r win-x64 --self-contained true \
         -p:UsedAvaloniaProducts= "-p:ChummerReleaseVersion=$chummer_version" "-p:ChummerFileVersion=$chummer_file_version" -o "$chummer_output/windows"
+    mv "$chummer_output/windows/ChummerMac.exe" "$chummer_output/windows/Chummer.exe"
     cp "$chummer_output/build-identity.json" "$chummer_output/windows/build-identity.json"
     python3 scripts/write-build-revision.py "$chummer_output/windows/source-revision.txt"
     python3 packaging/windows/build-msi.py "$chummer_output/windows" "$chummer_assets/ChummerSR4-Windows-x64.msi"

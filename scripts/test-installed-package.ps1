@@ -68,12 +68,13 @@ try {
     if ($IsWindows) {
         $portable = Join-Path $Output 'portable'
         Expand-Archive -LiteralPath (Join-Path $Assets 'ChummerSR4-Windows-x64-portable.zip') -DestinationPath $portable
-        Check-Identity (Join-Path $portable 'ChummerMac.exe') $portable
+        Check-Identity (Join-Path $portable 'Chummer.exe') $portable
         Check ($null -eq (Get-ItemProperty -Path 'HKCU:/Software/ChummerSR4/Installer' -Name Installed -ErrorAction SilentlyContinue)) 'The portable executable runs before MSI installation'
 
         $root = Join-Path $env:LOCALAPPDATA 'Programs/ChummerSR4'
-        $exe = Join-Path $root 'ChummerMac.exe'
-        Check (-not (Test-Path $exe)) 'Disposable host has no pre-existing Chummer installation'
+        $exe = Join-Path $root 'Chummer.exe'
+        $legacyExe = Join-Path $root 'ChummerMac.exe'
+        Check ((-not (Test-Path $exe)) -and (-not (Test-Path $legacyExe))) 'Disposable host has no pre-existing Chummer installation'
         # Install the previous public Nightly first so a newer candidate exercises
         # the real UpgradeCode path, not merely installation into an empty folder.
         $previous = Join-Path $Output 'previous-nightly'
@@ -85,7 +86,7 @@ try {
         Check ($msiLine.Count -eq 1 -and (Get-FileHash (Join-Path $previous 'ChummerSR4-Windows-x64.msi') -Algorithm SHA256).Hash -eq $msiLine.Substring(0,64)) 'Previous Nightly installer matches its published checksum'
         Run-Process 'msiexec.exe' @('/i', (Join-Path $previous 'ChummerSR4-Windows-x64.msi'), '/qn', '/norestart', '/l*v', (Join-Path $Output 'previous-install.log')) 'previous-install'
         $installed = $true
-        Check (Test-Path $exe) 'Previous Nightly installs to the documented per-user location'
+        Check ((Test-Path $exe) -or (Test-Path $legacyExe)) 'Previous Nightly installs to the documented per-user location'
         $userDirectory = Join-Path $env:APPDATA 'ChummerGenSR4Mac'
         New-Item -ItemType Directory -Path (Join-Path $userDirectory 'settings') -Force | Out-Null
         $marker = Join-Path $userDirectory 'settings/package-acceptance-sentinel.xml'
@@ -95,6 +96,7 @@ try {
         [IO.File]::WriteAllText($characterMarker, '<character><name>Preserve this QA file</name></character>')
         Run-Process 'msiexec.exe' @('/i', $msi, '/qn', '/norestart', '/l*v', (Join-Path $Output 'candidate-install.log')) 'candidate-upgrade'
         Check-Identity $exe $root
+        Check (-not (Test-Path $legacyExe)) 'Upgrade leaves only the Chummer.exe launcher'
         $shortcut = Join-Path $env:APPDATA 'Microsoft/Windows/Start Menu/Programs/Chummer SR4/Chummer SR4.lnk'
         Check (Test-Path $shortcut) 'Installed package registers its Start menu shortcut'
         $shell = New-Object -ComObject WScript.Shell
