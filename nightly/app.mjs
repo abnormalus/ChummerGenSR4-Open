@@ -1,11 +1,12 @@
-import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
-import * as db from './storage.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
-import {GitHub} from './github.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
-import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
-import {installController} from './install.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
-import {existingCharacter,sameRemote} from './identity.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
-import {AutoSync} from './autosync.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
-import {filteredSkills,magicSkillsApply,skillRating} from './skill-filters.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
+import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import * as db from './storage.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {GitHub} from './github.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {installController} from './install.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {existingCharacter,sameRemote} from './identity.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty} from './weapons.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {AutoSync} from './autosync.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
+import {filteredSkills,magicSkillsApply,skillRating} from './skill-filters.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=true,skillCategory='Active',client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -90,7 +91,7 @@ function render(){
   }
   if(page==='Combat'){
     const init=section('Initiative'),summary=el('div',undefined,'summary');init.append(summary);for(const [name,n] of [['Physical',`${character.initiative} / ${character.passes} IP`],['Matrix',`${character.matrix} / ${character.matrixPasses} IP`],...(character.magician?[['Astral',character.astral]]:[])]){const item=el('div',name);item.append(el('strong',n));summary.append(item);}
-    for(const physical of [true,false]){const s=section(physical?'Physical condition':'Stun condition'),boxes=el('div',undefined,'monitor');s.append(boxes);for(let n=1;n<=character.capacity(physical);n++){const b=button(n%3===0?`−${n/3}`:String(n),async()=>{character.set(physical?'physicalcmfilled':'stuncmfilled',character.damage(physical)===n?n-1:n);await flush();render();});b.className=n<=character.damage(physical)?'filled':'';b.setAttribute('aria-label',`${physical?'Physical':'Stun'} damage ${n}`);boxes.append(b);}}
+    for(const physical of [true,false]){const s=section(physical?'Physical condition':'Stun condition'),boxes=el('div',undefined,'monitor');s.append(boxes);for(let n=1;n<=character.capacity(physical);n++){const b=button(String(n),async()=>{character.set(physical?'physicalcmfilled':'stuncmfilled',character.damage(physical)===n?n-1:n);await flush();render();});b.className=n<=character.damage(physical)?'filled':'';const penalty=conditionPenalty(character,physical,n);if(penalty){const corner=el('span','−'+Math.abs(penalty),'wound-penalty');corner.setAttribute('aria-hidden','true');b.append(corner);}b.setAttribute('aria-label',`${physical?'Physical':'Stun'} damage ${n}`);if(penalty)b.setAttribute('aria-description',`Wound penalty ${penalty}`);boxes.append(b);}}
     $('main').append(el('p',`Wound modifier ${character.wounds}. Tap a box to set damage; tap the last filled box to heal one.`, 'muted'));
     weapons();if(character.magician||character.adept)list(character.magician?'Spells':'Adept powers',character.magician?'spells':'powers',character.magician?'spell':'power');if(character.magician)list('Spirits','spirits','spirit');list('Vehicles','vehicles','vehicle');
   }
@@ -103,7 +104,32 @@ function render(){
   if(page==='Contacts'){for(const node of character.rows('contacts','contact')){let expanded=false;const more=button('Stats',()=>{expanded=!expanded;details.hidden=!expanded;more.setAttribute('aria-expanded',expanded);});more.setAttribute('aria-expanded','false');const s=section(value(node,'name')||'Contact',more);for(const key of ['connection','loyalty'])row(s,key[0].toUpperCase()+key.slice(1),input(value(node,key),v=>character.setNode(node,key,v),key));if(value(node,'notes'))s.append(el('div',value(node,'notes'),'prose'));const details=el('div');details.hidden=true;for(const item of [...node.children].filter(c=>!['name','connection','loyalty','notes','professionalrating','guid'].includes(c.tagName)&&!c.children.length&&c.textContent))row(details,item.tagName,item.textContent);s.append(details);}}
 }
 function list(title,collection,item){const rows=character.rows(collection,item);if(!rows.length)return;const s=section(title);for(const node of rows)row(s,value(node,'name')+(value(node,'extra')?' ('+value(node,'extra')+')':'')+(value(node,'rating')?' '+value(node,'rating'):''),'',source(node));}
-function weapons(){const rows=character.rows('weapons','weapon');if(!rows.length)return;const s=section('Weapons');for(const node of rows)row(s,value(node,'name'),[character.weaponDamage(node),value(node,'mode'),value(node,'ap')&&'AP '+value(node,'ap')].filter(Boolean).join(' · '),source(node));}
+function weapons(){
+ const nodes=character.rows('weapons','weapon');if(!nodes.length)return;const s=section('Weapons');
+ function label(key){return ({rc:'Recoil compensation',ap:'Armor penetration',ammo:'Capacity',useskill:'Skill',spec:'Specialization',spec2:'Alternate specialization',rangemultiply:'Range multiplier',rangebonus:'Range bonus (%)',dvbonus:'Damage bonus',dicepool:'Dice pool modifier',weaponmods:'Modifications',weaponbonus:'Weapon bonuses',source:'Source',page:'Page'})[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,x=>x.toUpperCase());}
+ function savedFields(parent,node,skip=new Set()){
+  for(const field of node.children){if(skip.has(field.tagName)||['guid','sourceid','weaponguid','ammoloaded','ammoloaded2','ammoloaded3','ammoloaded4'].includes(field.tagName)||!field.textContent.trim())continue;
+   if(!field.children.length)row(parent,label(field.tagName),field.textContent);
+   else{const group=el('details',undefined,'weapon-extra'),heading=el('summary',value(field,'name')||label(field.tagName));group.append(heading);savedFields(group,field);parent.append(group);}
+  }
+ }
+ for(const node of nodes){
+  const details=el('details',undefined,'weapon-details'),summary=el('summary'),pool=weaponPool(character,node),name=el('span',value(node,'weaponname')||value(node,'name'),'name');
+  summary.append(name,el('span',[character.weaponDamage(node),...(page==='Combat'?['Pool '+pool.text]:[]),value(node,'mode'),value(node,'ap')&&'AP '+value(node,'ap')].filter(Boolean).join(' · '),'weapon-stats'));if(source(node))summary.append(el('small',source(node)));details.append(summary);
+  row(details,'Dice pool',pool.text,pool.description);
+  const bands=weaponRanges(character,node);if(bands.length){row(details,'Range bands','Metres');for(const band of bands)row(details,band.label,band.text);}else row(details,'Range',value(node,'type').toLowerCase()==='melee'?'Melee · Reach '+(value(node,'reach')||'0'):'No range bands available for '+(value(node,'range')||value(node,'category')||'this weapon'));
+  if(value(node,'type').toLowerCase()==='ranged'){
+   const active=activeSlot(character,node);
+   for(let slot=1;slot<=4;slot++){const suffix=slot===1?'':slot,ammo=loadedAmmo(character,node,slot),remaining=value(node,'ammoremaining'+suffix);if(slot!==active&&!ammo&&(!remaining||remaining==='0'))continue;
+    row(details,`Magazine ${slot}${slot===active?' · Active':''}`,`${ammo?value(ammo,'name'):'Ammo type not saved'} · ${remaining||'0'} rounds`,ammo?source(ammo):'');
+    if(ammo){const fields=el('details',undefined,'weapon-extra');fields.append(el('summary','Loaded ammo details'));savedFields(fields,ammo,new Set(['name','guid','qty']));details.append(fields);}
+   }
+  }
+  const mods=attachments(node);row(details,'Modifications / accessories',mods.length?String(mods.length):'None saved');
+  for(const mod of mods){const group=el('details',undefined,'weapon-extra');group.append(el('summary',[value(mod,'name'),value(mod,'rating')&&value(mod,'rating')!=='0'?value(mod,'rating'):'',truth(value(mod,'installed'))?'Installed':'Not installed',source(mod)].filter(Boolean).join(' · ')));savedFields(group,mod,new Set(['name','rating','installed','source','page']));details.append(group);}
+  savedFields(details,node,new Set(['name','weaponname','accessories','weaponmods','ammoremaining','ammoremaining2','ammoremaining3','ammoremaining4']));s.append(details);
+ }
+}
 $('characters').onchange=run(async e=>{const id=e.target.value;try{await select(id);}catch(error){e.target.value=record.id;throw error;}});
 $('import').onclick=()=>$('file').click();$('file').onchange=run(async()=>{const file=$('file').files[0];if(!file)return;if(file.size>MAX_BYTES)throw new Error('Character exceeds 32 MB.');await add(new Uint8Array(await file.arrayBuffer()),file.name);$('file').value='';});
 $('save-chum').onclick=run(async()=>{await flush();const bytes=character.bytes(true),url=URL.createObjectURL(new Blob([bytes],{type:'application/xml'})),a=el('a');a.href=url;a.download=record.filename||character.title+'.chum';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
@@ -119,7 +145,7 @@ function printCharacter(official){
   $('print-status').textContent='Preparing PDF…';
   for(const id of ['print-full','print-official'])$(id).disabled=true;
   try{
-   await flush();const {characterPDF}=await import('./printing.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564');const bytes=await characterPDF(snapshot,{official});
+   await flush();const {characterPDF}=await import('./printing.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41');const bytes=await characterPDF(snapshot,{official});
    if(printURL)URL.revokeObjectURL(printURL);
    printURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
    const filename=snapshot.title.replace(/[^\p{L}\p{N} ._-]/gu,'_')+(official?' - Official SR4A':' - Full character')+'.pdf';

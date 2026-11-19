@@ -1,4 +1,4 @@
-import {value,truth} from './core.mjs?v=cfc2c26877d4a48ffddd48ab18063abfbb00c564';
+import {value,truth} from './core.mjs?v=065be32a5d73de7f4067f71beefc2819397dcd41';
 const KNOWLEDGE=new Set(['Academic','Interest','Interests','Language','Professional','Street']);
 export function knowledgeSkill(skill){return truth(value(skill.node,'knowledge'))||KNOWLEDGE.has(value(skill.node,'skillcategory'));}
 export const nativeLanguage=skill=>skill.rating===0&&value(skill.node,'skillcategory')==='Language';
