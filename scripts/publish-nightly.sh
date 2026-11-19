@@ -20,7 +20,8 @@ Development builds from commit [$chummer_sha](https://github.com/$chummer_repo/c
 
 - **Mac:** download ChummerSR4-macOS-arm64.zip. Apple Silicon, macOS 15+. Locally signed preview; Apple notarization is not configured.
 - **Windows:** download ChummerSR4-Windows-x64.msi. Per-user installation and Start menu shortcut; .NET is bundled. The PDF reader requires Microsoft Edge WebView2.
-- Both packages use the same source, pass character compatibility checks, and include the Windows native PDF-window manifest fix.
+- **Windows portable:** download ChummerSR4-Windows-x64-portable.zip, extract the entire ZIP, and open ChummerMac.exe. It uses the usual Windows user settings folder. .NET is bundled, and the PDF reader requires Microsoft Edge WebView2.
+- The packages use the same source, pass character compatibility checks, and include the Windows native PDF-window manifest fix.
 - BUILD.txt records the source commit; SHA256SUMS.txt verifies every download.
 
 Nightly updates automatically when master changes and checks pass. To rebuild manually, open **Actions → Nightly desktop builds → Run workflow** on master. See [publishing instructions](https://github.com/$chummer_repo/blob/master/docs/RELEASING.md).

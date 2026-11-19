@@ -49,10 +49,10 @@ function Check-Sums([string]$Directory) {
 }
 function Check-Identity([string]$Exe, [string]$Root) {
     $manifest = Get-Content (Join-Path $Root 'build-identity.json') -Raw | ConvertFrom-Json
-    Check ($manifest.sourceCommit -eq $ExpectedSource -and -not $manifest.dirty) 'Installed package has the expected clean source identity'
+    Check ($manifest.sourceCommit -eq $ExpectedSource -and -not $manifest.dirty) 'Package has the expected clean source identity'
     $actual = & $Exe --version-json | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0) { throw 'Installed version command failed.' }
-    Check ($actual.sourceCommit -eq $ExpectedSource -and $actual.version -eq $manifest.informationalVersion -and $actual.fileVersion -eq $manifest.fileVersion -and $actual.channel -eq $manifest.channel) 'Installed executable agrees with its package manifest'
+    if ($LASTEXITCODE -ne 0) { throw 'Package version command failed.' }
+    Check ($actual.sourceCommit -eq $ExpectedSource -and $actual.version -eq $manifest.informationalVersion -and $actual.fileVersion -eq $manifest.fileVersion -and $actual.channel -eq $manifest.channel) 'Executable agrees with its package manifest'
 }
 function Native-Gate([string]$Exe, [string]$Flag, [string]$Name, [int]$Minimum, [int]$Seconds) {
     $report = Join-Path $Output "$Name.json"
@@ -66,6 +66,11 @@ try {
     Check-Sums $Assets
     Check ((Get-Content (Join-Path $Assets 'BUILD.txt') -Raw) -match [regex]::Escape("Source commit: $ExpectedSource")) 'BUILD.txt identifies this source revision'
     if ($IsWindows) {
+        $portable = Join-Path $Output 'portable'
+        Expand-Archive -LiteralPath (Join-Path $Assets 'ChummerSR4-Windows-x64-portable.zip') -DestinationPath $portable
+        Check-Identity (Join-Path $portable 'ChummerMac.exe') $portable
+        Check ($null -eq (Get-ItemProperty -Path 'HKCU:/Software/ChummerSR4/Installer' -Name Installed -ErrorAction SilentlyContinue)) 'The portable executable runs before MSI installation'
+
         $root = Join-Path $env:LOCALAPPDATA 'Programs/ChummerSR4'
         $exe = Join-Path $root 'ChummerMac.exe'
         Check (-not (Test-Path $exe)) 'Disposable host has no pre-existing Chummer installation'

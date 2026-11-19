@@ -172,8 +172,8 @@ jobs:
           (cd "$windows" && sha256sum --check SHA256SUMS.txt)
           cmp "$mac/BUILD.txt" "$windows/BUILD.txt"
           mkdir assets
-          cp "$mac/BUILD.txt" "$mac/ChummerSR4-macOS-arm64.zip" "$windows/ChummerSR4-Windows-x64.msi" assets/
-          (cd assets && sha256sum BUILD.txt ChummerSR4-macOS-arm64.zip ChummerSR4-Windows-x64.msi > SHA256SUMS.txt)
+          cp "$mac/BUILD.txt" "$mac/ChummerSR4-macOS-arm64.zip" "$windows/ChummerSR4-Windows-x64.msi" "$windows/ChummerSR4-Windows-x64-portable.zip" assets/
+          (cd assets && sha256sum BUILD.txt ChummerSR4-macOS-arm64.zip ChummerSR4-Windows-x64.msi ChummerSR4-Windows-x64-portable.zip > SHA256SUMS.txt)
       - name: Publish Nightly
         env:
           GH_TOKEN: ${{ github.token }}

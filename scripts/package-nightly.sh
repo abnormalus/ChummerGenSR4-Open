@@ -29,6 +29,8 @@ if [[ "$chummer_platform" != macos ]]; then
     python3 scripts/write-build-revision.py "$chummer_output/windows/source-revision.txt"
     python3 packaging/windows/build-msi.py "$chummer_output/windows" "$chummer_assets/ChummerSR4-Windows-x64.msi"
     python3 packaging/windows/verify-msi.py "$chummer_output/windows" "$chummer_assets/ChummerSR4-Windows-x64.msi"
+    python3 -c 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", root_dir=sys.argv[2])' \
+        "$chummer_assets/ChummerSR4-Windows-x64-portable" "$chummer_output/windows"
     # The WiX source contains builder paths; it is useful locally but is not a release asset.
     mv "$chummer_assets/ChummerSR4-Windows-x64.wxs" "$chummer_output/installer.wxs"
 fi
