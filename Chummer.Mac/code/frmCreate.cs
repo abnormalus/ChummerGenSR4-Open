@@ -127,7 +127,7 @@ namespace Chummer
 			SetTooltips();
 			MoveControls();
             InitializeCreationContactControllerLifetime();
-            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); InitializeCreationContactPresentation(); };
+            Load += (_, _) => { InitializeCreationInputSection(); InitializeCreationSkillGroups(); InitializeCreationActiveSkills(); InitializeCreationKnowledgeSkills(); InitializeCreationContactPresentation(); InitializeCreationLifestyleMonths(); };
 		}
 
 		/// <summary>
@@ -12140,6 +12140,9 @@ namespace Chummer
 				RefreshSelectedLifestyle();
 				UpdateCharacterInfo();
 			}
+
+			_blnIsDirty = true;
+			UpdateWindowTitle();
 		}
 
 		private void treLifestyles_ItemDrag(object sender, ItemDragEventArgs e)
@@ -12205,24 +12208,18 @@ namespace Chummer
 
 		private void nudLifestyleMonths_ValueChanged(object sender, EventArgs e)
 		{
-			if (treLifestyles.SelectedNode.Level > 0)
-			{
-				_blnSkipRefresh = true;
+			if (refreshingLifestyleMonths || SelectedLifestyle() is not Lifestyle lifestyle)
+				return;
 
-				// Locate the selected Lifestyle.
-				Lifestyle objLifestyle = _objFunctions.FindLifestyle(treLifestyles.SelectedNode.Tag.ToString(), _objCharacter.Lifestyles);
-				if (objLifestyle == null)
-					return;
+			int months = Convert.ToInt32(nudLifestyleMonths.Value);
+			if (lifestyle.Months == months)
+				return;
 
-				objLifestyle.Months = Convert.ToInt32(nudLifestyleMonths.Value);
-
-				_blnSkipRefresh = false;
-				UpdateCharacterInfo();
-				RefreshSelectedLifestyle();
-
-				_blnIsDirty = true;
-				UpdateWindowTitle();
-			}
+			lifestyle.Months = months;
+			UpdateCharacterInfo();
+			RefreshSelectedLifestyle();
+			_blnIsDirty = true;
+			UpdateWindowTitle();
 		}
 
 		private void treGear_AfterSelect(object sender, TreeViewEventArgs e)
@@ -17953,17 +17950,8 @@ namespace Chummer
 		/// </summary>
 		private void RefreshSelectedLifestyle()
 		{
-			bool blnClear = false;
-			try
-			{
-				if (treLifestyles.SelectedNode.Level == 0)
-					blnClear = true;
-			}
-			catch
-			{
-				blnClear = true;
-			}
-			if (blnClear)
+			Lifestyle objLifestyle = SelectedLifestyle();
+			if (objLifestyle == null)
 			{
 				lblLifestyleCost.Text = "";
 				lblLifestyleTotalCost.Text = "";
@@ -17979,104 +17967,94 @@ namespace Chummer
 				return;
 			}
 
-			if (treLifestyles.SelectedNode.Level > 0)
+			refreshingLifestyleMonths = true;
+			try
 			{
-				_blnSkipRefresh = true;
-
+				nudLifestyleMonths.Value = Math.Clamp(objLifestyle.Months, nudLifestyleMonths.Minimum, nudLifestyleMonths.Maximum);
 				nudLifestyleMonths.Enabled = true;
+			}
+			finally
+			{
+				refreshingLifestyleMonths = false;
+			}
 
-				// Locate the selected Lifestyle.
-				Lifestyle objLifestyle = _objFunctions.FindLifestyle(treLifestyles.SelectedNode.Tag.ToString(), _objCharacter.Lifestyles);
-				if (objLifestyle == null)
-					return;
+			lblLifestyleCost.Text = String.Format("{0:###,###,##0¥}", objLifestyle.TotalMonthlyCost);
+			lblLifestyleStartingNuyen.Text = objLifestyle.Dice.ToString() + "D6 x " + String.Format("{0:###,###,##0¥}", objLifestyle.Multiplier);
+			string strBook = _objOptions.LanguageBookShort(objLifestyle.Source);
+			string strPage = objLifestyle.Page;
+			lblLifestyleSource.Text = strBook + " " + strPage;
+			tipTooltip.SetToolTip(lblLifestyleSource, _objOptions.LanguageBookLong(objLifestyle.Source) + " " + LanguageManager.Instance.GetString("String_Page") + " " + objLifestyle.Page);
+			lblLifestyleTotalCost.Text = String.Format("= {0:###,###,##0¥}", objLifestyle.TotalCost);
 
-				decimal decMultiplier = 1.0m;
-				decimal decModifier = Convert.ToDecimal(_objImprovementManager.ValueOf(Improvement.ImprovementType.LifestyleCost), GlobalOptions.Instance.CultureInfo);
-				if (objLifestyle.StyleType == LifestyleType.Standard)
-					decModifier += Convert.ToDecimal(_objImprovementManager.ValueOf(Improvement.ImprovementType.BasicLifestyleCost), GlobalOptions.Instance.CultureInfo);
-				decMultiplier = 1.0m + Convert.ToDecimal(decModifier / 100, GlobalOptions.Instance.CultureInfo);
+			// Change the Cost/Month label.
+			if (objLifestyle.StyleType == LifestyleType.Safehouse)
+				lblLifestyleCostLabel.Text = LanguageManager.Instance.GetString("Label_SelectLifestyle_CostPerWeek");
+			else
+				lblLifestyleCostLabel.Text = LanguageManager.Instance.GetString("Label_SelectLifestyle_CostPerMonth");
 
-				lblLifestyleCost.Text = String.Format("{0:###,###,##0¥}", objLifestyle.TotalMonthlyCost);
-				nudLifestyleMonths.Value = Convert.ToDecimal(objLifestyle.Months, GlobalOptions.Instance.CultureInfo);
-				lblLifestyleStartingNuyen.Text = objLifestyle.Dice.ToString() + "D6 x " + String.Format("{0:###,###,##0¥}", objLifestyle.Multiplier);
-				string strBook = _objOptions.LanguageBookShort(objLifestyle.Source);
-				string strPage = objLifestyle.Page;
-				lblLifestyleSource.Text = strBook + " " + strPage;
-				tipTooltip.SetToolTip(lblLifestyleSource, _objOptions.LanguageBookLong(objLifestyle.Source) + " " + LanguageManager.Instance.GetString("String_Page") + " " + objLifestyle.Page);
-				lblLifestyleTotalCost.Text = String.Format("= {0:###,###,##0¥}", objLifestyle.TotalCost);
+			if (objLifestyle.Comforts != "")
+			{
+				XmlDocument objXmlDocument = XmlManager.Instance.Load("lifestyles.xml");
+				string strComforts = "";
+				string strEntertainment = "";
+				string strNecessities = "";
+				string strNeighborhood = "";
+				string strSecurity = "";
+				string strQualities = "";
 
-				// Change the Cost/Month label.
-				if (objLifestyle.StyleType == LifestyleType.Safehouse)
-					lblLifestyleCostLabel.Text = LanguageManager.Instance.GetString("Label_SelectLifestyle_CostPerWeek");
+				lblLifestyleQualities.Text = "";
+				XmlNode objNode = objXmlDocument.SelectSingleNode("/chummer/comforts/comfort[name = \"" + objLifestyle.Comforts + "\"]");
+				if (objNode["translate"] != null)
+					strComforts = objNode["translate"].InnerText;
 				else
-					lblLifestyleCostLabel.Text = LanguageManager.Instance.GetString("Label_SelectLifestyle_CostPerMonth");
-
-				if (objLifestyle.Comforts != "")
-				{
-					XmlDocument objXmlDocument = XmlManager.Instance.Load("lifestyles.xml");
-					string strComforts = "";
-					string strEntertainment = "";
-					string strNecessities = "";
-					string strNeighborhood = "";
-					string strSecurity = "";
-					string strQualities = "";
-
-					lblLifestyleQualities.Text = "";
-					XmlNode objNode = objXmlDocument.SelectSingleNode("/chummer/comforts/comfort[name = \"" + objLifestyle.Comforts + "\"]");
-					if (objNode["translate"] != null)
-						strComforts = objNode["translate"].InnerText;
-					else
-						strComforts = objNode["name"].InnerText;
-					objNode = objXmlDocument.SelectSingleNode("/chummer/entertainments/entertainment[name = \"" + objLifestyle.Entertainment + "\"]");
-					if (objNode["translate"] != null)
-						strEntertainment = objNode["translate"].InnerText;
-					else
-						strEntertainment = objNode["name"].InnerText;
-					objNode = objXmlDocument.SelectSingleNode("/chummer/necessities/necessity[name = \"" + objLifestyle.Necessities + "\"]");
-					if (objNode["translate"] != null)
-						strNecessities = objNode["translate"].InnerText;
-					else
-						strNecessities = objNode["name"].InnerText;
-					objNode = objXmlDocument.SelectSingleNode("/chummer/neighborhoods/neighborhood[name = \"" + objLifestyle.Neighborhood + "\"]");
-					if (objNode["translate"] != null)
-						strNeighborhood = objNode["translate"].InnerText;
-					else
-						strNeighborhood = objNode["name"].InnerText;
-					objNode = objXmlDocument.SelectSingleNode("/chummer/securities/security[name = \"" + objLifestyle.Security + "\"]");
-					if (objNode["translate"] != null)
-						strSecurity = objNode["translate"].InnerText;
-					else
-						strSecurity = objNode["name"].InnerText;
-
-					foreach (string strQuality in objLifestyle.Qualities)
-					{
-						string strQualityName = strQuality.Substring(0, strQuality.IndexOf('[') - 1);
-						objNode = objXmlDocument.SelectSingleNode("/chummer/qualities/quality[name = \"" + strQualityName + "\"]");
-						if (objNode["translate"] != null)
-							strQualities += objNode["translate"].InnerText;
-						else
-							strQualities += objNode["name"].InnerText;
-						strQualities += " [" + objNode["lp"].InnerText + "LP]\n";
-					}
-
-					lblLifestyleComforts.Text = strComforts;
-					lblLifestyleEntertainment.Text = strEntertainment;
-					lblLifestyleNecessities.Text = strNecessities;
-					lblLifestyleNeighborhood.Text = strNeighborhood;
-					lblLifestyleSecurity.Text = strSecurity;
-					lblLifestyleQualities.Text += strQualities;
-				}
+					strComforts = objNode["name"].InnerText;
+				objNode = objXmlDocument.SelectSingleNode("/chummer/entertainments/entertainment[name = \"" + objLifestyle.Entertainment + "\"]");
+				if (objNode["translate"] != null)
+					strEntertainment = objNode["translate"].InnerText;
 				else
+					strEntertainment = objNode["name"].InnerText;
+				objNode = objXmlDocument.SelectSingleNode("/chummer/necessities/necessity[name = \"" + objLifestyle.Necessities + "\"]");
+				if (objNode["translate"] != null)
+					strNecessities = objNode["translate"].InnerText;
+				else
+					strNecessities = objNode["name"].InnerText;
+				objNode = objXmlDocument.SelectSingleNode("/chummer/neighborhoods/neighborhood[name = \"" + objLifestyle.Neighborhood + "\"]");
+				if (objNode["translate"] != null)
+					strNeighborhood = objNode["translate"].InnerText;
+				else
+					strNeighborhood = objNode["name"].InnerText;
+				objNode = objXmlDocument.SelectSingleNode("/chummer/securities/security[name = \"" + objLifestyle.Security + "\"]");
+				if (objNode["translate"] != null)
+					strSecurity = objNode["translate"].InnerText;
+				else
+					strSecurity = objNode["name"].InnerText;
+
+				foreach (string strQuality in objLifestyle.Qualities)
 				{
-					lblLifestyleComforts.Text = "";
-					lblLifestyleEntertainment.Text = "";
-					lblLifestyleNecessities.Text = "";
-					lblLifestyleNeighborhood.Text = "";
-					lblLifestyleSecurity.Text = "";
-					lblLifestyleQualities.Text = "";
+					string strQualityName = strQuality.Substring(0, strQuality.IndexOf('[') - 1);
+					objNode = objXmlDocument.SelectSingleNode("/chummer/qualities/quality[name = \"" + strQualityName + "\"]");
+					if (objNode["translate"] != null)
+						strQualities += objNode["translate"].InnerText;
+					else
+						strQualities += objNode["name"].InnerText;
+					strQualities += " [" + objNode["lp"].InnerText + "LP]\n";
 				}
 
-				_blnSkipRefresh = false;
+				lblLifestyleComforts.Text = strComforts;
+				lblLifestyleEntertainment.Text = strEntertainment;
+				lblLifestyleNecessities.Text = strNecessities;
+				lblLifestyleNeighborhood.Text = strNeighborhood;
+				lblLifestyleSecurity.Text = strSecurity;
+				lblLifestyleQualities.Text += strQualities;
+			}
+			else
+			{
+				lblLifestyleComforts.Text = "";
+				lblLifestyleEntertainment.Text = "";
+				lblLifestyleNecessities.Text = "";
+				lblLifestyleNeighborhood.Text = "";
+				lblLifestyleSecurity.Text = "";
+				lblLifestyleQualities.Text = "";
 			}
 		}
 
@@ -20354,7 +20332,6 @@ namespace Chummer
 			// Lifestyles tab.
 			lblLifestyleCost.Left = lblLifestyleCostLabel.Left + lblLifestyleCostLabel.Width + 6;
 			lblLifestyleSource.Left = lblLifestyleSourceLabel.Left + lblLifestyleSourceLabel.Width + 6;
-			lblLifestyleTotalCost.Left = lblLifestyleMonthsLabel.Left + lblLifestyleMonthsLabel.Width + 6;
 			lblLifestyleStartingNuyen.Left = lblLifestyleStartingNuyenLabel.Left + lblLifestyleStartingNuyenLabel.Width + 6;
 
 			intWidth = Math.Max(lblLifestyleComfortsLabel.Width, lblLifestyleEntertainmentLabel.Width);
