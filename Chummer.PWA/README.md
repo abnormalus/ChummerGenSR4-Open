@@ -15,8 +15,10 @@ unmodified files export byte-identically, edited files export UTF-8.
 ## Remaining release work
 
 - Browser GitHub authorization and one-click private repository pairing. The preview
-  uses user-entered repository-scoped tokens in memory only; reload/disconnect clears
-  the token. Never put tokens in source, storage or logs.
+  uses user-entered repository-scoped tokens. They are memory-only by default; an
+  explicit Save token on this device option stores the token in local IndexedDB for
+  re-entry after refresh. Unchecking it or Disconnect deletes the saved token. This
+  is browser storage, not an OS keychain. Never put tokens in source or logs.
 - Browser end-to-end GitHub acceptance. Live repository tests now pass for the same
   GitHub client: private/write verification, create, byte-identical readback, conditional
   update, safe pull, two-sided conflict refusal, uncertain-write recovery and listing.
@@ -63,8 +65,10 @@ merged solely because their filenames match. Close saves locally first and reque
 
 Autosync checks for changed working copies every minute while open and connected,
 including closed dossiers. The stored bytes and last-synced hash persist pending work
-across reloads. Online and foreground events trigger a catch-up attempt. Tokens remain
-memory-only, so reconnecting GitHub is required after restarting the app. Browser
+across reloads. Online and foreground events trigger a catch-up attempt. Tokens are
+memory-only by default. The optional Save token on this device setting restores the
+masked token field after a refresh; Connect is still required to verify the repository
+and resume syncing. Unchecking the option or Disconnect forgets the stored token. Browser
 suspension can delay timers; the status distinguishes local saves from GitHub sync.
 Conflicts offer Save as new name, Overwrite GitHub, Delete local copy, and Later.
 Overwrite requires the reviewed remote SHA and refuses a newer intervening change;
