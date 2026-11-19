@@ -81,6 +81,20 @@ internal static class NativeBulkChecks
                 passed = true;
                 return;
             }
+            if (command == "--check-gear-inputs")
+            {
+                await NativeGearInputChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native carried gear checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-vehicle-inputs")
+            {
+                await NativeVehicleInputChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native vehicle checks preserve the source character file");
+                passed = true;
+                return;
+            }
             if (command == "--check-lifestyle-months")
             {
                 await NativeLifestyleMonthsChecks.RunAsync(main, character, Check);
