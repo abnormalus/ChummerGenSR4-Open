@@ -13,3 +13,5 @@
 .weapon-ammo{padding-left:28px;font-size:13px}.weapon-note{margin:6px 12px}.weapon-details>summary button{font-size:12px;padding:5px 7px}dialog select{max-width:100%;display:block;width:100%;padding:8px;background:var(--card);border:1px solid var(--line)}
 
 .skill-sense{padding-left:30px;font-size:14px;min-height:34px}
+
+.vehicle-details{border-bottom:1px solid var(--line)}.vehicle-details>summary{cursor:pointer;font-weight:600;min-height:44px;padding:10px 12px}.vehicle-details .monitor{padding:10px;display:flex;flex-wrap:wrap;gap:4px}.vehicle-details .row{flex-wrap:wrap}

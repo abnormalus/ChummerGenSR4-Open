@@ -5,7 +5,8 @@ const value=(node,key)=>node?xmlValue(node,key):'';
 const groups={Archery:['Bows','Crossbows'],Automatics:['Assault Rifles','Machine Pistols','Submachine Guns','Battle Rifles'],Blades:['Blades','Cyberware Blades'],Clubs:['Clubs'],'Heavy Weapons':['Assault Cannons','Grenade Launchers','Missile Launchers','Mortar Launchers','Light Machine Guns','Medium Machine Guns','Heavy Machine Guns'],Longarms:['Shotguns','Sniper Rifles','Sports Rifles'],'Throwing Weapons':['Throwing Weapons','Cyberware Throwing Weapons'],'Unarmed Combat':['Unarmed','Cyberware Clubs','Cyberware']};
 export function attachments(weapon){return ['accessories','weaponmods'].flatMap(key=>[...(child(weapon,key)?.children||[])]);}
 const installed=node=>truth(value(node,'installed'));
-export function loadedAmmo(character,weapon,slot=1){const guid=value(weapon,'ammoloaded'+(slot===1?'':slot)).toLowerCase();return guid&&guid!=='00000000-0000-0000-0000-000000000000'?character.gear.find(({node})=>value(node,'guid').toLowerCase()===guid)?.node:undefined;}
+export function weaponInventory(character,weapon){let vehicle=weapon.parentElement;while(vehicle&&vehicle.tagName!=='vehicle')vehicle=vehicle.parentElement;return [...character.gear.map(r=>r.node),...(vehicle?[...vehicle.querySelectorAll('gear')]:[])];}
+export function loadedAmmo(character,weapon,slot=1){const guid=value(weapon,'ammoloaded'+(slot===1?'':slot)).toLowerCase();return guid&&guid!=='00000000-0000-0000-0000-000000000000'?weaponInventory(character,weapon).find(node=>value(node,'guid').toLowerCase()===guid):undefined;}
 export function activeSlot(character,weapon){const id=value(weapon,'guid')||'row-'+character.rows('weapons','weapon').indexOf(weapon);const n=integer(character.field(`weapon.${id}.ammoSlot`),1);return n>=1&&n<=4?n:1;}
 const numericBonus=node=>value(node,'dicepool')==='Rating'?integer(value(node,'rating')):value(node,'dicepool')==='-Rating'?-integer(value(node,'rating')):integer(value(node,'dicepool'));
 export function weaponPool(character,weapon){
@@ -16,6 +17,7 @@ export function weaponPool(character,weapon){
  if(name.includes('Exotic')&&!spec)spec=value(weapon,'name');
  // Synthetic/imported weapons occasionally omit category; never call unarmed Pistols.
  if(!value(weapon,'useskill')&&!category&&value(weapon,'name').startsWith('Unarmed Attack'))name='Unarmed Combat';
+ let ancestor=weapon.parentElement;while(ancestor&&ancestor.tagName!=='vehicle')ancestor=ancestor.parentElement;if(ancestor){name='Gunnery';spec='';}
  const skill=character.skills.find(s=>s.name===name&&!truth(value(s.node,'knowledge'))&&(!spec||value(s.node,'spec')===spec));
  if(!skill)return {text:'—',description:name+' · Skill not saved'};
  const mods=attachments(weapon).filter(installed),ammo=loadedAmmo(character,weapon,activeSlot(character,weapon));
@@ -39,7 +41,7 @@ export function conditionPenalty(character,physical,n){if(character.ignoresWound
 
 export const isGrenade=node=>value(node,'category')==='Grenades'||(value(node,'category')==='Ammunition'&&/^(mini)?grenade:/i.test(value(node,'name')));
 export function grenadeLots(character,weapon){const guid=value(weapon,'guid').toLowerCase();return guid&&guid!=='00000000-0000-0000-0000-000000000000'?character.gear.filter(({node})=>isGrenade(node)&&value(node,'weaponguid').toLowerCase()===guid).map(r=>r.node):[];}
-export function ammunition(character,weapon){if(value(weapon,'type').toLowerCase()!=='ranged'||value(weapon,'requireammo').toLowerCase()==='false'||value(weapon,'ammo')==='0')return [];const category=value(weapon,'ammocategory')||value(weapon,'category').replace('Cyberware','').trim();return character.gear.filter(({node})=>value(node,'category')==='Ammunition'&&value(node,'extra')&&value(node,'extra').toLowerCase()===category.toLowerCase()).map(r=>r.node);}
+export function ammunition(character,weapon){if(value(weapon,'type').toLowerCase()!=='ranged'||value(weapon,'requireammo').toLowerCase()==='false'||value(weapon,'ammo')==='0')return [];const category=value(weapon,'ammocategory')||value(weapon,'category').replace('Cyberware','').trim();return weaponInventory(character,weapon).filter(node=>value(node,'category')==='Ammunition'&&value(node,'extra')&&value(node,'extra').toLowerCase()===category.toLowerCase());}
 export function fireCounts(weapon){const modes=value(weapon,'mode').toUpperCase().split(/[^A-Z0-9]+/),counts=new Set();if(modes.includes('SS'))counts.add(1);if(modes.includes('SA'))[1,2].forEach(n=>counts.add(n));if(modes.includes('BF'))[3,6].forEach(n=>counts.add(n));if(modes.includes('FA'))[3,6,integer(value(weapon,'fullburst'),10),integer(value(weapon,'suppressive'),20)].forEach(n=>counts.add(n));return [...counts].filter(n=>n>0).sort((a,b)=>a-b);}
 function checkSlot(slot){if(!Number.isInteger(slot)||slot<1||slot>4)throw Error('Choose a magazine from 1 to 4.');}
 export function setActiveSlot(character,weapon,slot){checkSlot(slot);const id=value(weapon,'guid')||'row-'+character.rows('weapons','weapon').indexOf(weapon);character.setField(`weapon.${id}.ammoSlot`,slot);}
