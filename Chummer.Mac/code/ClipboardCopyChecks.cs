@@ -13,6 +13,68 @@ internal static class ClipboardCopyChecks
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
     private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, Flags)!.GetValue(owner)!;
+    internal static void CheckItemFamilies(Action<bool, string> check)
+    {
+        var character = new Character();
+        var lookup = new CommonFunctions(character);
+        var clipboard = GlobalOptions.Instance;
+        var priorDocument = clipboard.Clipboard;
+        var priorType = clipboard.ClipboardContentType;
+
+        void Expect(InventoryCopyTarget target, string id, ClipboardContentType type, string element, int level = 1)
+        {
+            bool refresh = InventoryCopyCommand.Copy(character, lookup, target, id, level);
+            check(refresh && clipboard.ClipboardContentType == type &&
+                clipboard.Clipboard.SelectSingleNode("/character/" + element + "/guid")?.InnerText == id,
+                "Inventory Copy writes expected identity and item family " + target + " " + type);
+        }
+
+        try
+        {
+            var lifestyle = new Lifestyle(character) { Name = "Synthetic lifestyle" };
+            var armor = new Armor(character) { Name = "Synthetic armor" };
+            var weapon = new Weapon(character) { Name = "Synthetic weapon", Category = "Pistols" };
+            var vehicle = new Vehicle(character) { Name = "Synthetic vehicle" };
+            var mounted = new Weapon(character) { Name = "Synthetic mounted weapon", Category = "Pistols" };
+            var modification = new VehicleMod(character);
+            character.Lifestyles.Add(lifestyle);
+            character.Armor.Add(armor);
+            character.Weapons.Add(weapon);
+            character.Vehicles.Add(vehicle);
+            vehicle.Mods.Add(modification);
+            modification.Weapons.Add(mounted);
+
+            var armorGear = new Commlink(character) { Name = "Synthetic commlink" };
+            var weaponGear = new OperatingSystem(character) { Name = "Synthetic operating system" };
+            var vehicleGear = new Gear(character) { Name = "Synthetic vehicle gear", WeaponID = weapon.InternalId };
+            armor.Gear.Add(armorGear);
+            var accessory = new WeaponAccessory(character);
+            weapon.WeaponAccessories.Add(accessory);
+            accessory.Gear.Add(weaponGear);
+            vehicle.Gear.Add(vehicleGear);
+
+            Expect(InventoryCopyTarget.Lifestyle, lifestyle.InternalId, ClipboardContentType.Lifestyle, "lifestyle");
+            Expect(InventoryCopyTarget.Armor, armor.InternalId, ClipboardContentType.Armor, "armor");
+            Expect(InventoryCopyTarget.Armor, armorGear.InternalId, ClipboardContentType.Commlink, "gear", 2);
+            Expect(InventoryCopyTarget.Weapon, weapon.InternalId, ClipboardContentType.Weapon, "weapon");
+            Expect(InventoryCopyTarget.Weapon, weaponGear.InternalId, ClipboardContentType.OperatingSystem, "gear", 2);
+            Expect(InventoryCopyTarget.Vehicle, vehicle.InternalId, ClipboardContentType.Vehicle, "vehicle");
+            Expect(InventoryCopyTarget.Vehicle, mounted.InternalId, ClipboardContentType.Weapon, "weapon", 2);
+            Expect(InventoryCopyTarget.Vehicle, vehicleGear.InternalId, ClipboardContentType.Gear, "gear", 2);
+            check(clipboard.Clipboard.SelectSingleNode("/character/weapon/guid")?.InnerText == weapon.InternalId,
+                "Inventory Copy includes the weapon associated with copied vehicle gear");
+
+            var copied = clipboard.Clipboard;
+            weapon.Category = "Gear";
+            mounted.Category = "Cyberware Weapons";
+            check(!InventoryCopyCommand.Copy(character, lookup, InventoryCopyTarget.Weapon, weapon.InternalId, 1) &&
+                !InventoryCopyCommand.Copy(character, lookup, InventoryCopyTarget.Vehicle, mounted.InternalId, 2) &&
+                ReferenceEquals(clipboard.Clipboard, copied) && clipboard.ClipboardContentType == ClipboardContentType.Gear,
+                "Inventory Copy protects Gear and Cyberware weapons without replacing the clipboard");
+        }
+        finally { clipboard.Clipboard = priorDocument; clipboard.ClipboardContentType = priorType; }
+    }
+
     internal static void Run(Character source, Action<bool, string> check)
     {
         var priorDocument = GlobalOptions.Instance.Clipboard;

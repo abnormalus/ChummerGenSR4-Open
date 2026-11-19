@@ -81,6 +81,16 @@ internal static class NativeBulkChecks
                 passed = true;
                 return;
             }
+            if (command == "--check-inventory-copy")
+            {
+                ClipboardCopyChecks.Run(character, Check);
+                ClipboardCopyChecks.CheckItemFamilies(Check);
+                ClipboardDocumentChecks.Run(Check);
+                await NativeClipboardCopyChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Inventory Copy preserves the source character file");
+                passed = true;
+                return;
+            }
             if (command == "--check-repository-saving")
             {
                 await NativeRepositorySaveChecks.RunAsync(main, character, Check);

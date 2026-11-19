@@ -1058,6 +1058,7 @@ namespace Chummer
                 BuildPointPersistenceChecks.Run(character, Check);
                 WeaponFocusBindingChecks.Run(character, Check);
                 ClipboardCopyChecks.Run(character, Check);
+                ClipboardCopyChecks.CheckItemFamilies(Check);
                 ClipboardTransferChecks.RunAsync(null, character, Check, () => System.Threading.Tasks.Task.CompletedTask, "Headless").GetAwaiter().GetResult();
                 AccessoryBatchChecks.Run(character, Check);
                 WeaponAmmunitionChecks.Run(character, Check);

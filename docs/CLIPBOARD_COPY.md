@@ -1,8 +1,20 @@
-# Inventory Copy serialization boundary
+# Inventory Copy
 
-Creation and career each retain the same Copy command body, with nine item-serialization sites selected by the main/subtab and canonical tree selection. They create a Unicode XML document rooted at `character`, invoke existing model `Save` methods, parse the completed stream and publish the application clipboard. This is separate from whole-character snapshots and operating-system clipboard APIs.
+Creation and Career map their current tab and tree selection to
+`InventoryCopyCommand`. The command resolves model identity through
+`CommonFunctions`, dispatches to the existing item writers, and publishes the
+application clipboard through `ClipboardDocument`. The editor still owns
+ammunition-view eligibility and Copy/Paste availability.
 
-Keep selection eligibility, exact Commlink/OperatingSystem/Gear dispatch, attached-weapon inclusion and Paste availability with their callers. A shared XML wrapper should own writer/stream lifetime and document construction, not object lookup or clipboard policy. No interchangeable item serializer was found in the existing whole-character snapshot implementation.
+The shared command covers lifestyles, armor, weapons, gear, vehicles, mounted
+weapons, and attached gear. It preserves the exact Commlink and OperatingSystem
+writers, attached-weapon inclusion, and the restrictions on Gear and Cyberware
+weapons. It does not modify character data or use the system clipboard.
+
+Run the focused check with
+`ChummerMac --check-inventory-copy <generated-creation.chum> <report.json>`.
+On Mac, 43 assertions passed across the wrapper, item families, actual editor
+commands, and native Copy/Paste in both themes. Windows verification is separate.
 
 ## Observed failure ordering
 
@@ -12,7 +24,7 @@ Do not describe current clipboard publication as atomic. Preserve this ordering 
 
 `ClipboardCopyChecks` also verifies successful character-root UTF-16 XML with escaped/non-Latin/supplementary-Unicode notes, unchanged character snapshots on success/failure, and a stale selected ID that leaves both clipboard values unchanged. The stale-ID case changes the current node's Tag without raising AfterSelect: deliberately selecting an absent model invokes a different editor-refresh failure before Copy executes. Global clipboard state is restored in `finally`.
 
-All ten assertions passed in the corrected baseline, followed by the complete headless suite, all 399 file/memory round trips, both Foundry targets and shutdown (187.6 seconds). This matrix does not yet establish every copied item family or native clipboard/Paste interaction. `ClipboardDocument.Create` owns the repeated wrapper at all 18 sites; item-save callbacks and code outside the Copy methods are mechanically unchanged. The extraction builds and passed the same ten editor assertions, five independent wrapper contracts and the full headless/399/both Foundry/shutdown suite (184.4 seconds). Current-source platform verification remains separate.
+In the earlier serializer-only checkpoint, all ten assertions passed in the corrected baseline, followed by the complete headless suite, all 399 file/memory round trips, both Foundry targets and shutdown (187.6 seconds). This matrix does not yet establish every copied item family or native clipboard/Paste interaction. `ClipboardDocument.Create` owns the repeated wrapper at all 18 sites; item-save callbacks and code outside the Copy methods are mechanically unchanged. The extraction builds and passed the same ten editor assertions, five independent wrapper contracts and the full headless/399/both Foundry/shutdown suite (184.4 seconds). Current-source platform verification remains separate.
 
 The wrapper owns and disposes the writer, reader and temporary stream on success and failure. It retains Unicode writer formatting and BOM-aware reading. Callbacks can still mutate caller state and throw; the helper does not read global state, publish clipboard data, swallow errors or roll back callback effects. Five independent contracts cover fixed escaped/multi-item XML, empty output, successful resource closure, callback exception identity and parse-failure cleanup. Those are separate from the actual-editor baseline and do not derive expected documents through the wrapper.
 
