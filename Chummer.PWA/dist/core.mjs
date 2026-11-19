@@ -119,9 +119,9 @@ export class Character {
   }
   setSkillPool(index, pool) { this.setNode(this.rows('skills', 'skill')[index], 'totalvalue', integer(pool) - this.wounds + this.importedWounds); }
   setSkillRating(index, rating) {
-    const prior = this.skills[index], n = integer(rating, NaN);
+    const priorSkills = this.skills, prior = priorSkills[index], n = integer(rating, NaN);
     this.setNode(prior.node, 'rating', rating);
-    if (Number.isInteger(n)) this.setSkillPool(index, prior.pool + n - prior.rating);
+    if (Number.isInteger(n)) {this.setSkillPool(index, prior.pool + n - prior.rating);if(prior.name==='Perception')for(const sense of priorSkills.filter(s=>/^Perception \([^)]+\)$/.test(s.name))){this.setNode(sense.node,'rating',n);this.setSkillPool(sense.index,sense.pool+n-prior.rating);}}
   }
   get gear() {
     const flatten = (nodes, path = []) => nodes.flatMap((node, index) => {

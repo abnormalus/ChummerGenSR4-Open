@@ -36,3 +36,23 @@ export function weaponRanges(character,weapon){
  return ['Short','Medium','Long','Extreme'].map((label,i)=>({label,text:`${limits[i]+(i?1:0)}–${limits[i+1]} m`}));
 }
 export function conditionPenalty(character,physical,n){if(character.ignoresWounds(physical))return 0;const current=Math.floor(Math.max(0,n-character.woundOffset)/character.woundThreshold),prior=Math.floor(Math.max(0,n-1-character.woundOffset)/character.woundThreshold);return current>prior?-current:0;}
+
+export const isGrenade=node=>value(node,'category')==='Grenades'||(value(node,'category')==='Ammunition'&&/^(mini)?grenade:/i.test(value(node,'name')));
+export function grenadeLots(character,weapon){const guid=value(weapon,'guid').toLowerCase();return guid&&guid!=='00000000-0000-0000-0000-000000000000'?character.gear.filter(({node})=>isGrenade(node)&&value(node,'weaponguid').toLowerCase()===guid).map(r=>r.node):[];}
+export function ammunition(character,weapon){if(value(weapon,'type').toLowerCase()!=='ranged'||value(weapon,'requireammo').toLowerCase()==='false'||value(weapon,'ammo')==='0')return [];const category=value(weapon,'ammocategory')||value(weapon,'category').replace('Cyberware','').trim();return character.gear.filter(({node})=>value(node,'category')==='Ammunition'&&value(node,'extra')&&value(node,'extra').toLowerCase()===category.toLowerCase()).map(r=>r.node);}
+export function fireCounts(weapon){const modes=value(weapon,'mode').toUpperCase().split(/[^A-Z0-9]+/),counts=new Set();if(modes.includes('SS'))counts.add(1);if(modes.includes('SA'))[1,2].forEach(n=>counts.add(n));if(modes.includes('BF'))[3,6].forEach(n=>counts.add(n));if(modes.includes('FA'))[3,6,integer(value(weapon,'fullburst'),10),integer(value(weapon,'suppressive'),20)].forEach(n=>counts.add(n));return [...counts].filter(n=>n>0).sort((a,b)=>a-b);}
+function checkSlot(slot){if(!Number.isInteger(slot)||slot<1||slot>4)throw Error('Choose a magazine from 1 to 4.');}
+export function setActiveSlot(character,weapon,slot){checkSlot(slot);const id=value(weapon,'guid')||'row-'+character.rows('weapons','weapon').indexOf(weapon);character.setField(`weapon.${id}.ammoSlot`,slot);}
+export function fireWeapon(character,weapon,slot,rounds){checkSlot(slot);const key='ammoremaining'+(slot===1?'':slot),remaining=integer(value(weapon,key),NaN);if(!fireCounts(weapon).includes(rounds))throw Error('Choose a firing quantity supported by this weapon.');if(!Number.isInteger(remaining)||remaining<rounds)throw Error('Not enough loaded rounds. Reload first.');character.setNode(weapon,key,remaining-rounds);setActiveSlot(character,weapon,slot);}
+export function reloadWeapon(character,weapon,slot,reserve,rounds){
+ checkSlot(slot);const suffix=slot===1?'':slot,old=loadedAmmo(character,weapon,slot),remaining=integer(value(weapon,'ammoremaining'+suffix),0);
+ if(remaining<0||remaining>0&&!old)throw Error('The loaded rounds have no matching reserve. Reconnect that ammo in Chummer before reloading.');
+ const quantity=node=>{const n=Number(value(node,'qty'));if(!Number.isFinite(n)||n<0)throw Error('Ammo quantity must be a non-negative number.');return n;};
+ const oldQty=old?quantity(old):0;
+ if(reserve){if(!ammunition(character,weapon).includes(reserve)||!value(reserve,'guid')||/^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(value(reserve,'guid')))throw Error('Choose compatible ammunition with a saved identifier.');if(!Number.isSafeInteger(rounds)||rounds<1||rounds>2147483647)throw Error('Enter a whole number of rounds to load.');const available=quantity(reserve)+(reserve===old?remaining:0);if(available<rounds)throw Error('Not enough rounds in that reserve.');}
+ // Validate everything before changing either reserve or magazine.
+ if(old)character.setNode(old,'qty',oldQty+remaining);
+ if(reserve)character.setNode(reserve,'qty',quantity(reserve)-rounds);
+ character.setNode(weapon,'ammoloaded'+suffix,reserve?value(reserve,'guid'):'00000000-0000-0000-0000-000000000000');character.setNode(weapon,'ammoremaining'+suffix,reserve?rounds:0);setActiveSlot(character,weapon,slot);
+}
+export function useGrenade(character,node){if(!isGrenade(node)||!character.gear.some(r=>r.node===node))throw Error('Grenade is no longer available.');const quantity=Number(value(node,'qty'));if(!Number.isFinite(quantity)||quantity<1)throw Error('No grenades remaining.');character.setNode(node,'qty',quantity-1);}
