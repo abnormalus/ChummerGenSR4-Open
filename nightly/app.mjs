@@ -1,12 +1,12 @@
-import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import * as db from './storage.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import {GitHub} from './github.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import {installController} from './install.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import {existingCharacter,sameRemote} from './identity.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty,isGrenade,grenadeLots,ammunition,fireCounts,setActiveSlot,fireWeapon,reloadWeapon,useGrenade} from './weapons.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import {AutoSync} from './autosync.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
-import {filteredSkills,magicSkillsApply,skillRating,perceptionSense,perceptionDifferences} from './skill-filters.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import * as db from './storage.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {GitHub} from './github.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {installController} from './install.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {existingCharacter,sameRemote} from './identity.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty,isGrenade,grenadeLots,ammunition,fireCounts,setActiveSlot,fireWeapon,reloadWeapon,useGrenade} from './weapons.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {AutoSync} from './autosync.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
+import {filteredSkills,magicSkillsApply,skillRating,perceptionSense,perceptionDifferences} from './skill-filters.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=true,skillCategory='Active',client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -114,7 +114,6 @@ function reloadDialog(weapon,index,selected){weaponDialog('Reload '+value(weapon
  const load=action('Load',()=>weaponChange(()=>reloadWeapon(character,weapon,Number(slot.value),lots[Number(reserve.value)],Number(count.value)),index,weapon));load.disabled=!lots.length;
  dialog.append(load,action('Unload',()=>weaponChange(()=>reloadWeapon(character,weapon,Number(slot.value),null,0),index,weapon)));
 });}
-function fireDialog(weapon,index){weaponDialog('Fire '+value(weapon,'name'),(dialog,action)=>{const slot=activeSlot(character,weapon),ammo=loadedAmmo(character,weapon,slot),remaining=integer(value(weapon,'ammoremaining'+(slot===1?'':slot)));dialog.append(el('p',`Magazine ${slot} · ${ammo?value(ammo,'name'):'Ammo type not saved'} · ${remaining} rounds`));const actions=el('div',undefined,'actions');for(const count of fireCounts(weapon)){const fire=action('Fire '+count,()=>weaponChange(()=>fireWeapon(character,weapon,slot,count),index,weapon));fire.disabled=remaining<count;actions.append(fire);}if(!actions.children.length)dialog.append(el('p','No firing mode saved for this weapon.'));dialog.append(actions);});}
 function weapons(nodes=character.rows('weapons','weapon'),parent){
  if(!nodes.length)return;const s=parent||section('Weapons');
  const labels={rc:'Recoil compensation',reach:'Reach',notes:'Notes',dvbonus:'Damage bonus',apbonus:'AP bonus',dicepool:'Pool modifier',rcbonus:'Recoil bonus',fullburst:'Full burst',suppressive:'Suppressive fire',damage:'Damage',ap:'AP',pool:'Pool modifier',damagetype:'Damage type',damagereplace:'Damage replacement',apreplace:'AP replacement'};
@@ -125,7 +124,7 @@ function weapons(nodes=character.rows('weapons','weapon'),parent){
   if(grenades.length){const use=quick('Use',()=>weaponChange(()=>useGrenade(character,grenades.find(n=>Number(value(n,'qty'))>=1)),index));use.setAttribute('aria-label','Use '+value(node,'name'));use.disabled=!grenades.some(n=>Number(value(n,'qty'))>=1);summary.append(use);}
   summary.append(name,el('span',[character.weaponDamage(node),...(page==='Combat'?['Pool '+pool.text]:[]),value(node,'mode'),value(node,'ap')&&'AP '+value(node,'ap'),grenades.length?'×'+grenades.reduce((n,g)=>n+Number(value(g,'qty')||0),0):''].filter(Boolean).join(' · '),'weapon-stats'));if(source(node))summary.append(el('small',source(node)));
   const ranged=value(node,'type').toLowerCase()==='ranged'&&value(node,'requireammo').toLowerCase()!=='false'&&value(node,'ammo')!=='0'&&!grenades.length;
-  if(ranged){const fire=quick('Fire',()=>fireDialog(node,index));fire.setAttribute('aria-label','Fire '+value(node,'name'));summary.append(fire);const reload=quick('Reload',()=>reloadDialog(node,index));reload.setAttribute('aria-label','Reload '+value(node,'name'));summary.append(reload);}details.append(summary);
+  if(ranged){const active=activeSlot(character,node),remaining=integer(value(node,'ammoremaining'+(active===1?'':active)));const actions=el('span',undefined,'weapon-fire-actions');for(const count of fireCounts(node)){const fire=quick('Fire '+count,()=>weaponChange(()=>fireWeapon(character,node,active,count),index,node));fire.classList.add('fire-button');fire.setAttribute('aria-label','Fire '+count+' from '+value(node,'name'));fire.disabled=remaining<count;actions.append(fire);}const reload=quick('Reload',()=>reloadDialog(node,index));reload.setAttribute('aria-label','Reload '+value(node,'name'));actions.append(reload);summary.append(actions);}details.append(summary);
   if(page!=='Combat')row(details,'Dice pool',pool.text);details.append(el('p',pool.description,'muted weapon-note'));
   const bands=weaponRanges(character,node);if(bands.length)row(details,'Range (m)',bands.map(b=>b.text.match(/–([\d.]+)/)?.[1]||b.text).join('/'),'Short / Medium / Long / Extreme');
   fields(details,node,['rc','reach','notes']);if(ranged&&value(node,'ammo'))row(details,'Capacity',value(node,'ammo'));
@@ -164,7 +163,7 @@ function printCharacter(official){
   $('print-status').textContent='Preparing PDF…';
   for(const id of ['print-full','print-official'])$(id).disabled=true;
   try{
-   await flush();const {characterPDF}=await import('./printing.mjs?v=9118072a45515f30414799bbdbbd68a7da265197');const bytes=await characterPDF(snapshot,{official});
+   await flush();const {characterPDF}=await import('./printing.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1');const bytes=await characterPDF(snapshot,{official});
    if(printURL)URL.revokeObjectURL(printURL);
    printURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
    const filename=snapshot.title.replace(/[^\p{L}\p{N} ._-]/gu,'_')+(official?' - Official SR4A':' - Full character')+'.pdf';

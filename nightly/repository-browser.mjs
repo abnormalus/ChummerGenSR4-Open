@@ -1,4 +1,4 @@
-import {Character,child,children,value,unbase64} from './core.mjs?v=9118072a45515f30414799bbdbbd68a7da265197';
+import {Character,child,children,value,unbase64} from './core.mjs?v=0c86bbc158b285dfc1db19bb775a5e82e672c6e1';
 // Only embedded raster images are accepted. Character XML cannot supply a remote image URL.
 export function portraitBytes(character){
  const index=Number(character.get('mainmugshotindex')||0),container=child(character.root,'mugshots');
