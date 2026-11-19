@@ -19,6 +19,8 @@ public partial class frmCreate
 
     private void InitializeCreationLifestyleMonths()
     {
+        if (Avalonia.Application.Current == null || IsDisposed) return;
+
         var binding = new NativeInlineNumericBinding(nudLifestyleMonths, tipTooltip, wholeNumbers: true,
             available: () => SelectedLifestyle() != null);
         binding.Input.Width = 90;
