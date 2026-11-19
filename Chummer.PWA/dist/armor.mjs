@@ -23,7 +23,7 @@ export function armorProtections(c){
  const result=[];for(const armor of armorState(c).worn)for(const mod of armorMods(armor)){const name=value(mod,'name'),rating=num(value(mod,'rating'));if(/chemical|fire resistance|insulation|nonconductivity|radiation|thermal|shock|insulat|resistan|protect|seal/i.test(name))result.push({name,rating,armor:value(armor,'name'),source:[value(mod,'source'),value(mod,'page')&&'p. '+value(mod,'page')].filter(Boolean).join(' ')});}return result;
 }
 export function defensePools(c){
- const reaction=c.total('REA'),wounds=c.wounds,rows=[{name:'Ranged defence',pool:Math.max(0,reaction+wounds),formula:'REA'}];
+ const combatSense=Math.max(c.improvement('CombatSense'),...c.rows('powers','power').filter(n=>value(n,'name')==='Combat Sense').map(n=>num(value(n,'rating'))),0),reaction=c.total('REA')+combatSense,wounds=c.wounds,rows=[{name:'Ranged defence',pool:Math.max(0,reaction+wounds),formula:'REA'}];
  function skill(name){const s=c.skills.find(s=>s.name===name);if(!s)return null;return value(s.node,'totalvalue')?Math.max(0,num(value(s.node,'totalvalue'))-raw(c,s.attribute)-c.importedWounds):Math.max(0,s.rating+(s.rating===0&&truth(value(s.node,'default'))?-1:0));}
  const dodge=skill('Dodge'),gym=skill('Gymnastics'),unarmed=skill('Unarmed Combat');
  if(dodge!==null){rows.push({name:'Full ranged dodge',pool:Math.max(0,reaction+dodge+wounds),formula:'REA + Dodge'},{name:'Melee dodge',pool:Math.max(0,reaction+dodge+wounds),formula:'REA + Dodge'},{name:'Full melee dodge',pool:Math.max(0,reaction+2*dodge+wounds),formula:'REA + Dodge × 2'});}
@@ -31,5 +31,5 @@ export function defensePools(c){
  if(unarmed!==null)rows.push({name:'Melee block',pool:Math.max(0,reaction+unarmed+wounds),formula:'REA + Unarmed Combat'});
  const names=new Set(c.rows('weapons','weapon').filter(w=>value(w,'type').toLowerCase()==='melee').map(w=>value(w,'useskill')||(/blade/i.test(value(w,'category'))?'Blades':value(w,'category')==='Clubs'?'Clubs':value(w,'category')==='Unarmed'?'Unarmed Combat':'')));
  for(const name of names){if(!name||name==='Unarmed Combat')continue;const n=skill(name);if(n!==null)rows.push({name:'Parry · '+name,pool:Math.max(0,reaction+n+wounds),formula:'REA + '+name},{name:'Full parry · '+name,pool:Math.max(0,reaction+2*n+wounds),formula:'REA + '+name+' × 2'});}
- return rows;
+ if(combatSense)for(const row of rows)row.formula+=' + Combat Sense '+combatSense;return rows;
 }
