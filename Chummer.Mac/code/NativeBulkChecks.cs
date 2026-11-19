@@ -81,6 +81,12 @@ internal static class NativeBulkChecks
                 passed = true;
                 return;
             }
+            if (command == "--check-weapon-deletion")
+            {
+                await NativeWeaponDeletionChecks.RunAsync(main, character, Check);
+                passed = true;
+                return;
+            }
             if (command == "--check-inventory-copy")
             {
                 ClipboardCopyChecks.Run(character, Check);
@@ -174,6 +180,7 @@ internal static class NativeBulkChecks
             await NativeCatalogContrastChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeSaveAsFinalizationChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeInventoryEnhancementChecks.RunAsync(main, character, Check);
+            await NativeWeaponDeletionChecks.RunAsync(main, character, Check);
             await NativeGearEligibilityChecks.RunAsync(main, character, Check);
             var editor = new frmCreate(character) { Loading = true, MdiParent = main };
             editor.Show();
