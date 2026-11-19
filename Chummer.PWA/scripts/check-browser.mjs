@@ -32,7 +32,7 @@ try{
  console.log('PASS skill header defaults, category controls and phone/tablet fit');
 
  await page.getByLabel('Essence',{exact:true}).fill('5.75');
- await page.getByRole('button',{name:'Combat',exact:true}).click();
+ await page.getByRole('navigation',{name:'Dossier sections'}).getByRole('button',{name:'Combat',exact:true}).click();
  await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();
  await page.reload();if(await page.getByLabel('Essence',{exact:true}).inputValue()!=='5.75')throw Error('Autosave failed');
  await page.getByRole('button',{name:'Export',exact:true}).click();
@@ -105,7 +105,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('GitHub up to date'));
  await page.context().setOffline(true);
  await page.getByLabel('Essence',{exact:true}).fill('4.5');
- await page.getByRole('button',{name:'Combat',exact:true}).click();await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();
+ await page.getByRole('navigation',{name:'Dossier sections'}).getByRole('button',{name:'Combat',exact:true}).click();await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();
  const writesOffline=writes;await page.clock.fastForward(60000);if(writes!==writesOffline)throw Error('Autosync wrote while offline');
  await page.context().setOffline(false);
  await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('GitHub up to date'));
@@ -113,7 +113,7 @@ try{
  await page.clock.fastForward(60000);if(writes!==writesOffline+1)throw Error('Clean minute tick uploaded again');
  console.log('PASS minute autosync skips unchanged data and catches up immediately after offline edits');
  function externalEdit(path,sha){const file=remoteFiles.get(path);const xml=file.xml.replace(/<karma>.*?<\/karma>/,'<karma>99</karma>');remoteFiles.set(path,{xml,sha});blobs.set(sha,xml);}
- async function localEditAndConflict(path,essence,sha){externalEdit(path,sha);await page.getByRole('button',{name:'Character',exact:true}).click();await page.getByLabel('Essence',{exact:true}).fill(essence);await page.getByRole('button',{name:'Combat',exact:true}).click();await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();await page.clock.fastForward(60000);await page.locator('#sync-conflict').waitFor();}
+ async function localEditAndConflict(path,essence,sha){externalEdit(path,sha);await page.getByRole('button',{name:'Character',exact:true}).click();await page.getByLabel('Essence',{exact:true}).fill(essence);await page.getByRole('navigation',{name:'Dossier sections'}).getByRole('button',{name:'Combat',exact:true}).click();await page.getByRole('button',{name:'Physical damage 1',exact:true}).waitFor();await page.clock.fastForward(60000);await page.locator('#sync-conflict').waitFor();}
  await localEditAndConflict('Archive/Willow.chum','4.75','external-1');
  await page.getByLabel('New character name',{exact:true}).fill('Willow backup');
  await page.getByRole('button',{name:'Save as new name',exact:true}).click();await page.locator('#sync-conflict').waitFor({state:'hidden'});
