@@ -81,6 +81,12 @@ internal static class NativeBulkChecks
                 passed = true;
                 return;
             }
+            if (command == "--check-repository-saving")
+            {
+                await NativeRepositorySaveChecks.RunAsync(main, character, Check);
+                passed = true;
+                return;
+            }
             if (command == "--check-cyberware")
             {
                 await NativeCybereyeEnhancementChecks.RunAsync(main, character, Check);
@@ -95,6 +101,7 @@ internal static class NativeBulkChecks
             await NativeRenderingChecks.RunAsync(Check);
             await NativeDropDownChecks.RunAsync(Check);
             await NativeRepositoryDialogChecks.RunAsync(main, Check);
+            await NativeRepositorySaveChecks.RunAsync(main, character, Check);
             // Exercise the actual export modal rather than only reading constructor state.
             using (var foundryDialog = new FoundryExportDialog(new[] { character }))
             {

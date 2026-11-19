@@ -24,11 +24,14 @@ namespace Chummer
         private TextBox txtPdfMatchReport;
         private bool pdfMatching;
         private ComboBox cboSourceSet;
+        private CheckBox chkCharacterAutosave;
+        private NumericUpDown nudCharacterAutosaveMinutes;
 
 		#region Form Events
 		public frmOptions()
 		{
 			InitializeComponent();
+            AddCharacterAutosaveOptions();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 
 			// Populate the Build Method list.
@@ -89,6 +92,26 @@ namespace Chummer
 
 			MoveControls();
 		}
+
+        private void AddCharacterAutosaveOptions()
+        {
+            chkCharacterAutosave = new CheckBox
+            {
+                Name = "chkCharacterAutosave", Text = "Autosave characters", AutoSize = true, Left = 8, Top = 330,
+                Checked = GlobalOptions.Instance.CharacterAutosaveEnabled
+            };
+            var intervalLabel = new Label { Text = "Autosave interval (minutes)", AutoSize = true, Left = 8, Top = 359 };
+            nudCharacterAutosaveMinutes = new NumericUpDown
+            {
+                Name = "nudCharacterAutosaveMinutes", Left = 180, Top = 355, Width = 80, Minimum = 1,
+                Maximum = GlobalOptions.MaximumCharacterAutosaveMinutes, Enabled = chkCharacterAutosave.Checked,
+                Value = GlobalOptions.Instance.CharacterAutosaveMinutes
+            };
+            chkCharacterAutosave.CheckedChanged += (_, _) => nudCharacterAutosaveMinutes.Enabled = chkCharacterAutosave.Checked;
+            tabGlobal.Controls.Add(chkCharacterAutosave);
+            tabGlobal.Controls.Add(intervalLabel);
+            tabGlobal.Controls.Add(nudCharacterAutosaveMinutes);
+        }
 
 		private void frmOptions_Load(object sender, EventArgs e)
 		{
@@ -1891,6 +1914,10 @@ namespace Chummer
 			GlobalOptions.Instance.PDFArgumentStyle = cboPDFArgumentStyle.SelectedValue.ToString();
 			SettingsRegistryKey objRegistry = SettingsStore.CurrentUser.CreateSubKey("Software\\Chummer");
 			objRegistry.SetValue("autoupdate", chkAutomaticUpdate.Checked.ToString());
+            int autosaveMinutes = decimal.ToInt32(nudCharacterAutosaveMinutes.Value);
+            objRegistry.SetValue("characterautosave", chkCharacterAutosave.Checked.ToString());
+            objRegistry.SetValue("characterautosaveminutes", autosaveMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            GlobalOptions.Instance.SetCharacterAutosave(chkCharacterAutosave.Checked, autosaveMinutes);
 			objRegistry.SetValue("localisedupdatesonly", chkLocalisedUpdatesOnly.Checked.ToString());
 			objRegistry.SetValue("language", cboLanguage.SelectedValue.ToString());
 			objRegistry.SetValue("startupfullscreen", chkStartupFullscreen.Checked.ToString());

@@ -76,6 +76,7 @@ namespace Chummer
             _mnuCloseCharacter.Click += (_, _) => ActiveMdiChild?.Close();
             fileMenu.DropDownItems.Insert(5, _mnuCloseCharacter);
             InitializeCharacterRepositoryMenu();
+            InitializeCharacterAutosave();
             MdiChildActivate += (_, _) =>
             {
                 bool hasCharacter = ActiveMdiChild is frmCreate || ActiveMdiChild is frmCareer;

@@ -88,6 +88,21 @@ namespace Chummer
 
 		private frmMain _frmMainForm;
 
+        internal const int DefaultCharacterAutosaveMinutes = 5;
+        internal const int MaximumCharacterAutosaveMinutes = 1440;
+        internal bool CharacterAutosaveEnabled { get; private set; } = true;
+        internal int CharacterAutosaveMinutes { get; private set; } = DefaultCharacterAutosaveMinutes;
+        internal event Action CharacterAutosaveChanged;
+
+        internal void SetCharacterAutosave(bool enabled, int minutes)
+        {
+            int bounded = Math.Clamp(minutes, 1, MaximumCharacterAutosaveMinutes);
+            if (CharacterAutosaveEnabled == enabled && CharacterAutosaveMinutes == bounded) return;
+            CharacterAutosaveEnabled = enabled;
+            CharacterAutosaveMinutes = bounded;
+            CharacterAutosaveChanged?.Invoke();
+        }
+
 		private static bool _blnAutomaticUpdate = false;
 		private static bool _blnLocalisedUpdatesOnly = false;
 		private static bool _blnStartupFullscreen = false;
@@ -158,6 +173,12 @@ namespace Chummer
 		{
 			if (!Directory.Exists(MacPaths.SettingsDirectory))
 				Directory.CreateDirectory(MacPaths.SettingsDirectory);
+
+            var autosaveSettings = SettingsStore.CurrentUser.CreateSubKey(@"Software\Chummer");
+            bool autosave = !bool.TryParse(autosaveSettings.GetValue("characterautosave")?.ToString(), out bool enabled) || enabled;
+            int minutes = int.TryParse(autosaveSettings.GetValue("characterautosaveminutes")?.ToString(), out int parsed)
+                ? parsed : DefaultCharacterAutosaveMinutes;
+            Instance.SetCharacterAutosave(autosave, minutes);
 
 			// Automatic Update.
 			try
