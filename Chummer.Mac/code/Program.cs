@@ -15,7 +15,7 @@ namespace Chummer
         internal static bool IsNativeVerificationArgument(string argument) =>
             argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command" || argument == "--check-pdf-reader" || argument == "--check-cyberware" || argument == "--check-repository-saving" || argument == "--check-inventory-copy" || argument == "--check-weapon-deletion" || argument == "--check-lifestyle-months" || argument == "--check-vehicle-inputs" || argument == "--check-gear-inputs" ||
             argument is "--check-quality-trees" or "--check-dialog-trees" or "--check-character-trees" or
-                "--check-career-lists" or "--check-inventory-trees" or "--check-compact-spinners";
+                "--check-career-lists" or "--check-inventory-trees" or "--check-compact-spinners" or "--check-repository-portraits";
 
         /// <summary>
         /// The main entry point for the application.
