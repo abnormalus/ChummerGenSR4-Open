@@ -292,6 +292,9 @@ public partial class frmMain
             Height = 250,
             ItemTemplate = new FuncDataTemplate<RepositoryCharacterRow>((row, _) =>
             {
+                if (row == null)
+                    return new Border();
+
                 var initials = new TextBlock
                 {
                     Text = RepositoryPortrait.Initials(row.File.Name),

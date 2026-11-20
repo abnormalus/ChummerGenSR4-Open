@@ -60,7 +60,10 @@ internal static class NativeRepositoryPortraitChecks
             await pending;
             field.SetValue(owner, previous);
         }
-        check(server.Blobs == 2 && NativeDialogHost.Count == 0,
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+        check(server.Blobs == 2 && NativeDialogHost.Count == 0 &&
+            Majorsilence.Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner).IsEnabled &&
+            !Majorsilence.Forms.Application.OpenForms.OfType<Majorsilence.Forms.MessageBoxForm>().Any(),
             "Closing the picker releases ownership without reopening or redownloading a character");
     }
 
