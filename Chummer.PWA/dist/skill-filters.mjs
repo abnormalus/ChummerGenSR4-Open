@@ -8,6 +8,7 @@ export function filteredSkills(character,category='Active',positive=true){
  if(category==='Magic'&&!magicSkillsApply(character))category='Active';
  return character.skills.filter(skill=>{
   if(positive&&skill.pool<=0&&!(category==='Knowledge'&&nativeLanguage(skill)))return false;
+  if(category===null)return true;
   const knowledge=knowledgeSkill(skill),saved=value(skill.node,'skillcategory');
   if(category==='Knowledge')return knowledge;
   if(knowledge)return false;
