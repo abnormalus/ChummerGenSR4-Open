@@ -1,4 +1,4 @@
-import {value,children,child,truth,splitNotes} from './core.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
+import {value,children,child,truth,splitNotes} from './core.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
 export const citation=node=>[value(node,'source'),value(node,'page')&&'p. '+value(node,'page')].filter(Boolean).join(' ');
 export const named=node=>value(node,'name')+(value(node,'extra')?' ('+value(node,'extra')+')':'');
 export const native=skill=>skill.rating===0&&value(skill.node,'skillcategory')==='Language'&&truth(value(skill.node,'knowledge'));

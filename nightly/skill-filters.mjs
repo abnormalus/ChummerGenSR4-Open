@@ -1,4 +1,4 @@
-import {value,truth} from './core.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
+import {value,truth} from './core.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
 const KNOWLEDGE=new Set(['Academic','Interest','Interests','Language','Professional','Street']);
 export function knowledgeSkill(skill){return truth(value(skill.node,'knowledge'))||KNOWLEDGE.has(value(skill.node,'skillcategory'));}
 export const nativeLanguage=skill=>skill.rating===0&&value(skill.node,'skillcategory')==='Language';
@@ -8,6 +8,7 @@ export function filteredSkills(character,category='Active',positive=true){
  if(category==='Magic'&&!magicSkillsApply(character))category='Active';
  return character.skills.filter(skill=>{
   if(positive&&skill.pool<=0&&!(category==='Knowledge'&&nativeLanguage(skill)))return false;
+  if(category===null)return true;
   const knowledge=knowledgeSkill(skill),saved=value(skill.node,'skillcategory');
   if(category==='Knowledge')return knowledge;
   if(knowledge)return false;

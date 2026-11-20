@@ -1,14 +1,14 @@
-import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import * as db from './storage.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {GitHub} from './github.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {installController} from './install.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {existingCharacter,sameRemote} from './identity.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty,isGrenade,grenadeLots,ammunition,fireCounts,setActiveSlot,fireWeapon,reloadWeapon,useGrenade} from './weapons.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {armorRating,armorMods,armorProtections,defensePools} from './armor.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {augmentationEssence,augmentationEffects,augmentationChildren} from './augmentations.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {AutoSync} from './autosync.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
-import {filteredSkills,magicSkillsApply,skillRating,perceptionSense,perceptionDifferences} from './skill-filters.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
+import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import * as db from './storage.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {GitHub} from './github.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {installController} from './install.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {existingCharacter,sameRemote} from './identity.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty,isGrenade,grenadeLots,ammunition,fireCounts,setActiveSlot,fireWeapon,reloadWeapon,useGrenade} from './weapons.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {armorRating,armorMods,armorProtections,defensePools} from './armor.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {augmentationEssence,augmentationEffects,augmentationChildren} from './augmentations.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {AutoSync} from './autosync.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {filteredSkills,magicSkillsApply,skillRating,perceptionSense,perceptionDifferences} from './skill-filters.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=true,skillCategory='Active',client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -86,7 +86,7 @@ function render(){
     if(skillCategory==='Magic'&&!magicSkillsApply(character))skillCategory='Active';
     const controls=el('div',undefined,'skills-filters');controls.setAttribute('role','group');controls.setAttribute('aria-label','Skill filters');
     const filter=button('Pool > 0',()=>{positive=!positive;render();});filter.setAttribute('aria-pressed',positive);controls.append(filter);
-    for(const category of ['Combat','Active','Knowledge',...(magicSkillsApply(character)?['Magic']:[])]){const b=button(category,()=>{skillCategory=category;render();});b.setAttribute('aria-pressed',skillCategory===category);controls.append(b);}
+    for(const category of ['Combat','Active','Knowledge',...(magicSkillsApply(character)?['Magic']:[])]){const b=button(category,()=>{skillCategory=skillCategory===category?null:category;render();});b.setAttribute('aria-pressed',skillCategory===category);controls.append(b);}
     const skills=section('Skills',controls);skills.querySelector('h2').classList.add('skills-heading');
     for(const skill of filteredSkills(character,skillCategory,positive)){if(perceptionSense(skill)&&character.skills.some(s=>s.name==='Perception'))continue;row(skills,skill.name,input(skillRating(skill),v=>character.setSkillRating(skill.index,value(skill.node,'skillcategory')==='Language'&&v.trim().toUpperCase()==='N'?0:v),skill.name+' rating'),'Pool '+skill.pool);if(skill.name==='Perception')for(const sense of perceptionDifferences(character,skill)){const line=row(skills,sense.name,'Pool '+sense.pool);line.classList.add('skill-sense');}}
 
@@ -179,7 +179,7 @@ function printCharacter(official){
   $('print-status').textContent='Preparing PDF…';
   for(const id of ['print-full','print-official'])$(id).disabled=true;
   try{
-   await flush();const {characterPDF}=await import('./printing.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786');const bytes=await characterPDF(snapshot,{official});
+   await flush();const {characterPDF}=await import('./printing.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff');const bytes=await characterPDF(snapshot,{official});
    if(printURL)URL.revokeObjectURL(printURL);
    printURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
    const filename=snapshot.title.replace(/[^\p{L}\p{N} ._-]/gu,'_')+(official?' - Official SR4A':' - Full character')+'.pdf';

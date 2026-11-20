@@ -1,4 +1,4 @@
-import {armorState,importedArmorPenalty,armorEffectActive} from './armor.mjs?v=06bad7213560d75eac7b9d46e0d50224a1e32786';
+import {armorState,importedArmorPenalty,armorEffectActive} from './armor.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
 export const MAX_BYTES = 32 * 1024 * 1024;
 const encoder = new TextEncoder();
 export const integer = (value, fallback = 0) => /^-?\d+$/.test(String(value).trim()) && Number.isSafeInteger(Number(value)) ? Number(value) : fallback;
