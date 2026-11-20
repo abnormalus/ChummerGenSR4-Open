@@ -29,6 +29,13 @@ try{
  await skillHeader.getByRole('button',{name:'Active',exact:true}).click();
  for(const width of [390,820]){await page.setViewportSize({width,height:1000});const fits=await skillHeader.evaluate(node=>node.scrollWidth<=node.clientWidth+1);if(!fits)throw Error('Skill filters overflow at '+width);}
  await page.setViewportSize({width:1280,height:900});
+ await skillHeader.getByRole('button',{name:'Active',exact:true}).click();
+ if(await skillHeader.getByRole('button',{name:'Active',exact:true}).getAttribute('aria-pressed')!=='false')throw Error('Category cannot toggle off');
+ await skillHeader.getByRole('button',{name:'Pool > 0',exact:true}).click();
+ if(!await page.getByLabel('Astral Combat rating',{exact:true}).isVisible())throw Error('All-off hides zero-pool skills');
+ await skillHeader.getByRole('button',{name:'Pool > 0',exact:true}).click();
+ await skillHeader.getByRole('button',{name:'Active',exact:true}).click();
+ console.log('PASS all skill filters can toggle off and restore independently');
  console.log('PASS skill header defaults, category controls and phone/tablet fit');
 
  await page.getByLabel('Essence',{exact:true}).fill('5.75');

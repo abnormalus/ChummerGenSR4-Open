@@ -86,7 +86,7 @@ function render(){
     if(skillCategory==='Magic'&&!magicSkillsApply(character))skillCategory='Active';
     const controls=el('div',undefined,'skills-filters');controls.setAttribute('role','group');controls.setAttribute('aria-label','Skill filters');
     const filter=button('Pool > 0',()=>{positive=!positive;render();});filter.setAttribute('aria-pressed',positive);controls.append(filter);
-    for(const category of ['Combat','Active','Knowledge',...(magicSkillsApply(character)?['Magic']:[])]){const b=button(category,()=>{skillCategory=category;render();});b.setAttribute('aria-pressed',skillCategory===category);controls.append(b);}
+    for(const category of ['Combat','Active','Knowledge',...(magicSkillsApply(character)?['Magic']:[])]){const b=button(category,()=>{skillCategory=skillCategory===category?null:category;render();});b.setAttribute('aria-pressed',skillCategory===category);controls.append(b);}
     const skills=section('Skills',controls);skills.querySelector('h2').classList.add('skills-heading');
     for(const skill of filteredSkills(character,skillCategory,positive)){if(perceptionSense(skill)&&character.skills.some(s=>s.name==='Perception'))continue;row(skills,skill.name,input(skillRating(skill),v=>character.setSkillRating(skill.index,value(skill.node,'skillcategory')==='Language'&&v.trim().toUpperCase()==='N'?0:v),skill.name+' rating'),'Pool '+skill.pool);if(skill.name==='Perception')for(const sense of perceptionDifferences(character,skill)){const line=row(skills,sense.name,'Pool '+sense.pool);line.classList.add('skill-sense');}}
 
