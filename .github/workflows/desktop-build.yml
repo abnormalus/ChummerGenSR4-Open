@@ -61,9 +61,51 @@ jobs:
     needs: plan
     if: needs.plan.outputs.run_desktop == 'true'
     uses: ./.github/workflows/dependency-audit.yml
-  package:
-    needs: [checks, dependency-audit]
+  package-macos:
+    needs: [plan, checks, dependency-audit]
+    if: github.event_name != 'pull_request' || contains(fromJSON(needs.plan.outputs.platforms), 'macos-latest')
     runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Package and verify macos download
+        run: bash scripts/package-nightly.sh artifacts/nightly macos
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nightly-assets-macos
+          path: artifacts/nightly/assets
+          if-no-files-found: error
+  acceptance-macos:
+    name: package-acceptance (macos-latest)
+    needs: package-macos
+    runs-on: macos-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: nightly-assets-macos
+          path: artifacts/candidate
+      - name: Verify installed candidate and package lifecycle
+        shell: pwsh
+        run: ./scripts/test-installed-package.ps1 -Assets artifacts/candidate -ExpectedSource '${{ github.sha }}' -Output artifacts/package-acceptance
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: package-acceptance-macos-latest
+          path: artifacts/package-acceptance
+          if-no-files-found: error
+          retention-days: 14
+  package-windows:
+    needs: [plan, checks, dependency-audit]
+    if: github.event_name != 'pull_request' || contains(fromJSON(needs.plan.outputs.platforms), 'windows-latest')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,32 +114,26 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Install MSI tools
-        run: brew install msitools
-      - name: Package and verify both desktop downloads
-        run: bash scripts/package-nightly.sh artifacts/nightly
+        run: sudo apt-get update && sudo apt-get install -y msitools wixl
+      - name: Package and verify windows download
+        run: bash scripts/package-nightly.sh artifacts/nightly windows
       - uses: actions/upload-artifact@v7
         with:
-          name: nightly-assets
+          name: nightly-assets-windows
           path: artifacts/nightly/assets
           if-no-files-found: error
-  package-acceptance:
-    needs: [plan, package]
-    strategy:
-      fail-fast: false
-      matrix:
-        # Published downloads both need their own installed check. PRs can reuse
-        # a passing result for an unchanged platform.
-        os: ${{ fromJSON(github.event_name == 'pull_request' && needs.plan.outputs.platforms || '["macos-latest","windows-latest"]') }}
-    runs-on: ${{ matrix.os }}
+  acceptance-windows:
+    name: package-acceptance (windows-latest)
+    needs: package-windows
+    runs-on: windows-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          name: nightly-assets
+          name: nightly-assets-windows
           path: artifacts/candidate
       - name: Ensure native Windows browser runtime
-        if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/ensure-webview2.ps1
       - name: Verify installed candidate and package lifecycle
@@ -106,7 +142,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: package-acceptance-${{ matrix.os }}
+          name: package-acceptance-windows-latest
           path: artifacts/package-acceptance
           if-no-files-found: error
           retention-days: 14
@@ -115,7 +151,7 @@ jobs:
     concurrency:
       group: chummer-release-assets
       cancel-in-progress: false
-    needs: [package, package-acceptance]
+    needs: [acceptance-macos, acceptance-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -125,8 +161,19 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v8
         with:
-          name: nightly-assets
-          path: assets
+          pattern: nightly-assets-*
+          path: candidates
+      - name: Assemble verified release assets
+        run: |
+          set -euo pipefail
+          mac=candidates/nightly-assets-macos
+          windows=candidates/nightly-assets-windows
+          (cd "$mac" && sha256sum --check SHA256SUMS.txt)
+          (cd "$windows" && sha256sum --check SHA256SUMS.txt)
+          cmp "$mac/BUILD.txt" "$windows/BUILD.txt"
+          mkdir assets
+          cp "$mac/BUILD.txt" "$mac/ChummerSR4-macOS-arm64.zip" "$windows/ChummerSR4-Windows-x64.msi" "$windows/ChummerSR4-Windows-x64-portable.zip" assets/
+          (cd assets && sha256sum BUILD.txt ChummerSR4-macOS-arm64.zip ChummerSR4-Windows-x64.msi ChummerSR4-Windows-x64-portable.zip > SHA256SUMS.txt)
       - name: Publish Nightly
         env:
           GH_TOKEN: ${{ github.token }}
