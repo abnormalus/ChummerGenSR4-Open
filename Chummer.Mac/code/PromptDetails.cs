@@ -49,7 +49,7 @@ namespace Chummer
                 improvement.ImprovedName = value;
         }
 
-        internal static void Attach(Form owner, Character character, TreeView tree, Func<string, Quality> findQuality,
+        internal static Action Attach(Form owner, Character character, TreeView tree, Func<string, Quality> findQuality,
             Func<string, Gear> findGear, Action changed, params ContextMenuStrip[] menus)
         {
             if (findQuality != null)
@@ -97,6 +97,7 @@ namespace Chummer
             }
             tree.NodeMouseDoubleClick += (_, args) => { tree.SelectedNode = args.Node; Edit(); };
             tree.NodeMouseClick += (_, args) => { if (args.Button == MouseButtons.Right) tree.SelectedNode = args.Node; };
+            return Edit;
         }
     }
 }

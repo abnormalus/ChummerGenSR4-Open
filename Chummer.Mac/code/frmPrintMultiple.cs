@@ -33,6 +33,7 @@ namespace Chummer
 		public frmPrintMultiple()
 		{
 			InitializeComponent();
+            Load += (_, _) => NativeEditorTree.Attach(this, treCharacters, "NativetreCharacters", Text);
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			MoveControls();
             batchStatus = new Label { Left = prgProgress.Left, Top = prgProgress.Bottom + 6,

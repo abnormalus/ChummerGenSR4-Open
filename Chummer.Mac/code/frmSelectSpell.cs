@@ -25,6 +25,7 @@ namespace Chummer
 		public frmSelectSpell(Character objCharacter)
         {
             InitializeComponent();
+            Load += (_, _) => NativeEditorTree.Attach(this, treSpells, "NativetreSpells", Text);
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 

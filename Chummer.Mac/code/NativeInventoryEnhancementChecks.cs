@@ -4,6 +4,9 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Xml;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Threading;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -74,6 +77,7 @@ internal static class NativeInventoryEnhancementChecks
                     var weapon = new Weapon(character); var node = new Forms.TreeNode();
                     var definition = catalog.SelectNodes("/chummer/weapons/weapon")!.Cast<XmlNode>().First(item => item["name"]?.InnerText == name);
                     weapon.Create(definition, character, node, null, null, null);
+                    node.ContextMenuStrip = Field<Forms.ContextMenuStrip>(editor, "cmsWeapon");
                     character.Weapons.Add(weapon); weaponTree.Nodes[0].Nodes.Add(node); weaponTree.SelectedNode = node;
                     return weapon;
                 }
@@ -182,7 +186,17 @@ internal static class NativeInventoryEnhancementChecks
                     "Native " + mode + " cancelling a configured quantity does not buy any units");
                 var menu = Field<Forms.ContextMenuStrip>(editor, "cmsWeapon");
                 var command = menu.Items.OfType<Forms.ToolStripMenuItem>().Single(item => item.Name == "buyWeaponAmmunition");
-                menu.Show(weaponTree, new System.Drawing.Point(8, 8)); menu.Hide();
+                async Task OpenWeaponContextAsync()
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    var host = main.Controls.OfType<Forms.NativeControlHost>()
+                        .Single(item => item.Name == (career ? "NativeCareerWeapons" : "NativeCreationWeapons"));
+                    var tree = (TreeView)host.NativeControl!;
+                    var selected = (TreeViewItem)tree.SelectedItem!;
+                    selected.RaiseEvent(new ContextRequestedEventArgs { RoutedEvent = InputElement.ContextRequestedEvent });
+                    menu.Hide();
+                }
+                await OpenWeaponContextAsync();
                 if (!command.Visible) throw new InvalidOperationException("Ranged weapon ammunition command is unavailable.");
                 gearTree.SelectedNode = linkNode;
                 int beforeCount = character.Gear.Count, beforeMoney = character.Nuyen;
@@ -209,7 +223,7 @@ internal static class NativeInventoryEnhancementChecks
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => NativeDialogHost.ActiveWindow!.Close());
                 command.PerformClick();
                 weaponTree.SelectedNode = weaponTree.Nodes[0].Nodes.Cast<Forms.TreeNode>().Single(node => node.Tag?.ToString() == axe.InternalId);
-                menu.Show(weaponTree, new System.Drawing.Point(8, 8)); menu.Hide();
+                await OpenWeaponContextAsync();
                 check(character.Gear.Count == beforeCount && character.Nuyen == beforeMoney && !command.Visible,
                     "Native " + mode + " cancelled ammo purchase changes nothing and melee weapons hide the command");
 

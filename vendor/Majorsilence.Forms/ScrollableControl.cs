@@ -277,6 +277,14 @@ namespace Majorsilence.Forms
         internal int ViewportWidth
             => Math.Max (0, base.DisplayRectangle.Width - (vscrollbar.Visible ? vscrollbar.Width : 0) - Padding.Horizontal);
 
+        internal Rectangle GetContentViewport ()
+        {
+            var client = base.DisplayRectangle;
+            client.Width = Math.Max (0, client.Width - (vscrollbar.Visible ? vscrollbar.Width : 0));
+            client.Height = Math.Max (0, client.Height - (hscrollbar.Visible ? hscrollbar.Height : 0));
+            return LayoutUtils.DeflateRect (client, Padding);
+        }
+
         /// <inheritdoc/>
         /// <remarks>
         /// <para>

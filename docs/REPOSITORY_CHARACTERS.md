@@ -16,6 +16,8 @@ It uses the same default `characters/` directory and GitHub file revision as the
    same repository in GitHub, then paste the replacement into Chummer.
 3. Use **Open from Repository…** to open a linked working copy. Use
    **Save to Repository…** to link an existing local character for the first time.
+   The Open list shows embedded portrait thumbnails beside filenames as they load.
+   Files without a usable embedded portrait show initials.
    Ordinary **Save** then syncs the current revision to GitHub without a success popup.
    **Save As** creates a local copy and switches the editor to that copy.
 4. In **Options → Global**, enable or disable **Autosave characters** and set its

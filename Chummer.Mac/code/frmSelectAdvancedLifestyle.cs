@@ -26,6 +26,8 @@ namespace Chummer
 		public frmSelectAdvancedLifestyle(Lifestyle objLifestyle, Character objCharacter)
 		{
 			InitializeComponent();
+            Load += (_, _) => NativeEditorTree.Attach(this, trePositiveQualities, "NativetrePositiveQualities", LanguageManager.Instance.GetString("Node_SelectedPositiveQualities"));
+            Load += (_, _) => NativeEditorTree.Attach(this, treNegativeQualities, "NativetreNegativeQualities", LanguageManager.Instance.GetString("Node_SelectedNegativeQualities"));
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 			_objLifestyle = objLifestyle;

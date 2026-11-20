@@ -7,9 +7,16 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Templates;
+using Avalonia.Data.Converters;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Markup.Xaml.MarkupExtensions;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Majorsilence.Forms;
 using Button = Avalonia.Controls.Button;
@@ -269,26 +276,69 @@ public partial class frmMain
         }
     }
 
-    private async Task OpenRepositoryAsync()
+    internal async Task OpenRepositoryAsync()
     {
         var repository = characterRepository!;
         var panel = RepositoryPanel();
         var dialog = RepositoryDialog($"Open from {repository.Name}", panel);
         var search = new TextBox { PlaceholderText = "Search filenames", IsEnabled = false };
         var status = RepositoryLabel("Loading characters…");
-        var list = new ListBox { Height = 250, DisplayMemberBinding = new Avalonia.Data.Binding(nameof(RepositoryFile.Name)) };
+        using var previews = new CancellationTokenSource();
+        var cancellation = previews.Token;
+        RepositoryCharacterRow[] rows = [];
+        var list = new ListBox
+        {
+            Name = "RepositoryCharacterList",
+            Height = 250,
+            ItemTemplate = new FuncDataTemplate<RepositoryCharacterRow>((row, _) =>
+            {
+                if (row == null)
+                    return new Border();
+
+                var initials = new TextBlock
+                {
+                    Text = RepositoryPortrait.Initials(row.File.Name),
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var image = new Avalonia.Controls.Image { Width = 36, Height = 36, Stretch = Stretch.UniformToFill };
+                image.Bind(Avalonia.Controls.Image.SourceProperty, new Avalonia.Data.Binding(nameof(RepositoryCharacterRow.Portrait)) { Source = row });
+                initials.Bind(Visual.IsVisibleProperty, new Avalonia.Data.Binding(nameof(RepositoryCharacterRow.Portrait))
+                    { Source = row, Converter = ObjectConverters.IsNull });
+                var avatar = new Border
+                {
+                    Name = "RepositoryCharacterAvatar",
+                    Width = 36,
+                    Height = 36,
+                    ClipToBounds = true,
+                    CornerRadius = new CornerRadius(5),
+                    Child = new Grid { Children = { initials, image } }
+                };
+                return new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 10,
+                    Children = { avatar, new TextBlock { Text = row.File.Name, VerticalAlignment = VerticalAlignment.Center } }
+                };
+            })
+        };
+        list.Styles.Add(new Style(selector => selector.OfType<Border>().Name("RepositoryCharacterAvatar"))
+        {
+            Setters = { new Setter(Border.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush")) }
+        });
         var open = new Button { Content = "Open working copy", IsDefault = true, IsEnabled = false };
         var history = new Button { Content = "View file history in GitHub", IsEnabled = false };
         panel.Children.Add(search);
         panel.Children.Add(list);
         panel.Children.Add(status);
         panel.Children.Add(open);
-        open.Click += (_, _) => { if (list.SelectedItem is RepositoryFile file) dialog.Close(file); };
+        open.Click += (_, _) => { if (list.SelectedItem is RepositoryCharacterRow row) dialog.Close(row.File); };
         panel.Children.Add(history);
-        list.SelectionChanged += (_, _) => history.IsEnabled = open.IsEnabled = list.SelectedItem is RepositoryFile;
+        list.SelectionChanged += (_, _) => history.IsEnabled = open.IsEnabled = list.SelectedItem is RepositoryCharacterRow;
         history.Click += (_, _) =>
         {
-            if (list.SelectedItem is not RepositoryFile file) return;
+            if (list.SelectedItem is not RepositoryCharacterRow row) return;
+            var file = row.File;
             string path = string.Join("/", file.Path.Split('/').Select(Uri.EscapeDataString));
             string branch = Uri.EscapeDataString(repository.Branch);
             string url = $"https://github.com/{repository.Name}/commits/{branch}/{path}";
@@ -302,10 +352,11 @@ public partial class frmMain
             {
                 var files = await repository.ListAsync();
                 if (!dialog.IsVisible) return;
+                rows = files.Select(file => new RepositoryCharacterRow(file)).ToArray();
                 void Filter()
                 {
-                    var matches = files.Where(file =>
-                        file.Name.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)).ToArray();
+                    var matches = rows.Where(row =>
+                        row.File.Name.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)).ToArray();
                     list.ItemsSource = matches;
                     status.Text = files.Count == 0 ? "This folder contains no .chum files." :
                         matches.Length == 0 ? "No matching characters." : $"{matches.Length} character files";
@@ -313,6 +364,30 @@ public partial class frmMain
                 search.TextChanged += (_, _) => Filter();
                 search.IsEnabled = true;
                 Filter();
+                await Parallel.ForEachAsync(rows, new ParallelOptions
+                {
+                    CancellationToken = cancellation,
+                    MaxDegreeOfParallelism = 3
+                }, async (row, token) =>
+                {
+                    if (row.File.Size > RepositoryPortrait.MaximumCharacterBytes)
+                        return;
+                    try
+                    {
+                        var bytes = await repository.DownloadBlobAsync(row.File, token);
+                        if (RepositoryPortrait.ReadThumbnail(bytes) is { } png)
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                if (!cancellation.IsCancellationRequested)
+                                    row.SetPortrait(png);
+                            });
+                    }
+                    catch (Exception error) when (error is IOException or HttpRequestException or OperationCanceledException
+                        or JsonException or FormatException or InvalidOperationException or System.Collections.Generic.KeyNotFoundException)
+                    {
+                        // The filename and initials remain usable if an optional preview fails.
+                    }
+                });
             }
             catch (RepositoryTokenExpiredException)
             {
@@ -328,6 +403,10 @@ public partial class frmMain
         };
 
         var selected = await NativeDialogHost.ShowAsync<RepositoryFile>(dialog, this);
+        previews.Cancel();
+        list.ItemsSource = null;
+        foreach (var row in rows)
+            row.Dispose();
         if (requiresRenewal) throw new RepositoryTokenExpiredException();
         if (selected == null) return;
         var bytes = await repository.DownloadAsync(selected);

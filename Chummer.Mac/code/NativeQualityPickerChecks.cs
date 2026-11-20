@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -11,6 +12,7 @@ using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -28,6 +30,102 @@ internal static class NativeQualityPickerChecks
             await Task.Delay(20);
         }
     }
+    internal static async Task CheckEditorTreeAsync(Forms.Form owner, Character fixture, bool career, Action<bool, string> check, string? snapshots = null)
+    {
+        var character = new Character();
+        character.LoadSnapshot(fixture.CaptureSnapshot());
+        character.Created = career;
+        using Forms.Form editor = career ? new frmCareer(character) : new frmCreate(character);
+        editor.MdiParent = owner;
+        editor.Show();
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        T Field<T>(string name) => (T)editor.GetType().GetField(name, flags)!.GetValue(editor)!;
+
+        Field<Forms.TabControl>("tabCharacterTabs").SelectedTab = Field<Forms.TabPage>("tabCommon");
+        var source = Field<Forms.TreeView>("treQualities");
+        string editorName = career ? "Career" : "Creation";
+        var host = owner.Controls.OfType<Forms.NativeControlHost>().Single(item => item.Name == $"Native{editorName}Qualities");
+        var tree = (TreeView)host.NativeControl!;
+        await WaitForAsync(() => host.Visible && TopLevel.GetTopLevel(tree) != null && tree.Bounds.Height > 0);
+        if (!career)
+        {
+            var attributes = Field<Forms.Panel>("panAttributes");
+            var anchor = Field<Forms.TabPage>("tabCommon");
+            check(tree.Bounds.Width + source.Left < attributes.Left && attributes.Parent == anchor,
+                "Creation Qualities fit in the column before the Attributes viewport");
+        }
+        check(source.Parent == null && tree.Items.Count == source.Nodes.Count, $"{editorName} qualities use a visible native tree");
+
+        byte[] before = character.CaptureSnapshot();
+        var root = (TreeViewItem)tree.Items[0]!;
+        var menu = Field<Forms.ContextMenuStrip>("cmsQuality");
+        var node = new Forms.TreeNode
+        {
+            Text = "Synthetic quality",
+            ToolTipText = "Synthetic notes",
+            ContextMenuStrip = menu
+        };
+        source.Nodes[0].Nodes.Add(node);
+        source.Nodes[0].Expand();
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        var row = root.Items.OfType<TreeViewItem>().Single(item => ReferenceEquals(item.Tag, node));
+        check(root.IsExpanded && (string)row.Header! == node.Text && (string)ToolTip.GetTip(row)! == node.ToolTipText,
+            $"{editorName} qualities display an inserted item with its caption and notes");
+
+        tree.SelectedItem = row;
+        check(source.SelectedNode == node, "Native quality selection sets the command target by node identity");
+        bool opening = false;
+        void ObserveMenu(object? sender, System.ComponentModel.CancelEventArgs args)
+        {
+            opening = source.SelectedNode == node;
+            args.Cancel = true;
+        }
+        menu.Opening += ObserveMenu;
+        try
+        {
+            row.RaiseEvent(new ContextRequestedEventArgs { RoutedEvent = InputElement.ContextRequestedEvent });
+            check(opening, "Keyboard context request routes to the existing menu for the selected quality");
+        }
+        finally { menu.Opening -= ObserveMenu; }
+
+        if (snapshots != null)
+        {
+            var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);
+            var app = Application.Current!;
+            var previousTheme = app.RequestedThemeVariant;
+            try
+            {
+                foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                {
+                    app.RequestedThemeVariant = theme;
+                    await WaitForAsync(() => tree.ActualThemeVariant == theme);
+                    await Task.Delay(120);
+                    await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    using var bitmap = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width * 2,
+                        (int)window.ClientSize.Height * 2), new Vector(192, 192));
+                    bitmap.Render(window);
+                    bitmap.Save(Path.Combine(snapshots, $"qualities-{editorName.ToLowerInvariant()}-{theme.Key}.png"),
+                        PngBitmapEncoderOptions.Default);
+                }
+            }
+            finally { app.RequestedThemeVariant = previousTheme; }
+        }
+
+        node.Text = "Renamed synthetic quality";
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        check(ReferenceEquals(tree.SelectedItem, row) && (string)row.Header! == node.Text,
+            "A quality caption refresh preserves the selected native row");
+        root.IsExpanded = false;
+        check(!source.Nodes[0].IsExpanded, "Native quality collapse is reflected in the command tree");
+        node.Remove();
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        check(!root.Items.Contains(row) && !ReferenceEquals(tree.SelectedItem, row) &&
+            character.CaptureSnapshot().SequenceEqual(before),
+            "Removing the selected presentation row clears its identity without altering the character");
+        editor.Close();
+        check(!owner.Controls.Contains(host), $"Closing {editorName} disposes the native quality tree host");
+    }
+
     internal static async Task RunAsync(Forms.Form owner, Character source, string output, Action<bool, string> check)
     {
         var nativeOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner);

@@ -9,6 +9,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Chummer;
@@ -18,7 +19,7 @@ internal sealed record RepositoryRevision(long RepositoryId, string Branch, stri
 internal sealed class RepositoryTokenExpiredException() :
     IOException("The GitHub token has expired or was revoked. Create a new token to reconnect.");
 
-internal sealed record RepositoryFile(string Name, string Path, string Sha);
+internal sealed record RepositoryFile(string Name, string Path, string Sha, long Size = 0);
 
 internal sealed class CharacterRepository
 {
@@ -70,7 +71,7 @@ internal sealed class CharacterRepository
         string.Join("/", path.Split('/').Select(Uri.EscapeDataString));
 
     private async Task<JsonDocument?> RequestAsync(HttpMethod method, string path, object? body = null,
-        bool allowMissing = false)
+        bool allowMissing = false, CancellationToken cancellation = default)
     {
         using var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -79,7 +80,7 @@ internal sealed class CharacterRepository
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
         if (body != null) request.Content = JsonContent.Create(body);
 
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, cancellation);
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new RepositoryTokenExpiredException();
         if (response.Headers.TryGetValues("GitHub-Authentication-Token-Expiration", out var expiration) &&
@@ -101,7 +102,7 @@ internal sealed class CharacterRepository
                 _ => $"GitHub returned HTTP {(int)response.StatusCode}."
             });
         }
-        return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellation), cancellationToken: cancellation);
     }
 
     internal async Task VerifyAsync()
@@ -133,7 +134,8 @@ internal sealed class CharacterRepository
             .Where(item => item.GetProperty("type").GetString() == "file")
             .Where(item => item.GetProperty("name").GetString()!.EndsWith(".chum", StringComparison.OrdinalIgnoreCase))
             .Select(item => new RepositoryFile(item.GetProperty("name").GetString()!,
-                item.GetProperty("path").GetString()!, item.GetProperty("sha").GetString()!))
+                item.GetProperty("path").GetString()!, item.GetProperty("sha").GetString()!,
+                item.TryGetProperty("size", out var size) && size.TryGetInt64(out long bytes) ? bytes : 0))
             .OrderBy(file => file.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
@@ -141,9 +143,15 @@ internal sealed class CharacterRepository
     internal async Task<byte[]> DownloadAsync(RepositoryFile file)
     {
         await VerifyAsync();
+        return await DownloadBlobAsync(file, CancellationToken.None);
+    }
+
+    // The picker obtains these file revisions from ListAsync, which already verifies the repository.
+    internal async Task<byte[]> DownloadBlobAsync(RepositoryFile file, CancellationToken cancellation)
+    {
         if (file.Sha.Length != 40 || !file.Sha.All(char.IsAsciiHexDigit))
             throw new IOException("GitHub returned an invalid character revision.");
-        using var document = await RequestAsync(HttpMethod.Get, route + "/git/blobs/" + file.Sha);
+        using var document = await RequestAsync(HttpMethod.Get, route + "/git/blobs/" + file.Sha, cancellation: cancellation);
         var item = document!.RootElement;
         if (item.GetProperty("sha").GetString() != file.Sha)
             throw new IOException("GitHub returned a different character revision.");
