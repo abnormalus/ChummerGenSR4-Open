@@ -1,3 +1,4 @@
+import {armorState,importedArmorPenalty,armorEffectActive} from './armor.mjs';
 export const MAX_BYTES = 32 * 1024 * 1024;
 const encoder = new TextEncoder();
 export const integer = (value, fallback = 0) => /^-?\d+$/.test(String(value).trim()) && Number.isSafeInteger(Number(value)) ? Number(value) : fallback;
@@ -35,7 +36,7 @@ export function splitNotes(text) {
   if (metadata.version !== 1) throw new Error('This dossier notes version is not supported yet.');
   return { plain: text.slice(0, start) + text.slice(end + END.length), metadata, envelope: text.slice(start, end + END.length) };
 }
-function arithmetic(input) {
+export function arithmetic(input) {
   if (input.length > 256) return null;
   const source = input.replace(/\s/g, ''); let index = 0;
   function factor() {
@@ -75,8 +76,10 @@ export class Character {
   get plainNotes() { return splitNotes(this.get('notes')).plain; }
   setPlainNotes(text) { const notes = splitNotes(this.get('notes')); this.set('notes', text + notes.envelope); }
   rows(collection, item) { const container = child(this.root, collection); return container ? children(container, item) : []; }
-  get attributes() { return this.rows('attributes', 'attribute').map(node => ({ node, id: value(node, 'name'), base: integer(value(node, 'value')), total: integer(value(node, 'totalvalue'), integer(value(node, 'value'))) })); }
+  get attributes() { return this.rows('attributes', 'attribute').map(node => ({ node, id: value(node, 'name'), base: integer(value(node, 'value')), total: value(node,'name')==='ESS'?Number(this.essence):integer(value(node, 'totalvalue'), integer(value(node, 'value'))) + this.armorDelta(value(node,'name')) })); }
   total(id) { return this.attributes.find(attribute => attribute.id === id)?.total ?? 0; }
+  get armor() { if(this._armorRevision!==this.revision){this._armorCache=armorState(this);this._armorRevision=this.revision;}return this._armorCache; }
+  armorDelta(id) { return ['AGI','REA'].includes(id)?this.armor.penalty-importedArmorPenalty(this,id):0; }
   get essence() { return this.get('totaless') || '6'; }
   setAttribute(id, key, text) {
     const attribute = this.attributes.find(attribute => attribute.id === id); if (!attribute) return;
@@ -84,14 +87,14 @@ export class Character {
     const parsed = integer(text, NaN);
     if (!Number.isInteger(parsed)) { this.setNode(attribute.node, key === 'base' ? 'value' : 'totalvalue', text); return; }
     const delta = parsed - attribute[key];
-    this.setNode(attribute.node, key === 'base' ? 'value' : 'totalvalue', parsed);
-    if (key === 'base') this.setNode(attribute.node, 'totalvalue', attribute.total + delta);
+    this.setNode(attribute.node, key === 'base' ? 'value' : 'totalvalue', key==='base'?parsed:parsed-this.armorDelta(id));
+    if (key === 'base') this.setNode(attribute.node, 'totalvalue', attribute.total + delta-this.armorDelta(id));
     for (const skill of priorSkills.filter(skill => skill.attribute === id)) this.setSkillPool(skill.index, skill.pool + delta);
   }
   get magician() { return truth(this.get('magician')); }
   get adept() { return truth(this.get('adept')); }
   get technomancer() { return truth(this.get('resenabled')) || truth(this.get('technomancerenabled')); }
-  get improvements() { return this.rows('improvements', 'improvement').filter(node => !/^false$/i.test(value(node, 'enabled'))); }
+  get improvements() { return this.rows('improvements', 'improvement').filter(node => !/^false$/i.test(value(node, 'enabled'))&&armorEffectActive(this,node)); }
   improvement(type) {
     const rows = this.improvements.filter(node => value(node, 'improvementttype') === type && !truth(value(node, 'addtorating')) && !(this.technomancer && type === 'MatrixInitiativePass' && value(node, 'improvementsource') === 'Gear'));
     const sum = entries => {
@@ -114,10 +117,10 @@ export class Character {
     const wounds = this.wounds, imported = this.importedWounds;
     return this.rows('skills', 'skill').map((node, index) => {
       const rating = integer(value(node, 'rating')), attribute = value(node, 'attribute'), fallback = this.total(attribute) + (rating === 0 && truth(value(node, 'default')) ? -1 : rating);
-      return { node, index, name: value(node, 'name'), attribute, rating, pool: Math.max(0, child(node, 'totalvalue') ? integer(value(node, 'totalvalue'), fallback) - imported + wounds : fallback + wounds) };
+      return { node, index, name: value(node, 'name'), attribute, rating, pool: Math.max(0, child(node, 'totalvalue') ? integer(value(node, 'totalvalue'), fallback-this.armorDelta(attribute)) - imported + wounds + this.armorDelta(attribute) : fallback + wounds) };
     });
   }
-  setSkillPool(index, pool) { this.setNode(this.rows('skills', 'skill')[index], 'totalvalue', integer(pool) - this.wounds + this.importedWounds); }
+  setSkillPool(index, pool) { this.setNode(this.rows('skills', 'skill')[index], 'totalvalue', integer(pool) - this.wounds + this.importedWounds-this.armorDelta(value(this.rows('skills','skill')[index],'attribute'))); }
   setSkillRating(index, rating) {
     const priorSkills = this.skills, prior = priorSkills[index], n = integer(rating, NaN);
     this.setNode(prior.node, 'rating', rating);

@@ -1,0 +1,2 @@
+// Saved Chummer augmentation grade multipliers.
+export const grades={"Cyberware":{"Standard":1.0,"Standard (Adapsin)":0.9,"Standard (Second-Hand)":1.2,"Standard (Second-Hand) (Adapsin)":1.1,"Alphaware":0.8,"Alphaware (Adapsin)":0.7,"Alphaware (Second-Hand)":0.96,"Alphaware (Second-Hand) (Adapsin)":0.86,"Betaware":0.7,"Betaware (Adapsin)":0.6,"Deltaware":0.5,"Deltaware (Adapsin)":0.4},"Bioware":{"Standard":1.0,"Standard (Second-Hand)":1.2,"Alphaware":0.8,"Betaware":0.7,"Deltaware":0.5}};
