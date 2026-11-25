@@ -13,6 +13,7 @@ using Avalonia.LogicalTree;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -45,7 +46,8 @@ internal static class NativeQualityPickerChecks
         var source = Field<Forms.TreeView>("treQualities");
         string editorName = career ? "Career" : "Creation";
         var host = owner.Controls.OfType<Forms.NativeControlHost>().Single(item => item.Name == $"Native{editorName}Qualities");
-        var tree = (TreeView)host.NativeControl!;
+        var layout = (DockPanel)host.NativeControl!;
+        var tree = layout.Children.OfType<TreeView>().Single();
         await WaitForAsync(() => host.Visible && TopLevel.GetTopLevel(tree) != null && tree.Bounds.Height > 0);
         if (!career)
         {
@@ -55,6 +57,35 @@ internal static class NativeQualityPickerChecks
                 "Creation Qualities fit in the column before the Attributes viewport");
         }
         check(source.Parent == null && tree.Items.Count == source.Nodes.Count, $"{editorName} qualities use a visible native tree");
+
+        var cost = Field<Forms.Label>("lblQualityBP");
+        var citation = Field<Forms.Label>("lblQualitySource");
+        cost.Text = "5";
+        citation.Text = "SR4 123";
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        var actions = (WrapPanel)layout.Children[0];
+        var footer = layout.Children.OfType<ScrollViewer>().Single();
+        var details = (WrapPanel)footer.Content!;
+        check(actions.Children.Count == (career ? 3 : 2) && actions.Bounds.Bottom <= tree.Bounds.Top &&
+            tree.Bounds.Bottom <= footer.Bounds.Top && footer.Bounds.Bottom <= layout.Bounds.Height &&
+            details.Children.OfType<Button>().Single().Content is TextBlock text && text.Text!.EndsWith(citation.Text, StringComparison.Ordinal),
+            $"{editorName} quality actions and source details stay clear of the tree");
+        cost.Text = "";
+        citation.Text = "";
+
+        var troll = new Character { Metatype = "Troll" };
+        var racialQuality = new Quality(troll)
+        {
+            Name = "Thermographic Vision", OriginSource = QualitySource.Metatype, BP = 5, Source = "RC", Page = "115"
+        };
+        troll.Qualities.Add(racialQuality);
+        var racialRoot = new Forms.TreeNode("Selected Positive Qualities");
+        var racialNode = new Forms.TreeNode(racialQuality.Name) { Tag = racialQuality.InternalId };
+        racialRoot.Nodes.Add(racialNode);
+        QualityDetailsPresentation.Refresh(troll, career, racialNode, cost, citation, Field<Forms.ToolTip>("tipTooltip"));
+        check(citation.Text == troll.Options.LanguageBookShort("SR4") + " 66" && cost.Text.StartsWith("0 ", StringComparison.Ordinal),
+            $"{editorName} Troll vision cites the metatype entry and costs zero");
+        QualityDetailsPresentation.Clear(cost, citation, Field<Forms.ToolTip>("tipTooltip"));
 
         byte[] before = character.CaptureSnapshot();
         var root = (TreeViewItem)tree.Items[0]!;
@@ -87,6 +118,64 @@ internal static class NativeQualityPickerChecks
             check(opening, "Keyboard context request routes to the existing menu for the selected quality");
         }
         finally { menu.Opening -= ObserveMenu; }
+
+        using (var sample = new Forms.ContextMenuStrip())
+        {
+            var existing = new Forms.ToolStripMenuItem("Synthetic command");
+            var disabled = new Forms.ToolStripMenuItem("Disabled command") { Enabled = false };
+            var hidden = new Forms.ToolStripMenuItem("Hidden command");
+            var branch = new Forms.ToolStripMenuItem("Synthetic submenu");
+            var child = new Forms.ToolStripMenuItem("Nested command");
+            branch.DropDownItems.Add(child);
+            sample.Items.AddRange(new Forms.ToolStripItem[] { existing, disabled, hidden, branch });
+            bool current = true;
+            int invocations = 0, opened = 0, closed = 0;
+            existing.Click += (_, _) => invocations++;
+            child.Click += (_, _) => invocations++;
+            sample.Opening += (_, _) => hidden.Visible = false;
+            sample.Opened += (_, _) => opened++;
+            sample.Closed += (_, _) => closed++;
+            using var legacyAnchor = new Forms.Panel();
+            var popup = Forms.AvaloniaContextCommands.Show(tree, new Point(5, 5), sample, legacyAnchor, () => current,
+                NativeControlPresentation.AddTheme)!;
+            try
+            {
+                await WaitForAsync(() => popup.IsOpen && popup.Items.OfType<MenuItem>().First().Bounds.Width > 0);
+                var entries = popup.Items.OfType<MenuItem>().ToArray();
+                check(opened == 1 && ReferenceEquals(sample.SourceControl, legacyAnchor) &&
+                    entries.Length == 3 && !entries[1].IsEnabled,
+                    "Native context popup preserves opening rules and shows only eligible commands");
+                entries[2].IsSubMenuOpen = true;
+                var nested = (MenuItem)entries[2].Items[0]!;
+                Click(nested);
+                current = false;
+                Click(entries[0]);
+                check(invocations == 1, "Native context routes nested commands and rejects stale targets");
+            }
+            finally { popup.Close(); }
+            await WaitForAsync(() => closed == 1);
+            check(!popup.IsOpen, "Native context popup emits one close notification");
+
+            static void Click(MenuItem item) => item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = item });
+        }
+
+        using (var legacyPanel = new Forms.Panel { Bounds = new System.Drawing.Rectangle(8, 8, 25, 25) })
+        using (var legacyMenu = new Forms.ContextMenuStrip())
+        {
+            editor.Controls.Add(legacyPanel);
+            legacyPanel.BringToFront();
+            legacyMenu.Items.Add(new Forms.ToolStripMenuItem("Compatibility control command"));
+            int opened = 0, closed = 0;
+            legacyMenu.Opened += (_, _) => opened++;
+            legacyMenu.Closed += (_, _) => closed++;
+            legacyMenu.Show(legacyPanel, new System.Drawing.Point(5, 5));
+            check(opened == 1 && ReferenceEquals(legacyMenu.SourceControl, legacyPanel) &&
+                !legacyMenu.Visible,
+                "Compatibility controls open the native workspace context popup with the original source");
+            legacyPanel.Visible = false;
+            await WaitForAsync(() => closed == 1);
+            check(closed == 1, "Hiding the compatibility control closes its native context popup");
+        }
 
         if (snapshots != null)
         {
@@ -169,6 +258,11 @@ internal static class NativeQualityPickerChecks
                 window.SearchBox.Text = "a";
                 await WaitForAsync(() => window.AcceptButton.IsEnabled && window.ItemList.ContainerFromIndex(0) is { IsEffectivelyVisible: true });
                 await Task.Delay(80);
+                var selectedRow = (ListBoxItem)window.ItemList.ContainerFromItem(window.ItemList.SelectedItem!)!;
+                var caption = selectedRow.GetVisualDescendants().OfType<TextBlock>().Single();
+                var captionCenter = caption.TranslatePoint(new Point(0, caption.Bounds.Height / 2), selectedRow);
+                check(captionCenter is { } center && Math.Abs(center.Y - selectedRow.Bounds.Height / 2) <= 1,
+                    "Native quality caption is vertically centered in the selected row");
                 using (var bitmap = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width * 2, (int)window.ClientSize.Height * 2), new Vector(192, 192)))
                 {
                     bitmap.Render(window);

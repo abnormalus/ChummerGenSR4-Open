@@ -816,7 +816,7 @@ public class SplitButton : Button
 
     private void SetButtonDrawState()
     {
-        if (Bounds.Contains(Parent.PointToClient(Cursor.Position)))
+        if (Parent is { } parent && Bounds.Contains(parent.PointToClient(Cursor.Position)))
         {
             State = PushButtonState.Hot;
         }

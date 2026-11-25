@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Forms = Majorsilence.Forms;
@@ -33,10 +34,12 @@ internal sealed class CreationSkillGroupSection : IDisposable
             // broken-group availability, before retiring its drawn presentation.
             controller.CreateControl();
             var binding = new NativeInlineNumericBinding(controller.CreationRatingInput, controller.CreationToolTips, true);
+            binding.Input.ClearValue(NumericUpDown.FontSizeProperty);
+            binding.Input.ClearValue(Layoutable.WidthProperty);
             binding.Input.Name = "nativeCreationGroup" + index++;
             Inputs.Add(controller, binding.Input); cleanup.Add(binding.Dispose);
             var label = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 2), FontSize = 12 };
+                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 2) };
             label.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlForegroundBaseHighBrush"));
             void Refresh()
             {
@@ -57,8 +60,26 @@ internal sealed class CreationSkillGroupSection : IDisposable
             groupButton.Click += select;
             GroupButtons.Add(controller, groupButton);
             cleanup.Add(() => groupButton.Click -= select);
-            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,120"), MinHeight = 32 };
-            row.Children.Add(groupButton); Grid.SetColumn(binding.Input, 1); row.Children.Add(binding.Input);
+            var row = new Grid { ColumnSpacing = 4, RowSpacing = 3 };
+            row.Children.Add(groupButton);
+            row.Children.Add(binding.Input);
+            void Reflow()
+            {
+                bool stacked = row.Bounds.Width < Math.Max(220, binding.Input.FontSize * 13);
+                if (stacked == (Grid.GetRow(binding.Input) == 1)) return;
+
+                row.ColumnDefinitions = new ColumnDefinitions(stacked ? "*" : "3*,2*");
+                row.RowDefinitions = new RowDefinitions(stacked ? "Auto,Auto" : "Auto");
+                if (!stacked) row.ColumnDefinitions[1].MinWidth = 104;
+                Grid.SetColumn(binding.Input, stacked ? 0 : 1);
+                Grid.SetRow(binding.Input, stacked ? 1 : 0);
+            }
+            row.SizeChanged += (_, _) => Reflow();
+            row.PropertyChanged += (_, args) =>
+            {
+                if (args.Property == TextElement.FontSizeProperty) Reflow();
+            };
+            Reflow();
             rows.Children.Add(row); Refresh();
         }
         source.AutoScroll = false; // The native viewport owns all scrolling now.

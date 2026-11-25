@@ -127,7 +127,6 @@ public partial class frmCreate
 
     private frmCreate CommitPreparedPacks(Character prepared)
     {
-        var original = _objCharacter;
         var history = _inventoryUndo;
         bool dirty = _blnIsDirty;
         var replacement = new frmCreate(prepared) { Loading = true, MdiParent = MdiParent, WindowState = WindowState };
@@ -144,10 +143,8 @@ public partial class frmCreate
             // character save occurs: the imported character remains an unsaved change.
             _blnIsDirty = false;
             _blnSkipToolStripRevert = true;
-            var parent = MdiParent as frmMain;
             Close();
             if (!IsDisposed) throw new InvalidOperationException("Unable to replace the original character editor.");
-            parent?.ObserveReplacementCharacter(original, prepared);
             return replacement;
         }
         catch (Exception error)

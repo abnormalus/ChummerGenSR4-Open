@@ -3,6 +3,9 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Majorsilence.Forms;
+using Window = Avalonia.Controls.Window;
+using WindowState = Avalonia.Controls.WindowState;
 
 namespace Chummer;
 
@@ -44,6 +47,20 @@ internal static class NativeFullscreenTransition
                 trace.Add(FormattableString.Invariant($"{clock.ElapsedMilliseconds}ms:{reason}:state={window.WindowState}:client={window.ClientSize}:requested={window.Width}x{window.Height}:frame={window.FrameSize}:position={window.Position}"));
         }
         Trace("before-normal");
+        bool rejectedByAppKit = false, enteredByAppKit = false;
+        Action? stopWatching = null;
+        if (System.OperatingSystem.IsMacOS() &&
+            window.TryGetPlatformHandle() is { HandleDescriptor: "NSWindow" } handle && handle.Handle != IntPtr.Zero)
+        {
+            stopWatching = AppKitFullscreenNotifications.Watch(handle.Handle, notification =>
+            {
+                Trace(notification);
+                if (notification == "NSWindowDidFailToEnterFullScreenNotification")
+                    rejectedByAppKit = true;
+                if (notification == "NSWindowDidEnterFullScreenNotification")
+                    enteredByAppKit = true;
+            }, "WillEnter", "DidEnter", "DidFailToEnter");
+        }
         bool normalRequestReturned = false;
         bool nativeExitAcknowledged = !needsNativeExit;
         EventHandler<WindowResizedEventArgs> acknowledgeExit = (_, _) =>
@@ -86,7 +103,16 @@ internal static class NativeFullscreenTransition
                     if (DateTime.UtcNow - stableSince.Value >= TimeSpan.FromMilliseconds(120))
                     {
                         Trace("normal-acknowledged");
+                        window.Activate();
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(
+                            () => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                        Trace($"entry-request:active={window.IsActive}");
                         window.WindowState = WindowState.FullScreen;
+                        while (stopWatching != null && DateTime.UtcNow < deadline &&
+                            !rejectedByAppKit && !(enteredByAppKit && IsActualFullscreen()))
+                            await Task.Delay(10);
+                        if (rejectedByAppKit)
+                            check(false, FormattableString.Invariant($"AppKit rejected fullscreen entry [active={window.IsActive}; trace={string.Join("|", trace)}]"));
                         return deadline;
                     }
                 }
@@ -98,6 +124,10 @@ internal static class NativeFullscreenTransition
             check(false, FormattableString.Invariant($"Native fullscreen preceding normal transition acknowledged [needsExit={needsNativeExit}; acknowledged={nativeExitAcknowledged}; syncResizes={synchronousResizes}; asyncResizes={asynchronousResizes}; decorations={window.WindowDecorations}; trace={string.Join("|", trace)}]"));
             throw new TimeoutException("Native fullscreen test could not acknowledge the preceding native normal transition.");
         }
-        finally { window.Resized -= acknowledgeExit; }
+        finally
+        {
+            window.Resized -= acknowledgeExit;
+            stopWatching?.Invoke();
+        }
     }
 }

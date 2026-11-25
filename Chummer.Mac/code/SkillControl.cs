@@ -190,7 +190,8 @@ namespace Chummer
 
 			RefreshControl();
 			_blnSkipRefresh = false;
-            if (KnowledgeSkill) LayoutKnowledgeInputs();
+            if (KnowledgeSkill)
+                LayoutKnowledgeInputs();
         }
 
         private void nudSkill_ValueChanged(object sender, EventArgs e)
@@ -317,7 +318,11 @@ namespace Chummer
 			RevealCareerSpecialization();
 			_strOldSpec = cboSpec.Text;
 			cboSpec.Enabled = true;
-			cboSpec.Focus();
+            if (nativeCareerSpecialization == null)
+                cboSpec.Focus();
+            else
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => nativeCareerSpecialization.Focus(),
+                    Avalonia.Threading.DispatcherPriority.Loaded);
 		}
 
 		private void cboSpec_Leave(object sender, EventArgs e)

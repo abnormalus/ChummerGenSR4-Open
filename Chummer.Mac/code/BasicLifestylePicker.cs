@@ -93,8 +93,14 @@ internal sealed class BasicLifestylePickerWindow : CatalogPickerWindow<BasicLife
         var rows = new StackPanel { Spacing = 10 };
         void Add(string key, NumericUpDown input)
         {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            row.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString(key), VerticalAlignment = VerticalAlignment.Center }); row.Children.Add(input); rows.Children.Add(row);
+            var caption = new TextBlock
+            {
+                Text = LanguageManager.Instance.GetString(key),
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap
+            };
+            input.ClearValue(Layoutable.WidthProperty);
+            Avalonia.Automation.AutomationProperties.SetLabeledBy(input, caption);
+            rows.Children.Add(new StackPanel { Spacing = 4, Children = { caption, input } });
         }
         Add("Label_SelectLifestyle_Roommates", RoommatesInput); Add("Label_SelectLifestyle_PercentToPay", PercentageInput);
         DetailPanel.Children.Insert(1, rows);

@@ -73,6 +73,7 @@ namespace Chummer
         {
 			_objCharacter = objCharacter;
             InitializeComponent();
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 
 			// Attach EventHandlers for MAGEnabledChange and RESEnabledChanged since some Metatypes can enable these.

@@ -14,7 +14,7 @@ namespace Chummer;
 
 internal static class NativeCompactSpinner
 {
-    internal static void Attach(Forms.Form owner, Forms.NumericUpDown source, Forms.ToolTip tips, string label)
+    internal static void Attach(Forms.Form editor, Forms.NumericUpDown source, Forms.ToolTip? tips, string label)
     {
         if (Application.Current == null || source.Parent is not { } parent)
             return;
@@ -38,13 +38,14 @@ internal static class NativeCompactSpinner
                 new Setter(TextBox.MinHeightProperty, 0d),
                 new Setter(TextBox.HeightProperty, 20d),
                 new Setter(TextBox.MinWidthProperty, 0d),
+                new Setter(TextBox.ClipToBoundsProperty, true),
                 new Setter(TextBox.PaddingProperty, new Thickness(1, 0)),
                 new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
             }
         });
         input.TemplateApplied += (_, _) => Dispatcher.UIThread.Post(() => CompactButtons(input), DispatcherPriority.Loaded);
 
-        bool mdi = owner.MdiParent != null;
+        bool mdi = editor.MdiParent != null;
         Forms.Control slot = mdi ? new Forms.Panel() : new Forms.NativeControlHost { NativeControl = region };
         slot.Name = input.Name!;
         slot.Bounds = source.Bounds;
@@ -56,7 +57,11 @@ internal static class NativeCompactSpinner
         source.CreateControl();
         binding.Refresh();
 
-        var presenter = mdi ? new CreationRegionPresenter(owner, slot, region, slot.Name) : null;
+        var presenter = mdi ? new CreationRegionPresenter(editor, slot, region, slot.Name) : null;
+
+        void SyncEnabled(object? sender, EventArgs args) => region.IsEnabled = slot.Enabled;
+        slot.EnabledChanged += SyncEnabled;
+        SyncEnabled(null, EventArgs.Empty);
         var directHost = slot as Forms.NativeControlHost;
         void QueueHostSync(object? sender, EventArgs args)
         {
@@ -75,27 +80,33 @@ internal static class NativeCompactSpinner
             slot.SizeChanged += QueueHostSync;
         }
         void FollowBounds(object? sender, EventArgs args) => slot.Bounds = source.Bounds;
-        if (mdi)
-        {
-            source.LocationChanged += FollowBounds;
-            source.SizeChanged += FollowBounds;
-        }
+        source.LocationChanged += FollowBounds;
+        source.SizeChanged += FollowBounds;
 
-        owner.Disposed += (_, _) =>
+        void DisposeBinding(object? sender, EventArgs args)
         {
+            slot.EnabledChanged -= SyncEnabled;
             slot.VisibleChanged -= QueueHostSync;
             slot.LocationChanged -= QueueHostSync;
             slot.SizeChanged -= QueueHostSync;
             source.LocationChanged -= FollowBounds;
             source.SizeChanged -= FollowBounds;
             presenter?.Dispose();
+            if (directHost != null)
+                directHost.NativeControl = null;
             binding.Dispose();
             source.Dispose();
-        };
+        }
+        editor.Disposed += DisposeBinding;
     }
 
     private static void CompactButtons(NumericUpDown spinner)
     {
+        // Fluent joins the editor and button borders. Keep the value inside its own space.
+        var editor = spinner.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+        if (editor != null)
+            editor.Margin = new Thickness(0, 0, 1, 0);
+
         foreach (var button in spinner.GetVisualDescendants().OfType<RepeatButton>())
         {
             if (button.Name is not ("PART_IncreaseButton" or "PART_DecreaseButton"))
@@ -103,7 +114,7 @@ internal static class NativeCompactSpinner
 
             // Fluent sets the repeat-button minimum directly on the template part.
             button.MinWidth = 0;
-            button.Width = 11;
+            button.Width = 10;
             button.MinHeight = 0;
             button.Height = 18;
             button.Padding = new Thickness(0);

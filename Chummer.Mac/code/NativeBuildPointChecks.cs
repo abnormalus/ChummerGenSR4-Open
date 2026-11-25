@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Forms = Majorsilence.Forms;
@@ -20,6 +21,19 @@ internal static class NativeBuildPointChecks
             var pending = prompt.ShowDialogAsync(owner); var window = (BuildPointWindow)NativeDialogHost.ActiveWindow!;
             check(character.CaptureSnapshot().SequenceEqual(before) && window.MethodInput.IsEnabled && window.PointsInput.Maximum == 5000 && window.AvailabilityInput.Maximum == 100,
                 "Native build-point opening preserves character and historical numeric limits");
+            var layout = (Grid)window.Content!;
+            var body = (ScrollViewer)layout.Children[0];
+            var footer = (WrapPanel)layout.Children[1];
+            window.Width = 260;
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = 230;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.PointsInput.FontSize * 1.5);
+            await Task.Delay(100);
+            window.IgnoreRulesInput.BringIntoView();
+            await Task.Delay(60);
+            check(body.Offset.Y > 0 && body.Bounds.Bottom <= footer.Bounds.Top &&
+                window.PointsInput.Bounds.Width > 120 && footer.Bounds.Bottom <= layout.Bounds.Height,
+                "Build-point settings scroll and keep confirmation visible at 150% text");
             window.MethodInput.SelectedIndex = 1;
             int defaultKarma = character.Options.BuildMethod == "Karma" ? character.Options.BuildPoints : 750;
             check(window.PointsInput.Value == Math.Clamp(defaultKarma, 0, 5000), "Native build-point method switch uses profile or legacy Karma default");

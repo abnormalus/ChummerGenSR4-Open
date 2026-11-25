@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Forms = Majorsilence.Forms;
 namespace Chummer;
 
@@ -52,11 +51,12 @@ internal sealed class NumberPromptWindow : Window, INativeDialogCancellation
     private bool accepted, shutdownCancellation;
     internal NumberPromptWindow(string title, string description, int minimum, int maximum, int initialValue, bool allowCancel)
     {
-        Title = title; Width = 440; MinWidth = 340; SizeToContent = SizeToContent.Height;
+        Title = title; Width = 440; MinWidth = 260; MinHeight = 160; MaxHeight = 500; SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         NativeControlPresentation.AddTheme(Styles);
         Input = NativeIntegerInput.Create("selectedNumber", minimum, maximum);
-        Input.Value = initialValue; Input.HorizontalAlignment = HorizontalAlignment.Left;
+        Input.Value = initialValue;
+        Input.ClearValue(NumericUpDown.WidthProperty);
         CancelButton = new Button { Content = LanguageManager.Instance.GetString("String_Cancel"), IsEnabled = allowCancel, IsCancel = allowCancel };
         CancelButton.Click += (_, _) => Close();
         AcceptButton = new Button { Content = LanguageManager.Instance.GetString("String_OK"), IsDefault = true };
@@ -65,11 +65,10 @@ internal sealed class NumberPromptWindow : Window, INativeDialogCancellation
         // shutdown must unwind the modal without manufacturing an accepted value.
         Closing += (_, args) => { if (!allowCancel && !accepted && !shutdownCancellation) args.Cancel = true; };
         Opened += (_, _) => Input.Focus();
-        var layout = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
-        layout.Children.Add(new TextBlock { Text = description, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
-        layout.Children.Add(Input);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 };
-        buttons.Children.Add(CancelButton); buttons.Children.Add(AcceptButton); layout.Children.Add(buttons); Content = layout;
+        var prompt = new TextBlock { Text = description, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(Input, prompt);
+        Content = NativeControlPresentation.CreatePromptLayout(new StackPanel { Spacing = 10, Children = { prompt, Input } },
+            CancelButton, AcceptButton);
     }
     internal void Accept() { accepted = true; Close(new NumberPromptSelection((int)(Input.Value ?? Input.Minimum))); }
     public void CancelForShutdown() { shutdownCancellation = true; Close(); }

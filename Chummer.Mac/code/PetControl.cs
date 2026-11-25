@@ -14,10 +14,12 @@ namespace Chummer
 	public partial class PetControl : UserControl
 	{
 		private Contact _objContact;
+        private bool metatypeInitialized;
 
 		// Events.
 		public event DeleteContactHandler DeleteContact;
 		public event FileNameChangedHandler FileNameChanged;
+        internal event Action<object> DetailsChanged;
 
 		#region Control Events
 		public PetControl()
@@ -30,20 +32,30 @@ namespace Chummer
 		private void PetControl_Load(object sender, EventArgs e)
 		{
 			this.Width = cmdDelete.Left + cmdDelete.Width;
-			lblMetatype.Text = "";
+            InitializePetMetatype();
+        }
 
-			if (_objContact.FileName != string.Empty)
-			{
-				// Load the character to get their Metatype.
-				Character objPet = new Character();
-				objPet.FileName = _objContact.FileName;
-				objPet.Load();
-				lblMetatype.Text = objPet.Metatype;
-				if (objPet.Metavariant != string.Empty)
-					lblMetatype.Text += " (" + objPet.Metavariant + ")";
-				objPet = null;
-			}
-		}
+        internal void InitializePetMetatype()
+        {
+            if (metatypeInitialized)
+                return;
+            metatypeInitialized = true;
+            lblMetatype.Text = "";
+            string path = ResolveLinkedCharacter();
+            if (path == null)
+                return;
+
+            try
+            {
+                var pet = new Character { FileName = path };
+                if (pet.Load(false))
+                    lblMetatype.Text = FormatMetatype(pet);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Xml.XmlException)
+            {
+                AppDiagnostics.Record("pet-metatype-load-failed", error);
+            }
+        }
 
 		private void cmdDelete_Click(object sender, EventArgs e)
 		{
@@ -54,7 +66,12 @@ namespace Chummer
 
 		private void txtName_TextChanged(object sender, EventArgs e)
 		{
-			_objContact.Name = txtContactName.Text;
+            if (_objContact == null || _objContact.Name == txtContactName.Text)
+                return;
+
+            _objContact.Name = txtContactName.Text;
+            if (Parent != null)
+                DetailsChanged?.Invoke(this);
 		}
 
 		private void imgLink_Click(object sender, EventArgs e)
@@ -75,76 +92,88 @@ namespace Chummer
 			cmsContact.Show(imgLink, imgLink.Left - 700, imgLink.Top);
 		}
 
-		private void tsContactOpen_Click(object sender, EventArgs e)
-		{
-			bool blnError = false;
-			bool blnUseRelative = false;
+        private void tsContactOpen_Click(object sender, EventArgs e)
+        {
+            string path = ResolveLinkedCharacter();
+            if (path == null)
+            {
+                var language = LanguageManager.Instance;
+                MessageBox.Show(FindForm(), language.GetString("Message_FileNotFound").Replace("{0}", _objContact.FileName),
+                    language.GetString("MessageTitle_FileNotFound"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
-			// Make sure the file still exists before attempting to load it.
-			if (!File.Exists(_objContact.FileName))
-			{
-				// If the file doesn't exist, use the relative path if one is available.
-				if (_objContact.RelativeFileName == "")
-					blnError = true;
-				else
-				{
-					MessageBox.Show(Path.GetFullPath(_objContact.RelativeFileName));
-					if (!File.Exists(Path.GetFullPath(_objContact.RelativeFileName)))
-						blnError = true;
-					else
-						blnUseRelative = true;
-				}
+            GlobalOptions.Instance.MainForm.LoadCharacter(path, false);
+        }
 
-				if (blnError)
-				{
-					MessageBox.Show(LanguageManager.Instance.GetString("Message_FileNotFound").Replace("{0}", _objContact.FileName), LanguageManager.Instance.GetString("MessageTitle_FileNotFound"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-					return;
-				}
-			}
+        internal string ResolveLinkedCharacter()
+        {
+            if (File.Exists(_objContact.FileName))
+                return _objContact.FileName;
 
-			if (!blnUseRelative)
-				GlobalOptions.Instance.MainForm.LoadCharacter(_objContact.FileName, false);
-			else
-			{
-				string strFile = Path.GetFullPath(_objContact.RelativeFileName);
-				GlobalOptions.Instance.MainForm.LoadCharacter(strFile, false);
-			}
-		}
+            string relative = _objContact.RelativeFileName;
+            if (string.IsNullOrWhiteSpace(relative))
+                return null;
 
-		private void tsAttachCharacter_Click(object sender, EventArgs e)
-		{
-			// Prompt the user to select a save file to associate with this Contact.
-			OpenFileDialog openFileDialog = new OpenFileDialog();
-			openFileDialog.Filter = "Chummer Files (*.chum)|*.chum|All Files (*.*)|*.*";
+            try
+            {
+                string installedPath = Path.GetFullPath(Uri.UnescapeDataString(relative), Application.StartupPath);
+                if (File.Exists(installedPath))
+                    return installedPath;
 
-			if (openFileDialog.ShowDialog(this) == DialogResult.OK)
-			{
-				_objContact.FileName = openFileDialog.FileName;
-				tipTooltip.SetToolTip(imgLink, LanguageManager.Instance.GetString("Tip_Contact_OpenFile"));
+                string legacyPath = Path.GetFullPath(relative);
+                return File.Exists(legacyPath) ? legacyPath : null;
+            }
+            catch (Exception error) when (error is ArgumentException or IOException or NotSupportedException)
+            {
+                return null;
+            }
+        }
 
-				// Load the character to get their Metatype.
-				Character objPet = new Character();
-				objPet.FileName = _objContact.FileName;
-				objPet.Load();
-				lblMetatype.Text = objPet.Metatype;
-				if (objPet.Metavariant != string.Empty)
-					lblMetatype.Text += " (" + objPet.Metavariant + ")";
-				objPet = null;
+        private void tsAttachCharacter_Click(object sender, EventArgs e)
+        {
+            using var picker = new OpenFileDialog { Filter = "Chummer Files (*.chum)|*.chum|All Files (*.*)|*.*" };
+            var owner = FindForm();
+            if (picker.ShowDialog(owner) != DialogResult.OK)
+                return;
 
-				// Set the relative path.
-				Uri uriApplication = new Uri(@Application.StartupPath);
-				Uri uriFile = new Uri(@_objContact.FileName);
-				Uri uriRelative = uriApplication.MakeRelativeUri(uriFile);
-				_objContact.RelativeFileName = "../" + uriRelative.ToString();
+            try
+            {
+                AttachSelectedCharacter(picker.FileName);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Xml.XmlException or ArgumentException)
+            {
+                AppDiagnostics.Record("pet-link-failed", error);
+                AppErrors.Inform(owner, "Message_CommandFailed");
+            }
+        }
 
-				FileNameChanged(this);
-			}
-		}
+        internal bool AttachSelectedCharacter(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            string fullPath = Path.GetFullPath(path);
+            var pet = new Character { FileName = fullPath };
+            if (!pet.Load(false))
+                throw new InvalidDataException("Unable to read the selected character.");
+
+            var relativePath = new Uri(Application.StartupPath).MakeRelativeUri(new Uri(fullPath));
+            _objContact.FileName = fullPath;
+            _objContact.RelativeFileName = "../" + relativePath;
+            lblMetatype.Text = FormatMetatype(pet);
+            tipTooltip.SetToolTip(imgLink, LanguageManager.Instance.GetString("Tip_Contact_OpenFile"));
+            FileNameChanged?.Invoke(this);
+            return true;
+        }
+
+        private static string FormatMetatype(Character pet) =>
+            string.IsNullOrEmpty(pet.Metavariant) ? pet.Metatype : pet.Metatype + " (" + pet.Metavariant + ")";
 
 		private void tsRemoveCharacter_Click(object sender, EventArgs e)
 		{
 			// Remove the file association from the Contact.
-			if (MessageBox.Show(LanguageManager.Instance.GetString("Message_RemoveCharacterAssociation"), LanguageManager.Instance.GetString("MessageTitle_RemoveCharacterAssociation"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+			if (MessageBox.Show(FindForm(), LanguageManager.Instance.GetString("Message_RemoveCharacterAssociation"), LanguageManager.Instance.GetString("MessageTitle_RemoveCharacterAssociation"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 			{
 				_objContact.FileName = "";
 				_objContact.RelativeFileName = "";
@@ -156,12 +185,15 @@ namespace Chummer
 
 		private void imgNotes_Click(object sender, EventArgs e)
 		{
-			frmNotes frmContactNotes = new frmNotes();
+			using var frmContactNotes = new frmNotes();
 			frmContactNotes.Notes = _objContact.Notes;
 			frmContactNotes.ShowDialog(this);
 
-			if (frmContactNotes.DialogResult == DialogResult.OK)
-				_objContact.Notes = frmContactNotes.Notes;
+			if (frmContactNotes.DialogResult == DialogResult.OK && _objContact.Notes != frmContactNotes.Notes)
+            {
+                _objContact.Notes = frmContactNotes.Notes;
+                DetailsChanged?.Invoke(this);
+            }
 
 			string strTooltip = "";
 			strTooltip = LanguageManager.Instance.GetString("Tip_Contact_EditNotes");

@@ -37,6 +37,14 @@ internal sealed class SourceSets
         var sets = Read(); // Never replace an unreadable library with an empty one.
         sets.Remove(name);
         sets.Add(name, Normalize(books));
+        Write(path, sets);
+    }
+
+    internal static void Export(string destination, IEnumerable<string> books) =>
+        Write(destination, new Dictionary<string, string[]> { ["Source set"] = Normalize(books) });
+
+    private static void Write(string path, Dictionary<string, string[]> sets)
+    {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try

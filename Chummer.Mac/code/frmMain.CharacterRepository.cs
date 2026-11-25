@@ -40,6 +40,13 @@ public partial class frmMain
     {
         var connect = new ToolStripMenuItem("Connect Character Repository…");
         var open = new ToolStripMenuItem("Open from Repository…");
+        var toolbarOpen = new ToolStripButton
+        {
+            Name = "openGitHubToolStripButton",
+            Text = "Open from GitHub",
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        toolStrip.Items.Insert(toolStrip.Items.IndexOf(openToolStripButton) + 1, toolbarOpen);
         var save = new ToolStripMenuItem("Save to Repository…");
         fileMenu.DropDownItems.Insert(6, connect);
         fileMenu.DropDownItems.Insert(7, open);
@@ -49,6 +56,7 @@ public partial class frmMain
         {
             connect.Enabled = !repositoryBusy;
             open.Enabled = !repositoryBusy && savedRepository != null;
+            toolbarOpen.Enabled = !repositoryBusy;
             save.Enabled = open.Enabled && ActiveMdiChild is frmCreate or frmCareer;
         }
 
@@ -97,6 +105,15 @@ public partial class frmMain
         connect.Click += async (_, _) => await Run("Connect Character Repository",
             () => ConnectRepositoryAsync(false));
         open.Click += async (_, _) => await Run("Open from Repository", OpenRepositoryAsync, true);
+        toolbarOpen.Click += async (_, _) =>
+        {
+            if (repositoryBusy)
+                return;
+            if (savedRepository == null)
+                await Run("Connect Character Repository", () => ConnectRepositoryAsync(false));
+            if (!IsDisposed && savedRepository != null)
+                open.PerformClick();
+        };
         save.Click += async (_, _) =>
         {
             switch (ActiveMdiChild)
@@ -151,7 +168,7 @@ public partial class frmMain
         return characterRepository != null;
     }
 
-    private static Window RepositoryDialog(string title, StackPanel content)
+    private static Window RepositoryDialog(string title, Avalonia.Controls.Control content)
     {
         var window = new Window
         {
@@ -166,6 +183,27 @@ public partial class frmMain
         return window;
     }
 
+    private static Window RepositoryFormDialog(string title, StackPanel fields, double initialHeight)
+    {
+        var scroll = new ScrollViewer
+        {
+            Content = fields,
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            BringIntoViewOnFocusChange = true,
+            AllowAutoHide = false
+        };
+        NativeControlPresentation.AddTheme(scroll.Styles);
+        var layout = new Grid { RowDefinitions = new RowDefinitions("*"), Children = { scroll } };
+        var dialog = RepositoryDialog(title, layout);
+        dialog.SizeToContent = SizeToContent.Manual;
+        dialog.CanResize = true;
+        dialog.MinWidth = 300;
+        dialog.MinHeight = 240;
+        dialog.Height = initialHeight;
+        return dialog;
+    }
+
     private static StackPanel RepositoryPanel() => new() { Margin = new Thickness(20), Spacing = 10 };
 
     private static TextBlock RepositoryLabel(string text) => new()
@@ -177,7 +215,7 @@ public partial class frmMain
     internal async Task ConnectRepositoryAsync(bool renewing)
     {
         var panel = RepositoryPanel();
-        var dialog = RepositoryDialog(renewing ? "Renew GitHub Token" : "Connect Character Repository", panel);
+        var dialog = RepositoryFormDialog(renewing ? "Renew GitHub Token" : "Connect Character Repository", panel, 540);
         var status = RepositoryLabel(characterRepository == null ? "" : $"Connected to {characterRepository.Name}");
         var name = new TextBox { Text = savedRepository?.Name, PlaceholderText = "owner/repository", IsReadOnly = renewing };
         var folder = new TextBox { Text = savedRepository?.Folder ?? "characters", IsReadOnly = renewing };
@@ -185,10 +223,10 @@ public partial class frmMain
         Avalonia.Automation.AutomationProperties.SetName(name, "GitHub repository");
         Avalonia.Automation.AutomationProperties.SetName(folder, "Character folder");
         Avalonia.Automation.AutomationProperties.SetName(token, "GitHub token");
-        var create = new Button { Content = "Create private repository in GitHub" };
-        var authorize = new Button { Content = renewing ? "Open GitHub to create a replacement token" : "Create fine-grained token in GitHub" };
-        var connect = new Button { Content = renewing ? "Verify and save new token" : "Verify and connect", IsDefault = true };
-        var disconnect = new Button { Content = "Disconnect", IsVisible = savedRepository != null };
+        var create = new Button { Content = RepositoryLabel("Create private repository in GitHub") };
+        var authorize = new Button { Content = RepositoryLabel(renewing ? "Open GitHub to create a replacement token" : "Create fine-grained token in GitHub") };
+        var connect = new Button { Content = RepositoryLabel(renewing ? "Verify and save new token" : "Verify and connect"), IsDefault = true };
+        var disconnect = new Button { Content = RepositoryLabel("Disconnect"), IsVisible = savedRepository != null };
         if (renewing)
             panel.Children.Add(RepositoryLabel("Your GitHub token has expired or was revoked. Create a replacement to use this repository again."));
         else
@@ -207,7 +245,7 @@ public partial class frmMain
         panel.Children.Add(disconnect);
         if (renewing)
         {
-            var later = new Button { Content = "Renew later", IsCancel = true };
+            var later = new Button { Content = RepositoryLabel("Renew later"), IsCancel = true };
             later.Click += (_, _) => dialog.Close();
             panel.Children.Add(later);
         }
@@ -279,8 +317,13 @@ public partial class frmMain
     internal async Task OpenRepositoryAsync()
     {
         var repository = characterRepository!;
-        var panel = RepositoryPanel();
+        var panel = new Grid { Margin = new Thickness(16), RowSpacing = 8, RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto") };
         var dialog = RepositoryDialog($"Open from {repository.Name}", panel);
+        dialog.SizeToContent = SizeToContent.Manual;
+        dialog.MinWidth = 300;
+        dialog.MinHeight = 310;
+        dialog.Height = 480;
+        dialog.CanResize = true;
         var search = new TextBox { PlaceholderText = "Search filenames", IsEnabled = false };
         var status = RepositoryLabel("Loading characters…");
         using var previews = new CancellationTokenSource();
@@ -289,7 +332,6 @@ public partial class frmMain
         var list = new ListBox
         {
             Name = "RepositoryCharacterList",
-            Height = 250,
             ItemTemplate = new FuncDataTemplate<RepositoryCharacterRow>((row, _) =>
             {
                 if (row == null)
@@ -314,26 +356,40 @@ public partial class frmMain
                     CornerRadius = new CornerRadius(5),
                     Child = new Grid { Children = { initials, image } }
                 };
-                return new StackPanel
+                var filename = RepositoryLabel(row.File.Name);
+                filename.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(filename, 1);
+                return new Grid
                 {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 10,
-                    Children = { avatar, new TextBlock { Text = row.File.Name, VerticalAlignment = VerticalAlignment.Center } }
+                    ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                    ColumnSpacing = 10,
+                    Children = { avatar, filename }
                 };
             })
         };
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled);
+        ScrollViewer.SetVerticalScrollBarVisibility(list, Avalonia.Controls.Primitives.ScrollBarVisibility.Auto);
+        list.Styles.Add(new Style(selector => selector.OfType<ListBoxItem>())
+        {
+            Setters = { new Setter(ListBoxItem.HorizontalContentAlignmentProperty, Avalonia.Layout.HorizontalAlignment.Stretch),
+                new Setter(ListBoxItem.VerticalContentAlignmentProperty, VerticalAlignment.Center) }
+        });
         list.Styles.Add(new Style(selector => selector.OfType<Border>().Name("RepositoryCharacterAvatar"))
         {
             Setters = { new Setter(Border.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush")) }
         });
-        var open = new Button { Content = "Open working copy", IsDefault = true, IsEnabled = false };
-        var history = new Button { Content = "View file history in GitHub", IsEnabled = false };
+        var open = new Button { Content = RepositoryLabel("Open working copy"), IsDefault = true, IsEnabled = false };
+        var history = new Button { Content = RepositoryLabel("View file history in GitHub"), IsEnabled = false };
+        var actions = new WrapPanel { ItemSpacing = 8, LineSpacing = 4, Children = { open, history } };
+        NativeControlPresentation.ConstrainWrapItems(actions);
+        Grid.SetRow(list, 1);
+        Grid.SetRow(status, 2);
+        Grid.SetRow(actions, 3);
         panel.Children.Add(search);
         panel.Children.Add(list);
         panel.Children.Add(status);
-        panel.Children.Add(open);
+        panel.Children.Add(actions);
         open.Click += (_, _) => { if (list.SelectedItem is RepositoryCharacterRow row) dialog.Close(row.File); };
-        panel.Children.Add(history);
         list.SelectionChanged += (_, _) => history.IsEnabled = open.IsEnabled = list.SelectedItem is RepositoryCharacterRow;
         history.Click += (_, _) =>
         {
@@ -450,7 +506,7 @@ public partial class frmMain
             throw new IOException("This working copy is linked to another repository, branch, or folder. Reconnect to it or use local Save As to link a separate copy.");
 
         var panel = RepositoryPanel();
-        var dialog = RepositoryDialog("Save to Repository", panel);
+        var dialog = RepositoryFormDialog("Save to Repository", panel, 285);
         panel.Children.Add(RepositoryLabel($"{repository.Name} / {repository.Folder}"));
         var name = new TextBox
         {
@@ -461,7 +517,7 @@ public partial class frmMain
         panel.Children.Add(RepositoryLabel(revision == null ? "Choose a filename ending in .chum." :
             $"Last synced {revision.LastSynced.ToLocalTime():g}"));
         var status = RepositoryLabel("");
-        var upload = new Button { Content = "Upload saved snapshot", IsDefault = true };
+        var upload = new Button { Content = RepositoryLabel("Upload saved snapshot"), IsDefault = true };
         panel.Children.Add(upload);
         panel.Children.Add(status);
         upload.Click += (_, _) =>

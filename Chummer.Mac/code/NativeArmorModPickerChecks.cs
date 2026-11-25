@@ -39,8 +39,9 @@ internal static class NativeArmorModPickerChecks
             rating.GetVisualDescendants().OfType<TextBox>().Single().RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
             await WaitForAsync(() => window.Model.Rating == 4);
             check(window.Model.Rating == 4, "Native rating supports keyboard decreases");
-            window.SearchBox.Text = "Auto-Injector"; await WaitForAsync(() => !rating.IsEnabled);
-            check(rating.Value == 1 && window.Model.Rating == 1, "Native rating clamps and disables when a fixed item is selected");
+            window.SearchBox.Text = "Biomonitor";
+            await WaitForAsync(() => window.Model.SelectedEntry?.Name == "Biomonitor" && !rating.IsEnabled);
+            check(window.Model.CanAccept && rating.Value == 1 && window.Model.Rating == 1, "Native rating clamps and disables when a fixed item is selected");
             window.SearchBox.Text = "missing \"quoted\" mod";
             check(!window.AcceptButton.IsEnabled && window.Model.Details == null, "Native rated picker clears empty search state");
             window.SearchBox.Text = "Fire Resistance"; rating.Text = "4"; await WaitForAsync(() => window.Model.Rating == 4);

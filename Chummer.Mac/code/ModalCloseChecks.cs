@@ -7,15 +7,6 @@ internal static class ModalCloseChecks
     internal static void Run(Action<bool, string> check)
     {
         using var owner = new Form(); owner.Show();
-        using (var notes = new frmNotes())
-        {
-            notes.Notes = "Synthetic writer’s notes";
-            int closing = 0; notes.FormClosing += (_, _) => closing++;
-            var pending = notes.ShowDialogAsync(owner);
-            notes.Close();
-            check(pending.IsCompletedSuccessfully && pending.Result == DialogResult.OK && closing == 1 && owner.Enabled,
-                "Notes close chooses OK once without recursive closing and restores its owner");
-        }
         using (var dialog = new Form())
         {
             bool cancel = true; int calls = 0;

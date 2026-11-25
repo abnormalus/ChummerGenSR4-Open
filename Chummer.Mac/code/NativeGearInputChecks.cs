@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -23,7 +24,6 @@ internal static class NativeGearInputChecks
         var dirty = typeof(frmCreate).GetField("_blnIsDirty", flags)!;
         Forms.NativeControlHost Host(string name) =>
             owner.Controls.OfType<Forms.NativeControlHost>().Single(control => control.Name == name);
-        static NumericUpDown Input(Forms.NativeControlHost host) => (NumericUpDown)((Border)host.NativeControl!).Child!;
 
         try
         {
@@ -33,11 +33,15 @@ internal static class NativeGearInputChecks
             outer.SelectedTab = Field<Forms.TabPage>("tabStreetGear");
             tabs.SelectedTab = gearTab;
             await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var ratingHost = Host("nativenudGearRating");
-            var quantityHost = Host("nativenudGearQty");
-            var rating = Input(ratingHost);
-            var quantity = Input(quantityHost);
-            check(ratingHost.Visible && quantityHost.Visible && TopLevel.GetTopLevel(rating) != null &&
+            var summaryHost = Host("NativeCreationGear");
+            var summary = ((Control)summaryHost.NativeControl!).GetVisualDescendants().OfType<ScrollViewer>()
+                .Single(view => view.Name == "NativeCreationGearSummary");
+            var rows = (StackPanel)summary.Content!;
+            var ratingField = ((WrapPanel)rows.Children[2]).Children.OfType<Grid>().Single();
+            var quantityField = ((WrapPanel)rows.Children[4]).Children.OfType<Grid>().Single();
+            var rating = ratingField.Children.OfType<NumericUpDown>().Single();
+            var quantity = quantityField.Children.OfType<NumericUpDown>().Single();
+            check(summaryHost.Visible && TopLevel.GetTopLevel(rating) != null &&
                 rating.Bounds.Width > 0 && quantity.Bounds.Width > 0 && !gearTab.Controls.OfType<Forms.NumericUpDown>().Any(),
                 "The carried Gear tab presents both native spinners");
 
@@ -71,6 +75,20 @@ internal static class NativeGearInputChecks
                 quantity.IsEnabled && quantity.Value == 1 && !(bool)dirty.GetValue(editor)!,
                 "Selecting rated gear restores its limits and values without marking the character changed");
 
+            summary.Width = 145;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(summary, rating.FontSize * 1.5);
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check(new[] { rating, quantity }.All(input =>
+            {
+                var field = (Grid)input.Parent!;
+                var label = field.Children.OfType<TextBlock>().Single();
+                return Grid.GetRow(input) == 1 && label.Bounds.Bottom <= input.Bounds.Top &&
+                    input.Bounds.Right <= field.Bounds.Width + 1 && label.FontSize == input.FontSize;
+            }), "Carried Gear keeps Rating and Quantity below their captions at 145 logical pixels and enlarged text");
+            summary.ClearValue(Control.WidthProperty);
+            summary.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
             string DisplayedCost() => Field<Forms.Label>("lblGearCost").Text;
             void SetAndCheckRating(int input, int expected)
             {
@@ -96,13 +114,33 @@ internal static class NativeGearInputChecks
             check(!quantity.IsEnabled && pack.Quantity == 20 && plug.Quantity == 1,
                 "Selecting nested gear disables quantity without changing either item");
 
+            var options = rows.Children.OfType<WrapPanel>().Single(row => row.Name == "NativeGearOptions");
+            var equipped = options.Children.OfType<CheckBox>().Single(toggle => toggle.Name == "NativechkGearEquipped");
+            tree.SelectedNode = packNode;
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            bool wasEquipped = pack.Equipped;
+            check(summaryHost.Visible && equipped.IsEffectivelyVisible && equipped.IsChecked == wasEquipped,
+                "The native Equipped option reflects the selected gear");
+            equipped.IsChecked = !wasEquipped;
+            check(pack.Equipped != wasEquipped, "The native Equipped option updates the selected gear");
+            equipped.IsChecked = wasEquipped;
+
+            summary.Width = 145;
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check(rating.Bounds.Right <= summary.Viewport.Width + 1 &&
+                quantity.Bounds.Right <= summary.Viewport.Width + 1 &&
+                rows.Children[2].Bounds.Bottom <= rows.Children[3].Bounds.Top &&
+                rows.Children[3].Bounds.Bottom <= rows.Children[4].Bounds.Top,
+                "The native Gear summary keeps both inputs within the narrow scrolling layout");
+            summary.ClearValue(Control.WidthProperty);
+
             var restored = new Character();
             restored.LoadSnapshot(character.CaptureSnapshot());
             check(restored.Gear.Single(item => item.InternalId == rated.InternalId).Rating == 6 &&
                 restored.Gear.Single(item => item.InternalId == pack.InternalId).Quantity == 20,
                 "Carried Gear edits survive character serialization");
             tabs.SelectedTab = Field<Forms.TabPage>("tabArmor");
-            check(!ratingHost.Visible && !quantityHost.Visible, "Leaving Gear hides both native inputs");
+            check(!summaryHost.Visible, "Leaving Gear hides both native inputs");
         }
         finally
         {

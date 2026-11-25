@@ -1,85 +1,105 @@
+#nullable enable
 using System;
-using System.Collections.Generic;
-using Majorsilence.Forms;
+using System.Linq;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Forms = Majorsilence.Forms;
 
+namespace Chummer;
 
-
-namespace Chummer
+public sealed class frmSelectSide : IDisposable
 {
-	public partial class frmSelectSide : Form
-	{
-		private string _strSelectedSide = "";
+    private SidePickerWindow? window;
 
-		#region Control Events
-		public frmSelectSide()
-		{
-			InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
+    public string Description { private get; set; } = "";
+    public string SelectedSide { get; private set; } = "";
+    public Forms.DialogResult DialogResult { get; private set; } = Forms.DialogResult.Cancel;
 
-			// Create a list for the sides.
-			List<ListItem> lstSides = new List<ListItem>();
-			ListItem objLeft = new ListItem();
-			objLeft.Value = "Left";
-			objLeft.Name = LanguageManager.Instance.GetString("String_Improvement_SideLeft");
+    public void ForceValue(string side)
+    {
+        SelectedSide = side;
+        DialogResult = Forms.DialogResult.OK;
+    }
 
-			ListItem objRight = new ListItem();
-			objRight.Value = "Right";
-			objRight.Name = LanguageManager.Instance.GetString("String_Improvement_SideRight");
+    public Forms.DialogResult ShowDialog()
+    {
+        var owner = Forms.Form.ActiveForm ?? Forms.Application.OpenForms.Cast<Forms.Form>().LastOrDefault(form => form.Visible)
+            ?? throw new InvalidOperationException("A side picker requires an open owner window.");
+        var pending = ShowDialogAsync(owner);
+        Forms.Backends.Platform.Backend.RunModalLoop(pending);
+        return pending.GetAwaiter().GetResult();
+    }
 
-			lstSides.Add(objLeft);
-			lstSides.Add(objRight);
+    internal async Task<Forms.DialogResult> ShowDialogAsync(Forms.Form owner)
+    {
+        if (window != null)
+            throw new InvalidOperationException("The side picker is already open.");
 
-			cboSide.DataSource = lstSides;
-			cboSide.ValueMember = "Value";
-			cboSide.DisplayMember = "Name";
-		}
+        SelectedSide = "";
+        DialogResult = Forms.DialogResult.Cancel;
+        window = new SidePickerWindow(Description);
+        try
+        {
+            var selected = await NativeDialogHost.ShowAsync<string>(window, owner);
+            if (selected != null)
+                ForceValue(selected);
+            return DialogResult;
+        }
+        finally
+        {
+            window = null;
+        }
+    }
 
-		private void cmdOK_Click(object sender, EventArgs e)
-		{
-			_strSelectedSide = cboSide.Text;
-			this.DialogResult = DialogResult.OK;
-		}
+    public void Dispose() => window?.Close();
+}
 
-		private void frmSelectSide_Load(object sender, EventArgs e)
-		{
-			// Select the first item in the list.
-			cboSide.SelectedIndex = 0;
-		}
-		#endregion
+internal sealed class SidePickerWindow : Window
+{
+    internal ComboBox Sides { get; }
+    internal Button AcceptButton { get; }
+    internal Button CancelButton { get; }
 
-		#region Properties
-		// Description to show in the window.
-		public string Description
-		{
-			set
-			{
-				lblDescription.Text = value;
-			}
-		}
+    internal SidePickerWindow(string description)
+    {
+        var language = LanguageManager.Instance;
+        Title = language.GetString("Title_SelectSide");
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ShowInTaskbar = false;
+        Width = 360;
+        MinWidth = 250;
+        MinHeight = 160;
+        MaxHeight = 500;
+        SizeToContent = SizeToContent.Height;
+        NativeControlPresentation.AddTheme(Styles);
 
-		/// <summary>
-		/// Side that was selected in the dialogue.
-		/// </summary>
-		public string SelectedSide
-		{
-			get
-			{
-				return _strSelectedSide;
-			}
-		}
-		#endregion
+        Sides = new ComboBox
+        {
+            ItemsSource = new[]
+            {
+                language.GetString("String_Improvement_SideLeft"),
+                language.GetString("String_Improvement_SideRight")
+            },
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        AutomationProperties.SetName(Sides, Title);
 
-		#region Methods
-		/// <summary>
-		/// Force a particular value to be selected in the window.
-		/// </summary>
-		/// <param name="strSide">Value to force.</param>
-		public void ForceValue(string strSide)
-		{
-			cboSide.SelectedValue = strSide;
-			cboSide.Text = strSide;
-			cmdOK_Click(this, null);
-		}
-		#endregion
-	}
+        AcceptButton = new Button { Content = language.GetString("String_OK"), IsDefault = true };
+        AcceptButton.Click += (_, _) =>
+        {
+            if (Sides.SelectedItem is string selected)
+                Close(selected);
+        };
+        CancelButton = new Button { Content = language.GetString("String_Cancel"), IsCancel = true };
+        CancelButton.Click += (_, _) => Close();
+
+        var prompt = new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap };
+        Content = NativeControlPresentation.CreatePromptLayout(
+            new StackPanel { Spacing = 10, Children = { prompt, Sides } }, AcceptButton, CancelButton);
+    }
 }

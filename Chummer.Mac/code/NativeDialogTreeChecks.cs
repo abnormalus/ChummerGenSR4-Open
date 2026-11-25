@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -38,8 +39,18 @@ internal static class NativeDialogTreeChecks
                 {
                     var source = (Forms.TreeView)dialog.GetType()
                         .GetField(field, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(dialog)!;
-                    var host =  dialog.Controls.Cast<Forms.Control>().SelectMany(child => Descendants(child).Prepend(child)).OfType<Forms.NativeControlHost>()
-                        .Single(item => item.Name == "Native" + field);
+                    string hostName = dialog switch
+                    {
+                        frmSelectPACKSKit => "NativePACKSKitPicker",
+                        frmSelectCritterPower => "NativeCritterPowerPicker",
+                        frmSelectProgram => "NativeProgramPicker",
+                        frmSelectAdvancedLifestyle => "NativeAdvancedLifestyle",
+                        frmPrintMultiple => "NativeBatchPrint",
+                        frmSelectSpell => "NativeSpellPicker",
+                        _ => "Native" + field
+                    };
+                    var host = dialog.Controls.Cast<Forms.Control>().SelectMany(child => Descendants(child).Prepend(child)).OfType<Forms.NativeControlHost>()
+                        .Single(item => item.Name == hostName);
                     for (Forms.Control? parent = host.Parent; parent != null; parent = parent.Parent)
                     {
                         if (parent is Forms.TabPage page && page.Parent is Forms.TabControl tabs)
@@ -49,7 +60,9 @@ internal static class NativeDialogTreeChecks
                     if (source.Nodes.Count == 0 && field is "treCharacters" or "treContents")
                         source.Nodes.Add(new Forms.TreeNode { Text = "Synthetic entry" });
                     await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                    var tree = (TreeView)host.NativeControl!;
+                    var tree = dialog is frmSelectPACKSKit or frmSelectCritterPower or frmSelectProgram or frmSelectSpell or frmSelectAdvancedLifestyle or frmPrintMultiple
+                        ? ((Border)host.NativeControl!).GetVisualDescendants().OfType<TreeView>().Single(item => item.Name == "Native" + field)
+                        : (TreeView)host.NativeControl!;
                     string label = dialog.GetType().Name + "." + field;
                     check(source.Parent == null && host.Visible && tree.IsEffectivelyVisible &&
                         TopLevel.GetTopLevel(tree) != null && tree.Bounds.Width > 0 &&
@@ -73,6 +86,29 @@ internal static class NativeDialogTreeChecks
                     source.Enabled = false;
                     check(!tree.IsEnabled, label + " follows the enabled state");
                     source.Enabled = true;
+                    if (dialog is frmPrintMultiple)
+                    {
+                        const string path = "A long character file name for the batch print dialog that exceeds the available column width.chum";
+                        node.Text = path;
+                        node.ToolTipText = path;
+                        dialog.ClientSize = new System.Drawing.Size(280, 280);
+                        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                        var layout = (Grid)((Border)host.NativeControl!).Child!;
+                        var name = row.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == path);
+                        check(name.TextTrimming == Avalonia.Media.TextTrimming.CharacterEllipsis && Equals(ToolTip.GetTip(row), path) &&
+                            tree.Bounds.Bottom <= layout.Children[1].Bounds.Top,
+                            "Narrow batch printing trims long names, preserves their full tooltip, and keeps its actions clear");
+                    }
+                    if (dialog is frmSelectPACKSKit)
+                    {
+                        dialog.ClientSize = new System.Drawing.Size(380, 420);
+                        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                        var layout = (Grid)((Border)host.NativeControl!).Child!;
+                        var panes = (Grid)layout.Children[0];
+                        check(Grid.GetRow(panes.Children[1]) == 1 && panes.Children[0].Bounds.Bottom <= panes.Children[1].Bounds.Top &&
+                            panes.Bounds.Bottom <= layout.Children[1].Bounds.Top && tree.Bounds.Height > 0,
+                            "Narrow PACKS picker stacks its list and contents above the action buttons");
+                    }
                 }
                 dialog.Close();
             }

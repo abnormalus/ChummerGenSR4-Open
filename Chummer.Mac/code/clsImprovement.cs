@@ -1323,7 +1323,7 @@ namespace Chummer
 				if (NodeExists(nodBonus, "selectskill"))
 				{
 					// Display the Select Skill window and record which Skill was selected.
-					frmSelectSkill frmPickSkill = new frmSelectSkill(_objCharacter);
+					using var frmPickSkill = new frmSelectSkill(_objCharacter);
 					if (strFriendlyName != "")
 						frmPickSkill.Description = LanguageManager.Instance.GetString("String_Improvement_SelectSkillNamed").Replace("{0}", strFriendlyName);
 					else
@@ -1340,7 +1340,6 @@ namespace Chummer
 					if (_strForcedValue != "")
 					{
 						frmPickSkill.OnlySkill = _strForcedValue;
-						frmPickSkill.Opacity = 0;
 					}
 					frmPickSkill.ShowDialog();
 
@@ -1402,7 +1401,7 @@ namespace Chummer
 					if (nodBonus["selectskillgroup"].Attributes["excludecategory"] != null)
 						strExclude = nodBonus["selectskillgroup"].Attributes["excludecategory"].InnerText;
 
-					frmSelectSkillGroup frmPickSkillGroup = new frmSelectSkillGroup();
+					using var frmPickSkillGroup = new frmSelectSkillGroup();
 					if (strFriendlyName != "")
 						frmPickSkillGroup.Description = LanguageManager.Instance.GetString("String_Improvement_SelectSkillGroupName").Replace("{0}", strFriendlyName);
 					else
@@ -1411,7 +1410,6 @@ namespace Chummer
 					if (_strForcedValue != "")
 					{
 						frmPickSkillGroup.OnlyGroup = _strForcedValue;
-						frmPickSkillGroup.Opacity = 0;
 					}
 
 					if (strExclude != string.Empty)
@@ -1445,7 +1443,7 @@ namespace Chummer
 				if (NodeExists(nodBonus, "selectattribute"))
 				{
 					// Display the Select Attribute window and record which Skill was selected.
-					frmSelectAttribute frmPickAttribute = new frmSelectAttribute();
+					using var frmPickAttribute = new frmSelectAttribute();
 					if (strFriendlyName != "")
 						frmPickAttribute.Description = LanguageManager.Instance.GetString("String_Improvement_SelectAttributeNamed").Replace("{0}", strFriendlyName);
 					else
@@ -1480,7 +1478,6 @@ namespace Chummer
 					if (_strLimitSelection != "")
 					{
 						frmPickAttribute.SingleAttribute(_strLimitSelection);
-						frmPickAttribute.Opacity = 0;
 					}
 
 					frmPickAttribute.ShowDialog();
@@ -1527,7 +1524,7 @@ namespace Chummer
 				if (NodeExists(nodBonus, "swapskillattribute"))
 				{
 					// Display the Select Attribute window and record which Skill was selected.
-					frmSelectAttribute frmPickAttribute = new frmSelectAttribute();
+					using var frmPickAttribute = new frmSelectAttribute();
 					if (strFriendlyName != "")
 						frmPickAttribute.Description = LanguageManager.Instance.GetString("String_Improvement_SelectAttributeNamed").Replace("{0}", strFriendlyName);
 					else
@@ -1558,7 +1555,6 @@ namespace Chummer
 					if (_strLimitSelection != "")
 					{
 						frmPickAttribute.SingleAttribute(_strLimitSelection);
-						frmPickAttribute.Opacity = 0;
 					}
 
 					frmPickAttribute.ShowDialog();
@@ -2181,7 +2177,7 @@ namespace Chummer
 				// Check for Select Side.
 				if (NodeExists(nodBonus, "selectside"))
 				{
-					frmSelectSide frmPickSide = new frmSelectSide();
+					using frmSelectSide frmPickSide = new frmSelectSide();
 					frmPickSide.Description = LanguageManager.Instance.GetString("Label_SelectSide").Replace("{0}", strFriendlyName);
 					if (_strForcedValue != "")
 						frmPickSide.ForceValue(_strForcedValue);

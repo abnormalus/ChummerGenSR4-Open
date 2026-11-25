@@ -66,6 +66,23 @@ namespace Majorsilence.Forms
             }
         }
 
+        /// <summary>Additional clipping in the host window's client coordinates.</summary>
+        public Rectangle? AdditionalClip { get; set; }
+
+        /// <summary>Computes a control's visible bounds in the specified client's coordinates.</summary>
+        public static Rectangle GetClippedBounds (Control source, Control client)
+        {
+            var clip = new Rectangle (client.PointToClient (source.PointToScreen (Point.Empty)), source.Size);
+            for (var ancestor = source.Parent; ancestor is not null and not ControlAdapter; ancestor = ancestor.Parent) {
+                var viewport = ancestor is ScrollableControl { AutoScroll: true } scroll
+                    ? scroll.GetContentViewport ()
+                    : ancestor.DisplayRectangle;
+                viewport.Location = client.PointToClient (ancestor.PointToScreen (viewport.Location));
+                clip = Rectangle.Intersect (clip, viewport);
+            }
+            return clip;
+        }
+
         private INativeControlHostBackend? HostBackend => FindWindow ()?.Backend as INativeControlHostBackend;
 
         // Visibility along the whole parent chain — the native overlay must hide when any ancestor hides.
@@ -92,13 +109,11 @@ namespace Majorsilence.Forms
             if (backend is null || native is null)
                 return;
 
-            if (!attached) {
+            bool newlyAttached = !attached;
+            if (newlyAttached) {
                 backend.AttachNativeControl (this, native);
                 attached = true;
                 attached_backend = backend;
-                last_bounds = Rectangle.Empty;
-                last_clip = Rectangle.Empty;
-                last_visible = false;
             }
 
             var pos = GetPositionInForm ();
@@ -117,9 +132,13 @@ namespace Majorsilence.Forms
                 clip = Rectangle.Intersect (clip, new Rectangle (pp.X + vp.X, pp.Y + vp.Y, vp.Width, vp.Height));
             }
 
+            if (AdditionalClip is { } additionalClip)
+                clip = Rectangle.Intersect (clip, additionalClip);
+
             var visible = EffectiveVisible () && clip.Width > 0 && clip.Height > 0;
 
-            if (bounds == last_bounds && clip == last_clip && visible == last_visible)
+            // A freshly attached native element may be visible even when its first host state is empty.
+            if (!newlyAttached && bounds == last_bounds && clip == last_clip && visible == last_visible)
                 return;
 
             last_bounds = bounds;

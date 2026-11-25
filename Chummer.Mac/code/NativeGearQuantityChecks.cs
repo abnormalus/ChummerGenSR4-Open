@@ -23,6 +23,18 @@ internal static class NativeGearQuantityChecks
         {
             var pending = dialog.ShowDialogAsync(owner); var window = (GearQuantityWindow)NativeDialogHost.ActiveWindow!;
             await Task.Delay(100);
+            var layout = (Grid)window.Content!;
+            var body = layout.Children.OfType<ScrollViewer>().Single();
+            var footer = layout.Children.OfType<WrapPanel>().Single();
+            window.Width = 260;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.QuantityInput.FontSize * 1.5);
+            await Task.Delay(80);
+            check(body.Bounds.Bottom <= footer.Bounds.Top && window.AcceptButton.IsEffectivelyVisible &&
+                window.QuantityInput.Bounds.Width > 120 && window.MarkupInput.Bounds.Width == window.QuantityInput.Bounds.Width,
+                "Native gear quantity uses the available narrow width for both inputs at 150% text");
+            layout.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+            window.Width = 410;
+            await Task.Delay(40);
             window.QuantityInput.Text = "4"; await Task.Delay(30);
             check(window.QuantityInput.Value == 4, "Native quantity accepts typed integer input");
             window.QuantityInput.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "PART_IncreaseButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

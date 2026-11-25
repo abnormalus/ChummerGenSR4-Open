@@ -26,7 +26,7 @@ namespace Chummer
 		public frmSelectProgram(Character objCharacter)
         {
             InitializeComponent();
-            Load += (_, _) => NativeEditorTree.Attach(this, trePrograms, "NativetrePrograms", Text);
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 			MoveControls();
@@ -145,7 +145,7 @@ namespace Chummer
         private void trePrograms_AfterSelect(object sender, TreeViewEventArgs e)
         {
             // Only attempt to retrieve Program information if a child node is selected.
-            if (trePrograms.SelectedNode.Level > 0)
+            if (trePrograms.SelectedNode is { Level: > 0 })
             {
             	// Display the Program information.
                 XmlNode objXmlProgram = _objXmlDocument.SelectSingleNode("/chummer/programs/program[name = \"" + trePrograms.SelectedNode.Tag + "\"]");
@@ -228,7 +228,12 @@ namespace Chummer
 		private void txtSearch_TextChanged(object sender, EventArgs e)
 		{
 			// Treat everything as being uppercase so the search is case-insensitive.
-			string strSearch = "/chummer/programs/program[(" + _objCharacter.Options.BookXPath() + ") and ((contains(translate(name,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\") and not(translate)) or contains(translate(translate,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\"))]";
+			string search = txtSearch.Text.ToUpper();
+			string[] pieces = search.Split('"');
+			string literal = pieces.Length == 1
+				? "\"" + search + "\""
+				: "concat(" + string.Join(", '\"', ", pieces.Select(piece => "\"" + piece + "\"")) + ")";
+			string strSearch = "/chummer/programs/program[(" + _objCharacter.Options.BookXPath() + ") and ((contains(translate(name,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), " + literal + ") and not(translate)) or contains(translate(translate,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), " + literal + "))]";
 
 			trePrograms.Nodes.Clear();
 

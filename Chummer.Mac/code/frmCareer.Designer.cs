@@ -66,7 +66,6 @@ namespace Chummer
             this.tssEssence = new Majorsilence.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel4 = new Majorsilence.Forms.ToolStripStatusLabel();
             this.tssNuyen = new Majorsilence.Forms.ToolStripStatusLabel();
-            this.pgbProgress = new Majorsilence.Forms.ToolStripProgressBar();
             this.lblAttributes = new Majorsilence.Forms.Label();
             this.panAttributes = new Majorsilence.Forms.Panel();
             this.cmdImproveRES = new Majorsilence.Forms.Button();
@@ -1093,7 +1092,7 @@ namespace Chummer
             // 
             // StatusStrip
             // 
-            this.StatusStrip.Items.AddRange(new Majorsilence.Forms.ToolStripItem[] { this.tssKarmaLabel, this.tssKarma, this.toolStripStatusLabel3, this.tssEssence, this.toolStripStatusLabel4, this.tssNuyen, this.pgbProgress });
+            this.StatusStrip.Items.AddRange(new Majorsilence.Forms.ToolStripItem[] { this.tssKarmaLabel, this.tssKarma, this.toolStripStatusLabel3, this.tssEssence, this.toolStripStatusLabel4, this.tssNuyen });
             this.StatusStrip.Location = new System.Drawing.Point(0, 640);
             this.StatusStrip.Name = "StatusStrip";
             this.StatusStrip.Size = new System.Drawing.Size(1040, 24);
@@ -1141,12 +1140,6 @@ namespace Chummer
             this.tssNuyen.Name = "tssNuyen";
             this.tssNuyen.Size = new System.Drawing.Size(23, 19);
             this.tssNuyen.Text = "0¥";
-            // 
-            // pgbProgress
-            // 
-            this.pgbProgress.Name = "pgbProgress";
-            this.pgbProgress.Size = new System.Drawing.Size(400, 18);
-            this.pgbProgress.Visible = false;
             // 
             // lblAttributes
             // 
@@ -4855,7 +4848,7 @@ namespace Chummer
             this.lblEssenceHoleESS.Name = "lblEssenceHoleESS";
             this.lblEssenceHoleESS.Size = new System.Drawing.Size(19, 13);
             this.lblEssenceHoleESS.TabIndex = 68;
-            this.lblEssenceHoleESS.Text = "[0]";
+            this.lblEssenceHoleESS.Text = "0";
             // 
             // lblEssenceHoleESSLabel
             // 
@@ -4884,7 +4877,7 @@ namespace Chummer
             this.lblBiowareESS.Name = "lblBiowareESS";
             this.lblBiowareESS.Size = new System.Drawing.Size(19, 13);
             this.lblBiowareESS.TabIndex = 65;
-            this.lblBiowareESS.Text = "[0]";
+            this.lblBiowareESS.Text = "0";
             // 
             // lblCyberwareESS
             // 
@@ -4893,7 +4886,7 @@ namespace Chummer
             this.lblCyberwareESS.Name = "lblCyberwareESS";
             this.lblCyberwareESS.Size = new System.Drawing.Size(19, 13);
             this.lblCyberwareESS.TabIndex = 64;
-            this.lblCyberwareESS.Text = "[0]";
+            this.lblCyberwareESS.Text = "0";
             // 
             // lblBiowareESSLabel
             // 
@@ -11822,7 +11815,6 @@ namespace Chummer
 		private Majorsilence.Forms.ToolStripMenuItem tsVehicleGearAddAsPlugin;
 		private Majorsilence.Forms.ToolStripMenuItem tsVehicleSensorAddAsPlugin;
 		private Majorsilence.Forms.Label lblArmorRatingLabel;
-		private Majorsilence.Forms.ToolStripProgressBar pgbProgress;
 		private Majorsilence.Forms.Label lblWeaponAmmoRemaining;
 		private Majorsilence.Forms.Label lblWeaponAmmoRemainingLabel;
 		private Majorsilence.Forms.ContextMenuStrip cmsAmmoExpense;

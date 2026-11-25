@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Forms = Majorsilence.Forms;
@@ -18,6 +19,22 @@ internal static class NativeCalendarStartChecks
             var pending = prompt.ShowDialogAsync(owner); var window = (CalendarStartWindow)NativeDialogHost.ActiveWindow!;
             check(window.YearInput.Value == 2072 && window.MonthInput.Value == 12 && window.WeekInput.Value == 5,
                 "Native calendar loads the existing year final fifth week");
+            var layout = (Grid)window.Content!;
+            var viewport = layout.Children.OfType<ScrollViewer>().Single();
+            var footer = layout.Children.OfType<WrapPanel>().Single();
+            var weekField = (Grid)window.WeekInput.Parent!;
+            var caption = weekField.Children.OfType<TextBlock>().Single();
+            caption.Text = "Translated week within the selected month";
+            window.Width = 260;
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = 230;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.WeekInput.FontSize * 1.5);
+            await Task.Delay(80);
+            window.WeekInput.BringIntoView();
+            await Task.Delay(60);
+            check(viewport.Offset.Y > 0 && Grid.GetRow(window.WeekInput) == 1 &&
+                caption.Bounds.Bottom <= window.WeekInput.Bounds.Top && viewport.Bounds.Bottom <= footer.Bounds.Top,
+                "Calendar fields stack below captions while the confirmation footer stays clear at 150% text");
             window.MonthInput.Value = 1;
             check(window.WeekInput.Maximum == 4 && window.WeekInput.Value == 4, "Native calendar clamps fifth week when changing to a four-week month");
             window.YearInput.Text = "10000"; await Task.Delay(30);

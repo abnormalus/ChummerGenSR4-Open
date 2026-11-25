@@ -38,6 +38,16 @@ namespace Chummer
             }
         }
 
+        internal static readonly Avalonia.Controls.Templates.IDataTemplate NativeTemplate =
+            new Avalonia.Controls.Templates.FuncDataTemplate<AppearanceColor>((color, _) => new Avalonia.Controls.TextBlock
+            {
+                Text = color?.Name ?? string.Empty,
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                FontWeight = color?.IsFamily == true ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal,
+                Margin = new Avalonia.Thickness(color == null || color.IsFamily ? 0 : 17, 0, 0, 0)
+            });
+
         internal static SearchableChoices Attach(ComboBox combo, bool skin = false)
         {
             combo.DropDownStyle = ComboBoxStyle.DropDown;

@@ -31,7 +31,7 @@ internal sealed class CreationActiveSkillRow : IDisposable
     private static TextBlock Caption()
     {
         var text = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            VerticalAlignment = VerticalAlignment.Center, FontSize = 12, Margin = new Thickness(3, 2) };
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3, 2) };
         text.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlForegroundBaseHighBrush"));
         return text;
     }
@@ -42,17 +42,19 @@ internal sealed class CreationActiveSkillRow : IDisposable
         rating = new NativeInlineNumericBinding(controller.CreationRatingInput, controller.CreationToolTips, true,
             () => controller.Visible && controller.CreationRatingInput.Visible);
         specialization = new NativeInlineChoiceBinding(controller.CreationSpecializationInput);
+        Rating.ClearValue(NumericUpDown.FontSizeProperty);
+        Rating.ClearValue(Layoutable.WidthProperty);
         Rating.Name = "nativeCreationSkillRating" + index;
         Specialization.Name = "nativeCreationSkillSpecialization" + index;
         Specialization.PlaceholderText = LanguageManager.Instance.GetString("String_ExpenseSpecialization");
-        Layout = new Grid { ColumnDefinitions = new ColumnDefinitions("*,44,120,42,Auto"),
+        Layout = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,Auto,2*,Auto,2*"),
             RowDefinitions = new RowDefinitions("Auto,Auto"), ColumnSpacing = 3, RowSpacing = 2, Margin = new Thickness(2) };
         // Mirror the controller's trained-row emphasis with a live theme brush.
         Layout.Styles.Add(new Style(selector => selector.OfType<Grid>().Class("trained"))
         {
             Setters = { new Setter(Panel.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush")) }
         });
-        var heading = new StackPanel { Orientation = Orientation.Horizontal };
+        var heading = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         if (!controller.SkillIsMeta && controller.SkillName == "Perception")
         {
             PerceptionDisclosure = new Button { MinHeight = 32, Padding = new Thickness(5, 2) };
@@ -65,9 +67,10 @@ internal sealed class CreationActiveSkillRow : IDisposable
             PerceptionDisclosure.Click += disclose; cleanup.Add(() => PerceptionDisclosure.Click -= disclose);
             heading.Children.Add(PerceptionDisclosure);
         }
+        Grid.SetColumn(name, 1);
         heading.Children.Add(name); Layout.Children.Add(heading); Grid.SetColumn(attribute, 1); Layout.Children.Add(attribute);
         Grid.SetColumn(Rating, 2); Layout.Children.Add(Rating); Grid.SetColumn(pool, 3); Layout.Children.Add(pool);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        var actions = new WrapPanel { ItemSpacing = 2, LineSpacing = 2 };
         BreakGroup = Command(controller.CreationBreakButton); actions.Children.Add(BreakGroup);
         actions.Children.Add(Command(controller.CreationDeleteButton)); Grid.SetColumn(actions, 4); Layout.Children.Add(actions);
         var specializationLine = new Grid(); specializationLine.Children.Add(Specialization);
@@ -75,6 +78,39 @@ internal sealed class CreationActiveSkillRow : IDisposable
         SpecializationDisclosure = new SkillSpecializationDisclosure(specializationLine, "Show or hide skill specialization",
             () => controller.Visible && controller.Enabled && controller.CreationSpecializationInput.Visible);
         actions.Children.Add(SpecializationDisclosure.Toggle);
+        actions.SizeChanged += (_, args) =>
+        {
+            if (args.NewSize.Width <= 0) return;
+            foreach (var command in actions.Children)
+                command.MaxWidth = args.NewSize.Width;
+        };
+        void Reflow()
+        {
+            bool stacked = Layout.Bounds.Width < Math.Max(400, Rating.FontSize * 24);
+            if (stacked == (Grid.GetRow(Rating) == 1)) return;
+
+            Layout.ColumnDefinitions = new ColumnDefinitions(stacked ? "*,3*,*" : "2*,Auto,2*,Auto,2*");
+            if (!stacked) Layout.ColumnDefinitions[2].MinWidth = 104;
+            Layout.RowDefinitions = new RowDefinitions(stacked ? "Auto,Auto,Auto,Auto" : "Auto,Auto");
+            Grid.SetColumnSpan(heading, stacked ? 3 : 1);
+            Grid.SetRow(attribute, stacked ? 1 : 0);
+            Grid.SetColumn(attribute, stacked ? 0 : 1);
+            Grid.SetRow(Rating, stacked ? 1 : 0);
+            Grid.SetColumn(Rating, stacked ? 1 : 2);
+            Grid.SetRow(pool, stacked ? 1 : 0);
+            Grid.SetColumn(pool, stacked ? 2 : 3);
+            Grid.SetRow(actions, stacked ? 2 : 0);
+            Grid.SetColumn(actions, stacked ? 0 : 4);
+            Grid.SetColumnSpan(actions, stacked ? 3 : 1);
+            Grid.SetRow(specializationLine, stacked ? 3 : 1);
+            Grid.SetColumnSpan(specializationLine, stacked ? 3 : 5);
+        }
+        Layout.SizeChanged += (_, _) => Reflow();
+        Layout.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == Avalonia.Controls.Documents.TextElement.FontSizeProperty) Reflow();
+        };
+        Reflow();
         var sources = new Forms.Control[] { controller, controller.CreationNameLabel, controller.CreationAttributeLabel,
             controller.CreationPoolLabel, controller.CreationRatingInput, controller.CreationSpecializationInput };
         EventHandler changed = (_, _) => Refresh();
@@ -93,11 +129,12 @@ internal sealed class CreationActiveSkillRow : IDisposable
     }
     private Button Command(Forms.Button source)
     {
-        var target = new Button { MinHeight = 32, Padding = new Thickness(6, 2) };
+        var caption = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var target = new Button { MinHeight = 32, Padding = new Thickness(6, 2), Content = caption };
         void Sync()
         {
             if (disposed) return;
-            target.Content = source.Text; target.IsVisible = source.Visible; target.IsEnabled = source.Enabled;
+            caption.Text = source.Text; target.IsVisible = source.Visible; target.IsEnabled = source.Enabled;
             ToolTip.SetTip(target, controller.CreationToolTips.GetToolTip(source));
         }
         EventHandler changed = (_, _) => Sync();

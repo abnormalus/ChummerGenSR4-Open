@@ -1,172 +1,161 @@
-using Majorsilence.Forms.Drawing;
+#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Drawing;
-using Majorsilence.Forms;
+using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Controls.Templates;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Forms = Majorsilence.Forms;
 
+namespace Chummer;
 
-
-
-namespace Chummer
+public sealed class frmReload : IDisposable
 {
-	public partial class frmReload : Form
-	{
-		private List<Gear> _lstAmmo = new List<Gear>();
-		private List<string> _lstCount = new List<string>();
+    private ReloadWindow? window;
 
-		#region Control Events
-		public frmReload()
-		{
-			InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-			MoveControls();
-		}
+    public List<Gear> Ammo { private get; set; } = [];
+    public List<string> Count { private get; set; } = [];
+    public string SelectedAmmo { get; private set; } = "";
+    public int SelectedCount { get; private set; }
+    public Forms.DialogResult DialogResult { get; private set; } = Forms.DialogResult.Cancel;
 
-		private void frmReload_Load(object sender, EventArgs e)
-		{
-			List<ListItem> lstAmmo = new List<ListItem>();
+    public Forms.DialogResult ShowDialog(Forms.Form owner)
+    {
+        var pending = ShowDialogAsync(owner);
+        if (!pending.IsCompleted)
+            Forms.Backends.Platform.Backend.RunModalLoop(pending);
+        return pending.GetAwaiter().GetResult();
+    }
 
-			// Add each of the items to a new List since we need to also grab their plugin information.
-			foreach (Gear objGear in _lstAmmo)
-			{
-				ListItem objAmmo = new ListItem();
-				objAmmo.Value = objGear.InternalId;
-				objAmmo.Name = objGear.DisplayNameShort;
-				objAmmo.Name += " x" + objGear.Quantity.ToString();
-				if (objGear.Parent != null)
-				{
-					if (objGear.Parent.DisplayNameShort != string.Empty)
-					{
-						objAmmo.Name += " (" + objGear.Parent.DisplayNameShort;
-						if (objGear.Parent.Location != string.Empty)
-							objAmmo.Name += " @ " + objGear.Parent.Location;
-						objAmmo.Name += ")";
-					}
-				}
-				if (objGear.Location != string.Empty)
-					objAmmo.Name += " (" + objGear.Location + ")";
-				// Retrieve the plugin information if it has any.
-				if (objGear.Children.Count > 0)
-				{
-					string strPlugins = "";
-					foreach (Gear objChild in objGear.Children)
-					{
-						strPlugins += objChild.DisplayNameShort + ", ";
-					}
-					// Remove the trailing comma.
-					strPlugins = strPlugins.Substring(0, strPlugins.Length - 2);
-					// Append the plugin information to the name.
-					objAmmo.Name += " [" + strPlugins + "]";
-				}
-				lstAmmo.Add(objAmmo);
-			}
+    internal async Task<Forms.DialogResult> ShowDialogAsync(Forms.Form owner)
+    {
+        if (window != null)
+            throw new InvalidOperationException("The reload picker is already open.");
 
-			// Populate the lists.
-			cboAmmo.DataSource = lstAmmo;
-			cboAmmo.ValueMember = "Value";
-			cboAmmo.DisplayMember = "Name";
+        SelectedAmmo = "";
+        SelectedCount = 0;
+        DialogResult = Forms.DialogResult.Cancel;
+        if (Ammo.Count == 0 || Count.Count == 0)
+            return DialogResult;
+        if (Ammo.Count == 1 && Count.Count == 1)
+            return Accept(Ammo[0].InternalId, Count[0]);
 
-			cboType.DataSource = _lstCount;
+        window = new ReloadWindow(Ammo.Select(CreateChoice).ToArray(), Count.ToArray());
+        try
+        {
+            var selection = await NativeDialogHost.ShowAsync<ReloadSelection>(window, owner);
+            return selection == null ? DialogResult : Accept(selection.AmmoId, selection.Count);
+        }
+        finally { window = null; }
+    }
 
-			// If there's only 1 value in each list, the character doesn't have a choice, so just accept it.
-			if (cboAmmo.Items.Count == 1 && cboType.Items.Count == 1)
-				AcceptForm();
-		}
+    private Forms.DialogResult Accept(string ammo, string count)
+    {
+        if (!int.TryParse(count, NumberStyles.Integer, CultureInfo.CurrentCulture, out int rounds))
+            return Forms.DialogResult.Cancel;
+        SelectedAmmo = ammo;
+        SelectedCount = rounds;
+        return DialogResult = Forms.DialogResult.OK;
+    }
 
-		private void cmdCancel_Click(object sender, EventArgs e)
-		{
-			this.DialogResult = DialogResult.Cancel;
-		}
+    private static ListItem CreateChoice(Gear gear)
+    {
+        string label = gear.DisplayNameShort + " x" + gear.Quantity;
+        if (gear.Parent is { } parent && parent.DisplayNameShort.Length > 0)
+        {
+            string location = parent.Location.Length == 0 ? "" : " @ " + parent.Location;
+            label += " (" + parent.DisplayNameShort + location + ")";
+        }
+        if (gear.Location.Length > 0)
+            label += " (" + gear.Location + ")";
+        if (gear.Children.Count > 0)
+            label += " [" + string.Join(", ", gear.Children.Select(child => child.DisplayNameShort)) + "]";
+        return new ListItem { Value = gear.InternalId, Name = label };
+    }
 
-		private void cmdOK_Click(object sender, EventArgs e)
-		{
-			AcceptForm();
-		}
+    public void Dispose() => window?.Close();
+}
 
-		private void cboAmmo_DropDown(object sender, EventArgs e)
-		{
-			// Resize the width of the DropDown so that the longest name fits.
-			ComboBox objSender = (ComboBox)sender;
-			int intWidth = objSender.DropDownWidth;
-			Graphics objGraphics = objSender.CreateGraphics();
-			Font objFont = objSender.Font;
-			int intScrollWidth = (objSender.Items.Count > objSender.MaxDropDownItems) ? SystemInformation.VerticalScrollBarWidth : 0;
-			int intNewWidth;
-			foreach (ListItem objItem in ((ComboBox)sender).Items)
-			{
-				intNewWidth = (int)objGraphics.MeasureString(objItem.Name, objFont).Width + intScrollWidth;
-				if (intWidth < intNewWidth)
-				{
-					intWidth = intNewWidth;
-				}
-			}
-			objSender.DropDownWidth = intWidth;
-		}
-		#endregion
+internal sealed record ReloadSelection(string AmmoId, string Count);
 
-		#region Properties
-		/// <summary>
-		/// List of Ammo Gear that the user can selected.
-		/// </summary>
-		public List<Gear> Ammo
-		{
-			set
-			{
-				_lstAmmo = value;
-			}
-		}
-		
-		/// <summary>
-		/// List of ammunition that the user can select.
-		/// </summary>
-		public List<string> Count
-		{
-			set
-			{
-				_lstCount = value;
-			}
-		}
+internal sealed class ReloadWindow : Window
+{
+    internal ComboBox AmmoInput { get; }
+    internal ComboBox CountInput { get; }
+    internal Button AcceptButton { get; }
+    internal Button CancelButton { get; }
 
-		/// <summary>
-		/// Name of the ammunition that was selected.
-		/// </summary>
-		public string SelectedAmmo
-		{
-			get
-			{
-				return cboAmmo.SelectedValue.ToString();
-			}
-		}
+    internal ReloadWindow(ListItem[] ammo, string[] counts)
+    {
+        var language = LanguageManager.Instance;
+        Title = language.GetString("Title_Reload");
+        Width = 480;
+        MinWidth = 260;
+        MinHeight = 175;
+        MaxHeight = 500;
+        SizeToContent = SizeToContent.Height;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ShowInTaskbar = false;
+        NativeControlPresentation.AddTheme(Styles);
 
-		/// <summary>
-		/// Number of rounds that were selected to be loaded.
-		/// </summary>
-		public int SelectedCount
-		{
-			get
-			{
-				return Convert.ToInt32(cboType.Text);
-			}
-		}
-		#endregion
+        AmmoInput = new ComboBox
+        {
+            ItemsSource = ammo,
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            ItemTemplate = new FuncDataTemplate<ListItem>((choice, _) =>
+                new TextBlock { Text = choice?.Name ?? "", TextWrapping = TextWrapping.Wrap })
+        };
+        Avalonia.Controls.Primitives.Popup? ammoPopup = null;
+        AmmoInput.TemplateApplied += (_, args) =>
+            ammoPopup = args.NameScope.Find<Avalonia.Controls.Primitives.Popup>("PART_Popup");
+        AmmoInput.DropDownOpened += (_, _) =>
+        {
+            if (ammoPopup?.Child is { } content && AmmoInput.Bounds.Width > 0)
+            {
+                content.MinWidth = AmmoInput.Bounds.Width;
+                content.MaxWidth = AmmoInput.Bounds.Width;
+            }
+        };
+        CountInput = new ComboBox
+        {
+            ItemsSource = counts,
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        AcceptButton = new Button { Content = language.GetString("String_OK"), IsDefault = true };
+        AcceptButton.Click += (_, _) =>
+        {
+            if (AmmoInput.SelectedItem is ListItem selected && CountInput.SelectedItem is string count)
+                Close(new ReloadSelection(selected.Value, count));
+        };
+        CancelButton = new Button { Content = language.GetString("String_Cancel"), IsCancel = true };
+        CancelButton.Click += (_, _) => Close();
 
-		#region Methods
-		/// <summary>
-		/// Accept the selected item and close the form.
-		/// </summary>
-		private void AcceptForm()
-		{
-			this.DialogResult = DialogResult.OK;
-		}
+        var fields = new StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                Field(language.GetString("Label_Ammo"), AmmoInput),
+                Field(language.GetString("Label_Qty"), CountInput)
+            }
+        };
+        Content = NativeControlPresentation.CreatePromptLayout(fields, AcceptButton, CancelButton);
+    }
 
-		private void MoveControls()
-		{
-			int intWidth = Math.Max(lblAmmoLabel.Width, lblTypeLabel.Width);
-			cboAmmo.Left = lblAmmoLabel.Left + intWidth + 6;
-			cboAmmo.Width = this.Width - cboAmmo.Left - 19;
-			cboType.Left = lblTypeLabel.Left + intWidth + 6;
-			cboType.Width = this.Width - cboType.Left - 19;
-		}
-		#endregion
-	}
+    private static StackPanel Field(string caption, ComboBox input)
+    {
+        AutomationProperties.SetName(input, caption);
+        return new StackPanel
+        {
+            Spacing = 4,
+            Children = { new TextBlock { Text = caption, TextWrapping = TextWrapping.Wrap }, input }
+        };
+    }
 }

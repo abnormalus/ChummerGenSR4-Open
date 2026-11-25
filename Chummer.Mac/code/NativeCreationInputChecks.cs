@@ -3,6 +3,8 @@ using System;
 using System.Linq;
 using System.IO;
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Threading;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Input;
@@ -32,7 +34,7 @@ internal static class NativeCreationInputChecks
         });
         change(); await dismissed.Task;
     }
-    internal static async Task RunAsync(Forms.Form owner, Character source, string output, Action<bool, string> check)
+    internal static async Task RunAsync(Forms.Form owner, Character source, string output, Action<bool, string> check, bool checkFullscreen = true)
     {
         var character = new Character(); character.LoadSnapshot(source.CaptureSnapshot()); character.Created = false; character.IgnoreRules = true;
         character.Contacts.Clear();
@@ -113,20 +115,35 @@ internal static class NativeCreationInputChecks
                 input.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.TextPresenter>().Any(text =>
                     text.TranslatePoint(default, input) is { } position && position.Y >= -1 &&
                     position.Y + text.TextLayout.Height <= input.Bounds.Height + 1));
-            bool ContactsFit() => contacts.Right <= commonPage.ClientSize.Width && new[] { "panContacts", "panEnemies" }.All(name =>
+            async Task<bool> ContactsReachableAsync()
             {
-                bool enemy = name == "panEnemies";
-                var presentation = editor.ContactPresentation(enemy);
-                var controllers = enemy ? editor.CreationEnemyControllers : editor.CreationContactControllers;
-                if (presentation == null || presentation.Rows.Count != 1 || controllers.Count != 1 || controllers[0].Parent != null) return false;
-                var row = presentation.Rows[controllers[0]];
-                var viewport = presentation.Viewport;
-                return new Avalonia.Controls.Control[] { row.Name, row.Connection, row.Loyalty, row.Group, row.Notes, row.Link, row.Delete }
-                    .All(field => field.IsEffectivelyVisible && field.Bounds.Width > 0 && field.Bounds.Height > 0
-                        && field.TranslatePoint(default, viewport) is { } point && point.X >= -1 && point.Y >= -1
-                        && point.X + field.Bounds.Width <= viewport.Bounds.Width + 1
-                        && point.Y + field.Bounds.Height <= viewport.Bounds.Height + 1);
-            });
+                if (contacts.Right > commonPage.ClientSize.Width) return false;
+                foreach (bool enemy in new[] { false, true })
+                {
+                    var presentation = editor.ContactPresentation(enemy);
+                    var controllers = enemy ? editor.CreationEnemyControllers : editor.CreationContactControllers;
+                    if (presentation == null || presentation.Rows.Count != 1 || controllers.Count != 1 || controllers[0].Parent != null)
+                        return false;
+                    var row = presentation.Rows[controllers[0]];
+                    var viewport = presentation.Viewport;
+                    var originalOffset = viewport.Offset;
+                    try
+                    {
+                        foreach (var field in new Avalonia.Controls.Control[] { row.Name, row.Connection, row.Loyalty, row.Group, row.Notes, row.Link, row.Delete })
+                        {
+                            field.BringIntoView();
+                            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            if (!field.IsEffectivelyVisible || field.Bounds.Width <= 0 || field.Bounds.Height <= 0
+                                || field.TranslatePoint(default, viewport) is not { } point || point.X < -1 || point.Y < -1
+                                || point.X + field.Bounds.Width > viewport.Viewport.Width + 1
+                                || point.Y + field.Bounds.Height > viewport.Viewport.Height + 1)
+                                return false;
+                        }
+                    }
+                    finally { viewport.Offset = originalOffset; }
+                }
+                return true;
+            }
             string ContactGeometry() => " [" + string.Join(";", new[] { false, true }.Select(enemy =>
             {
                 var presentation = editor.ContactPresentation(enemy);
@@ -158,35 +175,83 @@ internal static class NativeCreationInputChecks
                         FormattableString.Invariant($" [actual={window.ClientSize}; state={window.WindowState}; requested={window.Width}x{window.Height}; min={window.MinWidth}x{window.MinHeight}; max={window.MaxWidth}x{window.MaxHeight}; sizing={window.SizeToContent}; owner={owner.Size}; resizeEvents={string.Join("|", geometryEvents)}; propertyChanges={string.Join("|", geometryPropertyChanges)}]"));
                     check(section.Inputs.Values.Any(input => input.IsVisible) && section.Inputs.Values.Where(input => input.IsVisible).All(input =>
                         input.Bounds.Width > 0 && input.Bounds.Height >= 20 && input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
-                        "Native creation input batch has measured controls in " + theme.Key);
+                        "Native creation input batch has measured controls in " + theme.Key +
+                        " [" + string.Join(", ", section.Inputs.Values.Where(input => input.IsVisible).Select(input => $"{input.Name}={input.Bounds}")) + "]");
                     check(AllAttributesFit() && attributesPanel.Bottom <= commonPage.ClientSize.Height &&
                         attributeInputs.All(input => input.TranslatePoint(default, window) is { } point && point.Y >= 0 &&
                             point.Y + input.Bounds.Height <= window.ClientSize.Height) &&
-                        !attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().Any(),
+                        attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>()
+                            .First().Offset.Y == 0,
                         "Native creation shows all eleven attribute rows simultaneously without scrolling in " + theme.Key +
                         FormattableString.Invariant($" [window={window.ClientSize}; common={commonPage.ClientSize}; attributes={attributesPanel.Bounds}; root={root.Bounds}]"));
-                    bool normalContactsFit = ContactsFit();
-                    check(normalContactsFit, "Native normal creation column exposes populated contact and enemy fields and commands in " + theme.Key + (normalContactsFit ? "" : ContactGeometry()));
+                    bool normalContactsFit = await ContactsReachableAsync();
+                    check(normalContactsFit, "Native normal creation column keeps populated contact and enemy fields and commands reachable in " + theme.Key + (normalContactsFit ? "" : ContactGeometry()));
                 }
-                var screen = window.Screens.ScreenFromWindow(window);
-                Size fullscreenSize = NativeFullscreenGeometry.ExpectedClientSize(window);
-                var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window, check);
-                bool firstFullscreenTheme = true;
-                foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                var enlargedMoneyHost = owner.Controls.OfType<Forms.NativeControlHost>().Single(host => host.Name == "nativeCreationMoney");
+                var moneyGrid = (Avalonia.Controls.Grid)enlargedMoneyHost.NativeControl!;
+                var moneyInput = section.Inputs["nudNuyen"];
+                int defaultMoneyHeight = enlargedMoneyHost.Height;
+                double defaultMoneyFont = moneyInput.FontSize;
+                try
                 {
-                    application.RequestedThemeVariant = theme;
-                    bool ready = await WaitForGeometry(Avalonia.Controls.WindowState.FullScreen, fullscreenSize, firstFullscreenTheme ? firstFullscreenDeadline : null);
-                    firstFullscreenTheme = false;
-                    Capture("native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
-                    check(screen != null && ready && GeometryMatches(Avalonia.Controls.WindowState.FullScreen, fullscreenSize),
-                        "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
-                        FormattableString.Invariant($" [expected={fullscreenSize}; actual={window.ClientSize}; state={window.WindowState}; frame={window.FrameSize}; decorations={window.WindowDecorations}; extended={window.ExtendClientAreaToDecorationsHint}; screen={screen?.Bounds}; workingArea={screen?.WorkingArea}; scaling={screen?.Scaling}]"));
-                    check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Right <= commonPage.ClientSize.Width && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
-                        "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
-                    bool fullscreenContactsFit = ContactsFit();
-                    check(fullscreenContactsFit, "Native full-screen creation column exposes populated contact and enemy fields and commands in " + theme.Key + (fullscreenContactsFit ? "" : ContactGeometry()));
-                    check(character.CaptureSnapshot().SequenceEqual(beforeLayout) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeLayout,
-                        "Native creation resizing preserves character and dirty state in " + theme.Key);
+                    Avalonia.Controls.Documents.TextElement.SetFontSize(moneyGrid, defaultMoneyFont * 2.25);
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                    var contactStart = owner.PointToClient(contacts.PointToScreen(System.Drawing.Point.Empty));
+                    check(moneyInput.FontSize == defaultMoneyFont * 2.25 && enlargedMoneyHost.Height > defaultMoneyHeight &&
+                        moneyGrid.Children.All(child => child.Bounds.Bottom <= moneyGrid.Bounds.Height + 1) &&
+                        enlargedMoneyHost.Bottom < contactStart.Y,
+                        $"Starting Money grows at larger text and clears Contacts [height={defaultMoneyHeight}/{enlargedMoneyHost.Height}, contacts={contactStart.Y}]");
+                }
+                finally
+                {
+                    moneyGrid.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                }
+                var attributeScroll = attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().First();
+                double defaultFont = attributeInputs[0].FontSize;
+                double defaultHeight = attributeInputs[0].Bounds.Height;
+                try
+                {
+                    Avalonia.Controls.Documents.TextElement.SetFontSize(attributeScroll, defaultFont * 2.25);
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                    var lastAttribute = attributeInputs.Last();
+                    Avalonia.Controls.ControlExtensions.BringIntoView(lastAttribute);
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                    var lastPosition = lastAttribute.TranslatePoint(default, attributeScroll);
+                    check(AllAttributesFit() && attributeInputs[0].FontSize == defaultFont * 2.25 &&
+                        attributeInputs[0].Bounds.Height > defaultHeight && attributeScroll.Offset.Y > 0 &&
+                        lastPosition.HasValue && lastPosition.Value.Y >= -1 &&
+                        lastPosition.Value.Y + lastAttribute.Bounds.Height <= attributeScroll.Viewport.Height + 1,
+                        $"Creation Attributes grows with larger text and scrolls to the last input [height={defaultHeight}/{attributeInputs[0].Bounds.Height}, viewport={attributeScroll.Viewport}, offset={attributeScroll.Offset}]");
+                }
+                finally
+                {
+                    attributeScroll.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                    attributeScroll.Offset = default;
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                }
+                if (checkFullscreen)
+                {
+                    var screen = window.Screens.ScreenFromWindow(window);
+                    Size fullscreenSize = NativeFullscreenGeometry.ExpectedClientSize(window);
+                    var firstFullscreenDeadline = await NativeFullscreenTransition.RequestAsync(window, check);
+                    bool firstFullscreenTheme = true;
+                    foreach (var theme in new[] { ThemeVariant.Dark, ThemeVariant.Light })
+                    {
+                        application.RequestedThemeVariant = theme;
+                        bool ready = await WaitForGeometry(Avalonia.Controls.WindowState.FullScreen, fullscreenSize, firstFullscreenTheme ? firstFullscreenDeadline : null);
+                        firstFullscreenTheme = false;
+                        Capture("native-creation-inputs-fullscreen-" + theme.Key.ToString()!.ToLowerInvariant() + ".png");
+                        check(screen != null && ready && GeometryMatches(Avalonia.Controls.WindowState.FullScreen, fullscreenSize),
+                            "Native creation full-screen capture uses actual screen client geometry in " + theme.Key +
+                            FormattableString.Invariant($" [expected={fullscreenSize}; actual={window.ClientSize}; state={window.WindowState}; frame={window.FrameSize}; decorations={window.WindowDecorations}; extended={window.ExtendClientAreaToDecorationsHint}; screen={screen?.Bounds}; workingArea={screen?.WorkingArea}; scaling={screen?.Scaling}]"));
+                        check(AllAttributesFit() && contacts.Left >= attributesPanel.Right && contacts.Right <= commonPage.ClientSize.Width && contacts.Bottom <= contacts.Parent!.ClientSize.Height,
+                            "Native creation full screen keeps all attributes visible and contacts beside them in " + theme.Key);
+                        bool fullscreenContactsFit = await ContactsReachableAsync();
+                        check(fullscreenContactsFit, "Native full-screen creation column keeps populated contact and enemy fields and commands reachable in " + theme.Key + (fullscreenContactsFit ? "" : ContactGeometry()));
+                        check(character.CaptureSnapshot().SequenceEqual(beforeLayout) && Field<bool>(editor, "_blnIsDirty") == dirtyBeforeLayout,
+                            "Native creation resizing preserves character and dirty state in " + theme.Key);
+                    }
                 }
             }
             finally
@@ -257,6 +322,13 @@ internal static class NativeCreationInputChecks
                 check(input.IsEffectivelyEnabled,
                     "Native creation inputs resume after modal cancellation");
             }
+            var moneyHost = owner.Controls.OfType<Forms.NativeControlHost>().Single(host => host.Name == "nativeCreationMoney");
+            var moneyLayout = (Avalonia.Controls.Grid)moneyHost.NativeControl!;
+            var moneyLabels = (Avalonia.Controls.StackPanel)moneyLayout.Children[0];
+            var nativeAllocation = section.Inputs["nudNuyen"];
+            check(nativeAllocation.Bounds.Width > 45 && moneyLabels.Bounds.Right <= nativeAllocation.Bounds.Left &&
+                nativeAllocation.Bounds.Right <= moneyLayout.Bounds.Width,
+                "Creation money keeps its captions clear of the spinner within the column");
             var money = section.Inputs["nudNuyen"]; money.Value = 2.5m;
             check(character.NuyenBP == 2.5m && Field<Forms.NumericUpDown>(editor, "nudNuyen").Value == 2.5m,
                 "Native money allocation preserves decimal model values through existing accounting");

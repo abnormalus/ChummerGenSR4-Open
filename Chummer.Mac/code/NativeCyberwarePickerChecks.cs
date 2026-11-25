@@ -66,6 +66,33 @@ internal static class NativeCyberwarePickerChecks
                         rating.Text = "2";
                     }
                     var discount = Input<NumericUpDown>("cyberwarePickerEssenceDiscount");
+                    if (career && !bio)
+                    {
+                        var root = (Grid)window.Content!;
+                        var gradeLayout = Input<StackPanel>("CyberwareGradeLayout");
+                        var discountLayout = Input<Grid>("CyberwareDiscountLayout");
+                        var discountCaption = discountLayout.Children.OfType<TextBlock>().First();
+                        var originalWidth = window.Width;
+                        string originalCaption = discountCaption.Text!;
+                        try
+                        {
+                            window.Width = 420;
+                            double enlarged = grade.FontSize * 1.5;
+                            Avalonia.Controls.Documents.TextElement.SetFontSize(root, enlarged);
+                            discountCaption.Text = "Translated essence discount for this selection";
+                            await ExpectAsync(() => grade.FontSize == enlarged && discount.FontSize == enlarged &&
+                                gradeLayout.Children[0].Bounds.Bottom <= grade.Bounds.Top &&
+                                discountCaption.Bounds.Bottom <= discount.Bounds.Top &&
+                                discount.Bounds.Right <= discountLayout.Bounds.Width && discount.Bounds.Width >= 100,
+                                "Narrow Cyberware picker keeps Grade and Essence Discount below their captions at 150% text");
+                        }
+                        finally
+                        {
+                            discountCaption.Text = originalCaption;
+                            window.Width = originalWidth;
+                            root.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                        }
+                    }
                     discount.Text = "101";
                     await ExpectAsync(() => discount.Value == 100 && window.Model.EssenceDiscount == 100,
                         "Native " + mode + " clips typed positive essence discount bound");

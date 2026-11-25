@@ -24,6 +24,7 @@ namespace Chummer
 		public frmSelectProgramOption(Character objCharacter)
 		{
 			InitializeComponent();
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 			MoveControls();

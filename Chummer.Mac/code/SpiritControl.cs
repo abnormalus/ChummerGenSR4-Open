@@ -80,6 +80,11 @@ namespace Chummer
 			if (_blnCareer)
 				nudForce.Enabled = true;
 			this.Width = cmdDelete.Left + cmdDelete.Width;
+            if (FindForm() is { } owner)
+            {
+                if (_objSpirit != null && Avalonia.Application.Current != null)
+                    AttachEntityActions(owner, _objSpirit.EntityType == SpiritType.Sprite);
+            }
 		}
 
 		private void cboSpiritName_TextChanged(object sender, EventArgs e)
@@ -187,6 +192,12 @@ namespace Chummer
 		}
 
 		private void imgLink_Click(object sender, EventArgs e)
+        {
+            UpdateLinkCommands();
+            cmsSpirit.Show(imgLink, imgLink.Left - 646, imgLink.Top);
+        }
+
+        private void UpdateLinkCommands()
 		{
 			// Determine which options should be shown based on the FileName value.
 			if (_objSpirit.FileName != "")
@@ -203,7 +214,6 @@ namespace Chummer
 				tsContactOpen.Visible = false;
 				tsRemoveCharacter.Visible = false;
 			}
-			cmsSpirit.Show(imgLink, imgLink.Left - 646, imgLink.Top);
 		}
 
 		private void imgNotes_Click(object sender, EventArgs e)

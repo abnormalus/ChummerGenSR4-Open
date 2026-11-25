@@ -31,7 +31,14 @@
         /// <inheritdoc/>
         public override string Text {
             get => TabStripItem.Text;
-            set => TabStripItem.Text = value ?? string.Empty;
+            set {
+                var text = value ?? string.Empty;
+                if (TabStripItem.Text == text)
+                    return;
+
+                TabStripItem.Text = text;
+                OnTextChanged (EventArgs.Empty);
+            }
         }
 
         /// <summary>Gets or sets the ToolTip text for this tab page.</summary>

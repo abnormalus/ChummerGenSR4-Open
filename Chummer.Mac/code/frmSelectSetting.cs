@@ -1,91 +1,69 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Majorsilence.Forms;
+using System.Threading.Tasks;
 using System.Xml;
+using Forms = Majorsilence.Forms;
 
+namespace Chummer;
 
-
-
-
-namespace Chummer
+public sealed class frmSelectSetting : IDisposable
 {
-	public partial class frmSelectSetting : Form
-	{
-		private string _strSettingsFile = "default.xml";
+    private NativeChoiceWindow? window;
 
-		#region Control Events
-		public frmSelectSetting()
-		{
-			InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-			MoveControls();
-		}
+    public string SettingsFile { get; private set; } = "default.xml";
+    public Forms.DialogResult DialogResult { get; private set; } = Forms.DialogResult.Cancel;
 
-		private void frmSelectSetting_Load(object sender, EventArgs e)
-		{
-			// Build the list of XML files found in the settings directory.
-			List<ListItem> lstSettings = new List<ListItem>();
-			foreach (string strFileName in Directory.GetFiles(MacPaths.SettingsDirectory, "*.xml"))
-			{
-				// Remove the path from the file name.
-				string strSettingsFile = strFileName;
-				strSettingsFile = strSettingsFile.Replace(MacPaths.SettingsDirectory, string.Empty);
-				strSettingsFile = strSettingsFile.Replace(Path.DirectorySeparatorChar, ' ').Trim();
+    public Forms.DialogResult ShowDialog(Forms.Form owner)
+    {
+        var pending = ShowDialogAsync(owner);
+        Forms.Backends.Platform.Backend.RunModalLoop(pending);
+        return pending.GetAwaiter().GetResult();
+    }
 
-				// Load the file so we can get the Setting name.
-				XmlDocument objXmlDocument = new XmlDocument();
-				objXmlDocument.Load(strFileName);
-				string strSettingsName = objXmlDocument.SelectSingleNode("/settings/name").InnerText;
+    internal async Task<Forms.DialogResult> ShowDialogAsync(Forms.Form owner)
+    {
+        if (window != null)
+            throw new InvalidOperationException("The settings picker is already open.");
 
-				ListItem objItem = new ListItem();
-				objItem.Value = strSettingsFile;
-				objItem.Name = strSettingsName;
+        SettingsFile = "default.xml";
+        DialogResult = Forms.DialogResult.Cancel;
+        var profiles = LoadProfiles();
+        var language = LanguageManager.Instance;
+        int defaultIndex = profiles.FindIndex(profile =>
+            string.Equals(profile.Name, "Default Settings", StringComparison.CurrentCultureIgnoreCase));
+        window = new NativeChoiceWindow(profiles, language.GetString("Title_SelectSetting"),
+            language.GetString("Label_SelectSetting_SettingsDescription"), language.GetString("Label_Options_SettingsFile"), defaultIndex);
+        try
+        {
+            var selected = await NativeDialogHost.ShowAsync<ListItem>(window, owner);
+            if (selected != null)
+            {
+                SettingsFile = selected.Value;
+                DialogResult = Forms.DialogResult.OK;
+            }
+            return DialogResult;
+        }
+        finally { window = null; }
+    }
 
-				lstSettings.Add(objItem);
-			}
-			SortListItem objSort = new SortListItem();
-			lstSettings.Sort(objSort.Compare);
-			cboSetting.DataSource = lstSettings;
-			cboSetting.ValueMember = "Value";
-			cboSetting.DisplayMember = "Name";
+    private static List<ListItem> LoadProfiles()
+    {
+        var profiles = new List<ListItem>();
+        foreach (var path in Directory.GetFiles(MacPaths.SettingsDirectory, "*.xml"))
+        {
+            var document = new XmlDocument();
+            document.Load(path);
+            profiles.Add(new ListItem
+            {
+                Value = Path.GetFileName(path),
+                Name = document.SelectSingleNode("/settings/name")!.InnerText
+            });
+        }
+        profiles.Sort(new SortListItem().Compare);
+        return profiles;
+    }
 
-			// Attempt to make default.xml the default one. If it could not be found in the list, select the first item instead.
-			cboSetting.SelectedIndex = cboSetting.FindStringExact("Default Settings");
-			if (cboSetting.SelectedIndex == -1)
-				cboSetting.SelectedIndex = 0;
-		}
-
-		private void cmdCancel_Click(object sender, EventArgs e)
-		{
-			this.DialogResult = DialogResult.Cancel;
-		}
-
-		private void cmdOK_Click(object sender, EventArgs e)
-		{
-			_strSettingsFile = cboSetting.SelectedValue.ToString();
-			this.DialogResult = DialogResult.OK;
-		}
-		#endregion
-
-		#region Methods
-		private void MoveControls()
-		{
-			cboSetting.Left = lblSetting.Left + lblSetting.Width + 6;
-		}
-		#endregion
-
-		#region Properties
-		/// <summary>
-		/// Settings file that was selected in the dialogue.
-		/// </summary>
-		public string SettingsFile
-		{
-			get
-			{
-				return _strSettingsFile;
-			}
-		}
-		#endregion
-	}
+    public void Dispose() => window?.Close();
 }

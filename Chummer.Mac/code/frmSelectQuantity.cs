@@ -3,7 +3,6 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -52,24 +51,27 @@ internal sealed class GearQuantityWindow : Window
     internal GearQuantityWindow(frmSelectQuantity.Operation operation, int maximum)
     {
         adding = operation == frmSelectQuantity.Operation.Add;
-        Title = T("Title_AddRemoveQuantity"); Width = 410; MinWidth = 360;
+        Title = T("Title_AddRemoveQuantity"); Width = 410; MinWidth = 260; MinHeight = 185; MaxHeight = 500;
         SizeToContent = SizeToContent.Height; CanResize = true;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         NativeControlPresentation.AddTheme(Styles);
-        QuantityInput = NativeIntegerInput.Create("gearQuantity", 0, maximum); QuantityInput.Value = 0; QuantityInput.HorizontalAlignment = HorizontalAlignment.Left;
-        MarkupInput = NativeIntegerInput.Create("gearQuantityMarkup", -99, 1000); MarkupInput.Value = 0; MarkupInput.HorizontalAlignment = HorizontalAlignment.Left; MarkupInput.IsEnabled = adding;
+        QuantityInput = NativeIntegerInput.Create("gearQuantity", 0, maximum); QuantityInput.Value = 0;
+        QuantityInput.ClearValue(NumericUpDown.WidthProperty);
+        MarkupInput = NativeIntegerInput.Create("gearQuantityMarkup", -99, 1000); MarkupInput.Value = 0; MarkupInput.IsEnabled = adding;
+        MarkupInput.ClearValue(NumericUpDown.WidthProperty);
         FreeInput = new CheckBox { Content = T("Checkbox_Free"), IsEnabled = adding };
         FreeInput.IsCheckedChanged += (_, _) => MarkupInput.IsEnabled = adding && FreeInput.IsChecked != true;
         AcceptButton = new Button { Content = T("String_OK"), IsDefault = true };
         AcceptButton.Click += (_, _) => Accept();
         var cancel = new Button { Content = T("String_Cancel"), IsCancel = true };
         cancel.Click += (_, _) => Close();
-        var layout = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
-        layout.Children.Add(new TextBlock { Text = T("Label_AddRemoveQuanity_Quantity") + (adding ? " +" : " −") });
-        layout.Children.Add(QuantityInput); layout.Children.Add(FreeInput);
-        layout.Children.Add(new TextBlock { Text = T("Label_SelectGear_Markup") + " (%)" }); layout.Children.Add(MarkupInput);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 };
-        buttons.Children.Add(cancel); buttons.Children.Add(AcceptButton); layout.Children.Add(buttons); Content = layout;
+        var quantityCaption = new TextBlock { Text = T("Label_AddRemoveQuanity_Quantity") + (adding ? " +" : " −"),
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        var markupCaption = new TextBlock { Text = T("Label_SelectGear_Markup") + " (%)", TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(QuantityInput, quantityCaption);
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(MarkupInput, markupCaption);
+        var fields = new StackPanel { Spacing = 8, Children = { quantityCaption, QuantityInput, FreeInput, markupCaption, MarkupInput } };
+        Content = NativeControlPresentation.CreatePromptLayout(fields, cancel, AcceptButton);
     }
     internal void Accept() => Close(new GearQuantitySelection((int)(QuantityInput.Value ?? 0), adding ? (int)(MarkupInput.Value ?? 0) : 0, adding && FreeInput.IsChecked == true));
 }

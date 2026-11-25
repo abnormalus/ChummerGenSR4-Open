@@ -37,35 +37,43 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         bool freeDuringCreation = false, bool showMarkup = true, string? freeVisibilityProperty = null)
     {
         Model = model; DataContext = model;
-        Title = T(titleKey); Width = 940; Height = 650; MinWidth = 740; MinHeight = 460;
+        Title = T(titleKey); Width = 940; Height = 650; MinWidth = 360; MinHeight = 380;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Icon = new WindowIcon(Path.Combine(AppContext.BaseDirectory, "branding", "chummer.ico"));
         NativeControlPresentation.AddTheme(Styles);
         var root = new Grid { Margin = new Thickness(18), RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"), RowSpacing = 12 };
-        var filters = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,2*,Auto,3*"), ColumnSpacing = 10 };
-        filters.Children.Add(new TextBlock { Text = T("Label_Category"), VerticalAlignment = VerticalAlignment.Center, IsVisible = model.Categories.Count > 0 });
-        var categories = new ComboBox { IsVisible = model.Categories.Count > 0, MinWidth = 180, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var filters = new Grid { Name = "CatalogFilters", ColumnDefinitions = new ColumnDefinitions("Auto,2*,Auto,3*"), ColumnSpacing = 10, RowSpacing = 4 };
+        bool hasCategories = model.Categories.Count > 0;
+        var categoryLabel = new TextBlock { Text = T("Label_Category"), TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center, IsVisible = hasCategories };
+        filters.Children.Add(categoryLabel);
+        var categories = new ComboBox { IsVisible = hasCategories, MinWidth = 120, HorizontalAlignment = HorizontalAlignment.Stretch };
         categories.Bind(ItemsControl.ItemsSourceProperty, Read(nameof(model.Categories)));
         categories.Bind(SelectingItemsControl.SelectedItemProperty, Edit(nameof(model.Category)));
         Grid.SetColumn(categories, 1); filters.Children.Add(categories);
-        var searchLabel = new TextBlock { Text = T("Label_Search"), VerticalAlignment = VerticalAlignment.Center };
+        var searchLabel = new TextBlock { Text = T("Label_Search"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(searchLabel, 2); filters.Children.Add(searchLabel);
         SearchBox = new TextBox { PlaceholderText = T("CatalogPicker_SearchHint"), Name = namePrefix + "Search" };
         SearchBox.Bind(TextBox.TextProperty, Edit(nameof(model.SearchText)));
         if (model.Categories.Count == 0) filters.ColumnDefinitions = new ColumnDefinitions("0,0,Auto,*");
         Grid.SetColumn(SearchBox, 3); filters.Children.Add(SearchBox); root.Children.Add(filters);
 
-        var body = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,Auto,3*"), ColumnSpacing = 10 };
+        var body = new Grid { Name = "CatalogBody", RowSpacing = 6, ColumnDefinitions = new ColumnDefinitions("2*,Auto,3*"), ColumnSpacing = 10 };
         Grid.SetRow(body, 1); root.Children.Add(body);
-        var listPanel = new Grid { RowDefinitions = new RowDefinitions("*,Auto"), MinWidth = 220 };
+        var listPanel = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
         ItemList = new ListBox { Name = namePrefix + "Choices", IsTextSearchEnabled = true,
             ItemTemplate = new FuncDataTemplate<CatalogEntry>((entry, _) => new TextBlock {
-                Text = entry?.DisplayName, TextWrapping = TextWrapping.Wrap }) };
+                Text = entry?.DisplayName, TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center }) };
+        ScrollViewer.SetHorizontalScrollBarVisibility(ItemList, ScrollBarVisibility.Disabled);
+        ScrollViewer.SetVerticalScrollBarVisibility(ItemList, ScrollBarVisibility.Auto);
         // Inset, rounded selection follows the desktop reference. Logical sizes scale
         // with the display; a minimum (not fixed) height permits larger/wrapped text.
         ItemList.Styles.Add(new Style(selector => selector.OfType<ListBoxItem>())
         {
             Setters = { new Setter(Layoutable.MinHeightProperty, 32.0),
+                new Setter(ContentControl.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch),
+                new Setter(ContentControl.VerticalContentAlignmentProperty, VerticalAlignment.Center),
                 new Setter(TemplatedControl.PaddingProperty, new Thickness(10, 6)),
                 new Setter(Layoutable.MarginProperty, new Thickness(5, 1)),
                 new Setter(TemplatedControl.CornerRadiusProperty, new CornerRadius(7)) }
@@ -96,14 +104,14 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         body.Children.Add(listPanel);
         var splitter = new GridSplitter { Width = 6, ResizeDirection = GridResizeDirection.Columns, HorizontalAlignment = HorizontalAlignment.Center };
         Grid.SetColumn(splitter, 1); body.Children.Add(splitter);
-        var details = new StackPanel { Spacing = 10, MinWidth = 260 };
+        var details = new StackPanel { Spacing = 10 };
         DetailPanel = details;
-        var name = new TextBlock { FontSize = 20, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
+        var name = new TextBlock { Name = "CatalogSelectedName", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
         name.Bind(TextBlock.TextProperty, Read("SelectedEntry.DisplayName")); details.Children.Add(name);
         if (model is IRatedCatalogPicker)
         {
-            var ratingRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            var ratingLabel = new TextBlock { Text = T("Label_Rating"), VerticalAlignment = VerticalAlignment.Center };
+            var ratingRow = new WrapPanel { ItemSpacing = 12, LineSpacing = 4 };
+            var ratingLabel = new TextBlock { Text = T("Label_Rating"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
             if (model is ILabeledRatingCatalogPicker) ratingLabel.Bind(TextBlock.TextProperty, Read(nameof(ILabeledRatingCatalogPicker.RatingLabel)));
             ratingRow.Children.Add(ratingLabel);
             var rating = NativeIntegerInput.Create(namePrefix + "Rating", 1, 1);
@@ -111,11 +119,11 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
             rating.Bind(NumericUpDown.MaximumProperty, Read(nameof(IRatedCatalogPicker.MaximumRating)));
             rating.Bind(NumericUpDown.ValueProperty, Edit(nameof(IRatedCatalogPicker.Rating)));
             rating.Bind(IsEnabledProperty, Read(nameof(IRatedCatalogPicker.IsRatingEnabled)));
-            ratingRow.Children.Add(rating); details.Children.Add(ratingRow);
+            ratingRow.Children.Add(rating); NativeControlPresentation.ConstrainWrapItems(ratingRow); details.Children.Add(ratingRow);
         }
         if (model is IQuantityCatalogPicker)
         {
-            var quantityRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            var quantityRow = new WrapPanel { ItemSpacing = 12, LineSpacing = 4 };
             quantityRow.Children.Add(new TextBlock { Text = T("Label_Qty"), VerticalAlignment = VerticalAlignment.Center });
             var quantity = NativeIntegerInput.Create(namePrefix + "Quantity", 1, 1000);
             if (model is IRangedQuantityCatalogPicker)
@@ -126,14 +134,14 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
             }
             quantity.Bind(NumericUpDown.ValueProperty, Edit(nameof(IQuantityCatalogPicker.Quantity)));
             quantity.Bind(IsEnabledProperty, Read(nameof(IQuantityCatalogPicker.IsQuantityEnabled)));
-            quantityRow.Children.Add(quantity); details.Children.Add(quantityRow);
+            quantityRow.Children.Add(quantity); NativeControlPresentation.ConstrainWrapItems(quantityRow); details.Children.Add(quantityRow);
         }
-        var fields = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 14, RowSpacing = 8 };
+        var fields = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,3*"), ColumnSpacing = 10, RowSpacing = 8 };
         details.Children.Add(fields);
         void Detail(string labelKey, string property)
         {
             int row = fields.RowDefinitions.Count; fields.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            var label = new TextBlock { Text = T(labelKey), VerticalAlignment = VerticalAlignment.Top };
+            var label = new TextBlock { Text = T(labelKey), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Top };
             var text = new TextBlock { Name = namePrefix + property, TextWrapping = TextWrapping.Wrap };
             text.Bind(TextBlock.TextProperty, Read("Details." + property));
             Grid.SetRow(label, row); Grid.SetRow(text, row); Grid.SetColumn(text, 1);
@@ -159,9 +167,9 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         var status = new TextBlock { Name = namePrefix + "Status", TextWrapping = TextWrapping.Wrap };
         status.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlErrorTextForegroundBrush"));
         status.Bind(TextBlock.TextProperty, Read(nameof(model.Error))); Grid.SetRow(status, 2); root.Children.Add(status);
-        var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
+        var footer = new Grid { Name = "CatalogFooter", RowSpacing = 5, ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
         Grid.SetRow(footer, 3); root.Children.Add(footer);
-        var purchase = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+        var purchase = new WrapPanel { ItemSpacing = 8, LineSpacing = 3, VerticalAlignment = VerticalAlignment.Center };
         purchase.IsVisible = model.IsCareer || freeDuringCreation;
         var free = new CheckBox { Name = namePrefix + "FreeCost", Content = T("Checkbox_Free"), VerticalAlignment = VerticalAlignment.Center };
         free.Bind(ToggleButton.IsCheckedProperty, Edit(nameof(model.FreeCost))); purchase.Children.Add(free);
@@ -174,7 +182,7 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
             purchase.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center });
         }
         footer.Children.Add(purchase);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var buttons = new WrapPanel { ItemSpacing = 8, LineSpacing = 4 };
         var cancel = new Button { Content = T("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
         AddMoreButton = new Button { Content = T("String_AddMore") };
         AcceptButton = new Button { Content = T("String_OK"), IsDefault = true };
@@ -182,6 +190,44 @@ internal class CatalogPickerWindow<TModel, TDetails> : Window
         AddMoreButton.Click += (_, _) => Accept(true); AcceptButton.Click += (_, _) => Accept(false);
         buttons.Children.Add(cancel); buttons.Children.Add(AddMoreButton); buttons.Children.Add(AcceptButton);
         Grid.SetColumn(buttons, 1); footer.Children.Add(buttons);
+        var wrapCaption = new FuncDataTemplate<string>((text, _) =>
+            new AccessText { Text = text, TextWrapping = TextWrapping.Wrap });
+        cancel.ContentTemplate = AddMoreButton.ContentTemplate = AcceptButton.ContentTemplate = free.ContentTemplate = wrapCaption;
+        source.ContentTemplate = wrapCaption;
+        NativeControlPresentation.ConstrainWrapItems(purchase);
+        NativeControlPresentation.ConstrainWrapItems(buttons);
+        bool narrow = false;
+        void Reflow()
+        {
+            double font = Avalonia.Controls.Documents.TextElement.GetFontSize(root);
+            name.FontSize = font * 1.45;
+            bool stack = root.Bounds.Width < Math.Max(640, font * 43);
+            if (stack == narrow) return;
+
+            narrow = stack;
+            filters.ColumnDefinitions = new ColumnDefinitions(narrow ? "2*,3*" :
+                hasCategories ? "Auto,2*,Auto,3*" : "0,0,Auto,*");
+            filters.RowDefinitions = new RowDefinitions(narrow && hasCategories ? "Auto,Auto" : "Auto");
+            Grid.SetRow(searchLabel, narrow && hasCategories ? 1 : 0);
+            Grid.SetRow(SearchBox, narrow && hasCategories ? 1 : 0);
+            Grid.SetColumn(searchLabel, narrow ? 0 : 2);
+            Grid.SetColumn(SearchBox, narrow ? 1 : 3);
+            body.ColumnDefinitions = new ColumnDefinitions(narrow ? "*" : "2*,Auto,3*");
+            body.RowDefinitions = new RowDefinitions(narrow ? "*,*" : "*");
+            Grid.SetRow(detailScroll, narrow ? 1 : 0);
+            Grid.SetColumn(detailScroll, narrow ? 0 : 2);
+            splitter.IsVisible = !narrow;
+            footer.ColumnDefinitions = new ColumnDefinitions(narrow ? "*" : "*,Auto");
+            footer.RowDefinitions = new RowDefinitions(narrow ? "Auto,Auto" : "Auto");
+            Grid.SetRow(buttons, narrow ? 1 : 0);
+            Grid.SetColumn(buttons, narrow ? 0 : 1);
+        }
+        root.SizeChanged += (_, _) => Reflow();
+        root.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == Avalonia.Controls.Documents.TextElement.FontSizeProperty) Reflow();
+        };
+        Reflow();
         Content = root;
         ItemList.DoubleTapped += (_, _) => Accept(false);
         SearchBox.KeyDown += (_, args) =>

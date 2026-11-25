@@ -28,7 +28,7 @@ namespace Chummer
 		public frmSelectCritterPower(Character objCharacter)
 		{
 			InitializeComponent();
-            Load += (_, _) => NativeEditorTree.Attach(this, trePowers, "NativetrePowers", Text);
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 			MoveControls();

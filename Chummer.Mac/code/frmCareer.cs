@@ -31,6 +31,7 @@ namespace Chummer
 	{
 		// Set the default culture to en-US so we work with decimals correctly.
 		private Character _objCharacter;
+        internal Character DocumentCharacter => _objCharacter;
         private SearchableChoices hairChoices, eyeChoices, skinChoices;
 		private MainController _objController;
 
@@ -70,19 +71,96 @@ namespace Chummer
 			_objImprovementManager = new ImprovementManager(_objCharacter);
 			_objController = new MainController(_objCharacter);
 			InitializeComponent();
+            Disposed += (_, _) => DisposeCareerContacts();
+            Load += (_, _) =>
+            {
+                NativeEditorTabStrip.Attach(this, tabCharacterTabs, "Character sections",
+                    Avalonia.Application.Current == null ? null : EditorSummaryPane.CreateToggle(this, splitMain));
+                NativeEditorTabStrip.Attach(this, tabStreetGearTabs, "Street gear sections");
+                PetPageLayout.Attach(this, tabPets, panPets, cmdAddPet);
+                NativeEditorTabStrip.Attach(this, tabInfo, "Character information sections");
+                NativeEditorSplitter.Attach(this, splitMain, "Character and summary panes");
+                NativeEditorSplitter.Attach(this, splitSkills, "Active and knowledge skill panes");
+                NativeEditorSplitter.Attach(this, splitContacts, "Contacts and enemies panes");
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    InitializeCareerCommonLayout();
+                    splitContacts.Panel1.Resize -= splitContacts_Panel1_Resize;
+                    splitContacts.Panel2.Resize -= splitContacts_Panel2_Resize;
+                    AdeptPowerHeader.AttachMeasured(this, splitContacts.Panel1, panContacts, "NativeCareerContactsHeader",
+                        TechnomancerPersonaLayout.BindLabel(this, splitContacts.Panel1, lblContacts), cmdAddContact, true, lblContacts);
+                    AdeptPowerHeader.AttachMeasured(this, splitContacts.Panel2, panEnemies, "NativeCareerEnemiesHeader",
+                        TechnomancerPersonaLayout.BindLabel(this, splitContacts.Panel2, lblEnemies), cmdAddEnemy, true, lblEnemies);
+                    InitializeCareerContactPresentation();
+                }
+                NativeEditorSplitter.Attach(this, splitKarmaNuyen, "Karma and nuyen panes");
+            };
+            Load += (_, _) => NativeCharacterStatus.Attach(this, StatusStrip);
+            Load += (_, _) =>
+            {
+                InitializeCareerSkillHeader();
+                InitializeCareerSkillGroups();
+                CharacterSummaryLayout.Attach(this, tabOtherInfo, "NativeCharacterSummary", tipTooltip,
+                    (lblCMPhysicalLabel, lblCMPhysical), (lblCMStunLabel, lblCMStun),
+                    (lblINILabel, lblINI), (lblIPLabel, lblIP), (lblActiveCommlink, cboActiveCommlink),
+                    (lblMatrixINILabel, lblMatrixINI), (lblMatrixIPLabel, lblMatrixIP),
+                    (lblAstralINILabel, lblAstralINI), (lblAstralIPLabel, lblAstralIP),
+                    (lblBallisticArmorLabel, lblBallisticArmor), (lblImpactArmorLabel, lblImpactArmor),
+                    (lblESS, lblESSMax), (lblRemainingNuyenLabel, lblRemainingNuyen),
+                    (lblCareerKarmaLabel, lblCareerKarma), (lblCareerNuyenLabel, lblCareerNuyen),
+                    (lblComposureLabel, lblComposure), (lblJudgeIntentionsLabel, lblJudgeIntentions),
+                    (lblLiftCarryLabel, lblLiftCarry), (lblMemoryLabel, lblMemory), (lblSwimLabel, lblSwim),
+                    (lblMovementLabel, lblMovement), (lblFlyLabel, lblFly));
+                if (Avalonia.Application.Current != null)
+                {
+                    var reputation = CreateReputationLayout();
+                    var sidebar = CharacterPortraitLayout.Build(this, tabCharacterInfo, _objCharacter, reputation,
+                        picMugshot, lblMugshot, cmdAddMugshot, cmdDeleteMugshot);
+                    CharacterNarrativeLayout.Attach(this, tabCharacterInfo, sidebar,
+                        [(lblSex, txtSex, null, null), (lblAge, txtAge, null, "ageGuidance"),
+                            (lblEyes, txtEyes, eyeChoices, null), (lblHair, txtHair, hairChoices, null),
+                            (lblHeight, txtHeight, null, "heightGuidance"), (lblWeight, txtWeight, null, "weightGuidance"),
+                            (lblSkin, txtSkin, skinChoices, null), (lblCharacterName, txtCharacterName, null, null),
+                            (lblPlayerName, txtPlayerName, null, null)],
+                        null,
+                        (lblDescription, txtDescription), (lblBackground, txtBackground),
+                        (lblConcept, txtConcept), (lblNotes, txtNotes));
+                }
+            };
             QualityDetailsPresentation.Initialize(treQualities, lblQualityBP, lblQualitySource, tipTooltip);
             InitializeWeaponAmmunitionMenus();
             Load += (_, _) => InitializeInventoryUndo();
+            Load += (_, _) => InitializeCareerSpinners();
+            Load += (_, _) => InitializeConditionMonitorLayout();
             Load += (_, _) =>
             {
+                if (Avalonia.Application.Current != null)
+                {
+                    chtKarma.AttachNative(this);
+                    chtNuyen.AttachNative(this);
+                }
                 NativeCareerList.Attach(this, lstKarma, "NativeCareerKarma", "Karma expenses",
                     () => lstKarma_DoubleClick(lstKarma, EventArgs.Empty),
-                    column => lstKarma_ColumnClick(lstKarma, new ColumnClickEventArgs(column)), followSourceBounds: true);
+                    column => lstKarma_ColumnClick(lstKarma, new ColumnClickEventArgs(column)), followSourceBounds: true,
+                    commands: [cmdKarmaGained, cmdKarmaSpent, cmdKarmaEdit]);
                 NativeCareerList.Attach(this, lstNuyen, "NativeCareerNuyen", "Nuyen expenses",
                     () => lstNuyen_DoubleClick(lstNuyen, EventArgs.Empty),
-                    column => lstNuyen_ColumnClick(lstNuyen, new ColumnClickEventArgs(column)), followSourceBounds: true);
+                    column => lstNuyen_ColumnClick(lstNuyen, new ColumnClickEventArgs(column)), followSourceBounds: true,
+                    commands: [cmdNuyenGained, cmdNuyenSpent, cmdNuyenEdit]);
+                splitKarmaNuyen_Panel1_Resize(this, EventArgs.Empty);
+                splitKarmaNuyen_Panel2_Resize(this, EventArgs.Empty);
+                var expenseWorkspace = MdiParent ?? this;
+                void ResizeExpenses(object sender, EventArgs args) => LayoutExpenseViewport();
+                expenseWorkspace.SizeChanged += ResizeExpenses;
+                tabKarma.VisibleChanged += ResizeExpenses;
+                Disposed += (_, _) =>
+                {
+                    expenseWorkspace.SizeChanged -= ResizeExpenses;
+                    tabKarma.VisibleChanged -= ResizeExpenses;
+                };
                 NativeCareerList.Attach(this, lstCalendar, "NativeCareerCalendar", "Calendar",
-                    () => lstCalendar_DoubleClick(lstCalendar, EventArgs.Empty));
+                    () => lstCalendar_DoubleClick(lstCalendar, EventArgs.Empty),
+                    commands: [cmdAddWeek, cmdEditWeek, cmdChangeStartWeek]);
             };
             treQualities.ShowLines = false;
             splitMain.Dock = DockStyle.Fill;
@@ -92,55 +170,158 @@ namespace Chummer
             Action detailChanged = () => { _blnIsDirty = true; UpdateCharacterInfo(); UpdateWindowTitle(); };
             var editQualityDetail = PromptDetails.Attach(this, _objCharacter, treQualities,
                 id => _objFunctions.FindQuality(id, _objCharacter.Qualities), null, detailChanged, cmsQuality);
-            Load += (_, _) => NativeEditorTree.Attach(this, treQualities, "NativeCareerQualities",
-                        LanguageManager.Instance.GetString("String_Qualities"), RefreshSelectedQuality,
+            Load += (_, _) => CommonQualitySection.Attach(this, treQualities, "NativeCareerQualities", lblQualityBPLabel, lblQualityBP,
+                        lblQualitySourceLabel, lblQualitySource, tipTooltip,
+                        () => lblQualitySource_Click(lblQualitySource, EventArgs.Empty), RefreshSelectedQuality,
                         () => cmdDeleteQuality_Click(treQualities, EventArgs.Empty), editQualityDetail,
-                        node => NativeEditorTree.QualityForeground(node, id => _objFunctions.FindQuality(id, _objCharacter.Qualities)));
+                        node => NativeEditorTree.QualityForeground(node, id => _objFunctions.FindQuality(id, _objCharacter.Qualities)),
+                        cmdAddQuality, cmdSwapQuality, cmdDeleteQuality);
             Load += (_, _) =>
             {
-                NativeEditorTree.Attach(this, treCyberware, "NativeCareerCyberware",
-                    "Cyberware", delete: () => treCyberware_KeyDown(treCyberware, new KeyEventArgs(Keys.Delete)));
-                NativeEditorTree.Attach(this, treSpells, "NativeCareerSpells",
-                    "Spells", delete: () => treSpells_KeyDown(treSpells, new KeyEventArgs(Keys.Delete)));
-                NativeEditorTree.Attach(this, treMartialArts, "NativeCareerMartialArts",
-                    "Martial Arts", delete: () => treMartialArts_KeyDown(treMartialArts, new KeyEventArgs(Keys.Delete)));
-                NativeEditorTree.Attach(this, treFoci, "NativeCareerFoci",
-                    "Foci");
-                NativeEditorTree.Attach(this, treMetamagic, "NativeCareerMetamagic",
-                    "Metamagic", delete: () => treMetamagic_KeyDown(treMetamagic, new KeyEventArgs(Keys.Delete)));
-                NativeEditorTree.Attach(this, treCritterPowers, "NativeCareerCritterPowers",
-                    "Critter Powers", delete: () => treCritterPowers_KeyDown(treCritterPowers, new KeyEventArgs(Keys.Delete)));
-                NativeEditorTree.Attach(this, treComplexForms, "NativeCareerComplexForms",
-                    "Complex Forms", delete: () => treComplexForms_KeyDown(treComplexForms, new KeyEventArgs(Keys.Delete)));
+                AdeptPowerHeader.Attach(this, tabAdept, panPowers, lblPowerPointsLabel, lblPowerPoints, cmdAddPower);
+                EditorRowStack.Attach<PowerControl>(this, panPowers);
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                    InventoryTreeLayout.AttachPage(this, tabCyberware, "NativeCareerCyberware", "Cyberware",
+                        CreateCareerCyberwareDetails(), treCyberware,
+                        () => treCyberware_KeyDown(treCyberware, new KeyEventArgs(Keys.Delete)), null, null,
+                        cmdAddCyberware, cmdAddBioware, cmdDeleteCyberware);
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    var spellDetails = SpellDetailsLayout.Create(this, tabMagician, lblSpellSourceLabel, lblSpellSource,
+                        tipTooltip, () => lblSpellSource_Click(lblSpellSource, EventArgs.Empty),
+                        (lblSpellDicePoolLabel, lblSpellDicePool), cmdRollSpell, cmdQuickenSpell,
+                        rows => SpellDetailsLayout.AddMagicRows(this, tabMagician, rows,
+                            lblTraditionLabel, cboTradition, lblDrainAttributesLabel, lblDrainAttributes, lblDrainAttributesValue,
+                            lblMentorSpiritLabel, lblMentorSpirit, lblMentorSpiritInformation, tipTooltip, cmdRollDrain),
+                        [(lblSpellDescriptorsLabel, lblSpellDescriptors)],
+                        [(lblSpellCategoryLabel, lblSpellCategory), (lblSpellTypeLabel, lblSpellType)],
+                        [(lblSpellRangeLabel, lblSpellRange), (lblSpellDamageLabel, lblSpellDamage)],
+                        [(lblSpellDurationLabel, lblSpellDuration), (lblSpellDVLabel, lblSpellDV)]);
+                    MagicInventoryLayout.AttachPage(this, tabMagician, "NativeCareerSpells", "NativeSpellDetails",
+                        spellDetails, lblSelectedSpells, lblSpirits, cmdAddSpirit, panSpirits, tipTooltip, treSpells,
+                        () => treSpells_KeyDown(treSpells, new KeyEventArgs(Keys.Delete)), cmdAddSpell, cmdDeleteSpell);
+                }
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    var rating = new Avalonia.Controls.WrapPanel { ItemSpacing = 8, LineSpacing = 4 };
+                    rating.Children.Add(GearReadoutsLayout.BindReadout(this, tabMartialArts, lblMartialArtsRatingLabel, lblMartialArtsRating));
+                    var improve = ArmorEquipmentLayout.BindCommand(this, tabMartialArts, cmdImproveMartialArtsRating, "+");
+                    Avalonia.Automation.AutomationProperties.SetName(improve, lblMartialArtsRatingLabel.Text + " +");
+                    improve.PointerEntered += (_, _) => Avalonia.Controls.ToolTip.SetTip(improve,
+                        tipTooltip.GetToolTip(cmdImproveMartialArtsRating));
+                    rating.Children.Add(improve);
+                    NativeControlPresentation.ConstrainWrapItems(rating);
+                    var details = MartialArtsDetailsLayout.Create(this, tabMartialArts, rating,
+                        lblMartialArtSourceLabel, lblMartialArtSource, tipTooltip,
+                        () => lblMartialArtSource_Click(lblMartialArtSource, EventArgs.Empty));
+                    InventoryTreeLayout.AttachPage(this, tabMartialArts, "NativeCareerMartialArts", "Martial Arts", details,
+                        treMartialArts, () => treMartialArts_KeyDown(treMartialArts, new KeyEventArgs(Keys.Delete)),
+                        null, null, cmdAddMartialArt, cmdAddManeuver, cmdDeleteMartialArt);
+                }
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    var group = InitiationGradeLayout.CreateGroup(this, tabInitiation, chkJoinGroup,
+                        lblGroupName, txtGroupName, lblGroupNotes, txtGroupNotes);
+                    var grade = InitiationGradeLayout.CreateGrade(this, tabInitiation, lblInitiateGradeLabel,
+                        lblInitiateGrade, chkInitiationGroup, chkInitiationOrdeal, tipTooltip, cmdImproveInitiation);
+                    InitiationGradeLayout.AttachPage(this, tabInitiation, "NativeCareerMetamagic", grade, group,
+                        lblInitiationHistoryLabel, lstInitiation, treMetamagic, lblMetamagicSourceLabel, lblMetamagicSource, tipTooltip,
+                        () => treMetamagic_KeyDown(treMetamagic, new KeyEventArgs(Keys.Delete)),
+                        () => lblMetamagicSource_Click(lblMetamagicSource, EventArgs.Empty), cmdAddMetamagic, cmdDeleteMetamagic);
+                }
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    var details = CritterPowerDetailsLayout.Create(this, tabCritter, chkCritterPowerCount,
+                        lblCritterPowerSourceLabel, lblCritterPowerSource, tipTooltip,
+                        () => lblCritterPowerSource_Click(lblCritterPowerSource, EventArgs.Empty),
+                        (lblCritterPowerPointCostLabel, lblCritterPowerPointCost),
+                        (lblCritterPowerPointsLabel, lblCritterPowerPoints), (lblCritterPowerNameLabel, lblCritterPowerName),
+                        (lblCritterPowerCategoryLabel, lblCritterPowerCategory), (lblCritterPowerTypeLabel, lblCritterPowerType),
+                        (lblCritterPowerActionLabel, lblCritterPowerAction), (lblCritterPowerRangeLabel, lblCritterPowerRange),
+                        (lblCritterPowerDurationLabel, lblCritterPowerDuration));
+                    InventoryTreeLayout.AttachPage(this, tabCritter, "NativeCareerCritterPowers", "Critter Powers",
+                        details, treCritterPowers, () => treCritterPowers_KeyDown(treCritterPowers, new KeyEventArgs(Keys.Delete)),
+                        null, null, cmdAddCritterPower, cmdDeleteCritterPower);
+                }
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    EditorRowStack.Attach<SpiritControl>(this, panSpirits);
+                    EditorRowStack.Attach<SpiritControl>(this, panSprites);
+                    var details = TechnomancerPersonaLayout.CreateComplexFormSummary(this, tabTechnomancer,
+                        lblComplexFormSkillLabel, lblComplexFormSkill, lblComplexFormSourceLabel, lblComplexFormSource,
+                        tipTooltip, () => lblComplexFormSource_Click(lblComplexFormSource, EventArgs.Empty),
+                        CreateComplexFormRating, AddComplexFormRows);
+                    TechnomancerPersonaLayout.AddPersona(this, tabTechnomancer, details, lblLivingPersonaLabel,
+                        lblParagonLabel, lblParagon, lblParagonInformation,
+                        (lblLivingPersonaResponseLabel, lblLivingPersonaResponse), (lblLivingPersonaSignalLabel, lblLivingPersonaSignal),
+                        (lblLivingPersonaSystemLabel, lblLivingPersonaSystem), (lblLivingPersonaFirewallLabel, lblLivingPersonaFirewall),
+                        (lblLivingPersonaBiofeedbackFilterLabel, lblLivingPersonaBiofeedbackFilter));
+                    MagicInventoryLayout.AttachPage(this, tabTechnomancer, "NativeCareerComplexForms", "NativeComplexFormSummary",
+                        details, lblComplexForms, lblSprites, cmdAddSprite, panSprites, tipTooltip, treComplexForms,
+                        () => treComplexForms_KeyDown(treComplexForms, new KeyEventArgs(Keys.Delete)),
+                        cmdAddComplexForm, cmdDeleteComplexForm);
+                }
             };
             var editGearDetail = PromptDetails.Attach(this, _objCharacter, treGear, null,
                 id => _objFunctions.FindGear(id, _objCharacter.Gear), detailChanged, cmsGear, cmsGearPlugin);
             Load += (_, _) =>
             {
-                NativeEditorTree.Attach(this, treWeapons, "NativeCareerWeapons", "Weapons",
-                    delete: () => treWeapons_KeyDown(treWeapons, new KeyEventArgs(Keys.Delete)),
-                    drag: new NativeTreeDrag(treWeapons, PrepareWeaponsDrag, DragWeaponsOver, DragWeaponsDrop,
-                        () => _objFunctions.ClearNodeBackground(treWeapons, null)));
-                NativeEditorTree.Attach(this, treArmor, "NativeCareerArmor", "Armor",
-                    delete: () => treArmor_KeyDown(treArmor, new KeyEventArgs(Keys.Delete)),
-                    drag: new NativeTreeDrag(treArmor, PrepareArmorDrag, DragArmorOver, DragArmorDrop,
-                        () => _objFunctions.ClearNodeBackground(treArmor, null)));
-                NativeEditorTree.Attach(this, treLifestyles, "NativeCareerLifestyles", "Lifestyles",
-                    delete: () => treLifestyles_KeyDown(treLifestyles, new KeyEventArgs(Keys.Delete)), editDetail: () => treLifestyles_DoubleClick(treLifestyles, EventArgs.Empty),
-                    drag: new NativeTreeDrag(treLifestyles, PrepareLifestylesDrag, DragLifestylesOver, DragLifestylesDrop,
-                        () => _objFunctions.ClearNodeBackground(treLifestyles, null)));
-                NativeEditorTree.Attach(this, treGear, "NativeCareerGear", "Gear",
-                    delete: () => treGear_KeyDown(treGear, new KeyEventArgs(Keys.Delete)), editDetail: editGearDetail,
-                    drag: new NativeTreeDrag(treGear, PrepareGearDrag, DragGearOver, DragGearDrop,
-                        () => { _objFunctions.ClearNodeBackground(treGear, null); _objDragButton = MouseButtons.None; }));
-                NativeEditorTree.Attach(this, treVehicles, "NativeCareerVehicles", "Vehicles",
-                    delete: () => treVehicles_KeyDown(treVehicles, new KeyEventArgs(Keys.Delete)),
-                    drag: new NativeTreeDrag(treVehicles, PrepareVehiclesDrag, DragVehiclesOver, DragVehiclesDrop,
-                        () => { _objFunctions.ClearNodeBackground(treVehicles, null); _objDragButton = MouseButtons.None; _blnDraggingGear = false; }));
-                NativeEditorTree.Attach(this, treImprovements, "NativeCareerImprovements", "Improvements",
-                    delete: () => treImprovements_KeyDown(treImprovements, new KeyEventArgs(Keys.Delete)), editDetail: () => treImprovements_DoubleClick(treImprovements, EventArgs.Empty),
-                    drag: new NativeTreeDrag(treImprovements, PrepareImprovementsDrag, DragImprovementsOver, DragImprovementsDrop,
-                        () => _objFunctions.ClearNodeBackground(treImprovements, null)));
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                    InventoryTreeLayout.AttachPage(this, tabWeapons, "NativeCareerWeapons", "Weapons",
+                        CreateWeaponDetails(), treWeapons, () => treWeapons_KeyDown(treWeapons, new KeyEventArgs(Keys.Delete)),
+                        null, new NativeTreeDrag(treWeapons, PrepareWeaponsDrag, DragWeaponsOver, DragWeaponsDrop,
+                            () => _objFunctions.ClearNodeBackground(treWeapons, null)),
+                        cmdAddWeapon, cmdDeleteWeapon, cmdAddWeaponLocation);
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    var details = ArmorEquipmentLayout.CreateDetails(this, tabArmor, chkArmorEquipped, lblArmorEquippedLabel,
+                        lblArmorEquipped, chkIncludedInArmor, lblArmorSourceLabel, lblArmorSource, tipTooltip,
+                        () => lblArmorSource_Click(lblArmorSource, EventArgs.Empty), [cmdArmorEquipAll, cmdArmorUnEquipAll],
+                        AddCareerArmorDetails);
+                    InventoryTreeLayout.AttachPage(this, tabArmor, "NativeCareerArmor", "Armor", details, treArmor,
+                        () => treArmor_KeyDown(treArmor, new KeyEventArgs(Keys.Delete)), null,
+                        new NativeTreeDrag(treArmor, PrepareArmorDrag, DragArmorOver, DragArmorDrop,
+                            () => _objFunctions.ClearNodeBackground(treArmor, null)),
+                        cmdAddArmor, cmdDeleteArmor, cmdAddArmorBundle);
+                }
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                    InventoryTreeLayout.AttachPage(this, tabLifestyle, "NativeCareerLifestyles", "Lifestyles",
+                        CreateLifestyleDetails(), treLifestyles,
+                        () => treLifestyles_KeyDown(treLifestyles, new KeyEventArgs(Keys.Delete)),
+                        () => treLifestyles_DoubleClick(treLifestyles, EventArgs.Empty),
+                        new NativeTreeDrag(treLifestyles, PrepareLifestylesDrag, DragLifestylesOver, DragLifestylesDrop,
+                            () => _objFunctions.ClearNodeBackground(treLifestyles, null)),
+                        cmdAddLifestyle, cmdDeleteLifestyle);
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                    GearReadoutsLayout.AttachPage(this, tabGear, "NativeCareer", CreateCareerGearDetails(),
+                        treGear, treFoci, lblFoci, cmdCreateStackedFocus, chkCommlinks,
+                        () => treGear_KeyDown(treGear, new KeyEventArgs(Keys.Delete)), editGearDetail,
+                        new NativeTreeDrag(treGear, PrepareGearDrag, DragGearOver, DragGearDrop,
+                            () => { _objFunctions.ClearNodeBackground(treGear, null); _objDragButton = MouseButtons.None; }),
+                        cmdAddGear, cmdDeleteGear, cmdAddLocation);
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                {
+                    var vehicleDetails = VehicleSummaryLayout.Create(this, tabVehicles, treVehicles, AddVehicleDetails,
+                        [(lblVehicleNameLabel, lblVehicleName)], [(lblVehicleCategoryLabel, lblVehicleCategory)],
+                        [(lblVehicleHandlingLabel, lblVehicleHandling), (lblVehicleAccelLabel, lblVehicleAccel),
+                         (lblVehicleSpeedLabel, lblVehicleSpeed), (lblVehicleDeviceLabel, lblVehicleDevice)],
+                        [(lblVehiclePilotLabel, lblVehiclePilot), (lblVehicleBodyLabel, lblVehicleBody),
+                         (lblVehicleArmorLabel, lblVehicleArmor), (lblVehicleSensorLabel, lblVehicleSensor)],
+                        [(lblVehicleFirewallLabel, lblVehicleFirewall), (lblVehicleSignalLabel, lblVehicleSignal),
+                         (lblVehicleResponseLabel, lblVehicleResponse), (lblVehicleSystemLabel, lblVehicleSystem)],
+                        [(lblVehicleAvailLabel, lblVehicleAvail), (lblVehicleCostLabel, lblVehicleCost), (lblVehicleSlotsLabel, lblVehicleSlots)]);
+                    InventoryTreeLayout.AttachPage(this, tabVehicles, "NativeCareerVehicles", "Vehicles",
+                        vehicleDetails, treVehicles, () => treVehicles_KeyDown(treVehicles, new KeyEventArgs(Keys.Delete)),
+                        null, new NativeTreeDrag(treVehicles, PrepareVehiclesDrag, DragVehiclesOver, DragVehiclesDrop,
+                            () => { _objFunctions.ClearNodeBackground(treVehicles, null); _objDragButton = MouseButtons.None; _blnDraggingGear = false; }),
+                        ComposeVehicleTree);
+                }
+                if (Avalonia.Application.Current != null && !IsDisposed)
+                    InventoryTreeLayout.AttachResponsivePage(this, tabImprovements, "NativeCareerImprovements", "Improvements",
+                        treImprovements, () => treImprovements_KeyDown(treImprovements, new KeyEventArgs(Keys.Delete)),
+                        () => treImprovements_DoubleClick(treImprovements, EventArgs.Empty),
+                        new NativeTreeDrag(treImprovements, PrepareImprovementsDrag, DragImprovementsOver, DragImprovementsDrop,
+                            () => _objFunctions.ClearNodeBackground(treImprovements, null)), ComposeImprovementTree);
             };
             GearStacks.Attach(this, _objCharacter, treGear, id => _objFunctions.FindGear(id, _objCharacter.Gear),
                 () => { RefreshSelectedGear(); detailChanged(); }, true, cmsGear, cmsGearPlugin);
@@ -168,10 +349,10 @@ namespace Chummer
 			GlobalOptions.Instance.MRUChanged += PopulateMRU;
 
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-            CharacterDetailsEditor.Attach(this, new[] { txtDescription, txtBackground, txtConcept, txtNotes },
-                new[] { lblDescription, lblBackground, lblConcept, lblNotes });
             MetatypeMeasurements.Attach(_objCharacter, tabCharacterInfo, lblMetatype, lblDescription);
-            AliasRandomizer.Attach(this, _objCharacter, txtAlias, lblMetatypeLabel);
+            AliasRandomizer.Attach(this, _objCharacter, txtAlias, lblAlias, lblMetatypeLabel);
+            CommonMetatypeSummary.Attach(this, lblMetatypeLabel, lblMetatype, lblMetatypeSourceLabel, lblMetatypeSource,
+                tipTooltip, () => lblMetatypeSource_Click(lblMetatypeSource, EventArgs.Empty), lblPossessed);
             hairChoices = AppearanceColors.Attach(txtHair);
             eyeChoices = AppearanceColors.Attach(txtEyes);
             skinChoices = AppearanceColors.Attach(txtSkin, skin: true);
@@ -755,7 +936,7 @@ namespace Chummer
 					objContactControl.BackColor = objContact.Colour;
 
 					objContactControl.Top = intContact * objContactControl.Height;
-					panContacts.Controls.Add(objContactControl);
+					AddCareerContact(objContactControl, enemy: false);
 				}
 				if (objContact.EntityType == ContactType.Enemy)
 				{
@@ -777,14 +958,15 @@ namespace Chummer
 					objContactControl.BackColor = objContact.Colour;
 
 					objContactControl.Top = intEnemy * objContactControl.Height;
-					panEnemies.Controls.Add(objContactControl);
+					AddCareerContact(objContactControl, enemy: true);
 				}
 				if (objContact.EntityType == ContactType.Pet)
 				{
 					PetControl objContactControl = new PetControl();
 					// Attach an EventHandler for the DeleteContact and FileNameChanged Events.
 					objContactControl.DeleteContact += objPet_DeleteContact;
-					objContactControl.FileNameChanged += objPet_FileNameChanged;
+					objContactControl.FileNameChanged += objPet_Changed;
+					objContactControl.DetailsChanged += objPet_Changed;
 
 					objContactControl.ContactObject = objContact;
 					objContactControl.ContactName = objContact.Name;
@@ -893,7 +1075,6 @@ namespace Chummer
 				if (objPower.DiscountedGeas)
 					objPowerControl.DiscountedByGeas = true;
 
-				objPowerControl.Top = i * objPowerControl.Height;
 				panPowers.Controls.Add(objPowerControl);
 			}
 
@@ -925,7 +1106,6 @@ namespace Chummer
 					objSpiritControl.Bound = objSpirit.Bound;
 					objSpiritControl.RebuildSpiritList(_objCharacter.MagicTradition);
 
-					objSpiritControl.Top = i * objSpiritControl.Height;
 					panSpirits.Controls.Add(objSpiritControl);
 				}
 			}
@@ -956,7 +1136,6 @@ namespace Chummer
 					objSpiritControl.Bound = objSpirit.Bound;
 					objSpiritControl.RebuildSpiritList(_objCharacter.TechnomancerStream);
 
-					objSpiritControl.Top = i * objSpiritControl.Height;
 					panSprites.Controls.Add(objSpiritControl);
 				}
 			}
@@ -1545,7 +1724,7 @@ namespace Chummer
 					objSkillControl.DiceRollerClicked -= objSkill_DiceRollerClicked;
 				}
 
-				foreach (ContactControl objContactControl in panContacts.Controls.OfType<ContactControl>())
+				foreach (ContactControl objContactControl in CareerContactControllers(enemy: false))
 				{
 					objContactControl.ConnectionRatingChanged -= objContact_ConnectionRatingChanged;
 					objContactControl.ConnectionGroupRatingChanged -= objContact_ConnectionGroupRatingChanged;
@@ -1555,7 +1734,7 @@ namespace Chummer
             objContactControl.ContactNameChanged -= objContact_NameChanged;
 				}
 
-				foreach (ContactControl objContactControl in panEnemies.Controls.OfType<ContactControl>())
+				foreach (ContactControl objContactControl in CareerContactControllers(enemy: true))
 				{
 					objContactControl.ConnectionRatingChanged -= objEnemy_ConnectionRatingChanged;
 					objContactControl.ConnectionGroupRatingChanged -= objEnemy_ConnectionGroupRatingChanged;
@@ -1568,7 +1747,8 @@ namespace Chummer
 				foreach (PetControl objContactControl in panPets.Controls.OfType<PetControl>())
 				{
 					objContactControl.DeleteContact -= objPet_DeleteContact;
-					objContactControl.FileNameChanged -= objPet_FileNameChanged;
+					objContactControl.FileNameChanged -= objPet_Changed;
+					objContactControl.DetailsChanged -= objPet_Changed;
 				}
 
 				foreach (PowerControl objPowerControl in panPowers.Controls.OfType<PowerControl>())
@@ -2104,7 +2284,7 @@ namespace Chummer
 			_objCharacter.Print(false);
 		}
 
-		private void mnuFileExport_Click(object sender, EventArgs e)
+		private async void mnuFileExport_Click(object sender, EventArgs e)
 		{
 			// Write the Character information to a MemoryStream so we don't need to create any files.
 			MemoryStream objStream = new MemoryStream();
@@ -2138,9 +2318,7 @@ namespace Chummer
 			objWriter.Close();
 			objStream.Close();
 
-			frmExport frmExportCharacter = new frmExport();
-			frmExportCharacter.CharacterXML = objCharacterXML;
-			frmExportCharacter.ShowDialog(this);
+			await CharacterExportWindow.ShowAsync(this, objCharacterXML);
 		}
 
 		private void mnuSpecialCyberzombie_Click(object sender, EventArgs e)
@@ -2265,7 +2443,7 @@ namespace Chummer
 		private void mnuSpecialReduceAttribute_Click(object sender, EventArgs e)
 		{
 			// Display the Select Attribute window and record which Skill was selected.
-			frmSelectAttribute frmPickAttribute = new frmSelectAttribute();
+			using var frmPickAttribute = new frmSelectAttribute();
 			frmPickAttribute.Description = LanguageManager.Instance.GetString("String_CyberzombieReduceAttribute");
 			if (_objCharacter.MAGEnabled)
 				frmPickAttribute.AddMAG();
@@ -3287,7 +3465,7 @@ namespace Chummer
 			}
 
 			// Verify that the user wants to Burn a point of Edge.
-			if (MessageBox.Show(LanguageManager.Instance.GetString("Message_BurnEdge"), LanguageManager.Instance.GetString("MessageTitle_BurnEdge"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
+			if (MessageBox.Show(this, LanguageManager.Instance.GetString("Message_BurnEdge"), LanguageManager.Instance.GetString("MessageTitle_BurnEdge"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 				return;
 
 			_objCharacter.EDG.Value -= 1;
@@ -4093,6 +4271,7 @@ namespace Chummer
 			}
 			// Remove the SkillControl that raised the Event.
 			panKnowledgeSkills.Controls.Remove(objSender);
+            objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -4227,25 +4406,7 @@ namespace Chummer
 
 			// Handle the DeleteContact Event for the ContactControl object.
 			ContactControl objSender = (ContactControl)sender;
-			bool blnFound = false;
-			foreach (ContactControl objContactControl in panContacts.Controls)
-			{
-				// Set the flag to show that we have found the Contact.
-				if (objContactControl == objSender)
-				{
-					blnFound = true;
-                    // Delete exactly the selected record; later rows only move.
-                    _objCharacter.Contacts.Remove(objContactControl.ContactObject);
-				}
-
-				// Once the Contact has been found, all of the other ContactControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
-				if (blnFound)
-				{
-					objContactControl.Top -= 25;
-				}
-			}
-			// Remove the ContactControl that raised the Event.
-			panContacts.Controls.Remove(objSender);
+			RemoveCareerContact(objSender, enemy: false);
             objSender.ConnectionRatingChanged -= objContact_ConnectionRatingChanged;
             objSender.ConnectionGroupRatingChanged -= objContact_ConnectionGroupRatingChanged;
             objSender.LoyaltyRatingChanged -= objContact_LoyaltyRatingChanged;
@@ -4328,25 +4489,7 @@ namespace Chummer
 			}
 
 			// Handle the DeleteContact Event for the ContactControl object.
-			bool blnFound = false;
-			foreach (ContactControl objContactControl in panEnemies.Controls)
-			{
-				// Set the flag to show that we have found the contact.
-				if (objContactControl == objSender)
-				{
-					blnFound = true;
-                    // Delete exactly the selected record; later rows only move.
-                    _objCharacter.Contacts.Remove(objContactControl.ContactObject);
-				}
-
-				// Once the Enemy has been found, all of the other ContactControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
-				if (blnFound)
-				{
-					objContactControl.Top -= 25;
-				}
-			}
-			// Remove the ContactControl that raised the Event.
-			panEnemies.Controls.Remove(objSender);
+			RemoveCareerContact(objSender, enemy: true);
             objSender.ConnectionRatingChanged -= objEnemy_ConnectionRatingChanged;
             objSender.ConnectionGroupRatingChanged -= objEnemy_ConnectionGroupRatingChanged;
             objSender.LoyaltyRatingChanged -= objEnemy_LoyaltyRatingChanged;
@@ -4382,30 +4525,18 @@ namespace Chummer
 			if (!_objFunctions.ConfirmDelete(LanguageManager.Instance.GetString("Message_DeleteContact")))
 				return;
 
-			// Handle the DeleteContact Event for the ContactControl object.
-			PetControl objSender = (PetControl)sender;
-			bool blnFound = false;
-			foreach (PetControl objContactControl in panPets.Controls)
-			{
-				// Set the flag to show that we have found the Contact.
-				if (objContactControl == objSender)
-					blnFound = true;
-
-				// Once the Contact has been found, all of the other ContactControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
-				if (blnFound)
-					_objCharacter.Contacts.Remove(objContactControl.ContactObject);
-			}
-			// Remove the ContactControl that raised the Event.
-			panPets.Controls.Remove(objSender);
+			var pet = (PetControl)sender;
+			_objCharacter.Contacts.Remove(pet.ContactObject);
+			panPets.Controls.Remove(pet);
+			pet.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
 			UpdateWindowTitle();
 		}
 
-		private void objPet_FileNameChanged(Object sender)
+		private void objPet_Changed(Object sender)
 		{
-			// Handle the FileNameChanged Event for the ContactControl object.
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -4441,22 +4572,9 @@ namespace Chummer
 
 			// Handle the DeleteSpirit Event for the SpiritControl object.
 			SpiritControl objSender = (SpiritControl)sender;
-			bool blnFound = false;
-			foreach (SpiritControl objSpiritControl in panSpirits.Controls)
-			{
-				// Set the flag to show that we have found the Spirit.
-				if (objSpiritControl == objSender)
-					blnFound = true;
-
-				// Once the Spirit has been found, all of the other SpiritControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
-				if (blnFound)
-				{
-					_objCharacter.Spirits.Remove(objSpiritControl.SpiritObject);
-					objSpiritControl.Top -= 25;
-				}
-			}
-			// Remove the SpiritControl that raised the Event.
+			_objCharacter.Spirits.Remove(objSender.SpiritObject);
 			panSpirits.Controls.Remove(objSender);
+            objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -4501,22 +4619,9 @@ namespace Chummer
 
 			// Handle the DeleteSpirit Event for the SpiritControl object.
 			SpiritControl objSender = (SpiritControl)sender;
-			bool blnFound = false;
-			foreach (SpiritControl objSpriteControl in panSprites.Controls)
-			{
-				// Set the flag to show that we have found the Sprite.
-				if (objSpriteControl == objSender)
-					blnFound = true;
-
-				// Once the Spirit has been found, all of the other SpiritControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
-				if (blnFound)
-				{
-					_objCharacter.Spirits.Remove(objSpriteControl.SpiritObject);
-					objSpriteControl.Top -= 25;
-				}
-			}
-			// Remove the SpiritControl that raised the Event.
+			_objCharacter.Spirits.Remove(objSender.SpiritObject);
 			panSprites.Controls.Remove(objSender);
+            objSender.Dispose();
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -4570,17 +4675,6 @@ namespace Chummer
 
 			// Handle the DeletePower Event for the PowerControl.
 			PowerControl objSender = (PowerControl)sender;
-			bool blnFound = false;
-			foreach (PowerControl objPowerControl in panPowers.Controls)
-			{
-				// Set the flag to show that we have found the Power.
-				if (objPowerControl == objSender)
-					blnFound = true;
-
-				// Once the Power has been found, all of the other PowerControls on the Panel should move up 25 pixels to fill in the gap that deleting this one will cause.
-				if (blnFound)
-					objPowerControl.Top -= 25;
-			}
 
 			// Remove the Improvements that were created by the Power.
 			_objImprovementManager.RemoveImprovements(Improvement.ImprovementSource.Power, objSender.PowerObject.InternalId);
@@ -4596,6 +4690,7 @@ namespace Chummer
 
 			// Remove the PowerControl that raised the Event.
 			panPowers.Controls.Remove(objSender);
+            objSender.Dispose();
 			CalculatePowerPoints();
 		}
 		#endregion
@@ -4743,7 +4838,7 @@ namespace Chummer
 			Contact objContact = new Contact(_objCharacter);
 			_objCharacter.Contacts.Add(objContact);
 
-			int i = panContacts.Controls.Count;
+			int i = CareerContactControllers(enemy: false).Count;
 			ContactControl objContactControl = new ContactControl();
 			objContactControl.ContactObject = objContact;
 			objContactControl.EntityType = ContactType.Contact;
@@ -4758,7 +4853,7 @@ namespace Chummer
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panContacts.AutoScrollPosition.Y);
-			panContacts.Controls.Add(objContactControl);
+			AddCareerContact(objContactControl, enemy: false, reveal: true);
 			UpdateCharacterInfo();
 
 			_blnIsDirty = true;
@@ -4771,7 +4866,7 @@ namespace Chummer
 			Contact objContact = new Contact(_objCharacter);
 			_objCharacter.Contacts.Add(objContact);
 
-			int i = panEnemies.Controls.Count;
+			int i = CareerContactControllers(enemy: true).Count;
 			ContactControl objContactControl = new ContactControl();
 			objContactControl.ContactObject = objContact;
 			objContactControl.EntityType = ContactType.Enemy;
@@ -4786,7 +4881,7 @@ namespace Chummer
 
 			// Set the ContactControl's Location since scrolling the Panel causes it to actually change the child Controls' Locations.
 			objContactControl.Location = new Point(0, objContactControl.Height * i + panEnemies.AutoScrollPosition.Y);
-			panEnemies.Controls.Add(objContactControl);
+			AddCareerContact(objContactControl, enemy: true, reveal: true);
 
 			UpdateCharacterInfo();
 
@@ -4949,7 +5044,6 @@ namespace Chummer
 			}
 			objSpiritControl.RebuildSpiritList(_objCharacter.MagicTradition);
 
-			objSpiritControl.Top = i * objSpiritControl.Height;
 			panSpirits.Controls.Add(objSpiritControl);
 
 			_blnIsDirty = true;
@@ -4978,7 +5072,6 @@ namespace Chummer
 			objSpriteControl.Force = Convert.ToInt32(_objCharacter.RES.Value);
 			objSpriteControl.RebuildSpiritList(_objCharacter.TechnomancerStream);
 
-			objSpriteControl.Top = i * objSpriteControl.Height;
 			panSprites.Controls.Add(objSpriteControl);
 
 			_blnIsDirty = true;
@@ -5035,7 +5128,6 @@ namespace Chummer
 
 			// Set the control's Maximum.
 			objPowerControl.RefreshMaximum(_objCharacter.MAG.TotalValue);
-			objPowerControl.Top = i * objPowerControl.Height;
 			objPowerControl.RefreshTooltip();
 			panPowers.Controls.Add(objPowerControl);
 
@@ -6292,16 +6384,14 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectMartialArt frmPickMartialArt = new frmSelectMartialArt(_objCharacter);
-			frmPickMartialArt.ShowDialog(this);
-
-			if (frmPickMartialArt.DialogResult == DialogResult.Cancel)
+			using var frmPickMartialArt = new MartialArtDetailPicker(_objCharacter, MartialArtDetailPicker.Kind.Art);
+			if (frmPickMartialArt.ShowDialog(this) == DialogResult.Cancel)
 				return;
 
 			// Open the Martial Arts XML file and locate the selected piece.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("martialarts.xml");
 
-			XmlNode objXmlArt = objXmlDocument.SelectSingleNode("/chummer/martialarts/martialart[name = \"" + frmPickMartialArt.SelectedMartialArt + "\"]");
+			XmlNode objXmlArt = objXmlDocument.SelectSingleNode("/chummer/martialarts/martialart[name = \"" + frmPickMartialArt.SelectedItem + "\"]");
 
 			TreeNode objNode = new TreeNode();
 			MartialArt objMartialArt = new MartialArt(_objCharacter);
@@ -6312,7 +6402,7 @@ namespace Chummer
 
 			// Create the Expense Log Entry.
 			ExpenseLogEntry objExpense = new ExpenseLogEntry();
-			objExpense.Create(intKarmaCost * -1, LanguageManager.Instance.GetString("String_ExpenseLearnMartialArt") + " " + frmPickMartialArt.SelectedMartialArt, ExpenseType.Karma, DateTime.Now);
+			objExpense.Create(intKarmaCost * -1, LanguageManager.Instance.GetString("String_ExpenseLearnMartialArt") + " " + frmPickMartialArt.SelectedItem, ExpenseType.Karma, DateTime.Now);
 			_objCharacter.ExpenseEntries.Add(objExpense);
 			_objCharacter.Karma -= intKarmaCost;
 
@@ -6428,16 +6518,14 @@ namespace Chummer
 				return;
 			}
 
-			frmSelectMartialArtManeuver frmPickMartialArtManeuver = new frmSelectMartialArtManeuver(_objCharacter);
-			frmPickMartialArtManeuver.ShowDialog(this);
-
-			if (frmPickMartialArtManeuver.DialogResult == DialogResult.Cancel)
+			using var frmPickMartialArtManeuver = new MartialArtDetailPicker(_objCharacter, MartialArtDetailPicker.Kind.Maneuver);
+			if (frmPickMartialArtManeuver.ShowDialog(this) == DialogResult.Cancel)
 				return;
 
 			// Open the Martial Arts XML file and locate the selected piece.
 			XmlDocument objXmlDocument = XmlManager.Instance.Load("martialarts.xml");
 
-			XmlNode objXmlManeuver = objXmlDocument.SelectSingleNode("/chummer/maneuvers/maneuver[name = \"" + frmPickMartialArtManeuver.SelectedManeuver + "\"]");
+			XmlNode objXmlManeuver = objXmlDocument.SelectSingleNode("/chummer/maneuvers/maneuver[name = \"" + frmPickMartialArtManeuver.SelectedItem + "\"]");
 
 			TreeNode objNode = new TreeNode();
 			MartialArtManeuver objManeuver = new MartialArtManeuver(_objCharacter);
@@ -6880,7 +6968,7 @@ namespace Chummer
 
 		private void cmdAddExoticSkill_Click(object sender, EventArgs e)
 		{
-			frmSelectExoticSkill frmPickExoticSkill = new frmSelectExoticSkill();
+			using var frmPickExoticSkill = new frmSelectExoticSkill();
 			frmPickExoticSkill.ShowDialog(this);
 
 			if (frmPickExoticSkill.DialogResult == DialogResult.Cancel)
@@ -9018,7 +9106,8 @@ namespace Chummer
 
 			// Attach an EventHandler for the DeleteContact and FileNameChanged Events.
 			objContactControl.DeleteContact += objPet_DeleteContact;
-			objContactControl.FileNameChanged += objPet_FileNameChanged;
+			objContactControl.FileNameChanged += objPet_Changed;
+			objContactControl.DetailsChanged += objPet_Changed;
 
 			// Add the control to the Panel.
 			panPets.Controls.Add(objContactControl);
@@ -10074,17 +10163,14 @@ namespace Chummer
 					return;
 				}
 
-				frmSelectMartialArtAdvantage frmPickMartialArtAdvantage = new frmSelectMartialArtAdvantage(_objCharacter);
-				frmPickMartialArtAdvantage.MartialArt = objMartialArt.Name;
-				frmPickMartialArtAdvantage.ShowDialog(this);
-
-				if (frmPickMartialArtAdvantage.DialogResult == DialogResult.Cancel)
+				using var frmPickMartialArtAdvantage = new MartialArtDetailPicker(_objCharacter, MartialArtDetailPicker.Kind.Advantage, objMartialArt.Name);
+				if (frmPickMartialArtAdvantage.ShowDialog(this) == DialogResult.Cancel)
 					return;
 
 				// Open the Martial Arts XML file and locate the selected piece.
 				XmlDocument objXmlDocument = XmlManager.Instance.Load("martialarts.xml");
 
-				XmlNode objXmlAdvantage = objXmlDocument.SelectSingleNode("/chummer/martialarts/martialart[name = \"" + objMartialArt.Name + "\"]/advantages/advantage[name = \"" + frmPickMartialArtAdvantage.SelectedAdvantage + "\"]");
+				XmlNode objXmlAdvantage = objXmlDocument.SelectSingleNode("/chummer/martialarts/martialart[name = \"" + objMartialArt.Name + "\"]/advantages/advantage[name = \"" + frmPickMartialArtAdvantage.SelectedItem + "\"]");
 
 				// Create the Improvements for the Advantage if there are any.
 				TreeNode objNode = new TreeNode();
@@ -17328,7 +17414,7 @@ namespace Chummer
 			}
 
 			// Show the Ammunition Selection window.
-			frmReload frmReloadWeapon = new frmReload();
+			using var frmReloadWeapon = new frmReload();
 			frmReloadWeapon.Ammo = lstAmmo;
 			frmReloadWeapon.Count = lstCount;
 			frmReloadWeapon.ShowDialog(this);
@@ -17373,7 +17459,8 @@ namespace Chummer
 								objNewGear.Quantity = objWeapon.AmmoRemaining;
 								objNewNode.Text = objNewGear.DisplayName;
 								_objCharacter.Gear.Add(objNewGear);
-								treGear.Nodes[0].Nodes.Add(objNewNode);
+								if (!chkCommlinks.Checked)
+									treGear.Nodes[0].Nodes.Add(objNewNode);
 								blnBreak = true;
 								break;
 							}
@@ -17430,7 +17517,8 @@ namespace Chummer
 						if (objSelectedAmmo.Parent.Quantity > 0)
 							objSelectedAmmo.Parent.Quantity--;
 						TreeNode objNode = _objFunctions.FindNode(objSelectedAmmo.Parent.InternalId, treGear);
-						objNode.Text = objSelectedAmmo.Parent.DisplayName;
+						if (objNode != null)
+							objNode.Text = objSelectedAmmo.Parent.DisplayName;
 					}
 				}
 				else
@@ -18214,7 +18302,7 @@ namespace Chummer
 			}
 
 			// Show the Ammunition Selection window.
-			frmReload frmReloadWeapon = new frmReload();
+			using var frmReloadWeapon = new frmReload();
 			frmReloadWeapon.Ammo = lstAmmo;
 			frmReloadWeapon.Count = lstCount;
 			frmReloadWeapon.ShowDialog(this);
@@ -18430,12 +18518,11 @@ namespace Chummer
 		#region Additional Spells and Spirits Tab Control Events
 		private void treSpells_AfterSelect(object sender, TreeViewEventArgs e)
 		{
-			if (treSpells.SelectedNode.Level > 0)
+			Spell objSpell = treSpells.SelectedNode is { Level: > 0, Tag: string id }
+				? _objFunctions.FindSpell(id, _objCharacter.Spells) : null;
+			if (objSpell != null)
 			{
 				_blnSkipRefresh = true;
-
-				// Locate the selected Spell.
-				Spell objSpell = _objFunctions.FindSpell(e.Node.Tag.ToString(), _objCharacter.Spells);
 
 				lblSpellDescriptors.Text = objSpell.DisplayDescriptors;
 				lblSpellCategory.Text = objSpell.DisplayCategory;
@@ -18478,7 +18565,7 @@ namespace Chummer
 						strDrain = strDrain.Replace(LanguageManager.Instance.GetString("String_AttributeMAGShort"), _objCharacter.MAG.TotalValue.ToString());
 						XPathExpression xprDrain = nav.Compile(strDrain);
 					    string temp = string.Format(GlobalOptions.Instance.CultureInfo, "{0}", nav.Evaluate(xprDrain));
-                        int intDrain = Convert.ToInt32(xprDrain);
+                        int intDrain = Convert.ToInt32(temp);
 						intDrain += _objImprovementManager.ValueOf(Improvement.ImprovementType.DrainResistance);
 
 						strTip = lblDrainAttributes.Text.Replace(LanguageManager.Instance.GetString("String_AttributeBODShort"), LanguageManager.Instance.GetString("String_AttributeBODShort") + " (" + _objCharacter.BOD.TotalValue.ToString() + ")");
@@ -19996,11 +20083,13 @@ namespace Chummer
 		#region Splitter Resize Events
 		private void splitSkills_Panel1_Resize(object sender, EventArgs e)
 		{
-			panActiveSkills.Height = splitSkills.Panel1.Height - panActiveSkills.Top;
 			panSkillGroups.Height = splitSkills.Panel1.Height - panSkillGroups.Top;
-			panActiveSkills.Width = splitSkills.Panel1.Width - panActiveSkills.Left;
 			panSkillGroups.Width = panActiveSkills.Left - 6 - panSkillGroups.Left;
+			if (cboSkillFilter.Parent == null)
+				return;
 
+			panActiveSkills.Height = splitSkills.Panel1.Height - panActiveSkills.Top;
+			panActiveSkills.Width = splitSkills.Panel1.Width - panActiveSkills.Left;
 			cmdAddExoticSkill.Left = panActiveSkills.Left + panActiveSkills.Width - cmdAddExoticSkill.Width - 3;
 			cboSkillFilter.Left = cmdAddExoticSkill.Left - cboSkillFilter.Width - 6;
 		}
@@ -20023,60 +20112,29 @@ namespace Chummer
 			panEnemies.Height = splitContacts.Panel2.Height - panEnemies.Top;
 		}
 
-		private void splitKarmaNuyen_Panel1_Resize(object sender, EventArgs e)
-		{
-			lstKarma.Width = splitKarmaNuyen.Panel1.Width;
-			if (_blnExpenseChartsAvailable)
-			{
-				chtKarma.Width = splitKarmaNuyen.Panel1.Width;
-				chtKarma.Height = 210;
-				chtKarma.Top = splitKarmaNuyen.Panel1.Height - 6 - chtKarma.Height;
-				lstKarma.Height = chtKarma.Top - 6 - lstKarma.Top;
-			}
-			else
-			{
-				lstKarma.Height = splitKarmaNuyen.Panel1.Height - 6 - lstKarma.Top;
-			}
-			try
-			{
-				if (lstKarma.Width > 409)
-				{
-					lstKarma.Columns[2].Width = lstKarma.Width - 220;
-				}
-			}
-			catch
-			{
-			}
-		}
+        private void splitKarmaNuyen_Panel1_Resize(object sender, EventArgs e) =>
+            ArrangeExpensePane(splitKarmaNuyen.Panel1, lstKarma, chtKarma);
 
-		private void splitKarmaNuyen_Panel2_Resize(object sender, EventArgs e)
-		{
-			lstNuyen.Width = splitKarmaNuyen.Panel2.Width;
-			if (_blnExpenseChartsAvailable)
-			{
-				chtNuyen.Width = splitKarmaNuyen.Panel2.Width;
-				chtNuyen.Height = 210;
-				chtNuyen.Top = splitKarmaNuyen.Panel2.Height - 6 - chtNuyen.Height;
-				lstNuyen.Height = chtNuyen.Top - 6 - lstNuyen.Top;
-			}
-			else
-			{
-				lstNuyen.Height = splitKarmaNuyen.Panel2.Height - 6 - lstNuyen.Top;
-			}
-			try
-			{
-				if (lstNuyen.Width > 409)
-				{
-					lstNuyen.Columns[2].Width = lstNuyen.Width - 220;
-				}
-			}
-			catch
-			{
-			}
-		}
-		#endregion
+        private void splitKarmaNuyen_Panel2_Resize(object sender, EventArgs e) =>
+            ArrangeExpensePane(splitKarmaNuyen.Panel2, lstNuyen, chtNuyen);
 
-		#region Other Control Events
+        private void ArrangeExpensePane(SplitterPanel pane, ListView ledger, HistoryChart chart)
+        {
+            const int gap = 6;
+            const int minimumLedger = 72;
+            const int minimumChart = 72;
+            var viewport = InventoryTreeLayout.VisiblePageSize(MdiParent ?? this, pane);
+            int available = Math.Max(0, viewport.Height - ledger.Top - gap);
+            int chartHeight = Math.Min(Math.Min(210, available * 2 / 5), available - minimumLedger - gap);
+            bool showChart = _blnExpenseChartsAvailable && chartHeight >= minimumChart;
+            ledger.Width = viewport.Width;
+            ledger.Height = showChart ? available - chartHeight - gap : available;
+            chart.Visible = showChart;
+            if (showChart)
+                chart.SetBounds(0, ledger.Bottom + gap, viewport.Width, chartHeight);
+
+        }
+
 		private void txtCharacterName_TextChanged(object sender, EventArgs e)
 		{
 			_objCharacter.Name = txtCharacterName.Text;
@@ -20321,7 +20379,9 @@ namespace Chummer
 			_objController.ClearSpellTab(treSpells);
 
 			// Remove the Spirits.
-			panSpirits.Controls.Clear();
+			foreach (Control row in panSpirits.Controls.Cast<Control>().ToArray())
+                row.Dispose();
+            panSpirits.Controls.Clear();
 
 			_blnIsDirty = true;
 			UpdateCharacterInfo();
@@ -20335,7 +20395,9 @@ namespace Chummer
 			_objController.ClearAdeptTab();
 
 			// Remove all of the Adept Powers from the panel.
-			panPowers.Controls.Clear();
+			foreach (Control row in panPowers.Controls.Cast<Control>().ToArray())
+                row.Dispose();
+            panPowers.Controls.Clear();
 
 			_blnIsDirty = true;
 			UpdateCharacterInfo();
@@ -20349,7 +20411,9 @@ namespace Chummer
 			_objController.ClearTechnomancerTab(treComplexForms);
 
 			// Remove the Sprites.
-			panSprites.Controls.Clear();
+			foreach (Control row in panSprites.Controls.Cast<Control>().ToArray())
+                row.Dispose();
+            panSprites.Controls.Clear();
 
 			_blnIsDirty = true;
 			UpdateCharacterInfo();
@@ -20472,7 +20536,7 @@ namespace Chummer
 
 		private void chkVehicleCM_CheckedChanged(object sender, EventArgs e)
 		{
-            if (WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
+            if (treVehicles.SelectedNode == null || WeaponInventoryViews.IsAmmunition(treVehicles.SelectedNode)) return;
 			if (_blnSkipRefresh)
 				return;
 
@@ -23726,6 +23790,7 @@ namespace Chummer
 			}
 			if (blnClear)
 			{
+				panVehicleCM.Visible = false;
 				lblVehicleWeaponAmmoRemaining.Text = "";
 				lblVehicleWeaponName.Text = "";
 				lblVehicleWeaponCategory.Text = "";
@@ -24918,16 +24983,17 @@ namespace Chummer
 			if (!_blnExpenseChartsAvailable)
 				return;
 
-            chtKarma.SetEntries(_objCharacter.ExpenseEntries, ExpenseType.Karma, "Karma Remaining");
-            chtNuyen.SetEntries(_objCharacter.ExpenseEntries, ExpenseType.Nuyen, "Nuyen Remaining");
+            chtKarma.SetEntries(_objCharacter.ExpenseEntries, ExpenseType.Karma, LanguageManager.Instance.GetString("Label_KarmaRemaining").TrimEnd(':'));
+            chtNuyen.SetEntries(_objCharacter.ExpenseEntries, ExpenseType.Nuyen, LanguageManager.Instance.GetString("Label_OtherNuyenRemain").TrimEnd(':'));
         }
 
         private void LayoutExpenseViewport()
         {
             if (tabCharacterTabs.SelectedTab != tabKarma) return;
             splitKarmaNuyen.Location = new System.Drawing.Point(3, 3);
-            splitKarmaNuyen.Size = new System.Drawing.Size(Math.Max(400, tabCharacterTabs.Width - 8),
-                Math.Max(300, ClientSize.Height - tabCharacterTabs.Top - 40));
+            var viewport = InventoryTreeLayout.VisiblePageSize(MdiParent ?? this, tabKarma);
+            splitKarmaNuyen.Size = new System.Drawing.Size(Math.Max(0, viewport.Width - 6),
+                Math.Max(0, viewport.Height - 6));
             splitKarmaNuyen_Panel1_Resize(this, EventArgs.Empty);
             splitKarmaNuyen_Panel2_Resize(this, EventArgs.Empty);
         }
@@ -26051,6 +26117,26 @@ namespace Chummer
 			}
 		}
 
+        private Avalonia.Controls.StackPanel CreateCareerGearDetails()
+        {
+            var rows = GearReadoutsLayout.CreateCareerSummary(this, tabGear,
+                (lblGearNameLabel, lblGearName), (lblGearCategoryLabel, lblGearCategory),
+                [(lblGearRatingLabel, lblGearRating), (lblGearAvailLabel, lblGearAvail), (lblGearCostLabel, lblGearCost)],
+                (lblGearCapacityLabel, lblGearCapacity), (lblGearQtyLabel, lblGearQty),
+                (cmdGearIncreaseQty, LanguageManager.Instance.GetString("Tip_IncreaseGearQty")),
+                (cmdGearReduceQty, LanguageManager.Instance.GetString("Tip_DecreaseGearQty")),
+                (cmdGearSplitQty, LanguageManager.Instance.GetString("Tip_SplitGearQty")),
+                (cmdGearMergeQty, LanguageManager.Instance.GetString("Tip_MergeGearQty")),
+                (cmdGearMoveToVehicle, LanguageManager.Instance.GetString("Tip_TransferToVehicle")));
+            GearReadoutsLayout.AddReadouts(this, tabGear, rows, lblGearSourceLabel, lblGearSource, tipTooltip,
+                () => lblGearSource_Click(lblGearSource, EventArgs.Empty),
+                [(lblGearResponseLabel, lblGearResponse), (lblGearSignalLabel, lblGearSignal),
+                 (lblGearSystemLabel, lblGearSystem), (lblGearFirewallLabel, lblGearFirewall)],
+                [(lblGearDamageLabel, lblGearDamage), (lblGearAPLabel, lblGearAP)]);
+            GearReadoutsLayout.AddOptions(this, tabGear, rows, chkGearEquipped, chkGearHomeNode, chkActiveCommlink);
+            return rows;
+        }
+
 		/// <summary>
 		/// Populate the TreeView that contains all of the character's Gear.
 		/// </summary>
@@ -26146,6 +26232,9 @@ namespace Chummer
 
 			foreach (Gear objGear in _objCharacter.Gear)
 			{
+				if (chkCommlinks.Checked && objGear.Category != "Commlink")
+					continue;
+
 				TreeNode objNode = new TreeNode();
 				objNode.Text = objGear.DisplayName;
 				objNode.Tag = objGear.InternalId;

@@ -101,6 +101,15 @@ namespace Majorsilence.Forms
             set => tab_strip.Visible = value;
         }
 
+        /// <summary>Reserves the header area for a native presentation while retaining page layout and selection.</summary>
+        public void InstallHeaderPresentation (Control header)
+        {
+            tab_strip.Visible = false;
+            header.Dock = DockForAlignment (Alignment);
+            Controls.Add (header);
+            header.SendToBack ();
+        }
+
         private TabPage? GetPageFromTab (TabStripItem? item) => TabPages.FirstOrDefault (p => p.TabStripItem == item);
 
         // The strip owns the hover, so it needs the page behind a tab to read its ToolTipText.

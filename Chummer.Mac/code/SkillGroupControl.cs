@@ -144,7 +144,6 @@ namespace Chummer
             set
             {
                 nudSkill.Value = value;
-				lblGroupRating.Text = value.ToString();
 				_objSkillGroup.Rating = value;
 
 				if (value < _objSkillGroup.RatingMaximum)
@@ -160,6 +159,7 @@ namespace Chummer
 				}
 				else
 					cmdImproveSkill.Enabled = false;
+				lblGroupRating.Text = value.ToString();
             }
         }
 

@@ -30,6 +30,29 @@ internal static class NativeBasicLifestyleChecks
                 window.SearchBox.Text = "Low"; await Task.Delay(100);
                 check(window.RoommatesInput.Minimum == 0 && window.RoommatesInput.Maximum == 10 && window.PercentageInput.Maximum == 900 && window.PercentageInput.Value == 100,
                     "Native basic lifestyle integer controls retain roommate and percentage bounds and defaults");
+                var root = (Grid)window.Content!;
+                var percentageRow = window.PercentageInput.GetVisualAncestors().OfType<StackPanel>().First();
+                var percentCaption = (TextBlock)percentageRow.Children[0];
+                var originalCaption = percentCaption.Text;
+                double originalWidth = window.Width;
+                try
+                {
+                    window.Width = 420;
+                    double enlarged = window.PercentageInput.FontSize * 1.5;
+                    Avalonia.Controls.Documents.TextElement.SetFontSize(root, enlarged);
+                    percentCaption.Text = "Translated percentage of the lifestyle cost to pay";
+                    await Task.Delay(100);
+                    check(window.PercentageInput.FontSize == enlarged && window.PercentageInput.Bounds.Width >= 100 &&
+                        percentCaption.Bounds.Bottom <= window.PercentageInput.Bounds.Top &&
+                        window.PercentageInput.Bounds.Right <= percentageRow.Bounds.Width + 1,
+                        "Narrow Lifestyle picker keeps the percentage input below its translated caption at 150% text");
+                }
+                finally
+                {
+                    percentCaption.Text = originalCaption;
+                    window.Width = originalWidth;
+                    root.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                }
                 window.RoommatesInput.Text = "2"; window.PercentageInput.Text = "33"; await Task.Delay(30);
                 check(window.Model.Details!.Cost == string.Format("{0:###,###,##0¥}", 792), "Native basic lifestyle typing updates the established preview price");
                 window.RoommatesInput.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "PART_IncreaseButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Task.Delay(30);

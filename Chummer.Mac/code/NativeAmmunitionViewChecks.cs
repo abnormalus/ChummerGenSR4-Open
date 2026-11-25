@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Avalonia.VisualTree;
 using Majorsilence.Forms;
 
 namespace Chummer;
@@ -72,6 +73,19 @@ internal static class NativeAmmunitionViewChecks
                 check(Field<Label>(editor, "lblWeaponName").Text == "" && !Field<Button>(editor, "cmdDeleteWeapon").Enabled &&
                     !Field<ToolStripMenuItem>(editor, "mnuEditCopy").Enabled && tree.SelectedNode.ContextMenuStrip == null,
                     "Native " + mode + " ammunition rows clear weapon details and expose no item context or destructive button");
+                if (career)
+                {
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { },
+                        Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                    var weaponHost = main.Controls.OfType<NativeControlHost>().Single(host => host.Name == "NativeCareerWeapons");
+                    var page = (Avalonia.Controls.Grid)((Avalonia.Controls.Grid)weaponHost.NativeControl!).Children[0];
+                    var weaponLayout = (Avalonia.Controls.Grid)page.Children[0];
+                    var commands = (Avalonia.Controls.WrapPanel)weaponLayout.Children[0];
+                    var deleteGroup = (Avalonia.Controls.DockPanel)commands.Children[1];
+                    check(commands.Children.Count == 3 && commands.Bounds.Bottom <= weaponLayout.Children[1].Bounds.Top &&
+                        !deleteGroup.IsEnabled,
+                        "Native weapon commands stay above the tree and disable Delete on an ammunition row");
+                }
                 foreach (string command in new[] { "cmdDeleteWeapon_Click", "tsWeaponName_Click", "tsWeaponNotes_Click", "tsWeaponAddAccessory_Click", "tsWeaponAddModification_Click", "tsWeaponAddUnderbarrel_Click", "chkWeaponAccessoryInstalled_CheckedChanged", "mnuEditCopy_Click" }) Invoke(editor, command);
                 if (career) foreach (string command in new[] { "tsWeaponSell_Click", "cmdReloadWeapon_Click", "cmsAmmoSingleShot_Click", "cmdWeaponMoveToVehicle_Click" }) Invoke(editor, command);
                 else Invoke(editor, "mnuEditPaste_Click");
@@ -83,6 +97,71 @@ internal static class NativeAmmunitionViewChecks
                 if (career) foreach (string command in new[] { "tsVehicleSell_Click", "cmdReloadVehicleWeapon_Click", "cmsVehicleAmmoSingleShot_Click", "cmdVehicleMoveToInventory_Click" }) Invoke(editor, command);
                 check(character.CaptureSnapshot().SequenceEqual(original) && !Field<Button>(editor, "cmdDeleteVehicle").Enabled,
                     "Native " + mode + " mounted ammunition projections cannot mutate sell or delete their vehicle or weapon");
+                if (career)
+                {
+                    var ammunition = Rows(vehicleTree)[0];
+                    var selected = ammunition;
+                    while (selected.Level > 1)
+                        selected = selected.Parent!;
+                    vehicleTree.SelectedNode = selected;
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { },
+                        Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                    var host = main.Controls.OfType<NativeControlHost>().Single(item => item.Name == "NativeCareerVehicles");
+                    var page = (Avalonia.Controls.Grid)((Avalonia.Controls.Grid)host.NativeControl!).Children[0];
+                    var layout = (Avalonia.Controls.Grid)page.Children[0];
+                    var scroll = (Avalonia.Controls.ScrollViewer)layout.Children[1];
+                    var track = (Avalonia.Controls.WrapPanel)scroll.Content!;
+                    var boxes = track.Children.OfType<Avalonia.Controls.Primitives.ToggleButton>()
+                        .Where(box => box.IsVisible).ToArray();
+                    var actions = (Avalonia.Controls.WrapPanel)layout.Children[2];
+                    var addGroup = (Avalonia.Controls.DockPanel)actions.Children[0];
+                    var dropdown = addGroup.Children.OfType<Avalonia.Controls.Button>().Single(button => button.Name == "NativecmdAddVehicleMenu");
+                    var addMenu = Field<ContextMenuStrip>(editor, "cmsVehicle");
+                    bool opening = false;
+                    void ObserveMenu(object? sender, System.ComponentModel.CancelEventArgs args)
+                    {
+                        opening = true;
+                        args.Cancel = true;
+                    }
+                    addMenu.Opening += ObserveMenu;
+                    try { dropdown.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent)); }
+                    finally { addMenu.Opening -= ObserveMenu; }
+                    check(opening && actions.Children.Count == 3 && actions.Bounds.Bottom <= layout.Children[0].Bounds.Top,
+                        "Native vehicle commands expose the existing Add menu above the tree");
+                    int previousDamage = vehicle.PhysicalCMFilled;
+                    check(boxes.Length == vehicle.PhysicalCM && boxes.Length >= 3 && track.IsEffectivelyVisible &&
+                        boxes.All(box => box.Bounds.Right <= track.Bounds.Width + 1) &&
+                        layout.Children[0].Bounds.Bottom <= scroll.Bounds.Top && scroll.Bounds.Bottom <= layout.Bounds.Height,
+                        "The selected vehicle shows the correct number of native damage boxes");
+                    var originalSize = main.ClientSize;
+                    try
+                    {
+                        main.ClientSize = new System.Drawing.Size(originalSize.Width, 380);
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { },
+                            Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                        check(main.ClientSize.Height < originalSize.Height && layout.Children[0].Bounds.Height > 0 &&
+                            scroll.Bounds.Height > 0 && scroll.Bounds.Height <= layout.Bounds.Height / 3 + 1 &&
+                            layout.Children[0].Bounds.Bottom <= scroll.Bounds.Top &&
+                            host.Bottom <= main.ClientSize.Height,
+                            $"The vehicle tree and damage track remain accessible in a shorter window [client={main.ClientSize}, host={host.Bounds}, tree={layout.Children[0].Bounds}, damage={scroll.Bounds}]");
+                    }
+                    finally
+                    {
+                        main.ClientSize = originalSize;
+                    }
+                    boxes[0].IsChecked = false;
+                    boxes[2].IsChecked = true;
+                    check(vehicle.PhysicalCMFilled == 3 && boxes.Take(3).All(box => box.IsChecked == true),
+                        "Native vehicle damage updates the selected vehicle and fills preceding boxes");
+                    boxes[0].IsChecked = false;
+                    if (previousDamage > 0)
+                        boxes[previousDamage - 1].IsChecked = true;
+                    vehicleTree.SelectedNode = ammunition;
+                    check(!scroll.IsVisible && vehicle.PhysicalCMFilled == previousDamage,
+                        "Selecting mounted ammunition hides stale vehicle damage controls");
+                    vehicleTree.SelectedNode = selected;
+                    check(scroll.IsVisible, "Selecting the vehicle restores its damage controls");
+                }
                 if (!career)
                 {
                     Field<TabControl>(editor, "tabCharacterTabs").SelectedTab = Field<TabPage>(editor, "tabStreetGear");
@@ -111,15 +190,51 @@ internal static class NativeAmmunitionViewChecks
                     // Multiple reserve subtypes force a real choice dialog. Cancelling must
                     // preserve canonical stock, loaded slots and every shared projection.
                     var alternate = new Gear(character) { Name = "Ammo: APDS", Category = "Ammunition", Extra = "Assault Rifles", Quantity = 6, Cost = "7" };
+                    using (var picker = new frmReload { Ammo = [reserve, alternate], Count = ["3", "6"] })
+                    {
+                        var pending = picker.ShowDialogAsync(editor);
+                        var window = (ReloadWindow)NativeDialogHost.ActiveWindow!;
+                        check(window.AmmoInput.ItemTemplate!.Build(null) is Avalonia.Controls.TextBlock { Text: "" },
+                            "The native ammunition choice template draws an empty item safely");
+                        window.Width = 260;
+                        window.SizeToContent = Avalonia.Controls.SizeToContent.Manual;
+                        window.Height = 220;
+                        var layout = (Avalonia.Controls.Grid)window.Content!;
+                        var body = (Avalonia.Controls.ScrollViewer)layout.Children[0];
+                        Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.AmmoInput.FontSize * 1.5);
+                        await Task.Delay(80);
+                        window.AmmoInput.IsDropDownOpen = true;
+                        await Task.Delay(50);
+                        var popup = window.AmmoInput.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Popup>().Single();
+                        check(window.AmmoInput.IsDropDownOpen && popup.Child is { } content &&
+                            content.MaxWidth <= window.AmmoInput.Bounds.Width + 1 &&
+                            body.Bounds.Bottom <= layout.Children[1].Bounds.Top &&
+                            window.AcceptButton.IsEffectivelyVisible,
+                            "Narrow reload keeps the ammunition popup within its input and leaves confirmation visible at 150% text");
+                        window.AmmoInput.IsDropDownOpen = false;
+                        window.AmmoInput.SelectedIndex = 1;
+                        window.CountInput.SelectedIndex = 1;
+                        window.AcceptButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+                        check(await pending == DialogResult.OK && picker.SelectedAmmo == alternate.InternalId && picker.SelectedCount == 6,
+                            "Interactive native reload returns the selected gear ID and round count");
+                    }
                     character.Gear.Add(alternate);
                     WeaponInventoryViews.Refresh(character, tree, false);
                     byte[] beforeCancel = character.CaptureSnapshot();
                     bool cancelledReload = false;
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => {
-                        var dialog = Application.OpenForms.OfType<frmReload>().SingleOrDefault();
-                        if (dialog == null) return;
+                    Avalonia.Threading.Dispatcher.UIThread.Post(async () => {
+                        if (NativeDialogHost.ActiveWindow is not ReloadWindow dialog) return;
                         cancelledReload = true;
-                        dialog.DialogResult = DialogResult.Cancel;
+                        dialog.Width = 260;
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { },
+                            Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                        var layout = (Avalonia.Controls.Grid)dialog.Content!;
+                        var body = (Avalonia.Controls.ScrollViewer)layout.Children[0];
+                        var fields = (Avalonia.Controls.StackPanel)body.Content!;
+                        bool fits = dialog.AmmoInput.ItemCount == 2 && fields.Children[0].Bounds.Bottom <= fields.Children[1].Bounds.Top &&
+                            body.Bounds.Bottom <= layout.Children[1].Bounds.Top;
+                        dialog.CancelButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+                        check(fits, "Narrow Career reload keeps both native fields and the confirmation row clear");
                     });
                     editor.GetType().GetMethod("cmdReloadWeapon_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(editor, new object[] { editor, EventArgs.Empty });
                     check(cancelledReload && character.CaptureSnapshot().SequenceEqual(beforeCancel) && Rows(tree).Length == 6,
@@ -127,8 +242,7 @@ internal static class NativeAmmunitionViewChecks
                     character.Gear.Remove(alternate);
                     reserve.Quantity = 40; WeaponInventoryViews.Refresh(character, tree, false);
                     var history = new InventoryUndo(character);
-                    // Both ammo and loading-method lists have one choice: the existing reload
-                    // dialog accepts itself. Exercise the real transfer and firing handlers.
+                    // Both lists have one choice. Exercise the real transfer and firing handlers.
                     editor.GetType().GetMethod("cmdReloadWeapon_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(editor, new object[] { editor, EventArgs.Empty });
                     check(first.AmmoRemaining == 38 && reserve.Quantity == 2 && Rows(tree).Length == 3 && Rows(tree).All(row => row.Text == reserve.DisplayName),
                         "Native career reload transfers canonical reserve into one magazine and refreshes all compatible views");

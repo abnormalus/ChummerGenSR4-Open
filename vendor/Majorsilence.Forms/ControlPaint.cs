@@ -67,7 +67,7 @@ namespace Majorsilence.Forms
 
             var color = disabled ? Theme.ForegroundDisabledColor
                             : state == CheckState.Checked && !disabled ? Theme.AccentColor
-                            : Theme.BorderLowColor;
+                            : Theme.ForegroundColor;
             var unit_1 = e.LogicalToDeviceUnits (1);
 
             // Draw the border

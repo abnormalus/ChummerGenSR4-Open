@@ -73,7 +73,7 @@ namespace Majorsilence.Forms
         internal static bool TryEnterMenuMode (Form form)
         {
             foreach (var menu in MenusOf (form)) {
-                if (!menu.IsTopLevelMenuBar)
+                if (!menu.IsTopLevelMenuBar || menu is MenuStrip { HasNativePresentation: true })
                     continue;
 
                 var first = menu.RootItems.FirstOrDefault (IsEnabledAndVisible);
@@ -93,7 +93,7 @@ namespace Majorsilence.Forms
             // The strips' own items only, as upstream's ToolStrip.ProcessMnemonic offers it: an open
             // drop-down takes its letters through MenuBase.HandleNavigationKey. Searching every drop-down
             // too, depth first, found ReportDesigner's Edit > Cu&t before &Tools, so Alt+T ran Cut.
-            foreach (var item in MenusOf (form).SelectMany (menu => menu.RootItems.Cast<MenuItem> ())) {
+            foreach (var item in MenusOf (form).Where (menu => menu is not MenuStrip { HasNativePresentation: true }).SelectMany (menu => menu.RootItems.Cast<MenuItem> ())) {
                 if (!IsEnabledAndVisible (item) || !Control.IsMnemonic (charCode, item.Text ?? string.Empty))
                     continue;
 

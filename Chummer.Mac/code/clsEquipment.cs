@@ -9874,7 +9874,7 @@ namespace Chummer
                     _strExtra = strForceValue;
                 else
                 {
-                    using var categoryPicker = new frmSelectWeaponCategory();
+                    using var categoryPicker = new CategoryPicker(CategoryPicker.Catalog.Weapon);
                     categoryPicker.Description = LanguageManager.Instance.GetString("String_SelectWeaponCategoryAmmo");
                     categoryPicker.ShowDialog();
                     _strExtra = categoryPicker.SelectedCategory;

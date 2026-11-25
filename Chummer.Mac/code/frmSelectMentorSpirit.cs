@@ -29,6 +29,7 @@ namespace Chummer
 		public frmSelectMentorSpirit(Character objCharacter)
 		{
 			InitializeComponent();
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 		}
@@ -146,10 +147,10 @@ namespace Chummer
 				cboChoice1.DisplayMember = "Name";
 				cboChoice1.DataSource = lstChoice1;
 
-				if (lstChoice2.Count > 0)
+				lblChoice2.Visible = lstChoice2.Count > 0;
+				cboChoice2.Visible = lblChoice2.Visible;
+				if (cboChoice2.Visible)
 				{
-					lblChoice2.Visible = true;
-					cboChoice2.Visible = true;
 					cboChoice2.ValueMember = "Value";
 					cboChoice2.DisplayMember = "Name";
 					cboChoice2.DataSource = lstChoice2;

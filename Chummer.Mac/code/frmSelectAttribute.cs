@@ -1,228 +1,143 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using Majorsilence.Forms;
+using System.Linq;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Forms = Majorsilence.Forms;
 
+namespace Chummer;
 
-
-namespace Chummer
+public sealed class frmSelectAttribute : IDisposable
 {
-    public partial class frmSelectAttribute : Form
+    private readonly List<string> attributes = ["BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG"];
+    private string? singleAttribute;
+    private AttributePickerWindow? window;
+
+    public string Description { private get; set; } = "";
+    public bool ShowMetatypeMaximum { private get; set; }
+    public string SelectedAttribute { get; private set; } = "";
+    public bool DoNotAffectMetatypeMaximum { get; private set; }
+    public Forms.DialogResult DialogResult { get; private set; } = Forms.DialogResult.Cancel;
+
+    public void AddMAG() => AddAttribute("MAG");
+    public void AddRES() => AddAttribute("RES");
+    public void SingleAttribute(string value) => singleAttribute = value;
+
+    public void LimitToList(List<string> values)
     {
-        private string _strReturnValue = "";
+        singleAttribute = null;
+        attributes.Clear();
+        attributes.AddRange(values);
+    }
 
-		private List<ListItem> _lstAttributes = new List<ListItem>();
+    public void RemoveFromList(List<string> values)
+    {
+        singleAttribute = null;
+        foreach (var value in values)
+            attributes.Remove(value);
+    }
 
-		#region Control Events
-		public frmSelectAttribute()
+    private void AddAttribute(string value)
+    {
+        singleAttribute = null;
+        attributes.Add(value);
+    }
+
+    public Forms.DialogResult ShowDialog(Forms.Form? owner = null)
+    {
+        var pending = ShowDialogAsync(owner);
+        if (!pending.IsCompleted)
+            Forms.Backends.Platform.Backend.RunModalLoop(pending);
+        return pending.GetAwaiter().GetResult();
+    }
+
+    internal async Task<Forms.DialogResult> ShowDialogAsync(Forms.Form? owner = null)
+    {
+        if (window != null)
+            throw new InvalidOperationException("The attribute picker is already open.");
+
+        SelectedAttribute = "";
+        DoNotAffectMetatypeMaximum = false;
+        DialogResult = Forms.DialogResult.Cancel;
+        var values = singleAttribute is { } value ? new[] { value } : attributes.ToArray();
+        if (values.Length == 0)
+            return DialogResult;
+        if (values.Length == 1)
         {
-            InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-
-			// Build the list of Attributes.
-			ListItem objBOD = new ListItem();
-			ListItem objAGI = new ListItem();
-			ListItem objREA = new ListItem();
-			ListItem objSTR = new ListItem();
-			ListItem objCHA = new ListItem();
-			ListItem objINT = new ListItem();
-			ListItem objLOG = new ListItem();
-			ListItem objWIL = new ListItem();
-			ListItem objEDG = new ListItem();
-			objBOD.Value = "BOD";
-			objBOD.Name = LanguageManager.Instance.GetString("String_AttributeBODShort");
-			objAGI.Value = "AGI";
-			objAGI.Name = LanguageManager.Instance.GetString("String_AttributeAGIShort");
-			objREA.Value = "REA";
-			objREA.Name = LanguageManager.Instance.GetString("String_AttributeREAShort");
-			objSTR.Value = "STR";
-			objSTR.Name = LanguageManager.Instance.GetString("String_AttributeSTRShort");
-			objCHA.Value = "CHA";
-			objCHA.Name = LanguageManager.Instance.GetString("String_AttributeCHAShort");
-			objINT.Value = "INT";
-			objINT.Name = LanguageManager.Instance.GetString("String_AttributeINTShort");
-			objLOG.Value = "LOG";
-			objLOG.Name = LanguageManager.Instance.GetString("String_AttributeLOGShort");
-			objWIL.Value = "WIL";
-			objWIL.Name = LanguageManager.Instance.GetString("String_AttributeWILShort");
-			objEDG.Value = "EDG";
-			objEDG.Name = LanguageManager.Instance.GetString("String_AttributeEDGShort");
-			_lstAttributes.Add(objBOD);
-			_lstAttributes.Add(objAGI);
-			_lstAttributes.Add(objREA);
-			_lstAttributes.Add(objSTR);
-			_lstAttributes.Add(objCHA);
-			_lstAttributes.Add(objINT);
-			_lstAttributes.Add(objLOG);
-			_lstAttributes.Add(objWIL);
-			_lstAttributes.Add(objEDG);
-
-			cboAttribute.ValueMember = "Value";
-			cboAttribute.DisplayMember = "Name";
-			cboAttribute.DataSource = _lstAttributes;
+            SelectedAttribute = values[0];
+            return DialogResult = Forms.DialogResult.OK;
         }
 
-		private void cmdOK_Click(object sender, EventArgs e)
-        {
-			_strReturnValue = cboAttribute.SelectedValue.ToString();
-            this.DialogResult = DialogResult.OK;
-        }
+        owner ??= Forms.Form.ActiveForm ?? Forms.Application.OpenForms.Cast<Forms.Form>().LastOrDefault(form => form.Visible)
+            ?? throw new InvalidOperationException("An attribute picker requires an open owner window.");
 
-        private void frmSelectAttribute_Load(object sender, EventArgs e)
+        window = new AttributePickerWindow(Description, values, ShowMetatypeMaximum);
+        try
         {
-            // Select the first Attribute in the list.
-            cboAttribute.SelectedIndex = 0;
-        }
-
-        private void cmdCancel_Click(object sender, EventArgs e)
-        {
-            this.DialogResult = DialogResult.Cancel;
-        }
-
-		private void frmSelectAttribute_Shown(object sender, EventArgs e)
-		{
-			// If only a single Attribute is in the list when the form is shown,
-			// click the OK button since the user really doesn't have a choice.
-			if (cboAttribute.Items.Count == 1)
-				cmdOK_Click(sender, e);
-		}
-		#endregion
-
-		#region Properties
-		/// <summary>
-        /// Attribute that was selected in the dialogue.
-        /// </summary>
-        public string SelectedAttribute
-        {
-            get
+            var selection = await NativeDialogHost.ShowAsync<AttributePickerSelection>(window, owner);
+            if (selection != null)
             {
-                return _strReturnValue;
+                SelectedAttribute = selection.Attribute;
+                DoNotAffectMetatypeMaximum = selection.DoNotAffectMaximum;
+                DialogResult = Forms.DialogResult.OK;
             }
+            return DialogResult;
         }
+        finally { window = null; }
+    }
 
-        /// <summary>
-        /// Description to display on the form.
-        /// </summary>
-        public string Description
+    public void Dispose() => window?.Close();
+}
+
+internal sealed record AttributePickerSelection(string Attribute, bool DoNotAffectMaximum);
+
+internal sealed class AttributePickerWindow : Window
+{
+    internal ComboBox AttributeInput { get; }
+    internal CheckBox MaximumInput { get; }
+    internal Button AcceptButton { get; }
+    internal Button CancelButton { get; }
+
+    internal AttributePickerWindow(string description, string[] values, bool showMetatypeMaximum)
+    {
+        var language = LanguageManager.Instance;
+        Title = language.GetString("Title_SelectAttribute");
+        Width = 400;
+        MinWidth = 260;
+        MinHeight = 160;
+        MaxHeight = 500;
+        SizeToContent = SizeToContent.Height;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ShowInTaskbar = false;
+        NativeControlPresentation.AddTheme(Styles);
+
+        AttributeInput = new ComboBox
         {
-            set
-            {
-                lblDescription.Text = value;
-            }
-        }
-
-		/// <summary>
-		/// Whether or not the Do not affect Metatype Maximum checkbox should be shown on the form.
-		/// </summary>
-		public bool ShowMetatypeMaximum
-		{
-			set
-			{
-				chkDoNotAffectMetatypeMaximum.Visible = value;
-			}
-		}
-
-		/// <summary>
-		/// Whether or not the Metatype Maximum value should be affected as well.
-		/// </summary>
-		public bool DoNotAffectMetatypeMaximum
-		{
-			get
-			{
-				return chkDoNotAffectMetatypeMaximum.Checked;
-			}
-		}
-		#endregion
-
-		#region Methods
-		/// <summary>
-        /// Add MAG to the list of selectable Attributes.
-        /// </summary>
-        public void AddMAG()
+            ItemsSource = values.Select(value => language.GetString("String_Attribute" + value + "Short")).ToArray(),
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        Avalonia.Automation.AutomationProperties.SetName(AttributeInput, Title);
+        MaximumInput = new CheckBox
         {
-			ListItem objMAG = new ListItem();
-			objMAG.Value = "MAG";
-			objMAG.Name = LanguageManager.Instance.GetString("String_AttributeMAGShort");
-			_lstAttributes.Add(objMAG);
-			cboAttribute.DataSource = null;
-			cboAttribute.DataSource = _lstAttributes;
-			cboAttribute.ValueMember = "Value";
-			cboAttribute.DisplayMember = "Name";
-        }
-
-        /// <summary>
-        /// Add RES to the list of selectable Attributes.
-        /// </summary>
-        public void AddRES()
+            IsVisible = showMetatypeMaximum,
+            Content = new TextBlock { Text = language.GetString("Checkbox_DoNotAffectMaximum"), TextWrapping = TextWrapping.Wrap }
+        };
+        AcceptButton = new Button { Content = language.GetString("String_OK"), IsDefault = true };
+        AcceptButton.Click += (_, _) =>
         {
-			ListItem objRES = new ListItem();
-			objRES.Value = "RES";
-			objRES.Name = LanguageManager.Instance.GetString("String_AttributeRESShort");
-			_lstAttributes.Add(objRES);
-			cboAttribute.DataSource = null;
-			cboAttribute.DataSource = _lstAttributes;
-			cboAttribute.ValueMember = "Value";
-			cboAttribute.DisplayMember = "Name";
-        }
+            if (AttributeInput.SelectedIndex >= 0)
+                Close(new AttributePickerSelection(values[AttributeInput.SelectedIndex], MaximumInput.IsChecked == true));
+        };
+        CancelButton = new Button { Content = language.GetString("String_Cancel"), IsCancel = true };
+        CancelButton.Click += (_, _) => Close();
 
-		/// <summary>
-		/// Limit the list to a single Attribute.
-		/// </summary>
-		/// <param name="strValue">Single Attribute to display.</param>
-		public void SingleAttribute(string strValue)
-		{
-			List<ListItem> lstItems = new List<ListItem>();
-			ListItem objItem = new ListItem();
-			objItem.Value = strValue;
-			objItem.Name = strValue;
-			lstItems.Add(objItem);
-			cboAttribute.DataSource = null;
-			cboAttribute.ValueMember = "Value";
-			cboAttribute.DisplayMember = "Name";
-			cboAttribute.DataSource = lstItems;
-		}
-
-		/// <summary>
-		/// Limit the list to a few Attributes.
-		/// </summary>
-		/// <param name="strValue">List of Attributes.</param>
-		public void LimitToList(List<string> strValue)
-		{
-			_lstAttributes.Clear();
-			foreach (string strAttribute in strValue)
-			{
-				ListItem objItem = new ListItem();
-				objItem.Value = strAttribute;
-				objItem.Name = LanguageManager.Instance.GetString("String_Attribute" + strAttribute + "Short");
-				_lstAttributes.Add(objItem);
-			}
-			cboAttribute.DataSource = null;
-			cboAttribute.DataSource = _lstAttributes;
-			cboAttribute.ValueMember = "Value";
-			cboAttribute.DisplayMember = "Name";
-		}
-
-		/// <summary>
-		/// Exclude the list of Attributes.
-		/// </summary>
-		/// <param name="strValue">List of Attributes.</param>
-		public void RemoveFromList(List<string> strValue)
-		{
-			foreach (string strAttribute in strValue)
-			{
-				foreach (ListItem objItem in _lstAttributes)
-				{
-					if (objItem.Value == strAttribute)
-					{
-						_lstAttributes.Remove(objItem);
-						break;
-					}
-				}
-			}
-			cboAttribute.DataSource = null;
-			cboAttribute.DataSource = _lstAttributes;
-			cboAttribute.ValueMember = "Value";
-			cboAttribute.DisplayMember = "Name";
-		}
-		#endregion
+        var prompt = new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap };
+        Content = NativeControlPresentation.CreatePromptLayout(
+            new StackPanel { Spacing = 10, Children = { prompt, AttributeInput, MaximumInput } }, AcceptButton, CancelButton);
     }
 }

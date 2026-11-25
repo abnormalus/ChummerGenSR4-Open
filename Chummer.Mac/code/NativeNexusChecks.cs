@@ -42,6 +42,19 @@ internal static class NativeNexusChecks
             var pending = prompt.ShowDialogAsync(owner); var window = (NexusWindow)NativeDialogHost.ActiveWindow!; await Task.Delay(100);
             check(window.ProcessorInput.Minimum == 10 && window.ProcessorInput.Maximum == 50 && window.SystemInput.Maximum == 10 && window.PersonaInput.Maximum == 50 && window.SignalInput.Value == 3,
                 "Native nexus retains numeric ranges and initial signal rating");
+            var layout = (Grid)window.Content!;
+            var body = layout.Children.OfType<ScrollViewer>().Single();
+            var footer = layout.Children.OfType<WrapPanel>().Single();
+            window.Width = 280;
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = 300;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.ProcessorInput.FontSize * 1.5);
+            await Task.Delay(100);
+            window.PersonaInput.BringIntoView();
+            await Task.Delay(60);
+            check(Grid.GetColumn(window.ProcessorInput) == 0 && Grid.GetRow(window.ProcessorInput) == 2 &&
+                body.Offset.Y > 0 && body.Bounds.Bottom <= footer.Bounds.Top && window.AcceptButton.IsEffectivelyVisible,
+                "Nexus ratings stack beneath captions and confirmation stays visible at 150% text");
             window.ProcessorInput.Text = "20"; await Task.Delay(30);
             check(window.Model.Processor == 20 && window.Model.Quote!.Cost == 1725, "Native nexus typed processor updates its characterized price");
             window.SystemInput.Value = 10; await Task.Delay(30);

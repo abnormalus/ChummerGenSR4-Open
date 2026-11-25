@@ -3,7 +3,6 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -56,26 +55,28 @@ internal sealed class CalendarStartWindow : Window
     internal CalendarStartWindow(int year, int month, int week)
     {
         Title = LanguageManager.Instance.GetString("Title_CalendarStart");
-        Width = 480; MinWidth = 350; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 480; MinWidth = 260; MinHeight = 175; MaxHeight = 500; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         NativeControlPresentation.AddTheme(Styles);
         YearInput.Value = Math.Clamp(year, 2000, 9000); MonthInput.Value = Math.Clamp(month, 1, 12);
         // Set the limit before the draft so a quarter's fifth week survives loading.
         UpdateWeekLimit(); WeekInput.Value = Math.Clamp(week, 1, (int)WeekInput.Maximum);
         MonthInput.ValueChanged += (_, _) => UpdateWeekLimit();
-        var layout = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
+        var layout = new StackPanel { Spacing = 10 };
         layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_CalendarStart"), TextWrapping = Avalonia.Media.TextWrapping.Wrap });
         AddField(layout, "Label_Year", YearInput); AddField(layout, "Label_Month", MonthInput); AddField(layout, "Label_Week", WeekInput);
         var cancel = new Button { Content = LanguageManager.Instance.GetString("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
         var accept = new Button { Content = LanguageManager.Instance.GetString("String_OK"), IsDefault = true }; accept.Click += (_, _) => Accept();
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 };
-        buttons.Children.Add(cancel); buttons.Children.Add(accept); layout.Children.Add(buttons); Content = layout;
+        Content = NativeControlPresentation.CreatePromptLayout(layout, cancel, accept);
         Opened += (_, _) => YearInput.Focus();
     }
     private static void AddField(StackPanel layout, string label, NumericUpDown input)
     {
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
-        var text = new TextBlock { Text = LanguageManager.Instance.GetString(label), VerticalAlignment = VerticalAlignment.Center, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
-        row.Children.Add(text); Grid.SetColumn(input, 1); row.Children.Add(input); layout.Children.Add(row);
+        var row = new WrapPanel();
+        var text = new TextBlock { Text = LanguageManager.Instance.GetString(label), TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(input, text);
+        row.Children.Add(NativeControlPresentation.CreateLabeledField(row, text, input));
+        NativeControlPresentation.ConstrainWrapItems(row);
+        layout.Children.Add(row);
     }
     private void UpdateWeekLimit() => WeekInput.Maximum = CalendarStartSelection.WeeksInMonth((int)(MonthInput.Value ?? 1));
     internal void Accept() => Close(CalendarStartSelection.FromMonth((int)(YearInput.Value ?? 2000), (int)(MonthInput.Value ?? 1), (int)(WeekInput.Value ?? 1)));

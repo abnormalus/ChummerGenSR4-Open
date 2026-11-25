@@ -85,7 +85,7 @@ namespace Chummer
 			this.toolStripSeparator2 = new Majorsilence.Forms.ToolStripSeparator();
 			this.helpToolStripButton = new Majorsilence.Forms.ToolStripButton();
 			this.toolTip = new Majorsilence.Forms.ToolTip(this.components);
-			this.tabForms = new Majorsilence.Forms.TabControl();
+			this.tabForms = new Majorsilence.Forms.NativeControlHost();
 			this.mnuHelpDumpshock = new Majorsilence.Forms.ToolStripMenuItem();
 			this.menuStrip.SuspendLayout();
 			this.toolStrip.SuspendLayout();
@@ -641,11 +641,9 @@ namespace Chummer
 			this.tabForms.Dock = Majorsilence.Forms.DockStyle.Top;
 			this.tabForms.Location = new System.Drawing.Point(0, 49);
 			this.tabForms.Name = "tabForms";
-			this.tabForms.SelectedIndex = 0;
-			this.tabForms.Size = new System.Drawing.Size(1175, 22);
+			this.tabForms.Size = new System.Drawing.Size(1175, 34);
 			this.tabForms.TabIndex = 3;
 			this.tabForms.Visible = false;
-			this.tabForms.SelectedIndexChanged += new System.EventHandler(this.tabForms_SelectedIndexChanged);
 			// 
 			// mnuHelpDumpshock
 			// 
@@ -739,7 +737,7 @@ namespace Chummer
 		private Majorsilence.Forms.ToolStripMenuItem mnuStickyMRU7;
 		private Majorsilence.Forms.ToolStripMenuItem mnuStickyMRU8;
 		private Majorsilence.Forms.ToolStripMenuItem mnuStickyMRU9;
-		private Majorsilence.Forms.TabControl tabForms;
+		private Majorsilence.Forms.NativeControlHost tabForms;
 		private Majorsilence.Forms.ToolStripMenuItem mnuToolsDiceRoller;
 		private Majorsilence.Forms.ToolStripSeparator toolStripSeparator5;
 		private Majorsilence.Forms.ToolStripMenuItem mnuHelpDumpshock;

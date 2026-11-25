@@ -23,6 +23,21 @@ internal static class NativeNaturalWeaponChecks
             var pending = prompt.ShowDialogAsync(owner); var window = (NaturalWeaponWindow)NativeDialogHost.ActiveWindow!; await Task.Delay(100);
             check(window.ModifierInput.Minimum == -10 && window.ModifierInput.Maximum == 10 && window.APInput.Minimum == -10 && window.APInput.Maximum == 10 && window.ReachInput.Minimum == -3 && window.ReachInput.Maximum == 3 && window.ModifierInput.Value == 0 && window.APInput.Value == 0 && window.ReachInput.Value == 0,
                 "Native natural weapon preserves signed modifier AP and reach limits");
+            var layout = (Grid)window.Content!;
+            var viewport = layout.Children.OfType<ScrollViewer>().Single();
+            var footer = layout.Children.OfType<WrapPanel>().Single();
+            var damage = (WrapPanel)window.ModifierInput.Parent!;
+            window.Width = 280;
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = 260;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.ModifierInput.FontSize * 1.5);
+            await Task.Delay(100);
+            window.ModifierInput.BringIntoView();
+            await Task.Delay(60);
+            check(damage.Children.Select(input => input.Bounds.Top).Distinct().Count() > 1 &&
+                damage.Children.All(input => input.Bounds.Right <= damage.Bounds.Width + 1) &&
+                viewport.Offset.Y > 0 && viewport.Bounds.Bottom <= footer.Bounds.Top,
+                "Natural weapon damage inputs wrap and confirmation stays visible at 150% text");
             window.ModifierInput.Text = "-4"; await Task.Delay(30);
             window.ModifierInput.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "PART_IncreaseButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check(window.ModifierInput.Value == -3, "Native natural weapon supports signed typing and standard spinner increase");

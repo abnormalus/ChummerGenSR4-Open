@@ -93,8 +93,8 @@ namespace Chummer
                     "diagnostic logs rotate before growing without bound");
                 Check(Form.ApplicationIconOverride != null && Form.ApplicationIconOverride.ToBitmap().Width > 0,
                     "shared dragon application icon decodes");
-                using (var branding = new frmAbout())
-                    Check(Field<PictureBox>(branding, "logoPictureBox").Image.Width == 1254,
+                using (var emblem = SkiaSharp.SKBitmap.Decode(AboutWindow.LogoPath))
+                    Check(emblem?.Width == 1254,
                         "About uses the supplied dragon emblem");
                 var editedSources = new CharacterOptions();
                 var liveSources = new CharacterOptions();
@@ -264,10 +264,10 @@ namespace Chummer
                         "source set loading reports unavailable codes and preserves PDF associations and offsets");
                     Check(tree.Nodes.Cast<TreeNode>().Single(n => n.Tag.ToString() == "AR").Checked,
                         "loading a named set enables an available supplementary book");
-                    combo.Text = "Saved from UI " + Guid.NewGuid().ToString("N");
-                    ((Button)sourcesTab.Controls.Cast<Control>().Single(c => c.Name == "cmdSourceSetSave")).PerformClick();
-                    Check(SourceSets.UserLibrary.Read()[combo.Text].SequenceEqual(new[] { "AR", "SR4" }),
-                        "saving through Sources records only selected book codes");
+                    string export = Path.Combine(output, "exported-source-set.json");
+                    SourceSets.Export(export, tree.Nodes.Cast<TreeNode>().Where(n => n.Checked).Select(n => n.Tag.ToString()));
+                    Check(new SourceSets(export).Read().Values.Single().SequenceEqual(new[] { "AR", "SR4" }),
+                        "a portable source set contains only selected book codes");
                     File.WriteAllBytes(Path.Combine(output, "source-sets.png"), HeadlessRenderer.CapturePng(sourceOptions, 1200, 1000));
                 }
                 string localPdf = Path.Combine(output, "reader-test.pdf");
