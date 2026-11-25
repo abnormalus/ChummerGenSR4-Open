@@ -1,5 +1,5 @@
-import {value,child,children,integer,truth,arithmetic} from './core.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
-import {grades} from './augmentation-grades.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {value,child,children,integer,truth,arithmetic} from './core.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
+import {grades} from './augmentation-grades.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
 export function augmentationEssence(c,node){
  if(node.parentElement?.tagName==='children'&&value(node,'capacity').includes('['))return 'Included in parent';
  const raw=value(node,'ess'),rating=integer(value(node,'rating'));let expression=raw;

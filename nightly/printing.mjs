@@ -1,7 +1,7 @@
-import {PDFDocument,rgb} from './vendor/pdf-lib.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
-import fontkit from './vendor/fontkit.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
-import {value,child,children,truth} from './core.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
-import {printSections,printSkills,native,named,primaryArmor} from './print-data.mjs?v=7835c6f6d4c1d60b038bf0e319a2a897a35162ff';
+import {PDFDocument,rgb} from './vendor/pdf-lib.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
+import fontkit from './vendor/fontkit.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
+import {value,child,children,truth} from './core.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
+import {printSections,printSkills,native,named,primaryArmor} from './print-data.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
 const BLACK=rgb(0,0,0),GREY=rgb(.89,.92,.91),MUTED=rgb(.3,.35,.34);
 const text=value=>String(value??'').replace(/\t/g,'    ').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');
 async function asset(path){const r=await fetch(new URL(path,import.meta.url));if(!r.ok)throw Error('Printing resource unavailable. Open the app online once to cache its print resources.');return new Uint8Array(await r.arrayBuffer());}
