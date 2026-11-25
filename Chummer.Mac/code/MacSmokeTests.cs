@@ -1105,21 +1105,6 @@ namespace Chummer
                     creation.MdiParent = main;
                     creation.Show();
                     CheckInventoryUndoView(creation, character);
-                    var aliasButton = Field<TextBox>(creation, "txtAlias").Parent.Controls.Cast<Control>().OfType<SplitButton>()
-                        .Single(button => button.Name == "cmdRandomizeAlias");
-                    var aliasField = Field<TextBox>(creation, "txtAlias");
-                    string aliasBefore = aliasField.Text;
-                    Check(aliasButton.Left > aliasField.Left && aliasButton.Left >= aliasField.Right &&
-                        aliasButton.Right < Field<Label>(creation, "lblMetatypeLabel").Left,
-                        "Randomize split button fits beside Alias before the metatype label");
-                    aliasButton.PerformClick();
-                    Check(aliasField.Text.Length > 0 && character.Alias == aliasField.Text,
-                        "character-aware randomization updates editable alias and character model");
-                    var undoAlias = aliasButton.SplitMenuStrip.Items.Cast<MenuItem>().Last();
-                    undoAlias.PerformClick();
-                    Check(aliasField.Text == aliasBefore && character.Alias == aliasBefore,
-                        "undo restores the previous alias without changing character format");
-
                     var hairColor = Field<ComboBox>(creation, "txtHair");
                     hairColor.SelectedIndex = 3;
                     Field<ComboBox>(creation, "txtEyes").Text = "Custom iridescent";

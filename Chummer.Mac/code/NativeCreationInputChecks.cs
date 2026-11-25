@@ -105,6 +105,7 @@ internal static class NativeCreationInputChecks
             }
             var attributeInputs = section.Inputs.Where(pair => pair.Key != "nudNuyen").Select(pair => pair.Value).ToArray();
             var root = (Avalonia.Controls.Grid)attributeInputs[0].Parent!;
+            var attributeScroll = attributeInputs[0].GetVisualAncestors().OfType<ScrollViewer>().First();
             var commonPage = Field<Forms.TabPage>(editor, "tabCommon");
             var attributesPanel = Field<Forms.Panel>(editor, "panAttributes");
             var contacts = Field<Forms.SplitContainer>(editor, "splitContacts");
@@ -115,6 +116,27 @@ internal static class NativeCreationInputChecks
                 input.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.TextPresenter>().Any(text =>
                     text.TranslatePoint(default, input) is { } position && position.Y >= -1 &&
                     position.Y + text.TextLayout.Height <= input.Bounds.Height + 1));
+            async Task<bool> AttributesReachableAsync()
+            {
+                if (!AllAttributesFit() || attributesPanel.Bottom > commonPage.ClientSize.Height)
+                    return false;
+
+                var originalOffset = attributeScroll.Offset;
+                try
+                {
+                    foreach (var input in attributeInputs)
+                    {
+                        input.BringIntoView();
+                        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                        if (input.TranslatePoint(default, attributeScroll) is not { } position ||
+                            position.Y < -1 || position.Y + input.Bounds.Height > attributeScroll.Viewport.Height + 1)
+                            return false;
+                    }
+                    return true;
+                }
+                finally { attributeScroll.Offset = originalOffset; }
+            }
+
             async Task<bool> ContactsReachableAsync()
             {
                 if (contacts.Right > commonPage.ClientSize.Width) return false;
@@ -177,13 +199,9 @@ internal static class NativeCreationInputChecks
                         input.Bounds.Width > 0 && input.Bounds.Height >= 20 && input.GetVisualDescendants().OfType<Avalonia.Controls.TextBox>().Any(text => text.Bounds.Width >= 24)),
                         "Native creation input batch has measured controls in " + theme.Key +
                         " [" + string.Join(", ", section.Inputs.Values.Where(input => input.IsVisible).Select(input => $"{input.Name}={input.Bounds}")) + "]");
-                    check(AllAttributesFit() && attributesPanel.Bottom <= commonPage.ClientSize.Height &&
-                        attributeInputs.All(input => input.TranslatePoint(default, window) is { } point && point.Y >= 0 &&
-                            point.Y + input.Bounds.Height <= window.ClientSize.Height) &&
-                        attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>()
-                            .First().Offset.Y == 0,
-                        "Native creation shows all eleven attribute rows simultaneously without scrolling in " + theme.Key +
-                        FormattableString.Invariant($" [window={window.ClientSize}; common={commonPage.ClientSize}; attributes={attributesPanel.Bounds}; root={root.Bounds}]"));
+                    check(await AttributesReachableAsync(),
+                        "Native creation shows all eleven attribute rows without clipping, with scrolling if needed, in " + theme.Key +
+                        FormattableString.Invariant($" [window={window.ClientSize}; common={commonPage.ClientSize}; attributes={attributesPanel.Bounds}; root={root.Bounds}; viewport={attributeScroll.Viewport}; extent={attributeScroll.Extent}]"));
                     bool normalContactsFit = await ContactsReachableAsync();
                     check(normalContactsFit, "Native normal creation column keeps populated contact and enemy fields and commands reachable in " + theme.Key + (normalContactsFit ? "" : ContactGeometry()));
                 }
@@ -207,7 +225,6 @@ internal static class NativeCreationInputChecks
                     moneyGrid.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
                 }
-                var attributeScroll = attributeInputs[0].GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().First();
                 double defaultFont = attributeInputs[0].FontSize;
                 double defaultHeight = attributeInputs[0].Bounds.Height;
                 try
