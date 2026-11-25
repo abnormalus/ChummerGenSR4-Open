@@ -940,6 +940,9 @@ internal static class NativeEditorLayoutChecks
                         firstPet.FileName = System.IO.Path.Combine(petFiles.FullName, "moved pet.chum");
                         check(petController.ResolveLinkedCharacter() == linkedPath,
                             Label("Pet links resolve an escaped relative path when the absolute path is stale"));
+                        firstPet.RelativeFileName = linkedPath.Replace(" ", "%20", StringComparison.Ordinal);
+                        check(petController.ResolveLinkedCharacter() == linkedPath,
+                            Label("Pet links decode spaces in rooted paths"));
                         firstPet.RelativeFileName = "../" + new Uri(linkedPath).AbsoluteUri;
                         check(petController.ResolveLinkedCharacter() == linkedPath,
                             Label("Pet links recover an escaped file URI stored by earlier versions for a different drive"));
