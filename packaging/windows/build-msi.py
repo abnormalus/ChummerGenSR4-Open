@@ -30,8 +30,8 @@ def main():
     args = parser.parse_args()
     source = args.publish.resolve()
     output = args.output.resolve()
-    if not (source / 'ChummerMac.exe').is_file():
-        parser.error('Publish win-x64 first; ChummerMac.exe is missing.')
+    if not (source / 'Chummer.exe').is_file():
+        parser.error('Publish win-x64 first; Chummer.exe is missing.')
     if output.exists():
         parser.error('Choose a new installer output path.')
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -85,7 +85,7 @@ def main():
         count += 1
     shortcuts = add(menu, 'Component', Id='ChummerShortcut', Guid=str(uuid.uuid5(UPGRADE, 'start-menu-shortcut')).upper(), Win64='yes')
     add(shortcuts, 'Shortcut', Id='LaunchChummer', Name='Chummer SR4', Description='Shadowrun fourth edition character manager',
-        Target='[INSTALLDIR]ChummerMac.exe', WorkingDirectory='INSTALLDIR', Icon='ChummerIcon', IconIndex='0')
+        Target='[INSTALLDIR]Chummer.exe', WorkingDirectory='INSTALLDIR', Icon='ChummerIcon', IconIndex='0')
     add(shortcuts, 'RemoveFolder', Id='RemoveChummerMenu', On='uninstall')
     add(shortcuts, 'RegistryValue', Root='HKCU', Key='Software\\ChummerSR4\\Installer', Name='Installed', Type='integer', Value='1', KeyPath='yes')
     add(feature, 'ComponentRef', Id='ChummerShortcut')

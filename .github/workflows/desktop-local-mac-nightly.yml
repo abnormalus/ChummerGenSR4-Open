@@ -66,14 +66,16 @@ jobs:
           dotnet publish Chummer.Mac/Chummer.Mac.csproj -c Release -r win-x64 --self-contained true \
             -p:RestoreLockedMode=true -p:UsedAvaloniaProducts= \
             "-p:ChummerReleaseVersion=$release_version" "-p:ChummerFileVersion=$file_version" -o artifacts/windows
+          mv artifacts/windows/ChummerMac.exe artifacts/windows/Chummer.exe
           cp artifacts/identity.json artifacts/windows/build-identity.json
           python3 scripts/write-build-revision.py artifacts/windows/source-revision.txt
           python3 packaging/windows/build-msi.py artifacts/windows artifacts/assets/ChummerSR4-Windows-x64.msi
           python3 packaging/windows/verify-msi.py artifacts/windows artifacts/assets/ChummerSR4-Windows-x64.msi
+          python3 -c 'import shutil; shutil.make_archive("artifacts/assets/ChummerSR4-Windows-x64-portable", "zip", root_dir="artifacts/windows")'
           rm artifacts/assets/ChummerSR4-Windows-x64.wxs
           printf 'Chummer SR4 %s\nChannel: Nightly\nSource commit: %s\nMac: Apple Silicon, macOS 15+\nWindows: x64, Windows 10/11; PDF reader requires WebView2\n' \
             "$release_version" "$GITHUB_SHA" > artifacts/assets/BUILD.txt
-          (cd artifacts/assets && sha256sum BUILD.txt ChummerSR4-macOS-arm64.zip ChummerSR4-Windows-x64.msi > SHA256SUMS.txt)
+          (cd artifacts/assets && sha256sum BUILD.txt ChummerSR4-macOS-arm64.zip ChummerSR4-Windows-x64.msi ChummerSR4-Windows-x64-portable.zip > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v7
         with:
           name: nightly-assets
