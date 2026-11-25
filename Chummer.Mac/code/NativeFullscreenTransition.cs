@@ -37,7 +37,8 @@ internal static class NativeFullscreenTransition
         }
         if (IsActualFullscreen()) return deadline;
 
-        bool needsNativeExit = System.OperatingSystem.IsMacOS() && window.WindowState != WindowState.Normal;
+        // AppKit fullscreen exits are asynchronous. Restoring a zoomed window can resize synchronously.
+        bool needsNativeExit = System.OperatingSystem.IsMacOS() && window.WindowState == WindowState.FullScreen;
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var trace = new System.Collections.Generic.List<string>();
         int synchronousResizes = 0, asynchronousResizes = 0;

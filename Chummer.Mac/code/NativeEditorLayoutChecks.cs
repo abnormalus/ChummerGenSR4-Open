@@ -113,6 +113,15 @@ internal static class NativeEditorLayoutChecks
                 alias.Text = "Synthetic alias edit";
                 check(character.Alias == "Synthetic alias edit", Label("Native alias input updates the character"));
                 alias.Text = priorAlias;
+                randomize.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.SplitButton.ClickEvent));
+                check(!string.IsNullOrWhiteSpace(alias.Text) && alias.Text != priorAlias && character.Alias == alias.Text,
+                    Label("Native randomization updates the alias input and character model"));
+                var undoAlias = ((MenuFlyout)randomize.Flyout!).Items.OfType<MenuItem>().Last();
+                check(undoAlias.IsEnabled, Label("Randomizing an alias enables the native Undo command"));
+                undoAlias.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+                check(alias.Text == priorAlias && character.Alias == priorAlias && !undoAlias.IsEnabled,
+                    Label("The native Undo command restores the previous alias"));
+
                 var aliasCaption = Field<Forms.Label>(editor, "lblAlias");
                 string originalCaption = aliasCaption.Text;
                 try
@@ -1039,10 +1048,11 @@ internal static class NativeEditorLayoutChecks
             void AssertTabs(Forms.TabControl source, TabControl native, string label)
             {
                 var headers = native.Items.OfType<TabItem>().ToArray();
+                var strip = Host("Native" + source.Name);
                 check(native.IsEffectivelyVisible && headers.Length == source.TabCount &&
                     headers.Select(header => header.Tag).SequenceEqual(source.TabPages.Cast<Forms.TabPage>()) &&
-                    headers.All(header => header.Bounds.Height > 0) && source.SelectedTab!.Top >= 30,
-                    Label(label + " render in order above the existing page content"));
+                    headers.All(header => header.Bounds.Height > 0) && strip.Height > 0 && source.SelectedTab!.Top >= strip.Height,
+                    Label($"{label} render in order above the existing page content [strip={strip.Bounds}, selected={source.SelectedTab?.Bounds}, headers={headers.Length}]"));
             }
         }
     }
