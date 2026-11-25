@@ -22,6 +22,21 @@ internal static class NativeNumberPromptChecks
             check(prompt.SelectedValue == 0, "Native number initial value remains an unaccepted draft");
             var pending = prompt.ShowDialogAsync(owner); var window = (NumberPromptWindow)NativeDialogHost.ActiveWindow!; await Task.Delay(100);
             check(window.Input.Value == 25 && !Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner).IsEnabled, "Native number displays configured draft and owns modality");
+            var layout = (Grid)window.Content!;
+            var body = layout.Children.OfType<ScrollViewer>().Single();
+            var footer = layout.Children.OfType<WrapPanel>().Single();
+            var description = ((StackPanel)body.Content!).Children.OfType<TextBlock>().Single();
+            description.Text = string.Join(" ", Enumerable.Repeat("Translated instructions for entering a number", 20));
+            window.Width = 260;
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = 230;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.Input.FontSize * 1.5);
+            await Task.Delay(80);
+            window.Input.BringIntoView();
+            await Task.Delay(60);
+            check(body.Offset.Y > 0 && body.Bounds.Bottom <= footer.Bounds.Top &&
+                footer.Bounds.Bottom <= layout.Bounds.Height && window.AcceptButton.IsEffectivelyVisible,
+                "Native number scrolls long instructions without covering confirmation at 150% text");
             window.Input.Text = "1000000"; await Task.Delay(30);
             check(window.Input.Value == 1000000, "Native number accepts configured large integer limit");
             window.Input.Text = "20"; await Task.Delay(30);

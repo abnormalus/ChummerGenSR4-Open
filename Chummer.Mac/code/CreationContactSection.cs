@@ -3,12 +3,12 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Templates;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Threading;
-using Avalonia.Styling;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -42,7 +42,7 @@ internal sealed class CreationContactRow : IDisposable
     private bool Available() => !disposed && !controller.IsDisposed && controller.Visible && controller.Enabled && sectionAvailable();
     private static TextBlock Caption()
     {
-        var text = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+        var text = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
         text.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlForegroundBaseHighBrush")); return text;
     }
     internal CreationContactRow(ContactControl controller, Forms.Form? editor, Func<bool> sectionAvailable, int index)
@@ -52,22 +52,15 @@ internal sealed class CreationContactRow : IDisposable
         name = new NativeInlineTextBinding(controller.CreationNameInput, Available);
         connection = new NativeInlineNumericBinding(controller.CreationConnectionInput, controller.CreationToolTips, true, Available);
         loyalty = new NativeInlineNumericBinding(controller.CreationLoyaltyInput, controller.CreationToolTips, true, Available);
-        Connection.Width = Loyalty.Width = 104;
-        // Match the established compact attribute editor: the normal Common
-        // column must show a complete row in its shorter enemy viewport.
-        Name.MinHeight = Name.Height = 26; Name.Padding = new Thickness(2, 0);
+        Name.ClearValue(TextBox.FontSizeProperty);
         foreach (var input in new[] { Connection, Loyalty })
-        { input.MinHeight = input.Height = 26; input.Padding = new Thickness(2, 0); }
-        Layout.Styles.Add(new Style(selector => selector.OfType<NumericUpDown>().Template().OfType<TextBox>())
         {
-            Setters = {
-                new Setter(TextBox.MinHeightProperty, 0d),
-                new Setter(TextBox.HeightProperty, 26d),
-                new Setter(TextBox.PaddingProperty, new Thickness(2, 0)),
-                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
-            }
-        });
-        string identity = controller.ContactObject.EntityType == ContactType.Enemy ? "nativeCreationEnemy" : "nativeCreationContact";
+            input.ClearValue(NumericUpDown.FontSizeProperty);
+            input.Width = double.NaN;
+        }
+        string editorMode = editor is frmCareer ? "Career" : "Creation";
+        string entity = controller.ContactObject.EntityType == ContactType.Enemy ? "Enemy" : "Contact";
+        string identity = "native" + editorMode + entity;
         Name.Name = identity + "Name" + index;
         Connection.Name = identity + "Connection" + index; Loyalty.Name = identity + "Loyalty" + index;
         group = new NativeInlineCommandBinding(controller.CreationGroupButton, controller.CreationToolTips, Available,
@@ -78,7 +71,16 @@ internal sealed class CreationContactRow : IDisposable
             OpenLinkMenu, () => "↗");
         delete = new NativeInlineCommandBinding(controller.CreationDeleteButton, controller.CreationToolTips, Available,
             controller.CreationDeleteButton.PerformClick);
-        foreach (var command in new[] { Group, Notes, Link, Delete }) actions.Children.Add(command);
+        foreach (var command in new[] { Group, Notes, Link, Delete })
+        {
+            command.ClearValue(Button.FontSizeProperty);
+            command.ContentTemplate = new FuncDataTemplate<string>((caption, _) => new TextBlock
+            {
+                Text = caption,
+                TextWrapping = TextWrapping.Wrap
+            });
+            actions.Children.Add(command);
+        }
         connectionCell.Children.Add(connectionLabel); connectionCell.Children.Add(Connection);
         loyaltyCell.Children.Add(loyaltyLabel); loyaltyCell.Children.Add(Loyalty);
         statistics.Children.Add(connectionCell); statistics.Children.Add(loyaltyCell);
@@ -98,10 +100,23 @@ internal sealed class CreationContactRow : IDisposable
                 source.VisibleChanged -= changed; source.BackColorChanged -= changed; source.Invalidated -= invalidated; });
         }
         EventHandler<SizeChangedEventArgs> resized = (_, _) => Arrange(); Layout.SizeChanged += resized;
-        cleanup.Add(() => Layout.SizeChanged -= resized);
+        EventHandler<AvaloniaPropertyChangedEventArgs> typography = (_, change) =>
+        {
+            if (change.Property == TextBox.FontSizeProperty) Arrange();
+        };
+        Name.PropertyChanged += typography;
+        cleanup.Add(() => { Layout.SizeChanged -= resized; Name.PropertyChanged -= typography; });
+        actions.SizeChanged += ResizeCommands;
+        cleanup.Add(() => actions.SizeChanged -= ResizeCommands);
         Avalonia.Automation.AutomationProperties.SetName(Name, "Contact or enemy name");
         Avalonia.Automation.AutomationProperties.SetName(Link, "Linked character actions");
         Arrange(); Refresh();
+    }
+    private void ResizeCommands(object? sender, SizeChangedEventArgs args)
+    {
+        if (args.NewSize.Width <= 0) return;
+        foreach (var command in new[] { Group, Notes, Link, Delete })
+            command.MaxWidth = Math.Max(0, args.NewSize.Width - command.Margin.Left - command.Margin.Right);
     }
     private void BindLink(MenuItem target, Func<bool> applicable, Action execute)
     {
@@ -125,13 +140,15 @@ internal sealed class CreationContactRow : IDisposable
     }
     private void Arrange()
     {
-        int mode = Layout.Bounds.Width >= 620 ? 2 : Layout.Bounds.Width >= 226 ? 1 : 0;
+        double fontSize = Name.FontSize;
+        int mode = Layout.Bounds.Width >= Math.Max(620, fontSize * 50) ? 2 :
+            Layout.Bounds.Width >= Math.Max(226, fontSize * 18) ? 1 : 0;
         if (mode == layoutMode) return; layoutMode = mode;
-        Layout.ColumnDefinitions = new ColumnDefinitions(mode == 2 ? "*,Auto,Auto" : "*");
+        Layout.ColumnDefinitions = new ColumnDefinitions(mode == 2 ? "3*,3*,4*" : "*");
         Layout.RowDefinitions = new RowDefinitions(mode == 2 ? "Auto" : "Auto,Auto,Auto");
         Grid.SetColumn(statistics, mode == 2 ? 1 : 0); Grid.SetRow(statistics, mode == 2 ? 0 : 1);
         Grid.SetColumn(actions, mode == 2 ? 2 : 0); Grid.SetRow(actions, mode == 2 ? 0 : 2);
-        statistics.ColumnDefinitions = new ColumnDefinitions(mode == 0 ? "*" : "Auto,Auto");
+        statistics.ColumnDefinitions = new ColumnDefinitions(mode == 0 ? "*" : "*,*");
         statistics.RowDefinitions = new RowDefinitions(mode == 0 ? "Auto,Auto" : "Auto");
         Grid.SetColumn(loyaltyCell, mode == 0 ? 0 : 1); Grid.SetRow(loyaltyCell, mode == 0 ? 1 : 0);
         Name.VerticalAlignment = statistics.VerticalAlignment = actions.VerticalAlignment = VerticalAlignment.Center;
@@ -165,7 +182,6 @@ internal sealed class CreationContactRow : IDisposable
         group.Dispose(); notes.Dispose(); link.Dispose(); delete.Dispose();
         foreach (var action in cleanup) action(); cleanup.Clear();
         linkMenu.Close(); Link.ContextMenu = null; controller.CreationViewportOwner = null;
-        // The creation owner, not the view, owns controller disposal.
     }
 }
 

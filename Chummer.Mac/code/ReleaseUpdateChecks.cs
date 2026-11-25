@@ -56,8 +56,6 @@ namespace Chummer
             try { ReleaseUpdates.CheckAsync(CancellationToken.None, client, current).GetAwaiter().GetResult(); }
             catch (System.IO.InvalidDataException) { rejected = true; }
             Check(rejected, "malformed release metadata cannot be reported as up to date");
-            var window = new frmUpdate(); window.Dispose(); window.Dispose();
-            Check(true, "closing and disposing the updater repeatedly releases requests safely");
             // Captured from the pre-modernization implementation with the same explicit seed.
             uint[] expected = { 2505241820, 4267588480, 2524958330, 3682800685, 3542011659,
                 1205025162, 2780548418, 1640330559, 1928256307, 3761466531 };

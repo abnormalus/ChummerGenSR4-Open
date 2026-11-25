@@ -11,7 +11,7 @@ namespace Chummer
     internal static class AppPlatform
     {
         internal static bool UsesNativeMenus => System.OperatingSystem.IsMacOS();
-        internal static void ConfigureMenus(Form owner, MenuStrip menus, MenuItem preferences, MenuItem about, MenuItem quit, Action openPreferences)
+        internal static bool ConfigureMenus(Form owner, MenuStrip menus, MenuItem preferences, MenuItem about, MenuItem quit, Action openPreferences)
         {
             owner.FormClosing += (_, _) => { AppDiagnostics.CaptureUiState(); AppDiagnostics.Record("main-closing"); };
             owner.FormClosed += (_, _) => { AppDiagnostics.CaptureUiState(); AppDiagnostics.Record("main-closed"); };
@@ -35,9 +35,11 @@ namespace Chummer
                         if (change.Property == Avalonia.Controls.Window.WindowStateProperty) RefreshFallbackCommands();
                     };
                     RefreshFallbackCommands();
+                    return true;
                 }
                 catch (Exception error) { AppDiagnostics.Record("native-menu-fallback", error); }
             }
+            return false;
         }
         internal static bool QuitApproved { get; private set; }
         internal static bool QuitInProgress { get; private set; }

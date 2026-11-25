@@ -1,78 +1,55 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using Majorsilence.Forms;
+using System.Threading.Tasks;
 using System.Xml;
+using Forms = Majorsilence.Forms;
 
+namespace Chummer;
 
-
-
-namespace Chummer
+public sealed class frmSelectExoticSkill : IDisposable
 {
-	public partial class frmSelectExoticSkill : Form
-	{
-		#region Control Events
-		public frmSelectExoticSkill()
-		{
-			InitializeComponent();
-			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-		}
+    private NativeChoiceWindow? window;
 
-		private void cmdOK_Click(object sender, EventArgs e)
-		{
-			this.DialogResult = DialogResult.OK;
-		}
+    public string SelectedExoticSkill { get; private set; } = "";
+    public Forms.DialogResult DialogResult { get; private set; } = Forms.DialogResult.Cancel;
 
-		private void cmdCancel_Click(object sender, EventArgs e)
-		{
-			this.DialogResult = DialogResult.Cancel;
-		}
+    public Forms.DialogResult ShowDialog(Forms.Form owner)
+    {
+        var pending = ShowDialogAsync(owner);
+        Forms.Backends.Platform.Backend.RunModalLoop(pending);
+        return pending.GetAwaiter().GetResult();
+    }
 
-		private void frmSelectExoticSkill_Load(object sender, EventArgs e)
-		{
-			XmlDocument objXmlDocument = new XmlDocument();
-			objXmlDocument = XmlManager.Instance.Load("skills.xml");
+    internal async Task<Forms.DialogResult> ShowDialogAsync(Forms.Form owner)
+    {
+        if (window != null)
+            throw new InvalidOperationException("The exotic skill picker is already open.");
 
-			List<ListItem> lstSkills = new List<ListItem>();
+        SelectedExoticSkill = "";
+        DialogResult = Forms.DialogResult.Cancel;
+        var skills = new List<ListItem>();
+        foreach (XmlNode skill in XmlManager.Instance.Load("skills.xml").SelectNodes("/chummer/skills/skill[exotic = 'Yes']")!)
+        {
+            string name = skill["name"]!.InnerText;
+            skills.Add(new ListItem { Value = name, Name = skill["translate"]?.InnerText ?? name });
+        }
+        skills.Sort(new SortListItem().Compare);
+        var language = LanguageManager.Instance;
+        string title = language.GetString("Title_SelectExoticSkill");
+        window = new NativeChoiceWindow(skills, title, language.GetString("Label_SelectExoticSkill_Description"), title);
+        try
+        {
+            var selected = await NativeDialogHost.ShowAsync<ListItem>(window, owner);
+            if (selected != null)
+            {
+                SelectedExoticSkill = selected.Value;
+                DialogResult = Forms.DialogResult.OK;
+            }
+            return DialogResult;
+        }
+        finally { window = null; }
+    }
 
-			// Build the list of Exotic Active Skills from the Skills file.
-			XmlNodeList objXmlSkillList = objXmlDocument.SelectNodes("/chummer/skills/skill[exotic = \"Yes\"]");
-			foreach (XmlNode objXmlSkill in objXmlSkillList)
-			{
-				ListItem objItem = new ListItem();
-				objItem.Value = objXmlSkill["name"].InnerText;
-				if (objXmlSkill.Attributes != null)
-				{
-					if (objXmlSkill["translate"] != null)
-						objItem.Name = objXmlSkill["translate"].InnerText;
-					else
-						objItem.Name = objXmlSkill["name"].InnerText;
-				}
-				else
-					objItem.Name = objXmlSkill["name"].InnerXml;
-				lstSkills.Add(objItem);
-			}
-			SortListItem objSort = new SortListItem();
-			lstSkills.Sort(objSort.Compare);
-			cboCategory.ValueMember = "Value";
-			cboCategory.DisplayMember = "Name";
-			cboCategory.DataSource = lstSkills;
-
-			// Select the first Skill in the list.
-			cboCategory.SelectedIndex = 0;
-		}
-		#endregion
-
-		#region Properties
-		/// <summary>
-		/// Skill that was selected in the dialogue.
-		/// </summary>
-		public string SelectedExoticSkill
-		{
-			get
-			{
-				return cboCategory.SelectedValue.ToString();
-			}
-		}
-		#endregion
-	}
+    public void Dispose() => window?.Close();
 }

@@ -13,12 +13,19 @@ namespace Chummer
 	public partial class frmCreateCyberwareSuite : Form
 	{
 		private readonly Character _objCharacter;
+        private readonly string dataDirectory;
 		private Improvement.ImprovementSource _objSource = Improvement.ImprovementSource.Cyberware;
 		private string _strType = "cyberware";
 
 		#region Control Events
 		public frmCreateCyberwareSuite(Character objCharacter, Improvement.ImprovementSource objSource)
+            : this(objCharacter, objSource, Path.Combine(Application.StartupPath, "data"))
+        {
+        }
+
+        internal frmCreateCyberwareSuite(Character objCharacter, Improvement.ImprovementSource objSource, string dataDirectory)
 		{
+            this.dataDirectory = dataDirectory;
 			InitializeComponent();
 			_objSource = objSource;
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
@@ -33,6 +40,9 @@ namespace Chummer
 			}
 
 			txtFileName.Text = "custom_" + _strType + ".xml";
+            Load += (_, _) => NativeCreationFormLayout.Attach(this, "NativeSuiteCreation",
+                [(lblName, txtName, "NativeSuiteName"), (lblFileName, txtFileName, "NativeSuiteFile")],
+                cmdCancel, cmdOK, new System.Drawing.Size(420, 210));
 		}
 
 		private void cmdOK_Click(object sender, EventArgs e)
@@ -60,7 +70,7 @@ namespace Chummer
 			// See if a Suite with this name already exists for the Custom category. This is done without the XmlManager since we need to check each file individually.
 			XmlDocument objXmlDocument = new XmlDocument();
 			XmlNodeList objXmlSuiteList;
-			string strCustomPath = Path.Combine(Application.StartupPath, "data");
+			string strCustomPath = dataDirectory;
 			foreach (string strFile in Directory.GetFiles(strCustomPath, "custom*_" + _strType + ".xml"))
 			{
 				objXmlDocument.Load(strFile);
@@ -72,8 +82,7 @@ namespace Chummer
 				}
 			}
 
-			string strPath = Path.Combine(Application.StartupPath, "data");
-			strPath = Path.Combine(strPath, txtFileName.Text);
+			string strPath = Path.Combine(strCustomPath, txtFileName.Text);
 			bool blnNewFile = !File.Exists(strPath);
 
 			// If this is not a new file, read in the existing contents.
@@ -179,7 +188,7 @@ namespace Chummer
 			objWriter.Close();
 			objStream.Close();
 
-			MessageBox.Show(LanguageManager.Instance.GetString("Message_CyberwareSuite_SuiteCreated").Replace("{0}", txtName.Text), LanguageManager.Instance.GetString("MessageTitle_CyberwareSuite_SuiteCreated"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show(this, LanguageManager.Instance.GetString("Message_CyberwareSuite_SuiteCreated").Replace("{0}", txtName.Text), LanguageManager.Instance.GetString("MessageTitle_CyberwareSuite_SuiteCreated"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 			this.DialogResult = DialogResult.OK;
 		}
 

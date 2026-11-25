@@ -364,8 +364,8 @@ namespace Chummer
 			this.cmdOK.Name = "cmdOK";
 			this.cmdOK.Size = new System.Drawing.Size(75, 23);
 			this.cmdOK.TabIndex = 5;
-			this.cmdOK.Tag = "String_OK";
-			this.cmdOK.Text = "OK";
+			this.cmdOK.Tag = "Button_Preferences_Save";
+			this.cmdOK.Text = "Save";
 			this.cmdOK.UseVisualStyleBackColor = true;
 			this.cmdOK.Click += new System.EventHandler(this.cmdOK_Click);
 			// 

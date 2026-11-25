@@ -81,6 +81,184 @@ internal static class NativeBulkChecks
                 passed = true;
                 return;
             }
+            if (command == "--check-editor-layout")
+            {
+                await NativeEditorLayoutChecks.RunAsync(main, character, Check, Path.GetDirectoryName(Path.GetFullPath(report)));
+                await NativeCharacterDetailsChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Editor layout checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-contact-notes")
+            {
+                await NativeContactNotesChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Contact notes checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-contact-removal")
+            {
+                await NativeContactRemovalChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Contact removal checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-armor-mod-picker")
+            {
+                await NativeArmorModPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Armor modification picker checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-catalog-layout")
+            {
+                string snapshots = Path.GetDirectoryName(Path.GetFullPath(report))!;
+                await NativeCatalogContrastChecks.RunAsync(main, character, snapshots, Check);
+                await NativeGearPickerChecks.RunAsync(main, character, snapshots, Check);
+                await NativeWeaponPickerChecks.RunAsync(main, character, snapshots, Check);
+                await NativeCyberwarePickerChecks.RunAsync(main, character, snapshots, Check);
+                await NativeVehiclePickerChecks.RunAsync(main, character, snapshots, Check);
+                await NativeBasicLifestyleChecks.RunAsync(main, character, snapshots, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Catalog layout checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-contact-options")
+            {
+                await NativeLegacyControlChecks.CheckContactOptionsAsync(main, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Contact options preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-information-dialogs")
+            {
+                await NativeInformationDialogChecks.RunAsync(main, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Information dialogs preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-ammunition-views")
+            {
+                await NativeAmmunitionViewChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Ammunition checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-career-attributes")
+            {
+                await NativeEditorLayoutChecks.CheckCareerAttributesAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Career attribute checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-career-skills")
+            {
+                await NativeCareerSkillSpecializationChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Career skill checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-creation-knowledge-skills")
+            {
+                await NativeCreationKnowledgeNameChecks.RunAsync(main, character, Check);
+                await NativeCreationKnowledgeViewportChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check,
+                    checkFullscreen: false);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Creation knowledge skill checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-creation-skill-groups")
+            {
+                await NativeCreationSkillGroupChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Creation skill group checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-creation-active-skills")
+            {
+                await NativeCreationActiveSkillChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Creation active skill checks preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-fullscreen-probe")
+            {
+                string scenario = Environment.GetCommandLineArgs().ElementAtOrDefault(4) ?? "workspace-managed";
+                if (scenario is "creation-check" or "creation-windowed")
+                    await NativeCreationInputChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check,
+                        checkFullscreen: scenario == "creation-check");
+                else
+                    await NativeFullscreenProbe.RunAsync(main, character, report + ".fullscreen.jsonl", scenario);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Fullscreen diagnostics preserve the fixture file");
+                passed = true;
+                return;
+            }
+            if (command is "--check-workspace-tabs" or "--check-workspace-commands")
+            {
+                await NativeCharacterSwitchChecks.RunAsync(main, character, Check, checkFullscreen: command == "--check-workspace-commands");
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Workspace tab checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-legacy-controls")
+            {
+                await NativeLegacyControlChecks.CheckCharacterOpenAsync(main, path, Check);
+                await NativeLegacyControlChecks.RunAsync(main, character, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Legacy-control checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-specialist-spinners")
+            {
+                await NativeSpecialistSpinnerChecks.RunAsync(main, character, Check);
+                passed = true;
+                return;
+            }
+            if (command == "--check-build-point-layout")
+            {
+                await NativeBuildPointChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Build-point layout checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-nexus-layout")
+            {
+                await NativeNexusChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Nexus layout checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-creation-prompts")
+            {
+                string snapshots = Path.GetDirectoryName(Path.GetFullPath(report))!;
+                await NativeStartingMoneyChecks.RunAsync(main, character, snapshots, Check);
+                await NativeNaturalWeaponChecks.RunAsync(main, character, snapshots, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Creation prompt checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-calendar-layout")
+            {
+                await NativeCalendarStartChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Calendar layout checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-expense-layout")
+            {
+                await NativeExpenseChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Expense checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-number-prompts")
+            {
+                string snapshots = Path.GetDirectoryName(Path.GetFullPath(report))!;
+                await NativeNumberPromptChecks.RunAsync(main, character, snapshots, Check);
+                await NativeGearQuantityChecks.RunAsync(main, character, snapshots, Check);
+                passed = true;
+                return;
+            }
             if (command == "--check-compact-spinners")
             {
                 await NativeCompactSpinnerChecks.RunAsync(main, character, Check);
@@ -114,6 +292,13 @@ internal static class NativeBulkChecks
             {
                 await NativeDialogTreeChecks.RunAsync(character, Check);
                 Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native dialog tree checks preserve the source character file");
+                passed = true;
+                return;
+            }
+            if (command == "--check-quality-picker")
+            {
+                await NativeQualityPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
+                Check(File.ReadAllBytes(path).SequenceEqual(originalFile), "Native quality picker checks preserve the source character file");
                 passed = true;
                 return;
             }
@@ -216,6 +401,7 @@ internal static class NativeBulkChecks
             await NativeCyberwareRemovalChecks.RunAsync(main, character, Check);
             await NativeWeaponFocusChecks.RunAsync(main, character, Check);
             await NativeCharacterSwitchChecks.RunAsync(main, character, Check);
+            await NativeEditorLayoutChecks.RunAsync(main, character, Check);
             await NativeContactNotesChecks.RunAsync(main, character, Check);
             await NativeContactRemovalChecks.RunAsync(main, character, Check);
             await NativeCreationContactViewportChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
@@ -229,6 +415,8 @@ internal static class NativeBulkChecks
             await NativeCharacterTreeChecks.RunAsync(main, character, Check);
             await NativeCareerListChecks.RunAsync(main, character, Check);
             await NativeCompactSpinnerChecks.RunAsync(main, character, Check);
+            await NativeSpecialistSpinnerChecks.RunAsync(main, character, Check);
+            await NativeLegacyControlChecks.RunAsync(main, character, Check);
             await NativeInventoryTreeChecks.RunAsync(main, character, Check);
             await NativeQualityPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
             await NativeAccessoryPickerChecks.RunAsync(main, character, Path.GetDirectoryName(Path.GetFullPath(report))!, Check);
@@ -278,10 +466,13 @@ internal static class NativeBulkChecks
             var pending = editor.ImportPacksKitAsync(Kit("<gears>" + string.Concat(Enumerable.Repeat(
                 "<gear><name>Backpack</name></gear>", 1000)) + "</gears>"), false);
             await WaitForAsync(() => pending.IsCompleted || Application.OpenForms.OfType<BulkProgressDialog>()
-                .Any(d => d.Controls.OfType<ProgressBar>().Single().Value >= 2));
+                .Any(d => Field<ProgressBar>(d, "progress").Value >= 2));
             Check(!pending.IsCompleted, "Native dispatcher accepts cancellation while PACKS work is in progress");
             var progress = Application.OpenForms.OfType<BulkProgressDialog>().Single();
-            progress.Controls.OfType<Button>().Single().PerformClick();
+            var progressHost = progress.Controls.OfType<NativeControlHost>().Single();
+            var progressLayout = (Avalonia.Controls.Grid)((Avalonia.Controls.Border)progressHost.NativeControl!).Child!;
+            progressLayout.Children.OfType<Avalonia.Controls.Button>().Single().RaiseEvent(
+                new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
             Check(await pending == null && !editor.IsDisposed && current.CaptureSnapshot().SequenceEqual(beforeCancel),
                 "Native Cancel discards partially prepared PACKS entries");
 

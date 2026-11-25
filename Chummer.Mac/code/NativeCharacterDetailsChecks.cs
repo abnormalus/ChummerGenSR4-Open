@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
@@ -8,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
+using Avalonia.VisualTree;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -36,15 +38,25 @@ internal static class NativeCharacterDetailsChecks
             try
             {
                 Field<Forms.TabControl>(owner, "tabCharacterTabs").SelectedTab = Field<Forms.TabPage>(owner, "tabCharacterInfo");
-                var parent = Field<Forms.Label>(owner, "lblDescription").Parent!;
-                var expand = (Forms.Button)parent.Controls.Find("expandCharacterDetail0", false)[0]; expand.PerformClick();
+                var host = main.Controls.OfType<Forms.NativeControlHost>().Single(item => item.Name == "NativeCharacterNarrative");
+                var narrative = (ScrollViewer)host.NativeControl!;
+                await Task.Delay(60);
+                async Task Expand(int section)
+                {
+                    var button = narrative.GetVisualDescendants().OfType<Button>()
+                        .Single(item => item.Name == "expandCharacterDetail" + section);
+                    button.BringIntoView();
+                    await Task.Delay(40);
+                    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                }
+                await Expand(0);
                 var window = (CharacterDetailsWindow)NativeDialogHost.ActiveWindow!;
                 check(window.Editors[0].Text == character.Description && !Forms.AvaloniaHostInterop.ToAvaloniaWindow(main).IsEnabled,
                     "Native " + mode + " expanded details preserve original paragraphs and modal ownership");
                 window.Editors[0].Text = "Discarded draft"; window.Close(); await ClosedAsync();
                 check(character.Description.StartsWith("Paragraph one.") && Forms.AvaloniaHostInterop.ToAvaloniaWindow(main).IsEnabled,
                     "Native " + mode + " cancelled detail draft leaves the character unchanged");
-                ((Forms.Button)parent.Controls.Find("expandCharacterDetail3", false)[0]).PerformClick();
+                await Expand(3);
                 window = (CharacterDetailsWindow)NativeDialogHost.ActiveWindow!;
                 check(window.Sections.SelectedIndex == 3, "Native " + mode + " notes expansion opens the requested section");
                 await Task.Delay(80);
@@ -54,6 +66,37 @@ internal static class NativeCharacterDetailsChecks
                 bool undone = notes.Text == "Original notes";
                 window.RedoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 check(undone && notes.Text == typed && typed.EndsWith(" Ω"), "Native " + mode + " detail toolbar uses standard text undo and redo");
+                window.Width = 330;
+                window.Height = 380;
+                ((TextBlock)window.UndoButton.Content!).Text = string.Join(" ", Enumerable.Repeat("Undo the last text change", 5));
+                await Task.Delay(100);
+                var layout = (Grid)window.Content!;
+                var toolbar = (ScrollViewer)layout.Children[0];
+                var tools = (WrapPanel)toolbar.Content!;
+                check(tools.Children.Select(button => button.Bounds.Top).Distinct().Count() > 1 &&
+                    toolbar.Bounds.Bottom <= window.Sections.Bounds.Top &&
+                    window.Sections.Bounds.Bottom <= layout.Children[2].Bounds.Top &&
+                    window.AcceptButton.IsEffectivelyVisible,
+                    "Native " + mode + " detail toolbar wraps above the editor and leaves confirmation clear");
+                double baseEditorFont = notes.FontSize;
+                double baseControlsFont = window.AcceptButton.FontSize;
+                try
+                {
+                    Avalonia.Controls.Documents.TextElement.SetFontSize(layout, baseControlsFont * 1.5);
+                    await Task.Delay(60);
+                    var tabs = window.Sections.Items.OfType<TabItem>().ToArray();
+                    check(notes.FontSize == baseEditorFont * 1.5 && window.AcceptButton.FontSize == baseControlsFont * 1.5 &&
+                        tabs.All(tab => tab.FontSize == baseControlsFont * 1.5 &&
+                            tab.Bounds.Right <= window.Sections.Bounds.Width + 1) &&
+                        toolbar.Bounds.Bottom <= window.Sections.Bounds.Top &&
+                        window.Sections.Bounds.Bottom <= layout.Children[2].Bounds.Top && notes.Bounds.Height > 32,
+                        $"Native {mode} detail editor keeps tabs, editing space and confirmation visible at 150% text [body={baseEditorFont}/{notes.FontSize}/{notes.Bounds}, button={baseControlsFont}/{window.AcceptButton.FontSize}, tabs={string.Join("/", tabs.Select(tab => tab.Bounds))}, sections={window.Sections.Bounds}]");
+                }
+                finally
+                {
+                    layout.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                    await Task.Delay(30);
+                }
                 notes.Text = "New notes\n\nPlain text <literal> & Ω"; window.Editors[1].Text = "New background";
                 window.Width = 720; window.Height = 540; await Task.Delay(100);
                 using (var bitmap = new RenderTargetBitmap(new PixelSize((int)window.ClientSize.Width * 2, (int)window.ClientSize.Height * 2), new Vector(192, 192)))

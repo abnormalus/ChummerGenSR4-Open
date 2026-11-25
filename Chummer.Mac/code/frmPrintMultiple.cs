@@ -33,7 +33,7 @@ namespace Chummer
 		public frmPrintMultiple()
 		{
 			InitializeComponent();
-            Load += (_, _) => NativeEditorTree.Attach(this, treCharacters, "NativetreCharacters", Text);
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			MoveControls();
             batchStatus = new Label { Left = prgProgress.Left, Top = prgProgress.Bottom + 6,
@@ -61,6 +61,7 @@ namespace Chummer
 					TreeNode objNode = new TreeNode();
 					objNode.Text = strLongName[strLongName.Length - 1];
 					objNode.Tag = strFileName;
+					objNode.ToolTipText = strFileName;
 					treCharacters.Nodes.Add(objNode);
 				}
 			}

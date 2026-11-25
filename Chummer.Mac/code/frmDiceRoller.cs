@@ -15,6 +15,11 @@ namespace Chummer
 		public frmDiceRoller(frmMain frmMainForm, List<Quality> lstQualities = null, int intDice = 1)
 		{
 			InitializeComponent();
+            Load += (_, _) => NativeCreationFormLayout.Attach(this, "NativeDiceRoller",
+                [(lblRoll, nudDice, "nativenudDice"), (lblD6, cboMethod, "NativecboMethod"),
+                    (lblGremlins, nudGremlins, "nativenudGremlins"), (lblThreshold, nudThreshold, "nativenudThreshold")],
+                cmdReroll, cmdRollDice, new System.Drawing.Size(460, 600), [chkRuleOf6, chkCinematicGameplay, chkRushJob],
+                results: (lblResults, lstResults));
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_frmMain = frmMainForm;
             _RNG = new MTRNG();

@@ -101,7 +101,7 @@ internal sealed class ExpenseWindow : Window
         this.original = original; this.settings = settings;
         bool nuyen = original.Mode == ExpenseType.Nuyen;
         Title = LanguageManager.Instance.GetString(nuyen ? "Title_Expense_Nuyen" : "Title_Expense_Karma");
-        Width = 560; MinWidth = 400; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 560; MinWidth = 310; MinHeight = 200; MaxHeight = 560; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         NativeControlPresentation.AddTheme(Styles);
         AmountInput = NativeIntegerInput.Create("expenseAmount", settings.Minimum, 9999999);
         AmountInput.Value = original.RawAmount; AmountInput.IsEnabled = settings.AmountEditable;
@@ -110,20 +110,43 @@ internal sealed class ExpenseWindow : Window
         RefundInput = new CheckBox { IsChecked = original.Refund, IsEnabled = settings.RefundEditable,
             Content = new TextBlock { Text = LanguageManager.Instance.GetString(nuyen ? "Checkbox_Expense_RefundNuyen" : "Checkbox_Expense_Refund"), TextWrapping = Avalonia.Media.TextWrapping.Wrap } };
         DateInput = new DatePicker { Name = "expenseDate", MinYear = new DateTimeOffset(1753, 1, 1, 0, 0, 0, TimeSpan.Zero), MaxYear = new DateTimeOffset(9998, 12, 31, 0, 0, 0, TimeSpan.Zero),
-            SelectedDate = new DateTimeOffset(original.Date.Year, original.Date.Month, original.Date.Day, 0, 0, 0, TimeSpan.Zero), Width = 300, Margin = new Thickness(0, 0, 12, 8) };
+            SelectedDate = new DateTimeOffset(original.Date.Year, original.Date.Month, original.Date.Day, 0, 0, 0, TimeSpan.Zero), Width = 300, MinWidth = 0 };
         TimeInput = new TimePicker { Name = "expenseTime", SelectedTime = original.Date.TimeOfDay, UseSeconds = false, IsVisible = settings.ShowTime,
-            ClockIdentifier = CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains('H') ? "24HourClock" : "12HourClock", Width = 200 };
-        var layout = new StackPanel { Margin = new Thickness(20), Spacing = 12 };
-        layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString(nuyen ? "Label_Expense_NuyenAmount" : "Label_Expense_KarmaAmount") });
-        var numbers = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 }; numbers.Children.Add(AmountInput);
-        var percentage = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, IsVisible = nuyen }; percentage.Children.Add(PercentInput); percentage.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center }); numbers.Children.Add(percentage);
-        layout.Children.Add(numbers); layout.Children.Add(PreviewText);
-        layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_Expense_Description") }); layout.Children.Add(ReasonInput); layout.Children.Add(RefundInput);
-        layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_Expense_Date") });
-        var dateRow = new WrapPanel(); dateRow.Children.Add(DateInput); dateRow.Children.Add(TimeInput); layout.Children.Add(dateRow); layout.Children.Add(validation);
-        var cancel = new Button { Content = LanguageManager.Instance.GetString("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
-        AcceptButton = new Button { Content = LanguageManager.Instance.GetString("String_OK"), IsDefault = true }; AcceptButton.Click += (_, _) => Accept();
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 }; buttons.Children.Add(cancel); buttons.Children.Add(AcceptButton); layout.Children.Add(buttons); Content = layout;
+            ClockIdentifier = CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains('H') ? "24HourClock" : "12HourClock", Width = 200, MinWidth = 0 };
+        var fields = new StackPanel { Spacing = 10 };
+        var amountLabel = Caption(nuyen ? "Label_Expense_NuyenAmount" : "Label_Expense_KarmaAmount");
+        fields.Children.Add(amountLabel);
+        var numbers = new WrapPanel { ItemSpacing = 12, LineSpacing = 4, Children = { AmountInput } };
+        var percentage = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, IsVisible = nuyen,
+            Children = { PercentInput, new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center } } };
+        numbers.Children.Add(percentage);
+        NativeControlPresentation.ConstrainWrapItems(numbers);
+        fields.Children.Add(numbers);
+        fields.Children.Add(PreviewText);
+        var reasonLabel = Caption("Label_Expense_Description");
+        fields.Children.Add(reasonLabel);
+        fields.Children.Add(ReasonInput);
+        fields.Children.Add(RefundInput);
+        var dateLabel = Caption("Label_Expense_Date");
+        fields.Children.Add(dateLabel);
+        var dateRow = new WrapPanel { ItemSpacing = 6, LineSpacing = 4, Children = { DateInput, TimeInput } };
+        NativeControlPresentation.ConstrainWrapItems(dateRow);
+        fields.Children.Add(dateRow);
+        fields.Children.Add(validation);
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(AmountInput, amountLabel);
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(ReasonInput, reasonLabel);
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(DateInput, dateLabel);
+        var cancel = new Button { Content = Caption("String_Cancel"), IsCancel = true };
+        cancel.Click += (_, _) => Close();
+        AcceptButton = new Button { Content = Caption("String_OK"), IsDefault = true };
+        AcceptButton.Click += (_, _) => Accept();
+        Content = NativeControlPresentation.CreatePromptLayout(fields, cancel, AcceptButton);
+
+        static TextBlock Caption(string key) => new()
+        {
+            Text = LanguageManager.Instance.GetString(key),
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
+        };
         AmountInput.ValueChanged += (_, _) => Refresh(); PercentInput.ValueChanged += (_, _) => Refresh(); DateInput.SelectedDateChanged += (_, _) => Refresh(); TimeInput.SelectedTimeChanged += (_, _) => Refresh();
         Opened += (_, _) => { if (AmountInput.IsEnabled) AmountInput.Focus(); else ReasonInput.Focus(); }; Refresh();
     }

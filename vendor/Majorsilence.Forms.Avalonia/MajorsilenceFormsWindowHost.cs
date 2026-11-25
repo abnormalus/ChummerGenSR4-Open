@@ -47,6 +47,7 @@ namespace Majorsilence.Forms
         private DispatcherTimer? _renderTimer;
         private bool _painting;
         private bool _invalidatePending;
+        private Action? _stopFullscreenNotifications;
 
         internal bool IsDirty = true;
 
@@ -96,10 +97,27 @@ namespace Majorsilence.Forms
 
             Opened += (_, _) => {
                 _opened = true;
+                if (OperatingSystem.IsMacOS () && this.TryGetPlatformHandle () is { HandleDescriptor: "NSWindow" } handle && handle.Handle != IntPtr.Zero)
+                    _stopFullscreenNotifications = AppKitFullscreenNotifications.Watch (handle.Handle, _ =>
+                    {
+                        // AppKit can reject entry while Avalonia still holds the requested state.
+                        // Reconcile after AppKit has finished dispatching the failure notification.
+                        Dispatcher.UIThread.Post (() =>
+                        {
+                            if (_stopFullscreenNotifications != null && WindowState == WindowState.FullScreen &&
+                                !AppKitFullscreenNotifications.IsFullscreen (handle.Handle))
+                                WindowState = WindowState.Normal;
+                        });
+                    }, "DidFailToEnter");
                 EnsureFramebuffer ();
                 StartRenderTimer ();
             };
-            Closed += (_, _) => { StopRenderTimer (); _owner.OnBackendClosed (); };
+            Closed += (_, _) => {
+                _stopFullscreenNotifications?.Invoke ();
+                _stopFullscreenNotifications = null;
+                StopRenderTimer ();
+                _owner.OnBackendClosed ();
+            };
             PositionChanged += (_, _) => _owner.OnBackendMoved ();
             Activated += (_, _) => _owner.OnBackendActivated ();
             Deactivated += (_, _) => _owner.OnBackendDeactivated ();

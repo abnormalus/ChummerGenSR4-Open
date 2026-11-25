@@ -62,13 +62,27 @@ internal sealed class VehiclePickerWindow : CatalogPickerWindow<VehiclePickerMod
             ("Label_Pilot", "Pilot"), ("Label_Body", "Body"), ("Label_Armor", "Armor"), ("Label_Sensor", "Sensor"),
             ("Label_Avail", "Availability"), ("Label_Cost", "Cost"), ("Label_Test", "AvailabilityTest") })
     {
-        UsedInput = new CheckBox { Content = LanguageManager.Instance.GetString("Checkbox_SelectVehicle_UsedVehicle") };
+        UsedInput = new CheckBox { Content = new TextBlock
+        {
+            Text = LanguageManager.Instance.GetString("Checkbox_SelectVehicle_UsedVehicle"),
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
+        } };
         UsedInput.Bind(ToggleButton.IsCheckedProperty, new Binding(nameof(model.UsedVehicle)) { Mode = BindingMode.TwoWay });
         DiscountInput = NativeIntegerInput.Create("vehicleUsedDiscount", 20, 50);
         DiscountInput.Bind(NumericUpDown.ValueProperty, new Binding(nameof(model.UsedDiscount)) { Mode = BindingMode.TwoWay });
-        var row = new WrapPanel(); row.Children.Add(UsedInput);
-        row.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_SelectVehicle_Discount"), Margin = new Avalonia.Thickness(10,0), VerticalAlignment = VerticalAlignment.Center });
-        row.Children.Add(DiscountInput); row.Children.Add(new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center });
-        DetailPanel.Children.Insert(1, row);
+        DiscountInput.ClearValue(Layoutable.WidthProperty);
+        var caption = new TextBlock
+        {
+            Text = LanguageManager.Instance.GetString("Label_SelectVehicle_Discount"),
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
+        };
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(DiscountInput, caption);
+        var discount = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 6 };
+        discount.Children.Add(DiscountInput);
+        var percent = new TextBlock { Text = "%", VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(percent, 1);
+        discount.Children.Add(percent);
+        var options = new StackPanel { Name = "VehiclePurchaseOptions", Spacing = 4, Children = { UsedInput, caption, discount } };
+        DetailPanel.Children.Insert(1, options);
     }
 }

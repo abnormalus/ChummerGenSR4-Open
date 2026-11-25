@@ -1,10 +1,7 @@
 #nullable enable
 using System;
-using System.Drawing;
 using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Layout;
-using Avalonia.Styling;
 
 namespace Chummer;
 
@@ -20,55 +17,49 @@ public partial class frmCreate
         vehicleQuantityInput?.Refresh();
     }
 
-    private void InitializeCreationVehicleInputs()
+    private void AddVehicleDetails(StackPanel rows)
     {
-        if (Avalonia.Application.Current == null || IsDisposed) return;
+        var rating = new WrapPanel { ItemSpacing = 8, LineSpacing = 4 };
+        vehicleRatingInput = AddInput(rating, lblVehicleRatingLabel, nudVehicleRating);
+        rating.Children.Add(GearReadoutsLayout.BindOption(this, tabVehicles, chkVehicleIncludedInWeapon));
+        rating.Children.Add(GearReadoutsLayout.BindOption(this, tabVehicles, chkVehicleWeaponAccessoryInstalled));
+        NativeControlPresentation.ConstrainWrapItems(rating);
+        rows.Children.Add(rating);
 
-        var rating = vehicleRatingInput = new NativeInlineNumericBinding(nudVehicleRating, tipTooltip, wholeNumbers: true);
-        var quantity = vehicleQuantityInput = new NativeInlineNumericBinding(nudVehicleGearQty, tipTooltip, wholeNumbers: true);
-        int width = Math.Clamp(chkVehicleIncludedInWeapon.Left - nudVehicleRating.Left - 4,
-            nudVehicleRating.Width, 80);
-        var inputs = new StackPanel { ClipToBounds = true, Spacing = 1 };
-        NativeControlPresentation.AddTheme(inputs.Styles);
-        inputs.Styles.Add(new Style(selector => selector.OfType<NumericUpDown>().Template().OfType<TextBox>())
+        var quantity = new WrapPanel { ItemSpacing = 8, LineSpacing = 4 };
+        vehicleQuantityInput = AddInput(quantity, lblVehicleGearQtyLabel, nudVehicleGearQty);
+        quantity.Children.Add(GearReadoutsLayout.BindOption(this, tabVehicles, chkVehicleHomeNode));
+        NativeControlPresentation.ConstrainWrapItems(quantity);
+        rows.Children.Add(quantity);
+
+        var reference = new WrapPanel { ItemSpacing = 8, LineSpacing = 4 };
+        reference.Children.Add(GearReadoutsLayout.BindSource(this, tabVehicles, "NativeVehicleSource",
+            lblVehicleSourceLabel, lblVehicleSource, tipTooltip, () => lblVehicleSource_Click(lblVehicleSource, EventArgs.Empty)));
+        reference.Children.Add(GearReadoutsLayout.BindOption(this, tabVehicles, chkVehicleBlackMarketDiscount));
+        rows.Children.Add(reference);
+
+        MountedWeaponLayout.AddRows(this, tabVehicles, rows, lblVehicleWeaponRangeLabel,
+            [(lblVehicleWeaponRangeShortLabel, lblVehicleWeaponRangeShort), (lblVehicleWeaponRangeMediumLabel, lblVehicleWeaponRangeMedium),
+             (lblVehicleWeaponRangeLongLabel, lblVehicleWeaponRangeLong), (lblVehicleWeaponRangeExtremeLabel, lblVehicleWeaponRangeExtreme)],
+            null,
+            [(lblVehicleWeaponNameLabel, lblVehicleWeaponName)], [(lblVehicleWeaponCategoryLabel, lblVehicleWeaponCategory)],
+            [(lblVehicleWeaponDamageLabel, lblVehicleWeaponDamage), (lblVehicleWeaponAPLabel, lblVehicleWeaponAP),
+             (lblVehicleWeaponModeLabel, lblVehicleWeaponMode), (lblVehicleWeaponAmmoLabel, lblVehicleWeaponAmmo)]);
+
+        NativeInlineNumericBinding AddInput(WrapPanel row, Majorsilence.Forms.Label label, Majorsilence.Forms.NumericUpDown source)
         {
-            Setters =
+            var heading = TechnomancerPersonaLayout.BindLabel(this, tabVehicles, label);
+            tabVehicles.Controls.Remove(source);
+            var binding = new NativeInlineNumericBinding(source, tipTooltip, wholeNumbers: true);
+            AutomationProperties.SetLabeledBy(binding.Input, heading);
+            binding.Input.ClearValue(NumericUpDown.FontSizeProperty);
+            row.Children.Add(NativeControlPresentation.CreateLabeledField(row, heading, binding.Input));
+            Disposed += (_, _) =>
             {
-                new Setter(TextBox.MinHeightProperty, 0d),
-                new Setter(TextBox.HeightProperty, 25d),
-                new Setter(TextBox.PaddingProperty, new Avalonia.Thickness(2, 0)),
-                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
-            }
-        });
-
-        foreach (var binding in new[] { rating, quantity })
-        {
-            binding.Input.Width = width;
-            binding.Input.MinHeight = 25;
-            binding.Input.Height = 25;
-            binding.Input.Padding = new Avalonia.Thickness(2, 0);
-            inputs.Children.Add(binding.Input);
+                binding.Dispose();
+                source.Dispose();
+            };
+            return binding;
         }
-
-        void SyncRatingLabel(object? sender, EventArgs args) => AutomationProperties.SetName(rating.Input, lblVehicleRatingLabel.Text);
-        lblVehicleRatingLabel.TextChanged += SyncRatingLabel;
-        SyncRatingLabel(null, EventArgs.Empty);
-        AutomationProperties.SetName(quantity.Input, lblVehicleGearQtyLabel.Text);
-        tabVehicles.Controls.Remove(nudVehicleRating);
-        tabVehicles.Controls.Remove(nudVehicleGearQty);
-        rating.Refresh();
-        quantity.Refresh();
-
-        var presenter = new CreationRegionPresenter(this, tabVehicles, inputs, "nativeCreationVehicleInputs",
-            () => new Rectangle(nudVehicleRating.Left, nudVehicleRating.Top, width, 51));
-        Disposed += (_, _) =>
-        {
-            presenter.Dispose();
-            rating.Dispose();
-            quantity.Dispose();
-            lblVehicleRatingLabel.TextChanged -= SyncRatingLabel;
-            nudVehicleRating.Dispose();
-            nudVehicleGearQty.Dispose();
-        };
     }
 }

@@ -28,6 +28,8 @@ namespace Majorsilence.Forms
         // Whether the drag in progress has actually moved the split, so that SplitterMoved fires once
         // at the end of a real drag and not at all for a press-and-release (LAY-03).
         private bool split_moved_by_drag;
+        private bool panel2_collapsed;
+        private int expanded_distance;
 
         /// <summary>
         /// Initializes a new instance of the SplitContainer class.
@@ -132,7 +134,8 @@ namespace Majorsilence.Forms
         /// (LAY-02).</remarks>
         protected override void OnLayout (LayoutEventArgs e)
         {
-            ApplyFixedPanel ();
+            if (!panel2_collapsed)
+                ApplyFixedPanel ();
 
             base.OnLayout (e);
         }
@@ -154,7 +157,8 @@ namespace Majorsilence.Forms
                     SuspendLayout ();
 
                     splitter.Orientation = orientation;
-                    Panel1.Dock = orientation == Orientation.Vertical ? DockStyle.Left : DockStyle.Top;
+                    Panel1.Dock = panel2_collapsed ? DockStyle.Fill :
+                        orientation == Orientation.Vertical ? DockStyle.Left : DockStyle.Top;
                     Panel1.Size = new Size (Panel1.Height, Panel1.Width);
 
                     // The extent recorded for FixedPanel was measured along the OTHER axis, so it is
@@ -218,7 +222,9 @@ namespace Majorsilence.Forms
             // collapsing it.
             var clamped = value.Clamp (panel1_min_size, GetMaximumPanel1Size ());
 
-            if (orientation == Orientation.Vertical)
+            if (panel2_collapsed)
+                expanded_distance = clamped;
+            else if (orientation == Orientation.Vertical)
                 Panel1.Width = clamped;
             else
                 Panel1.Height = clamped;
@@ -247,7 +253,8 @@ namespace Majorsilence.Forms
         /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
         public int SplitterDistance {
             // Vertical docks Panel1 to the left, so its Width is the distance.
-            get => orientation == Orientation.Vertical ? Panel1.Width : Panel1.Height;
+            get => panel2_collapsed ? expanded_distance :
+                orientation == Orientation.Vertical ? Panel1.Width : Panel1.Height;
             set => SetSplitterDistance (value, force: false);
         }
 
@@ -292,10 +299,30 @@ namespace Majorsilence.Forms
             set => Panel1.Visible = !value;
         }
 
-        /// <summary>Gets or sets whether Panel2 is collapsed. Stub in Majorsilence.Forms.</summary>
+        /// <summary>Gets or sets whether Panel2 is hidden and Panel1 fills the container.</summary>
         public bool Panel2Collapsed {
-            get => !Panel2.Visible;
-            set => Panel2.Visible = !value;
+            get => panel2_collapsed;
+            set {
+                if (panel2_collapsed == value)
+                    return;
+
+                var previousDistance = SplitterDistance;
+                SuspendLayout ();
+                try {
+                    panel2_collapsed = value;
+                    expanded_distance = previousDistance;
+                    Panel2.Visible = !value;
+                    splitter.Visible = !value;
+                    Panel1.Dock = value ? DockStyle.Fill :
+                        orientation == Orientation.Vertical ? DockStyle.Left : DockStyle.Top;
+                    if (!value) {
+                        ResizePanels (previousDistance);
+                        ApplyFixedPanel ();
+                    }
+                } finally {
+                    ResumeLayout (true);
+                }
+            }
         }
 
         /// <summary>Gets or sets whether the splitter can be moved by the user.</summary>

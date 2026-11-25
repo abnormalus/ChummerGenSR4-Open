@@ -26,12 +26,16 @@ namespace Chummer
         {
             InitializeComponent();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
-			MoveControls();
+			if (Avalonia.Application.Current == null)
+				MoveControls();
         }
 
 		private void PowerControl_Load(object sender, EventArgs e)
 		{
-			this.Width = cmdDelete.Left + cmdDelete.Width;
+            if (Avalonia.Application.Current != null)
+                AttachNativePowerRow();
+            else
+                this.Width = cmdDelete.Left + cmdDelete.Width;
 		}
 
 		private void nudRating_ValueChanged(object sender, EventArgs e)

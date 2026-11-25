@@ -1,17 +1,13 @@
 #nullable enable
 using System;
-using System.Drawing;
 using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Layout;
-using Avalonia.Styling;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
 
 public partial class frmCreate
 {
-    private const int GearRatingInputWidth = 76;
     private NativeInlineNumericBinding? gearRatingInput;
     private NativeInlineNumericBinding? gearQuantityInput;
 
@@ -22,43 +18,47 @@ public partial class frmCreate
         gearQuantityInput?.Refresh();
     }
 
-    private void InitializeCreationGearInputs()
+    private StackPanel CreateGearDetails()
     {
-        if (Avalonia.Application.Current == null || IsDisposed) return;
+        var ratingRow = new WrapPanel { ItemSpacing = 12, LineSpacing = 4 };
+        var capacityRow = new WrapPanel { ItemSpacing = 12, LineSpacing = 4 };
+        var quantityRow = new WrapPanel { ItemSpacing = 8, LineSpacing = 4 };
+        gearRatingInput = Attach(ratingRow, nudGearRating, lblGearRatingLabel);
+        ratingRow.Children.Add(GearReadoutsLayout.BindReadout(this, tabGear, lblGearAvailLabel, lblGearAvail));
+        ratingRow.Children.Add(GearReadoutsLayout.BindReadout(this, tabGear, lblGearCostLabel, lblGearCost));
+        capacityRow.Children.Add(GearReadoutsLayout.BindReadout(this, tabGear, lblGearCapacityLabel, lblGearCapacity));
+        capacityRow.Children.Add(GearReadoutsLayout.BindOption(this, tabGear, chkGearBlackMarketDiscount));
+        gearQuantityInput = Attach(quantityRow, nudGearQty, lblGearQtyLabel);
 
-        gearRatingInput = Attach(nudGearRating, lblGearRatingLabel, GearRatingInputWidth);
-        gearQuantityInput = Attach(nudGearQty, lblGearQtyLabel, 96);
-
-        NativeInlineNumericBinding Attach(Forms.NumericUpDown source, Forms.Label label, int width)
+        var rows = new StackPanel
         {
-            const int height = 24;
-            var binding = new NativeInlineNumericBinding(source, tipTooltip, wholeNumbers: true);
-            var input = binding.Input;
-            input.Width = width;
-            input.Height = height;
-            input.MinHeight = height;
-            input.Padding = new Avalonia.Thickness(2, 0);
-            var region = new Border { Child = input, ClipToBounds = true };
-            NativeControlPresentation.AddTheme(region.Styles);
-            region.Styles.Add(new Style(selector => selector.OfType<NumericUpDown>().Template().OfType<TextBox>())
+            Spacing = 4,
+            Children =
             {
-                Setters =
-                {
-                    new Setter(TextBox.MinHeightProperty, 0d),
-                    new Setter(TextBox.HeightProperty, (double)height),
-                    new Setter(TextBox.PaddingProperty, new Avalonia.Thickness(2, 0)),
-                    new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
-                }
-            });
+                GearReadoutsLayout.BindReadout(this, tabGear, lblGearNameLabel, lblGearName),
+                GearReadoutsLayout.BindReadout(this, tabGear, lblGearCategoryLabel, lblGearCategory),
+                ratingRow, capacityRow, quantityRow
+            }
+        };
+        GearReadoutsLayout.AddReadouts(this, tabGear, rows, lblGearSourceLabel, lblGearSource, tipTooltip,
+            () => lblGearSource_Click(lblGearSource, EventArgs.Empty),
+            [(lblGearResponseLabel, lblGearResponse), (lblGearSignalLabel, lblGearSignal),
+             (lblGearSystemLabel, lblGearSystem), (lblGearFirewallLabel, lblGearFirewall)],
+            [(lblGearDamageLabel, lblGearDamage), (lblGearAPLabel, lblGearAP)]);
+        GearReadoutsLayout.AddOptions(this, tabGear, rows, chkGearEquipped, chkGearHomeNode, chkActiveCommlink);
+        return rows;
 
-            AutomationProperties.SetName(input, label.Text);
+        NativeInlineNumericBinding Attach(WrapPanel row, Forms.NumericUpDown source, Forms.Label label)
+        {
             tabGear.Controls.Remove(source);
-            binding.Refresh();
-            var presenter = new CreationRegionPresenter(this, tabGear, region, input.Name!,
-                () => new Rectangle(source.Left, source.Top, width, height));
+            var heading = TechnomancerPersonaLayout.BindLabel(this, tabGear, label);
+            var binding = new NativeInlineNumericBinding(source, tipTooltip, wholeNumbers: true);
+            binding.Input.ClearValue(NumericUpDown.FontSizeProperty);
+            AutomationProperties.SetLabeledBy(binding.Input, heading);
+            row.Children.Add(NativeControlPresentation.CreateLabeledField(row, heading, binding.Input));
+            NativeControlPresentation.ConstrainWrapItems(row);
             Disposed += (_, _) =>
             {
-                presenter.Dispose();
                 binding.Dispose();
                 source.Dispose();
             };

@@ -67,7 +67,6 @@ namespace Chummer
 			this.tssEssence = new Majorsilence.Forms.ToolStripStatusLabel();
 			this.toolStripStatusLabel4 = new Majorsilence.Forms.ToolStripStatusLabel();
 			this.tssNuyenRemaining = new Majorsilence.Forms.ToolStripStatusLabel();
-			this.pgbProgress = new Majorsilence.Forms.ToolStripProgressBar();
 			this.dlgSaveFile = new Majorsilence.Forms.SaveFileDialog();
 			this.tipTooltip = new Majorsilence.Forms.ToolTip(this.components);
 			this.lblSignalLabel = new Majorsilence.Forms.Label();
@@ -909,8 +908,7 @@ namespace Chummer
             this.toolStripStatusLabel3,
             this.tssEssence,
             this.toolStripStatusLabel4,
-            this.tssNuyenRemaining,
-            this.pgbProgress});
+            this.tssNuyenRemaining});
 			this.StatusStrip.Location = new System.Drawing.Point(0, 640);
 			this.StatusStrip.Name = "StatusStrip";
 			this.StatusStrip.Size = new System.Drawing.Size(1040, 24);
@@ -972,12 +970,6 @@ namespace Chummer
 			this.tssNuyenRemaining.Name = "tssNuyenRemaining";
 			this.tssNuyenRemaining.Size = new System.Drawing.Size(23, 19);
 			this.tssNuyenRemaining.Text = "0¥";
-			// 
-			// pgbProgress
-			// 
-			this.pgbProgress.Name = "pgbProgress";
-			this.pgbProgress.Size = new System.Drawing.Size(400, 18);
-			this.pgbProgress.Visible = false;
 			// 
 			// dlgSaveFile
 			// 
@@ -5577,7 +5569,7 @@ namespace Chummer
 			this.lblEssenceHoleESS.Name = "lblEssenceHoleESS";
 			this.lblEssenceHoleESS.Size = new System.Drawing.Size(19, 13);
 			this.lblEssenceHoleESS.TabIndex = 61;
-			this.lblEssenceHoleESS.Text = "[0]";
+			this.lblEssenceHoleESS.Text = "0";
 			// 
 			// lblEssenceHoleESSLabel
 			// 
@@ -5606,7 +5598,7 @@ namespace Chummer
 			this.lblBiowareESS.Name = "lblBiowareESS";
 			this.lblBiowareESS.Size = new System.Drawing.Size(19, 13);
 			this.lblBiowareESS.TabIndex = 58;
-			this.lblBiowareESS.Text = "[0]";
+			this.lblBiowareESS.Text = "0";
 			// 
 			// lblCyberwareESS
 			// 
@@ -5615,7 +5607,7 @@ namespace Chummer
 			this.lblCyberwareESS.Name = "lblCyberwareESS";
 			this.lblCyberwareESS.Size = new System.Drawing.Size(19, 13);
 			this.lblCyberwareESS.TabIndex = 57;
-			this.lblCyberwareESS.Text = "[0]";
+			this.lblCyberwareESS.Text = "0";
 			// 
 			// lblBiowareESSLabel
 			// 
@@ -9766,7 +9758,6 @@ namespace Chummer
 		private Majorsilence.Forms.Label lblArmorRatingLabel;
 		private Majorsilence.Forms.Label lblLifestyleStartingNuyenLabel;
 		private Majorsilence.Forms.Label lblLifestyleStartingNuyen;
-		private Majorsilence.Forms.ToolStripProgressBar pgbProgress;
 		private Majorsilence.Forms.NumericUpDown nudMartialArtsRating;
 		private Majorsilence.Forms.CheckBox chkCharacterCreated;
 		private SplitButton cmdAddLifestyle;

@@ -25,7 +25,7 @@ namespace Chummer
 		public frmSelectSpell(Character objCharacter)
         {
             InitializeComponent();
-            Load += (_, _) => NativeEditorTree.Attach(this, treSpells, "NativetreSpells", Text);
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 
@@ -126,7 +126,7 @@ namespace Chummer
         private void treSpells_AfterSelect(object sender, TreeViewEventArgs e)
         {
             // Only attempt to retrieve Spell information if a child node is selected.
-            if (treSpells.SelectedNode.Level > 0)
+            if (treSpells.SelectedNode is { Level: > 0 })
             {
             	// Display the Spell information.
                 XmlNode objXmlSpell = _objXmlDocument.SelectSingleNode("/chummer/spells/spell[name = \"" + treSpells.SelectedNode.Tag + "\"]");
@@ -347,7 +347,12 @@ namespace Chummer
 				strAdditionalFilter = " and ((not(contains(name, \", Extended\"))))";
 			
 			// Treat everything as being uppercase so the search is case-insensitive.
-			string strSearch = "/chummer/spells/spell[(" + _objCharacter.Options.BookXPath() + ")" + strAdditionalFilter + " and ((contains(translate(name,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\") and not(translate)) or contains(translate(translate,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), \"" + txtSearch.Text.ToUpper() + "\"))]";
+			string search = txtSearch.Text.ToUpper();
+			string[] pieces = search.Split('"');
+			string literal = pieces.Length == 1
+				? "\"" + search + "\""
+				: "concat(" + string.Join(", '\"', ", pieces.Select(piece => "\"" + piece + "\"")) + ")";
+			string strSearch = "/chummer/spells/spell[(" + _objCharacter.Options.BookXPath() + ")" + strAdditionalFilter + " and ((contains(translate(name,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), " + literal + ") and not(translate)) or contains(translate(translate,'abcdefghijklmnopqrstuvwxyzàáâãäåçèéêëìíîïñòóôõöùúûüýß','ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝß'), " + literal + "))]";
 
 			treSpells.Nodes.Clear();
 

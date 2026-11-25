@@ -2545,6 +2545,7 @@ namespace Majorsilence.Forms
     /// </summary>
     public partial class MenuStrip : Menu
     {
+        internal bool HasNativePresentation { get; set; }
         /// <summary>Initializes a new instance of the MenuStrip class.</summary>
         public MenuStrip ()
         {

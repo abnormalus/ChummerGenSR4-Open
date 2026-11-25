@@ -17,8 +17,9 @@ internal static class BuildIdentityChecks
         check(typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion == BuildIdentity.Version &&
             typeof(Program).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version == BuildIdentity.FileVersion,
             "reported release and file versions come from the actual binary attributes");
-        using var about = new frmAbout();
-        check(about.Controls.Count > 0 && !string.IsNullOrWhiteSpace(BuildIdentity.ReleaseVersion),
-            "About opens with the shared build identity");
+        check(AboutWindow.BuildDetails.Contains(BuildIdentity.Version, StringComparison.Ordinal) &&
+            AboutWindow.BuildDetails.Contains(BuildIdentity.Channel, StringComparison.Ordinal) &&
+            AboutWindow.BuildDetails.Contains(typeof(Program).Module.ModuleVersionId.ToString(), StringComparison.Ordinal),
+            "About displays build metadata from the shared binary identity");
     }
 }

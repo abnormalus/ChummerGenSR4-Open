@@ -23,7 +23,7 @@ public partial class frmCreate
             (nudEDG, lblEDGLabel, lblEDGMetatype, lblEDGAug),
             (nudMAG, lblMAGLabel, lblMAGMetatype, lblMAGAug),
             (nudRES, lblRESLabel, lblRESMetatype, lblRESAug),
-        }, nudNuyen, lblNuyen, lblNuyenTotal, tipTooltip, (lblAttributesBase, lblAttributesAug, lblAttributesMetatype));
+        }, nudNuyen, lblNuyen, lblNuyenTotal, tipTooltip, (lblAttributesBase, lblAttributesAug, lblAttributesMetatype), UpdateCreationMoneyHeight);
         Disposed += (_, _) => creationInputSection?.Dispose();
     }
 

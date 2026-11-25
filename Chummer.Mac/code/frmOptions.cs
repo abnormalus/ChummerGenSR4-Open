@@ -25,15 +25,29 @@ namespace Chummer
         private bool pdfMatching;
         private ComboBox cboSourceSet;
         private CheckBox chkCharacterAutosave;
+        private Label lblCharacterAutosaveMinutes;
+        private System.Action initializeSourcesLayout;
         private NumericUpDown nudCharacterAutosaveMinutes;
 
 		#region Form Events
 		public frmOptions()
 		{
 			InitializeComponent();
-            Load += (_, _) => NativeEditorTree.Attach(this, treSourcebook, "NativetreSourcebook", Text);
             AddCharacterAutosaveOptions();
-            Load += (_, _) => InitializePreferenceSpinners();
+            FormClosing += (_, args) =>
+            {
+                if (!args.Cancel && args.CloseReason == CloseReason.UserClosing && DialogResult != DialogResult.OK)
+                    args.Cancel = !SavePreferences();
+            };
+            Load += (_, _) =>
+            {
+                NativeEditorTabStrip.Attach(this, tabControl1, "Preferences sections");
+                NativeEditorTabStrip.Attach(this, tabControl2, "General preferences sections");
+                InitializeRuleLayouts();
+                initializeSourcesLayout();
+                InitializePreferenceSpinners();
+                InitializeSourcebookPane();
+            };
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 
 			// Populate the Build Method list.
@@ -102,7 +116,7 @@ namespace Chummer
                 Name = "chkCharacterAutosave", Text = "Autosave characters", AutoSize = true, Left = 8, Top = 330,
                 Checked = GlobalOptions.Instance.CharacterAutosaveEnabled
             };
-            var intervalLabel = new Label { Text = "Autosave interval (minutes)", AutoSize = true, Left = 8, Top = 359 };
+            lblCharacterAutosaveMinutes = new Label { Text = "Autosave interval (minutes)", AutoSize = true, Left = 8, Top = 359 };
             nudCharacterAutosaveMinutes = new NumericUpDown
             {
                 Name = "nudCharacterAutosaveMinutes", Left = 180, Top = 355, Width = 80, Minimum = 1,
@@ -111,7 +125,7 @@ namespace Chummer
             };
             chkCharacterAutosave.CheckedChanged += (_, _) => nudCharacterAutosaveMinutes.Enabled = chkCharacterAutosave.Checked;
             tabGlobal.Controls.Add(chkCharacterAutosave);
-            tabGlobal.Controls.Add(intervalLabel);
+            tabGlobal.Controls.Add(lblCharacterAutosaveMinutes);
             tabGlobal.Controls.Add(nudCharacterAutosaveMinutes);
         }
 
@@ -337,12 +351,23 @@ namespace Chummer
 		#region Control Events
 		private void cmdOK_Click(object sender, EventArgs e)
 		{
+			if (SavePreferences())
+				DialogResult = DialogResult.OK;
+		}
+
+		private bool SavePreferences()
+		{
+			if (pdfMatching)
+				return false;
 			// Make sure the current Setting has a name.
 			if (txtSettingName.Text.Trim() == "")
 			{
 				MessageBox.Show("You must give your Settings a name.", "Chummer Settings", MessageBoxButtons.OK, MessageBoxIcon.Information);
-				txtSettingName.Focus();
-				return;
+				if (nativeSettingName == null)
+					txtSettingName.Focus();
+				else
+					nativeSettingName.Focus();
+				return false;
 			}
 
 			SaveRegistrySettings();
@@ -519,7 +544,7 @@ namespace Chummer
 
 			_objOptions.Save();
 
-			this.DialogResult = DialogResult.OK;
+			return true;
 		}
 
 		private void cboBuildMethod_SelectedIndexChanged(object sender, EventArgs e)
@@ -673,11 +698,12 @@ namespace Chummer
             string L(string key) => LanguageManager.Instance.GetString(key);
             var sources = new TabPage { Name = "tabSources", Text = L("PdfCollection_Sources") };
             tabControl2.Controls.Add(sources);
-            sources.Controls.Add(new Label { Left = 8, Top = 12, Width = 420, Height = 20, Text = L("PdfCollection_Base") });
+            var baseLabel = new Label { Left = 8, Top = 12, Width = 420, Height = 20, Text = L("PdfCollection_Base") };
+            sources.Controls.Add(baseLabel);
             txtPdfBaseFolder = new TextBox { Name = "txtPdfBaseFolder", Left = 8, Top = 36, Width = 380,
                 Text = SettingsStore.CurrentUser.CreateSubKey("Software\\Chummer").GetValue("pdfbasefolder")?.ToString() ?? "" };
             sources.Controls.Add(txtPdfBaseFolder);
-            var browse = new Button { Left = 396, Top = 34, Width = 100, Text = L("PdfCollection_Browse") };
+            var browse = new Button { Name = "cmdPdfBrowseCollection", Left = 396, Top = 34, Width = 100, Text = L("PdfCollection_Browse") };
             sources.Controls.Add(browse);
             browse.Click += async (_, _) => {
                 using var picker = new FolderBrowserDialog { Description = L("PdfCollection_Base"), SelectedPath = txtPdfBaseFolder.Text };
@@ -710,13 +736,15 @@ namespace Chummer
                 if (treSourcebook.SelectedNode != null) treSourcebook_AfterSelect(this, null);
                 AppDiagnostics.Record("pdf.clear-links");
             };
-            sources.Controls.Add(new Label { Left = 8, Top = 200, Width = 490, Height = 76, Text = L("PdfCollection_Help") });
+            var helpLabel = new Label { Name = "lblPdfCollectionHelp", Left = 8, Top = 200, Width = 490, Height = 76, Text = L("PdfCollection_Help") };
+            sources.Controls.Add(helpLabel);
             var controls = new Control[] { lblPDFLocation, txtPDFLocation, cmdPDFLocation, lblPDFOffset, nudPDFOffset, cmdPDFTest };
             foreach (var control in controls) { tabGlobal.Controls.Remove(control); sources.Controls.Add(control); control.Top -= 41; }
             txtPdfMatchReport = new TextBox { Name = "txtPdfMatchReport", Left = 8, Top = 372, Width = 490, Height = 128,
                 Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
             sources.Controls.Add(txtPdfMatchReport);
-            sources.Controls.Add(new Label { Left = 8, Top = 140, Width = 490, Height = 20, Text = L("SourceSets_Label") });
+            var setLabel = new Label { Left = 8, Top = 140, Width = 490, Height = 20, Text = L("SourceSets_Label") };
+            sources.Controls.Add(setLabel);
             cboSourceSet = new ComboBox { Name = "cboSourceSet", Left = 8, Top = 164, Width = 280,
                 DropDownStyle = ComboBoxStyle.DropDown, KeepInputFocusOnDropDown = true };
             sources.Controls.Add(cboSourceSet);
@@ -731,12 +759,16 @@ namespace Chummer
                 try
                 {
                     string name = cboSourceSet.Text.Trim();
-                    if (SourceSets.UserLibrary.Read().ContainsKey(name) && MessageBox.Show(L("SourceSets_Overwrite"),
-                        L("SourceSets_Label"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-                    SourceSets.UserLibrary.Save(name, treSourcebook.Nodes.Cast<TreeNode>().Where(n => n.Checked).Select(n => n.Tag.ToString()));
-                    RefreshSourceSets();
-                    cboSourceSet.Text = name;
-                    txtPdfMatchReport.Text = L("SourceSets_Saved");
+                    var books = treSourcebook.Nodes.Cast<TreeNode>().Where(n => n.Checked).Select(n => n.Tag.ToString()).ToArray();
+                    using var picker = new SaveFileDialog
+                    {
+                        Title = L("SourceSets_Save"),
+                        Filter = "Chummer source set (*.json)|*.json",
+                        FileName = string.IsNullOrWhiteSpace(name) ? "source-set.json" : name + ".json"
+                    };
+                    if (picker.ShowDialog(this) != DialogResult.OK) return;
+                    SourceSets.Export(picker.FileName, books);
+                    txtPdfMatchReport.Text = L("SourceSets_Exported");
                 }
                 catch (Exception error) { SourceSetFailure(error); }
             };
@@ -745,7 +777,18 @@ namespace Chummer
                 try
                 {
                     if (!SourceSets.UserLibrary.Read().TryGetValue(cboSourceSet.Text.Trim(), out var books))
-                    { txtPdfMatchReport.Text = L("SourceSets_NotFound"); return; }
+                    {
+                        using var picker = new OpenFileDialog
+                        {
+                            Title = L("SourceSets_Load"),
+                            Filter = "Chummer source set (*.json)|*.json"
+                        };
+                        if (picker.ShowDialog(this) != DialogResult.OK) return;
+                        var fileSets = new SourceSets(picker.FileName).Read();
+                        if (fileSets.Count != 1)
+                            throw new InvalidDataException("A source-set file must contain exactly one set.");
+                        books = fileSets.Values.Single();
+                    }
                     var selected = new HashSet<string>(books, StringComparer.Ordinal);
                     foreach (TreeNode node in treSourcebook.Nodes)
                         if (node.Tag.ToString() != "SR4") node.Checked = selected.Contains(node.Tag.ToString());
@@ -757,6 +800,19 @@ namespace Chummer
             };
             txtPDFLocation.Width = 300;
             cmdPDFLocation.Left = txtPDFLocation.Right + 6;
+            initializeSourcesLayout = () =>
+            {
+                if (Avalonia.Application.Current == null)
+                    return;
+                AttachPreferenceRows(sources, "NativeSources",
+                    [(baseLabel, txtPdfBaseFolder, null), (setLabel, cboSourceSet, null),
+                     (lblPDFLocation, txtPDFLocation, null), (lblPDFOffset, nudPDFOffset, null)],
+                    [],
+                    [baseLabel, txtPdfBaseFolder, browse, cmdPdfAutoMatch, deselect, clear, select,
+                     setLabel, cboSourceSet, saveSet, loadSet, helpLabel,
+                     lblPDFLocation, txtPDFLocation, cmdPDFLocation, lblPDFOffset, nudPDFOffset, cmdPDFTest, txtPdfMatchReport],
+                    [[cmdPdfAutoMatch, deselect, clear, select], [saveSet, loadSet]]);
+            };
         }
 
         private void RefreshSourceSets()
@@ -1111,9 +1167,8 @@ namespace Chummer
 			HashSet<string> setAllowedCategories = new HashSet<string>();
 			foreach (ListItem objItem in _lstStickNShockWeaponCategories)
 				if (!_setStickNShockExcludedWeaponCategories.Contains(objItem.Value)) setAllowedCategories.Add(objItem.Value);
-			frmSelectWeaponCategories frmSelectCategories = new frmSelectWeaponCategories(_lstStickNShockWeaponCategories, setAllowedCategories);
-			frmSelectCategories.ShowDialog(this);
-			if (frmSelectCategories.DialogResult != DialogResult.OK) return;
+			using var frmSelectCategories = new frmSelectWeaponCategories(_lstStickNShockWeaponCategories, setAllowedCategories);
+			if (frmSelectCategories.ShowDialog(this) != DialogResult.OK) return;
 			HashSet<string> setSelectedCategories = new HashSet<string>(frmSelectCategories.SelectedCategories);
 			_setStickNShockExcludedWeaponCategories.Clear();
 			foreach (ListItem objItem in _lstStickNShockWeaponCategories)

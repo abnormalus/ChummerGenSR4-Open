@@ -29,6 +29,7 @@ namespace Chummer
 		public frmSelectCyberwareSuite(Improvement.ImprovementSource objSource, Character objCharacter)
 		{
 			InitializeComponent();
+            Load += (_, _) => InitializeNativeSuitePicker();
 			_objSource = objSource;
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 

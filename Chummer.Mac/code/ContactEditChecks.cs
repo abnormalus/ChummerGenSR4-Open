@@ -23,7 +23,7 @@ internal static class ContactEditChecks
             try
             {
                 editor.GetType().GetProperty("Loading").SetValue(editor, false);
-                var row = Field<Forms.Panel>(editor, enemy ? "panEnemies" : "panContacts").Controls.OfType<ContactControl>().Single();
+                var row = NativeContactInteractions.Controllers(editor, enemy).Single();
                 var input = Field<Forms.TextBox>(row, "txtContactName");
                 var dirty = editor.GetType().GetField("_blnIsDirty", Flags); dirty.SetValue(editor, false);
                 const string edited = "Synthetic literal [O'Brien]";
@@ -35,7 +35,7 @@ internal static class ContactEditChecks
                 dirty.SetValue(editor, false); input.Text = edited;
                 check(!(bool)dirty.GetValue(editor), "Unchanged contact name preserves clean state" + label);
                 Field<Forms.Button>(editor, enemy ? "cmdAddEnemy" : "cmdAddContact").PerformClick();
-                var added = Field<Forms.Panel>(editor, enemy ? "panEnemies" : "panContacts").Controls.OfType<ContactControl>().Last();
+                var added = NativeContactInteractions.Controllers(editor, enemy).Last();
                 dirty.SetValue(editor, false);
                 Field<Forms.TextBox>(added, "txtContactName").Text = edited + " added";
                 check(!ReferenceEquals(added, row) && character.Contacts.Contains(added.ContactObject)
@@ -47,7 +47,7 @@ internal static class ContactEditChecks
             }
             finally
             {
-                var owned = Field<Forms.Panel>(editor, enemy ? "panEnemies" : "panContacts").Controls.OfType<ContactControl>().ToArray();
+                var owned = NativeContactInteractions.Controllers(editor, enemy).ToArray();
                 editor.GetType().GetField("_blnIsDirty", Flags).SetValue(editor, false); editor.Close();
                 check(owned.All(row => !(typeof(ContactControl).GetField("ContactNameChanged", Flags).GetValue(row) is Delegate handlers)
                     || !handlers.GetInvocationList().Any(handler => ReferenceEquals(handler.Target, editor))),

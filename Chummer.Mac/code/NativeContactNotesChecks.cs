@@ -7,12 +7,11 @@ using Forms = Majorsilence.Forms;
 
 namespace Chummer;
 
-// Synthetic notes only. Exercise the real ContactControl handler and legacy modal;
+// Synthetic notes only. Exercise the real ContactControl handler and native modal;
 // no private character, contact identity or text is written into reports/images.
 internal static class NativeContactNotesChecks
 {
     private const BindingFlags Flags = BindingFlags.NonPublic | BindingFlags.Instance;
-    private static T Field<T>(object owner, string name) => (T)owner.GetType().GetField(name, Flags)!.GetValue(owner)!;
     internal static async Task RunAsync(Forms.Form owner, Character source, Action<bool, string> check)
     {
         foreach (bool career in new[] { false, true })
@@ -27,8 +26,8 @@ internal static class NativeContactNotesChecks
             editor.Show(); await Task.Delay(20);
             try
             {
-                var panel = Field<Forms.Panel>(editor, "panContacts");
-                var inputs = editor is frmCreate creation ? creation.CreationContactControllers.ToArray() : panel.Controls.OfType<ContactControl>().ToArray();
+                var inputs = NativeContactInteractions.Controllers(editor, enemy: false);
+                var section = NativeContactInteractions.Section(editor, enemy: false);
                 var texts = new[] { "", "Synthetic writer’s notes; ordinary prose. ".PadRight(349, 'a'), "Synthetic ordinary notes - punctuation. ".PadRight(335, 'b') };
                 for (int sample = 0; sample < texts.Length; sample++)
                 {
@@ -37,37 +36,53 @@ internal static class NativeContactNotesChecks
                     contact.Notes = texts[sample];
                     for (int repeat = 0; repeat < 2; repeat++)
                     {
-                        string expected = contact.Notes; bool loaded = false; frmNotes? closedDialog = null;
+                        string expected = contact.Notes; bool loaded = false; NotesWindow? closedDialog = null;
+                        int closing = 0;
                         var reply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                         Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
                         {
                             try
                             {
                                 var deadline = DateTime.UtcNow.AddSeconds(20);
-                                while (!Forms.Application.OpenForms.OfType<frmNotes>().Any())
+                                while (NativeDialogHost.ActiveWindow is not NotesWindow)
                                 { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Contact notes did not open."); await Task.Delay(10); }
-                                closedDialog = Forms.Application.OpenForms.OfType<frmNotes>().Last();
-                                var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(closedDialog);
+                                var window = closedDialog = (NotesWindow)NativeDialogHost.ActiveWindow!;
                                 while (!window.IsVisible || window.Bounds.Width <= 0 || window.Bounds.Height <= 0)
                                 { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Contact notes did not become visible."); await Task.Delay(10); }
                                 // Opening/closing within one dispatcher turn can avoid the
                                 // paint/focus path implicated by an opening-time crash.
                                 await Task.Delay(100);
-                                loaded = closedDialog.Notes == expected && window.IsVisible;
-                                closedDialog.Notes = expected + "\nSynthetic edit";
-                                closedDialog.Close(); reply.TrySetResult();
+                                if (sample == 1)
+                                {
+                                    window.Width = 250;
+                                    await Task.Delay(60);
+                                    check(window.Input.Bounds.Width <= window.ClientSize.Width &&
+                                        window.Input.TextWrapping == Avalonia.Media.TextWrapping.Wrap &&
+                                        window.Input.AcceptsReturn, "Narrow contact notes keeps the multiline editor inside the window");
+                                }
+                                loaded = window.Input.Text == expected && window.IsVisible;
+                                window.Input.Text = expected + "\nSynthetic edit";
+                                window.Closing += (_, _) => closing++;
+                                if (repeat == 0)
+                                    window.Close();
+                                else
+                                    window.Input.RaiseEvent(new Avalonia.Input.KeyEventArgs
+                                    {
+                                        Key = Avalonia.Input.Key.Escape,
+                                        RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent
+                                    });
+                                reply.TrySetResult();
                             }
                             catch (Exception error)
-                            { Forms.Application.OpenForms.OfType<frmNotes>().LastOrDefault()?.Close(); reply.TrySetException(error); }
+                            { closedDialog?.Close(); reply.TrySetException(error); }
                         });
-                        if (editor is frmCreate creationEditor)
-                            await NativeContactInteractions.ClickAsync(creationEditor.ContactPresentation(false)!, creationEditor.ContactPresentation(false)!.Rows[control].Notes, check);
-                        else control.GetType().GetMethod("imgNotes_Click", Flags)!.Invoke(control, new object[] { control, EventArgs.Empty });
+                        await NativeContactInteractions.ClickAsync(section, section.Rows[control].Notes, check);
                         await reply.Task;
                         string label = " career=" + career + " sample=" + sample + " repeat=" + repeat;
                         check(loaded && contact.Notes == expected + "\nSynthetic edit", "Contact notes modal loads and accepts exact synthetic plain text" + label);
-                        check(closedDialog != null && closedDialog.IsDisposed && editor.Enabled &&
-                            !Forms.Application.OpenForms.OfType<frmNotes>().Any(), "Repeated contact notes closes and disposes its modal without blocking the editor" + label);
+                        check(closedDialog is { IsVisible: false } && closing == 1 && editor.Enabled && owner.Enabled &&
+                            NativeDialogHost.ActiveWindow is not NotesWindow,
+                            "Contact notes closes once and restores the editor after window close or Escape" + label);
                     }
                 }
                 var reopened = new Character(); reopened.LoadSnapshot(character.CaptureSnapshot());

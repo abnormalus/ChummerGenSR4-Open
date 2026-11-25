@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
@@ -67,6 +68,47 @@ internal static class NativeCreationActiveSkillChecks
             var quickFilters = Field<Dictionary<string, Avalonia.Controls.Primitives.ToggleButton>>(editor, "creationSkillFilterButtons");
             check(quickFilters.Keys.SequenceEqual(new[] { "0", "BOD", "AGI", "REA", "STR", "CHA", "INT", "LOG", "WIL", "EDG", "MAG", "RES", "1" }),
                 "Native skill quick filters put All first, attributes in order and Ranked last");
+            var filterHost = owner.Controls.OfType<Forms.NativeControlHost>()
+                .Single(host => host.Name == "nativeCreationSkillFilters");
+            var originalSize = owner.ClientSize;
+            int originalHeight = filterHost.Height;
+            var split = Field<Forms.SplitContainer>(editor, "splitSkills");
+            var originalSplit = split.Bounds;
+            owner.ClientSize = new System.Drawing.Size(420, originalSize.Height);
+            await Task.Delay(30);
+            check(filterHost.Height > originalHeight &&
+                quickFilters.Values.Select(button => button.Bounds.Top).Distinct().Count() > 1 &&
+                quickFilters.Values.All(button => button.Bounds.Right <= filterHost.Width && button.Bounds.Bottom <= filterHost.Height),
+                $"Narrow Creation Skills wraps every filter inside the available area [before={originalSize}/{originalHeight}, skills={skills.Size}, host={filterHost.Bounds}, buttons={string.Join("/", quickFilters.Values.Select(button => button.Bounds))}]");
+            owner.ClientSize = originalSize;
+            await Task.Delay(30);
+            check(filterHost.Height == originalHeight && split.Bounds == originalSplit,
+                "Restoring Creation Skills width restores its exact split layout");
+            owner.ClientSize = new System.Drawing.Size(420, originalSize.Height);
+            await Task.Delay(30);
+            check(split.Top == filterHost.Height && split.Bottom == skills.ClientSize.Height &&
+                split.Width == skills.ClientSize.Width,
+                "Repeated narrow Skills sizing keeps filters clear of the split panes");
+            var filterSurface = (Border)filterHost.NativeControl!;
+            var filterBar = (WrapPanel)filterSurface.Child!;
+            int narrowHeight = filterHost.Height;
+            double baseFont = quickFilters.Values.First().FontSize;
+            try
+            {
+                Avalonia.Controls.Documents.TextElement.SetFontSize(filterBar, baseFont * 1.5);
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                check(filterHost.Height > narrowHeight && split.Top == filterHost.Height &&
+                    quickFilters.Values.All(button => button.FontSize == baseFont * 1.5 &&
+                        button.Bounds.Right <= filterHost.Width + 1 && button.Bounds.Bottom <= filterHost.Height + 1),
+                    "Creation Skills remeasures every filter at 150% inherited text without covering the split panes");
+            }
+            finally
+            {
+                filterBar.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            }
+            owner.ClientSize = originalSize;
+            await Task.Delay(30);
             foreach (var pair in quickFilters)
             {
                 pair.Value.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
@@ -125,6 +167,22 @@ internal static class NativeCreationActiveSkillChecks
             editor.Loading = false;
             var pistols = controllers.Single(row => row.SkillName == "Pistols" && !row.SkillIsMeta && !row.SkillObject.ExoticSkill);
             var row = section.Rows[pistols];
+            try
+            {
+                double enlarged = row.Rating.FontSize * 1.5;
+                section.Viewport.MaxWidth = 240;
+                Avalonia.Controls.Documents.TextElement.SetFontSize(section.Viewport, enlarged);
+                await Task.Delay(60);
+                check(row.Rating.FontSize == enlarged && Grid.GetRow(row.Rating) == 1 &&
+                    row.Rating.Bounds.Width >= 100 && row.Rating.Bounds.Right <= row.Layout.Bounds.Width + 1,
+                    "Creation active skills stack a readable rating at narrow width and 150% text");
+            }
+            finally
+            {
+                section.Viewport.ClearValue(ScrollViewer.MaxWidthProperty);
+                section.Viewport.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                await Task.Delay(30);
+            }
             ControlExtensions.BringIntoView(row.Layout); await Task.Delay(30);
             row.Rating.Text = "2"; await Task.Delay(20);
             check(pistols.SkillRating == 2 && Field<bool>(editor, "_blnIsDirty"),
@@ -192,15 +250,15 @@ internal static class NativeCreationActiveSkillChecks
                     try
                     {
                         var deadline = DateTime.UtcNow.AddSeconds(20);
-                        while (!Forms.Application.OpenForms.OfType<frmSelectExoticSkill>().Any())
+                        while (NativeDialogHost.ActiveWindow is not NativeChoiceWindow)
                         { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Exotic skill picker did not open."); await Task.Delay(10); }
-                        var picker = Forms.Application.OpenForms.OfType<frmSelectExoticSkill>().Last();
-                        var window = Forms.AvaloniaHostInterop.ToAvaloniaWindow(picker);
+                        var window = (NativeChoiceWindow)NativeDialogHost.ActiveWindow!;
                         while (!window.IsVisible || window.Bounds.Width <= 0)
                         { if (DateTime.UtcNow >= deadline) throw new TimeoutException("Exotic skill picker did not become visible."); await Task.Delay(10); }
                         await Task.Delay(30);
-                        string selected = picker.SelectedExoticSkill;
-                        if (accept) Field<Forms.Button>(picker, "cmdOK").PerformClick(); else picker.Close();
+                        string selected = ((ListItem)window.ChoiceInput.SelectedItem!).Value;
+                        var action = accept ? window.AcceptButton : window.CancelButton;
+                        action.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
                         reply.TrySetResult(selected);
                     }
                     catch (Exception error) { NativeDialogHost.ActiveWindow?.Close(); reply.TrySetException(error); }

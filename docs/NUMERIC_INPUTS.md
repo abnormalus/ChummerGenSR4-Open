@@ -2,7 +2,8 @@
 
 Current checkpoint: creation contacts/enemies and the common Gear picker are accepted on both platforms and released, most recently in verified Nightly0.2.148/source4a263195872a7c02703fb851155ccafe3d90b162. Cyberware rating/essence-discount migration has a prepared shared model/window and audited caller boundary:641local checks pass and the window compiles, but production connection and native acceptance are pending. See [CYBERWARE_PICKER.md](CYBERWARE_PICKER.md). Earlier pending statements below are historical checkpoints rather than current acceptance claims.
 
-The current local batch completes native presentation for all 63 Preferences and all 24 direct Character Creation numeric fields. The latest replacements are the 63 Preferences fields and the seven specialist fields on the Creation editor itself. Career and shared rows or dialogs remain separate migration work. See [the focused batch results](COMPATIBILITY_CONTROLS.md#preferences-and-creation-spinner-batch).
+
+Nightly 0.2.177 includes native presentation for all 63 Preferences and all 24 direct Character Creation numeric fields. The local follow-up also replaces the seven direct Career inputs, 12 specialist dialog inputs and five visible shared row fields. Creation skill ratings and skill-group ratings have native presentation, and Career uses improvement buttons. See [the focused batch results](COMPATIBILITY_CONTROLS.md#preferences-and-creation-spinner-batch).
 
 Use maintained Avalonia NumericUpDown controls for migrated inputs. NativeIntegerInput supplies whole-number parsing, unit stepping, logical sizing, formatting and framework range clipping. Keep decimal precision for currency, multipliers and fractional quantities; never round a decimal domain just to reuse the integer factory. The model owns rules, limits and calculations; the control owns typing, buttons, keyboard routing and layout.
 

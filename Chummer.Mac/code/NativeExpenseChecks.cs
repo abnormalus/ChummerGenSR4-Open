@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Forms = Majorsilence.Forms;
@@ -39,6 +40,20 @@ internal static class NativeExpenseChecks
             var pending = prompt.ShowDialogAsync(owner); var window = (ExpenseWindow)NativeDialogHost.ActiveWindow!;
             check(window.AmountInput.Minimum == 1 && window.AmountInput.Maximum == 9999999 && window.PercentInput.Maximum == 1000 && window.TimeInput.IsVisible == GlobalOptions.Instance.DatesIncludeTime,
                 "Native expense preserves integer percentage and time-visibility limits");
+            var layout = (Grid)window.Content!;
+            var body = layout.Children.OfType<ScrollViewer>().Single();
+            var footer = layout.Children.OfType<WrapPanel>().Single();
+            window.Width = 320;
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = 300;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, window.AmountInput.FontSize * 1.5);
+            await Task.Delay(100);
+            window.DateInput.BringIntoView();
+            await Task.Delay(60);
+            var datePosition = window.DateInput.TranslatePoint(default, body);
+            check(body.Offset.Y > 0 && datePosition.HasValue && datePosition.Value.X + window.DateInput.Bounds.Width <= body.Viewport.Width + 1 &&
+                body.Bounds.Bottom <= footer.Bounds.Top && footer.Bounds.Bottom <= layout.Bounds.Height,
+                $"Narrow expense form scrolls to the date and keeps confirmation clear at 150% text [date={datePosition}/{window.DateInput.Bounds}, body={body.Bounds}/{body.Viewport}/{body.Offset}, footer={footer.Bounds}, layout={layout.Bounds}]");
             window.PercentInput.Value = 50;
             check(window.PreviewText.Text == string.Format(GlobalOptions.Instance.CultureInfo, "{0:N0}¥", 52), "Native expense preview preserves midpoint-to-even percentage calculation");
             window.DateInput.SelectedDate = null; window.Accept();

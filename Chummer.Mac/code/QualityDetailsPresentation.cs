@@ -41,10 +41,32 @@ internal static class QualityDetailsPresentation
         var quality = character.Qualities.FirstOrDefault(q => q.InternalId == selected.Tag.ToString());
         if (quality == null) return;
         var options = character.Options;
-        source.Text = options.LanguageBookShort(quality.Source) + " " + quality.Page;
-        tooltip.SetToolTip(source, options.LanguageBookLong(quality.Source) + " " +
-            LanguageManager.Instance.GetString("String_Page") + " " + quality.Page);
-        cost.Text = (useKarma ? quality.BP * options.KarmaQuality : quality.BP).ToString() + " " +
+        var (book, page) = Citation(character, quality);
+        source.Text = options.LanguageBookShort(book) + " " + page;
+        tooltip.SetToolTip(source, options.LanguageBookLong(book) + " " +
+            LanguageManager.Instance.GetString("String_Page") + " " + page);
+        int baseCost = quality.ContributeToBP ? quality.BP : 0;
+        cost.Text = (useKarma ? baseCost * options.KarmaQuality : baseCost).ToString() + " " +
             LanguageManager.Instance.GetString(useKarma ? "String_Karma" : "String_BP");
+    }
+
+    private static (string Book, string Page) Citation(Character character, Quality quality)
+    {
+        if (quality.OriginSource is QualitySource.Metatype or QualitySource.MetatypeRemovable)
+        {
+            var metatype = FindDefinition(XmlManager.Instance.Load("metatypes.xml"), "chummer/metatypes/metatype", character.Metatype);
+            var variant = FindDefinition(metatype, "metavariants/metavariant", character.Metavariant);
+            foreach (var definition in new[] { variant, metatype })
+            {
+                if (definition?.SelectNodes("qualities/*/quality")?.Cast<System.Xml.XmlNode>()
+                    .Any(node => node.InnerText == quality.Name) == true &&
+                    definition["source"] is { } book && definition["page"] is { } page)
+                    return (book.InnerText, page.InnerText);
+            }
+        }
+        return (quality.Source, quality.Page);
+
+        static System.Xml.XmlNode? FindDefinition(System.Xml.XmlNode? parent, string path, string name) =>
+            parent?.SelectNodes(path)?.Cast<System.Xml.XmlNode>().FirstOrDefault(node => node["name"]?.InnerText == name);
     }
 }

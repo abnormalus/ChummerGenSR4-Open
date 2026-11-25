@@ -1,6 +1,6 @@
 # Character switching and toolbar ownership
 
-The main window owns document activation. Every `MdiChildActivate` synchronizes the selected tab, even for an editor that already has a tab. Tab clicks select their editor in turn; selecting an already-active editor is a no-op in the compatibility framework, so this does not introduce an activation loop or duplicate tabs.
+The main window owns document activation. `WorkspaceDocumentTabs` presents native Avalonia tabs for the open editors and follows `MdiChildActivate`. Selecting a tab activates its editor through the existing workspace. Each header observes its own character's name and alias, and the selected header scrolls into view when documents overflow. Closing an editor releases its header and name subscription. The strip is hidden when fewer than two documents remain.
 
 `frmMain.RefreshCharacterToolbar` is the common toolbar boundary for creation and career editors. It reverts the prior merge on the explicit main-window strip and merges the actual active editor's strip. Load and native Activated callbacks delegate to the same boundary. Hosted MDI switches do not consistently produce a separate native Activated event; relying only on that event left commands belonging to the previous character visible and clickable.
 
@@ -12,13 +12,19 @@ The existing Save/Save As/Close menu actions resolve the current active editor w
 
 ## Verification
 
-`CharacterTabChecks` covers canceled/active/inactive/final closes, programmatic activation, repeated tab selection and header reuse in the headless smoke suite. The programmatic activation assertion reproduced the previous header mismatch before the fix.
+`CharacterTabChecks` covers canceled/active/inactive/final closes, repeated programmatic activation and document-entry reuse in the headless smoke suite. The programmatic activation assertion reproduced the previous header mismatch before the fix.
 
 `NativeCharacterSwitchChecks` uses real creation and career editors on the native dispatcher. It checks five repeated switches, exact Save-button ownership, menu availability, inactive close, the shared Close Character command and an unchanged source character snapshot. The combined native CI report requires at least 105 checks on Mac and Windows. Generic MDI forms alone cannot verify editor toolbar handlers.
 
+Run `--check-workspace-tabs FIXTURE REPORT` for the focused native workspace checks. The Mac run passed 36 assertions, including overflow, inactive renaming, command ownership, live Creation/Career status presentation and cleanup. The focused command omits the fullscreen menu check, which remains in the combined native suite.
+
+The workspace projects merged command order, the current editor's commands, original toolbar icons and enabled state into Avalonia. The Window menu refreshes its document list when opened. macOS uses the system menu in normal windows and shows the Avalonia menu when fullscreen. Both menu surfaces invoke the same shared commands.
+
+Run `--check-workspace-commands FIXTURE REPORT` for the focused workspace command checks, including fullscreen menu placement on Mac. Mac passed 49 focused checks and the Windows x64 build passed. Windows runtime verification is pending.
+
 ## Remaining work
 
-The stale Paste regression is covered for both incompatible and compatible clipboard changes while another character is active. Continue auditing undo and remaining edit commands and modal transitions. Armor is now the second native catalog picker; see [CATALOG_PICKERS.md](CATALOG_PICKERS.md). The shell and editor toolbars still use the compatibility layer; this change centralizes their lifecycle rather than replacing the entire shell. Shared framework commands and native layouts remain the preferred direction when that section is migrated.
+The stale Paste regression is covered for both incompatible and compatible clipboard changes while another character is active. Continue auditing undo and remaining edit commands and modal transitions. Armor is now the second native catalog picker; see [CATALOG_PICKERS.md](CATALOG_PICKERS.md). The workspace toolbar and in-window menu now use Avalonia controls over the shared command definitions. The editor section tabs, split panes, and remaining context menus still use the compatibility layer.
 
 ## Character menu integration
 

@@ -3,6 +3,8 @@ using System.Linq;
 using System.Drawing;
 using Majorsilence.Forms.Drawing;
 using Majorsilence.Forms;
+using Avalonia;
+using Avalonia.Data;
 
 
 namespace Chummer
@@ -11,6 +13,7 @@ namespace Chummer
     {
         private string _strReturnValue = "";
         private ComboBox detailChoices;
+        private SearchableChoices detailSearch;
         public void ConfigureChoices(Character character, string qualityName)
         {
             var choices = DetailChoices.ForQuality(character, qualityName);
@@ -43,7 +46,7 @@ namespace Chummer
             };
             detailChoices.Items.AddRange(choices.Cast<object>().ToArray());
             detailChoices.Text = txtValue.Text;
-            SearchableChoices.Attach(detailChoices, choices.Cast<object>(), item => ((DetailChoice)item).Name);
+            detailSearch = SearchableChoices.Attach(detailChoices, choices.Cast<object>(), item => ((DetailChoice)item).Name);
             txtValue.Visible = false;
             Controls.Add(detailChoices);
         }
@@ -67,6 +70,7 @@ namespace Chummer
 		public frmSelectText()
         {
             InitializeComponent();
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
         }
 

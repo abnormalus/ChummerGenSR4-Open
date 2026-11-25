@@ -4,12 +4,21 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Forms = Majorsilence.Forms;
 
 namespace Chummer;
 
 // Test the visible native command after framework layout/scrolling completes.
 internal static class NativeContactInteractions
 {
+    internal static CreationContactSection Section(Forms.Form editor, bool enemy) => editor is frmCreate creation
+        ? creation.ContactPresentation(enemy)!
+        : ((frmCareer)editor).CareerContactPresentation(enemy)!;
+
+    internal static System.Collections.Generic.IReadOnlyList<ContactControl> Controllers(Forms.Form editor, bool enemy) => editor is frmCreate creation
+        ? (enemy ? creation.CreationEnemyControllers : creation.CreationContactControllers)
+        : ((frmCareer)editor).CareerContactControllers(enemy);
+
     internal static async Task ClickAsync(CreationContactSection section, Button command, Action<bool, string>? check = null)
     {
         string Geometry() => "[command=" + command.Bounds + "; position=" + command.TranslatePoint(default, section.Viewport)

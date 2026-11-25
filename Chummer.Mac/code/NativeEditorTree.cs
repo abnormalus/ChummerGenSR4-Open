@@ -20,7 +20,8 @@ internal static class NativeEditorTree
 {
     internal static TreeView? Attach(Forms.Form editor, Forms.TreeView source, string name,
         string accessibleName, Action? refreshDetails = null, Action? delete = null, Action? editDetail = null,
-        Func<Forms.TreeNode, System.Drawing.Color>? foreground = null, bool followSourceBounds = false, NativeTreeDrag? drag = null)
+        Func<Forms.TreeNode, System.Drawing.Color>? foreground = null, bool followSourceBounds = false, NativeTreeDrag? drag = null,
+        Forms.NativeControlHost? layoutHost = null, Func<TreeView, Control>? compose = null)
     {
         if (Application.Current == null || editor.IsDisposed || source.Parent is not { } parent)
             return null;
@@ -32,28 +33,44 @@ internal static class NativeEditorTree
         {
             Setters = { new Setter(TreeView.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush")) }
         });
-        bool mdi = editor.MdiParent != null;
-        Forms.Control region = mdi ? new Forms.Panel() : new Forms.NativeControlHost { NativeControl = tree };
-        region.Bounds = source.Bounds;
-        region.Anchor = followSourceBounds ? Forms.AnchorStyles.Top | Forms.AnchorStyles.Left : source.Anchor;
-        region.Dock = source.Dock;
-        region.TabIndex = source.TabIndex;
-        region.TabStop = false;
-        region.Name = name;
-        parent.Controls.Add(region);
+        Control presentation = compose?.Invoke(tree) ?? tree;
+        bool mdi = layoutHost == null && editor.MdiParent != null;
+        Forms.Control region = layoutHost ?? (mdi ? new Forms.Panel() : (Forms.Control)new Forms.NativeControlHost { NativeControl = presentation });
+        if (layoutHost == null)
+        {
+            region.Bounds = source.Bounds;
+            region.Anchor = followSourceBounds ? Forms.AnchorStyles.Top | Forms.AnchorStyles.Left : source.Anchor;
+            region.Dock = source.Dock;
+            region.TabIndex = source.TabIndex;
+            region.TabStop = false;
+            region.Name = name;
+            parent.Controls.Add(region);
+        }
         parent.Controls.Remove(source);
         // A tree on an initially hidden tab may never have been created. Its
         // node collections raise invalidation events only once created.
         source.CreateControl();
-        region.Visible = source.Visible;
+        SyncVisibility();
 
         // The responsive creation layout continues to calculate its tree bounds.
         void FollowLayout(object? sender, EventArgs args) => region.Bounds = source.Bounds;
         void FollowEnabled(object? sender, EventArgs args) => tree.IsEnabled = source.Enabled;
-        if (followSourceBounds)
+        if (followSourceBounds && layoutHost == null)
             source.SizeChanged += FollowLayout;
         source.EnabledChanged += FollowEnabled;
-        var presenter = mdi ? new CreationRegionPresenter(editor, region, tree, name) : null;
+        var presenter = mdi
+            ? new CreationRegionPresenter(editor, region, presentation, name,
+                compose == null ? null : VisiblePaneBounds, clipToSource: compose != null)
+            : null;
+
+        System.Drawing.Rectangle VisiblePaneBounds()
+        {
+            var workspace = editor.MdiParent!;
+            var origin = workspace.PointToClient(region.PointToScreen(System.Drawing.Point.Empty));
+            return new System.Drawing.Rectangle(0, 0,
+                Math.Clamp(workspace.ClientSize.Width - origin.X, 0, region.Width),
+                Math.Clamp(workspace.ClientSize.Height - origin.Y, 0, region.Height));
+        }
         var rows = new Dictionary<Forms.TreeNode, TreeViewItem>();
         var owners = new Dictionary<TreeViewItem, ItemCollection>();
         bool updating = false;
@@ -124,6 +141,7 @@ internal static class NativeEditorTree
                     if (source.CheckBoxes)
                     {
                         var checkBox = new CheckBox();
+                        checkBox.Click += (_, _) => tree.SelectedItem = row;
                         checkBox.IsCheckedChanged += (_, _) =>
                         {
                             if (updating)
@@ -166,8 +184,11 @@ internal static class NativeEditorTree
             }
         }
 
+        ContextMenu? openContext = null;
         tree.SelectionChanged += (_, _) =>
         {
+            openContext?.Close();
+            openContext = null;
             if (updating)
                 return;
             source.SelectedNode = (tree.SelectedItem as TreeViewItem)?.Tag as Forms.TreeNode;
@@ -222,12 +243,23 @@ internal static class NativeEditorTree
             if (!pointerRequest)
                 point = row.TranslatePoint(new Point(0, row.Bounds.Height), tree) ?? default;
             args.Handled = true;
-            menu.Show(region, (int)point.X, (int)point.Y);
+            openContext?.Close();
+            openContext = Forms.AvaloniaContextCommands.Show(tree, point, menu, region,
+                () => !disposed && ReferenceEquals(tree.SelectedItem, row) && ReferenceEquals(source.SelectedNode, row.Tag),
+                NativeControlPresentation.AddTheme);
         };
+
+        void SyncVisibility()
+        {
+            if (layoutHost == null)
+                region.Visible = source.Visible;
+            else
+                tree.IsVisible = source.Visible;
+        }
 
         void FollowVisibility(object? sender, EventArgs args)
         {
-            region.Visible = source.Visible;
+            SyncVisibility();
             if (source.Visible)
             {
                 source.CreateControl();
@@ -245,6 +277,7 @@ internal static class NativeEditorTree
         editor.Disposed += (_, _) =>
         {
             disposed = true;
+            openContext?.Close();
             drag?.Cancel();
             source.Invalidated -= RequestRefresh;
             source.VisibleChanged -= FollowVisibility;

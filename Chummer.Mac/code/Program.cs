@@ -14,8 +14,8 @@ namespace Chummer
         // opening path; otherwise startup prompts before the driver can run.
         internal static bool IsNativeVerificationArgument(string argument) =>
             argument == "--check-bulk" || argument == "--check-sensor-transactions" || argument == "--check-focus-command" || argument == "--check-pdf-reader" || argument == "--check-cyberware" || argument == "--check-repository-saving" || argument == "--check-inventory-copy" || argument == "--check-weapon-deletion" || argument == "--check-lifestyle-months" || argument == "--check-vehicle-inputs" || argument == "--check-gear-inputs" ||
-            argument is "--check-quality-trees" or "--check-dialog-trees" or "--check-character-trees" or
-                "--check-career-lists" or "--check-inventory-trees" or "--check-compact-spinners" or "--check-repository-portraits";
+            argument is "--check-quality-picker" or "--check-quality-trees" or "--check-dialog-trees" or "--check-character-trees" or
+                "--check-career-lists" or "--check-inventory-trees" or "--check-compact-spinners" or "--check-repository-portraits" or "--check-specialist-spinners" or "--check-number-prompts" or "--check-expense-layout" or "--check-calendar-layout" or "--check-creation-prompts" or "--check-nexus-layout" or "--check-build-point-layout" or "--check-legacy-controls" or "--check-workspace-tabs" or "--check-workspace-commands" or "--check-fullscreen-probe" or "--check-editor-layout" or "--check-creation-active-skills" or "--check-creation-knowledge-skills" or "--check-creation-skill-groups" or "--check-career-skills" or "--check-career-attributes" or "--check-contact-notes" or "--check-contact-removal" or "--check-information-dialogs" or "--check-ammunition-views" or "--check-contact-options" or "--check-catalog-layout" or "--check-armor-mod-picker";
 
         /// <summary>
         /// The main entry point for the application.

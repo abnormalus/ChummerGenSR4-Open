@@ -648,6 +648,8 @@ namespace Majorsilence.Forms
             remove => base.Deactivated -= value;
         }
 
+        internal Action<ContextMenu, Control, Control?, System.Drawing.Point>? ShowHostedContextMenu;
+
         /// <summary>Raised on the MDI container when one of its child forms is activated.</summary>
         public event EventHandler? MdiChildActivate {
             add => mdi_child_activate += value;

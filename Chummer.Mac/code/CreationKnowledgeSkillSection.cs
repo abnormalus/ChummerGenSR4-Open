@@ -34,7 +34,7 @@ internal sealed class CreationKnowledgeSkillRow : IDisposable
     internal SkillSpecializationDisclosure SpecializationDisclosure { get; }
     private static TextBlock Caption()
     {
-        var text = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        var text = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
         text.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlForegroundBaseHighBrush"));
         return text;
     }
@@ -50,20 +50,21 @@ internal sealed class CreationKnowledgeSkillRow : IDisposable
         specialization = new NativeInlineChoiceBinding(controller.CreationSpecializationInput);
         rating = new NativeInlineNumericBinding(controller.CreationRatingInput, controller.CreationToolTips, true,
             () => controller.Visible && controller.CreationRatingInput.Visible);
-        Rating.Width = 104;
+        Rating.ClearValue(Layoutable.WidthProperty);
+        Rating.ClearValue(NumericUpDown.FontSizeProperty);
         Type.Name = "nativeCreationKnowledgeType" + index; Name.Name = "nativeCreationKnowledgeName" + index;
         Rating.Name = "nativeCreationKnowledgeRating" + index; Specialization.Name = "nativeCreationKnowledgeSpecialization" + index;
         Specialization.PlaceholderText = LanguageManager.Instance.GetString("String_ExpenseSpecialization");
-        Layout = new Grid { ColumnDefinitions = new ColumnDefinitions("140,*,104,40,Auto"),
+        Layout = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,3*,2*,Auto,2*"),
             RowDefinitions = new RowDefinitions("Auto,Auto"), ColumnSpacing = 4, RowSpacing = 3, Margin = new Thickness(3) };
         Layout.Styles.Add(new Style(selector => selector.OfType<Grid>().Class("trained"))
         { Setters = { new Setter(Panel.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush")) } });
         Layout.Children.Add(Type); Grid.SetColumn(Name, 1); Layout.Children.Add(Name);
         Grid.SetColumn(Rating, 2); Layout.Children.Add(Rating); Grid.SetColumn(pool, 3); Layout.Children.Add(pool);
         Delete = Command(controller.CreationDeleteButton);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        var actions = new WrapPanel { ItemSpacing = 2, LineSpacing = 2 };
         actions.Children.Add(Delete); Grid.SetColumn(actions, 4); Layout.Children.Add(actions);
-        var specializationLine = new Grid { ColumnDefinitions = new ColumnDefinitions("*,40,Auto"), ColumnSpacing = 4 };
+        var specializationLine = new Grid { ColumnDefinitions = new ColumnDefinitions("3*,*,2*"), ColumnSpacing = 4 };
         Grid.SetRow(specializationLine, 1); Grid.SetColumnSpan(specializationLine, 5); Layout.Children.Add(specializationLine);
         specializationLine.Children.Add(Specialization);
         Grid.SetColumn(attribute, 1); specializationLine.Children.Add(attribute);
@@ -72,6 +73,39 @@ internal sealed class CreationKnowledgeSkillRow : IDisposable
         SpecializationDisclosure = new SkillSpecializationDisclosure(specializationLine, "Show or hide knowledge skill specialization",
             () => controller.Visible && controller.Enabled && controller.CreationSpecializationInput.Visible);
         actions.Children.Add(SpecializationDisclosure.Toggle);
+        void Reflow()
+        {
+            bool stacked = Layout.Bounds.Width < Math.Max(450, Rating.FontSize * 26);
+            if (stacked == (Grid.GetRow(Rating) == 2)) return;
+
+            Layout.ColumnDefinitions = new ColumnDefinitions(stacked ? "2*,*,*" : "2*,3*,2*,Auto,2*");
+            if (!stacked) Layout.ColumnDefinitions[2].MinWidth = 104;
+            Layout.RowDefinitions = new RowDefinitions(stacked ? "Auto,Auto,Auto,Auto,Auto" : "Auto,Auto");
+            Place(Type, 0, 0, stacked ? 3 : 1);
+            Place(Name, stacked ? 1 : 0, stacked ? 0 : 1, stacked ? 3 : 1);
+            Place(Rating, stacked ? 2 : 0, stacked ? 0 : 2, stacked ? 2 : 1);
+            Place(pool, stacked ? 2 : 0, stacked ? 2 : 3);
+            Place(actions, stacked ? 3 : 0, stacked ? 0 : 4, stacked ? 3 : 1);
+            Place(specializationLine, stacked ? 4 : 1, 0, stacked ? 3 : 5);
+
+            specializationLine.ColumnDefinitions = new ColumnDefinitions(stacked ? "*,2*" : "3*,*,2*");
+            specializationLine.RowDefinitions = new RowDefinitions(stacked ? "Auto,Auto" : "Auto");
+            Place(Specialization, 0, 0, stacked ? 2 : 1);
+            Place(attribute, stacked ? 1 : 0, stacked ? 0 : 1);
+            Place(AddSpecialty, stacked ? 1 : 0, stacked ? 1 : 2);
+        }
+        static void Place(Control control, int row, int column, int span = 1)
+        {
+            Grid.SetRow(control, row);
+            Grid.SetColumn(control, column);
+            Grid.SetColumnSpan(control, span);
+        }
+        Layout.SizeChanged += (_, _) => Reflow();
+        Layout.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == Avalonia.Controls.Documents.TextElement.FontSizeProperty) Reflow();
+        };
+        Reflow();
         Avalonia.Automation.AutomationProperties.SetName(Type, "Knowledge skill type");
         Avalonia.Automation.AutomationProperties.SetName(Name, "Knowledge skill name");
         Avalonia.Automation.AutomationProperties.SetName(Rating, "Knowledge skill rating");
@@ -99,11 +133,12 @@ internal sealed class CreationKnowledgeSkillRow : IDisposable
     }
     private Button Command(Forms.Button source)
     {
-        var target = new Button { MinHeight = 32, Padding = new Thickness(6, 2) };
+        var caption = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var target = new Button { MinHeight = 32, Padding = new Thickness(6, 2), Content = caption };
         void Sync()
         {
             if (disposed) return;
-            target.Content = source.Text; target.IsVisible = source.Visible; target.IsEnabled = controller.Enabled && source.Enabled;
+            caption.Text = source.Text; target.IsVisible = source.Visible; target.IsEnabled = controller.Enabled && source.Enabled;
             ToolTip.SetTip(target, controller.CreationToolTips.GetToolTip(source));
         }
         EventHandler changed = (_, _) => Sync();

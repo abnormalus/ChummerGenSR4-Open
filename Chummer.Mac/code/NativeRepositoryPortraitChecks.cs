@@ -49,6 +49,17 @@ internal static class NativeRepositoryPortraitChecks
                 rows[1].Portrait == null && list.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == "BN" && text.IsEffectivelyVisible),
                 "Open from Repository shows an embedded portrait and initials for an unreadable portrait");
             var search = window.GetVisualDescendants().OfType<TextBox>().Single();
+            var footer = ((Grid)window.Content!).Children.OfType<WrapPanel>().Single();
+            window.Width = 320;
+            window.Height = 360;
+            Avalonia.Controls.Documents.TextElement.SetFontSize((Grid)window.Content!, search.FontSize * 1.5);
+            await WaitAsync(() => window.ClientSize.Width <= 320 && footer.Bounds.Height > 35);
+            var longFilename = list.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == rows[1].File.Name);
+            check(longFilename.Bounds.Height > longFilename.FontSize * 2 &&
+                search.Bounds.Bottom <= list.Bounds.Top && list.Bounds.Height > 0 &&
+                list.Bounds.Bottom <= footer.Bounds.Top && footer.Bounds.Bottom <= window.ClientSize.Height &&
+                footer.Children.All(button => button.Bounds.Right <= footer.Bounds.Width + 1),
+                "Repository picker wraps long filenames and keeps its actions visible at 150% text and narrow width");
             search.Text = "echo";
             await WaitAsync(() => list.Items.Count == 1);
             check(ReferenceEquals(list.Items[0], rows[0]) && rows[0].Portrait != null,
@@ -91,7 +102,7 @@ internal static class NativeRepositoryPortraitChecks
                 payload = new[]
                 {
                     new { type = "file", name = "Alice Echo.chum", path = "characters/Alice Echo.chum", sha = Alice, size = 1024 },
-                    new { type = "file", name = "Broken Note.chum", path = "characters/Broken Note.chum", sha = Broken, size = 128 }
+                    new { type = "file", name = "Broken Note with a deliberately long filename for narrow character lists.chum", path = "characters/Broken Note with a deliberately long filename for narrow character lists.chum", sha = Broken, size = 128 }
                 };
             else if (path.Contains("/git/blobs/", StringComparison.Ordinal))
             {

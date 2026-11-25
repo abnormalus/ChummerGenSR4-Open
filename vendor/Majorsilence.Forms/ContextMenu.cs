@@ -98,8 +98,40 @@ namespace Majorsilence.Forms
             return args.Cancel;
         }
 
+        internal bool PrepareHostedContext (Control? source)
+        {
+            SourceControl = source;
+            OnPopup (EventArgs.Empty);
+            return !RaiseOpeningCancelled ();
+        }
+
+        internal void NotifyHostedOpened () => OnOpened (EventArgs.Empty);
+
+        internal bool CanCloseHostedContext (ToolStripDropDownCloseReason reason)
+        {
+            var args = new ToolStripDropDownClosingEventArgs (reason) {
+                Cancel = reason != ToolStripDropDownCloseReason.CloseCalled && !AutoCloseCore,
+            };
+            OnClosing (args);
+            return !args.Cancel;
+        }
+
+        internal void NotifyHostedClosed (ToolStripDropDownCloseReason reason)
+        {
+            OnClosed (new ToolStripDropDownClosedEventArgs (reason));
+            OnCollapse (EventArgs.Empty);
+        }
+
         private void ShowCore (Control anchor, Control? source, Point location)
         {
+            var form = anchor.FindForm ();
+            var presenter = form?.MdiParent ?? form;
+            if (presenter?.ShowHostedContextMenu is { } showHosted)
+            {
+                showHosted (this, anchor, source, location);
+                return;
+            }
+
             SourceControl = source;
             Application.ActiveMenu ??= this;
 

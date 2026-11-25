@@ -45,6 +45,9 @@ namespace Chummer
             RefreshEmblem();
         }
 
+        internal WorkspaceDocumentTabs DocumentTabs { get; }
+        private AvaloniaWorkspaceCommands _workspaceCommands;
+
 		#region Control Events
 		public frmMain()
 		{
@@ -52,6 +55,8 @@ namespace Chummer
             // follow Avalonia's system theme using the maintained framework bridge.
             MajorsilenceFormsTheme.FollowHost();
 			InitializeComponent();
+            DocumentTabs = new WorkspaceDocumentTabs(this, tabForms);
+            Disposed += (_, _) => DocumentTabs.Dispose();
             InitializeEmptyWorkspace();
             _mnuSaveCharacter = new ToolStripMenuItem { Name = "nativeSaveCharacter", Text = "&Save", Tag = "Menu_FileSave", Enabled = false };
             _mnuSaveCharacterAs = new ToolStripMenuItem { Name = "nativeSaveCharacterAs", Text = "Save &As…", Tag = "Menu_FileSaveAs", Enabled = false };
@@ -89,7 +94,7 @@ namespace Chummer
             // Defer optional network checks until the main window and dispatcher are ready.
             Shown += async (_, _) => {
                 if (!GlobalOptions.Instance.AutomaticUpdate) return;
-                await frmUpdate.CheckSilentlyAsync(this);
+                await UpdateWindow.CheckSilentlyAsync(this);
             };
 
 			GlobalOptions.Instance.MRUChanged += PopulateMRU;
@@ -107,8 +112,7 @@ namespace Chummer
 				{
 					if (strArgs[2] == "/test")
 					{
-						frmTest frmTestData = new frmTest();
-						frmTestData.Show();
+						Shown += (_, _) => new CatalogValidationWindow().Show(AvaloniaHostInterop.ToAvaloniaWindow(this));
 					}
 				}
 			}
@@ -159,9 +163,30 @@ namespace Chummer
 			catch
 			{
 			}
-            AppPlatform.ConfigureMenus(this, menuStrip, optionsToolStripMenuItem,
+            bool hasSystemMenu = AppPlatform.ConfigureMenus(this, menuStrip, optionsToolStripMenuItem,
                 aboutToolStripMenuItem, exitToolStripMenuItem, () => optionsToolStripMenuItem_Click(this, EventArgs.Empty));
+            if (Avalonia.Application.Current != null)
+            {
+                AvaloniaContextCommands.InstallWorkspace(this, NativeControlPresentation.AddTheme);
+                _workspaceCommands = new AvaloniaWorkspaceCommands(this, menuStrip, toolStrip, hasSystemMenu, WorkspaceMenuSecondaryAction, NativeControlPresentation.AddTheme);
+                Disposed += (_, _) => _workspaceCommands.Dispose();
+            }
 		}
+
+        private bool WorkspaceMenuSecondaryAction(MenuItem item)
+        {
+            if (item is not ToolStripMenuItem command)
+                return false;
+
+            var args = new MouseEventArgs(MouseButtons.Right, 1, 0, 0, System.Drawing.Point.Empty);
+            if (command.Name.StartsWith("mnuStickyMRU", StringComparison.Ordinal))
+                mnuStickyMRU_MouseDown(command, args);
+            else if (command.Name.StartsWith("mnuMRU", StringComparison.Ordinal) && command.Name != "mnuMRU")
+                mnuMRU_MouseDown(command, args);
+            else
+                return false;
+            return true;
+        }
 
 		private void ExitToolsStripMenuItem_Click(object sender, EventArgs e)
 		{
@@ -182,16 +207,14 @@ namespace Chummer
 			frmOptions.ShowDialog(this);
 		}
 
-		private void mnuToolsUpdate_Click(object sender, EventArgs e)
+		private async void mnuToolsUpdate_Click(object sender, EventArgs e)
 		{
-			frmUpdate frmUpdateApp = new frmUpdate();
-			frmUpdateApp.ShowDialog(this);
+			await UpdateWindow.ShowAsync(this);
 		}
 
-		private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
+		private async void aboutToolStripMenuItem_Click(object sender, EventArgs e)
 		{
-			frmAbout frmShowAbout = new frmAbout();
-			frmShowAbout.ShowDialog(this);
+			await AboutWindow.ShowAsync(this);
 		}
 
 		private void contentsToolStripMenuItem_Click(object sender, EventArgs e)
@@ -214,10 +237,9 @@ namespace Chummer
             catch (Exception error) { AppDiagnostics.Record("batch-window-failed", error); AppErrors.Inform(this, "BatchOutput_Failed"); }
         }
 
-		private void mnuHelpRevisionHistory_Click(object sender, EventArgs e)
+		private async void mnuHelpRevisionHistory_Click(object sender, EventArgs e)
 		{
-			frmHistory frmShowHistory = new frmHistory();
-			frmShowHistory.ShowDialog(this);
+			await RevisionHistoryWindow.ShowAsync(this);
 		}
 
 		private void mnuNewCritter_Click(object sender, EventArgs e)
@@ -226,7 +248,7 @@ namespace Chummer
 
 			if (Directory.GetFiles(MacPaths.SettingsDirectory, "*.xml").Count() > 1)
 			{
-				frmSelectSetting frmPickSetting = new frmSelectSetting();
+				using var frmPickSetting = new frmSelectSetting();
 				frmPickSetting.ShowDialog(this);
 
 				if (frmPickSetting.DialogResult == DialogResult.Cancel)
@@ -285,7 +307,6 @@ namespace Chummer
 			frmNewCharacter.WindowState = FormWindowState.Maximized;
 			frmNewCharacter.Show();
 
-			objCharacter.CharacterNameChanged += objCharacter_CharacterNameChanged;
 		}
 
 		private void mnuMRU_Click(object sender, EventArgs e)
@@ -392,97 +413,13 @@ namespace Chummer
             catch (Exception exception) { ToolbarRefreshFailureCount++; AppDiagnostics.Record("toolbar-activation-merge-failed", exception); }
         }
 
-		private void frmMain_MdiChildActivate(object sender, EventArgs e)
-		{
+        private void frmMain_MdiChildActivate(object sender, EventArgs e)
+        {
             RefreshCharacterToolbar();
-			// If there are no child forms, hide the tab control.
-			if (this.ActiveMdiChild == null)
-				tabForms.Visible = false;
-			else
-			{
-				this.ActiveMdiChild.WindowState = FormWindowState.Maximized;
-
-				// If this is a new child form and does not have a tab page, create one.
-				if (this.ActiveMdiChild.Tag == null)
-				{
-					// Add a tab page.
-					TabPage tp = new TabPage(LanguageManager.Instance.GetString("String_UnnamedCharacter"));
-					tp.Tag = this.ActiveMdiChild;
-					tp.Parent = tabForms;
-
-					if (this.ActiveMdiChild.GetType() == typeof(frmCareer))
-					{
-						tp.Text = ((frmCareer)this.ActiveMdiChild).CharacterName;
-					}
-
-					tabForms.SelectedTab = tp;
-
-					this.ActiveMdiChild.Tag = tp;
-					this.ActiveMdiChild.FormClosed += ActiveMdiChild_FormClosed;
-				}
-
-                // Activation can come from a menu or code as well as a tab click.
-                // Always synchronize the header, including already-open editors.
-                if (ActiveMdiChild.Tag is TabPage activeTab)
-                    tabForms.SelectedTab = activeTab;
-
-				// Don't show the tab control if there is only one window open.
-				if (tabForms.TabCount <= 1)
-					tabForms.Visible = false;
-				else
-					tabForms.Visible = true;
-			}
-		}
-
-        private void ActiveMdiChild_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            if (sender is not Form closedEditor) return;
-            closedEditor.FormClosed -= ActiveMdiChild_FormClosed;
-            // TabPages owns the headers as well as the page controls. Disposing just
-            // the page can leave a header holding a disposed editor in the compat UI.
-            if (closedEditor.Tag is TabPage closedTab)
-            {
-                closedEditor.Tag = null;
-                closedTab.Tag = null;
-                tabForms.TabPages.Remove(closedTab);
-                closedTab.Dispose();
-            }
-            closedEditor.Dispose();
-            tabForms.Visible = tabForms.TabCount > 1;
-            if (ActiveMdiChild?.Tag is TabPage activeTab)
-                tabForms.SelectedTab = activeTab;
+            if (ActiveMdiChild is { } editor)
+                editor.WindowState = FormWindowState.Maximized;
+            DocumentTabs?.Synchronize();
         }
-
-		private void tabForms_SelectedIndexChanged(object sender, EventArgs e)
-		{
-            if (tabForms.SelectedTab?.Tag is Form editor && !editor.IsDisposed)
-                editor.Select();
-		}
-
-        internal void ObserveReplacementCharacter(Character original, Character replacement)
-        {
-            original.CharacterNameChanged -= objCharacter_CharacterNameChanged;
-            replacement.CharacterNameChanged += objCharacter_CharacterNameChanged;
-            objCharacter_CharacterNameChanged(replacement);
-        }
-
-		private void objCharacter_CharacterNameChanged(Object sender)
-		{
-			// Change the TabPage's text to match the character's name (or "Unnamed Character" if they are currently unnamed).
-			Character objCharacter = (Character)sender;
-			string strTitle = objCharacter.Name;
-			if (objCharacter.Alias.Trim() != string.Empty)
-				strTitle = objCharacter.Alias;
-			if (strTitle.Trim() == string.Empty)
-				strTitle = LanguageManager.Instance.GetString("String_UnnamedCharacter");
-			try
-			{
-				tabForms.SelectedTab.Text = strTitle;
-			}
-			catch
-			{
-			}
-		}
 
 		private void mnuToolsDiceRoller_Click(object sender, EventArgs e)
 		{
@@ -592,7 +529,7 @@ namespace Chummer
 
 			if (Directory.GetFiles(MacPaths.SettingsDirectory, "*.xml").Count() > 1)
 			{
-				frmSelectSetting frmPickSetting = new frmSelectSetting();
+				using var frmPickSetting = new frmSelectSetting();
 				frmPickSetting.ShowDialog(this);
 
 				if (frmPickSetting.DialogResult == DialogResult.Cancel)
@@ -641,7 +578,6 @@ namespace Chummer
 			frmNewCharacter.WindowState = FormWindowState.Maximized;
 			frmNewCharacter.Show();
 
-			objCharacter.CharacterNameChanged += objCharacter_CharacterNameChanged;
 		}
 
 		/// <summary>
@@ -714,8 +650,6 @@ namespace Chummer
 				if (blnIncludeInMRU)
 					GlobalOptions.Instance.AddToMRUList(strFileName);
 
-				objCharacter.CharacterNameChanged += objCharacter_CharacterNameChanged;
-				objCharacter_CharacterNameChanged(objCharacter);
 			}
 			else
 			{

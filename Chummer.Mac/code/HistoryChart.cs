@@ -1,60 +1,143 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using Majorsilence.Forms;
-using SkiaSharp;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Layout;
+using Avalonia.Markup.Xaml.MarkupExtensions;
+using Avalonia.Media;
+using Avalonia.Styling;
+using Forms = Majorsilence.Forms;
 
-namespace Chummer
+namespace Chummer;
+
+public sealed class HistoryChart : Forms.Control, ISupportInitialize
 {
-    // Replaces the Windows-only DataVisualization control with an actual Skia chart.
-    public sealed class HistoryChart : Control, ISupportInitialize
+    private readonly TextBlock heading = CreateLabel();
+    private readonly TextBlock maximum = CreateLabel();
+    private readonly TextBlock minimum = CreateLabel();
+    private readonly Plot plot = new();
+
+    public void BeginInit() { }
+    public void EndInit() { }
+
+    internal void AttachNative(Forms.Form editor)
     {
-        private int[] _intValues = Array.Empty<int>();
-        private string _strTitle = "";
-        private SKColor _objColor = SKColors.Blue;
+        minimum.VerticalAlignment = VerticalAlignment.Bottom;
+        minimum.Margin = new Thickness(0, 0, 0, 2);
+        maximum.VerticalAlignment = VerticalAlignment.Top;
+        var labels = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
+        Grid.SetRow(minimum, 2);
+        labels.Children.Add(maximum);
+        labels.Children.Add(minimum);
 
-        public void BeginInit() { }
-        public void EndInit() { }
-
-        public void SetEntries(IEnumerable<ExpenseLogEntry> entries, ExpenseType type, string title)
+        var graph = new Grid
         {
-            int intTotal = 0;
-            _intValues = entries.Where(x => x.Type == type).OrderBy(x => x.Date)
-                .Select(x => intTotal += x.Amount).Prepend(0).ToArray();
-            _strTitle = title;
-            _objColor = type == ExpenseType.Karma ? SKColors.RoyalBlue : SKColors.ForestGreen;
-            Invalidate();
+            ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+            ColumnSpacing = 6,
+            MinHeight = 34
+        };
+        Grid.SetColumn(plot, 1);
+        graph.Children.Add(labels);
+        graph.Children.Add(plot);
+
+        var content = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), RowSpacing = 4 };
+        Grid.SetRow(graph, 1);
+        content.Children.Add(heading);
+        content.Children.Add(graph);
+        var surface = new Border
+        {
+            Padding = new Thickness(8, 3),
+            Child = new ScrollViewer
+            {
+                Content = content,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            }
+        };
+
+        NativeControlPresentation.AddTheme(surface.Styles);
+        surface.Bind(Border.BackgroundProperty, new DynamicResourceExtension("SystemControlBackgroundListLowBrush"));
+        var presenter = new CreationRegionPresenter(editor, this, surface, "Native" + Name, clipToSource: true);
+        editor.Disposed += (_, _) => presenter.Dispose();
+    }
+
+    public void SetEntries(IEnumerable<ExpenseLogEntry> entries, ExpenseType type, string title)
+    {
+        long total = 0;
+        long[] values = entries.Where(entry => entry.Type == type).OrderBy(entry => entry.Date)
+            .Select(entry => total += entry.Amount).Prepend(0L).ToArray();
+        long high = Math.Max(1, values.Max());
+        long low = values.Min();
+        heading.Text = title;
+        maximum.Text = high.ToString("N0");
+        minimum.Text = low.ToString("N0");
+        plot.SetValues(values, low, high, type);
+    }
+
+    private static TextBlock CreateLabel()
+    {
+        var label = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        label.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlForegroundBaseHighBrush"));
+        return label;
+    }
+
+    private sealed class Plot : Control
+    {
+        private double[] values = Array.Empty<double>();
+        private ExpenseType type;
+
+        internal void SetValues(long[] entries, long low, long high, ExpenseType expenseType)
+        {
+            values = entries.Select(value => (value - (double)low) / (high - (double)low)).ToArray();
+            type = expenseType;
+            InvalidateVisual();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
-            base.OnPaint(e);
-            var canvas = e.Canvas;
-            using var paint = new SKPaint { IsAntialias = true, Color = SKColors.White };
-            canvas.DrawRect(0, 0, Width, Height, paint);
-            paint.Color = SKColors.Black;
-            using var font = new SKFont(SKTypeface.Default, 12);
-            canvas.DrawText(_strTitle, 8, 17, font, paint);
-            if (_intValues.Length == 0 || Width < 90 || Height < 60) return;
-            float min = Math.Min(0, _intValues.Min()), max = Math.Max(1, _intValues.Max());
-            float left = 65, top = 28, right = Width - 12, bottom = Height - 25;
-            paint.Color = SKColors.Gray;
-            canvas.DrawLine(left, top, left, bottom, paint);
-            canvas.DrawLine(left, bottom, right, bottom, paint);
-            canvas.DrawText(max.ToString("0"), 3, top + 10, font, paint);
-            canvas.DrawText(min.ToString("0"), 3, bottom, font, paint);
-            using var path = new SKPath();
-            for (int i = 0; i < _intValues.Length; i++)
+            base.OnAttachedToVisualTree(e);
+            ActualThemeVariantChanged += ThemeChanged;
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            ActualThemeVariantChanged -= ThemeChanged;
+            base.OnDetachedFromVisualTree(e);
+        }
+
+        private void ThemeChanged(object? sender, EventArgs args) => InvalidateVisual();
+
+        public override void Render(DrawingContext context)
+        {
+            double width = Bounds.Width - 2;
+            double height = Bounds.Height - 2;
+            if (width < 8 || height < 8) return;
+
+            bool dark = ActualThemeVariant == ThemeVariant.Dark;
+            var axis = new Pen(new SolidColorBrush(dark ? Colors.Silver : Colors.DimGray));
+            context.DrawLine(axis, new Point(1, 1), new Point(1, height));
+            context.DrawLine(axis, new Point(1, height), new Point(width, height));
+
+            var color = (type, dark) switch
             {
-                float x = left + (right - left) * i / Math.Max(1, _intValues.Length - 1);
-                float y = bottom - (bottom - top) * (_intValues[i] - min) / (max - min);
-                if (i == 0) path.MoveTo(x, y); else path.LineTo(x, y);
+                (ExpenseType.Karma, true) => Color.FromRgb(130, 176, 255),
+                (ExpenseType.Karma, false) => Colors.RoyalBlue,
+                (_, true) => Color.FromRgb(115, 211, 144),
+                _ => Colors.ForestGreen
+            };
+            var line = new Pen(new SolidColorBrush(color), 2);
+            var previous = new Point(1, height);
+            for (int index = 0; index < values.Length; index++)
+            {
+                var point = new Point(1 + (width - 1) * index / Math.Max(1, values.Length - 1),
+                    height - (height - 1) * values[index]);
+                if (index > 0) context.DrawLine(line, previous, point);
+                previous = point;
             }
-            paint.Color = _objColor;
-            paint.Style = SKPaintStyle.Stroke;
-            paint.StrokeWidth = 2;
-            canvas.DrawPath(path, paint);
         }
     }
 }

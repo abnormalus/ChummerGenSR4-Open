@@ -24,6 +24,7 @@ namespace Chummer
 			_objCharacter = objCharacter;
 			_objSpell = new Spell(_objCharacter);
 			InitializeComponent();
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objXmlDocument = XmlManager.Instance.Load("spells.xml");
 			MoveControls();

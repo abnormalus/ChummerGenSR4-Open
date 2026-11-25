@@ -33,3 +33,20 @@ Use these checks as acceptance coverage while moving a selected inventory list/d
 ## Arrowless tree connectors
 
 Expanded read-only trees such as PACKS contents hide expand arrows and images while retaining connector lines. `TreeViewRenderer.TextBoundsFor` reserves the connector gutter even in that configuration. Previously labels started at the indent origin and the connector crossed their text, which resembled a stale redraw artifact. Scale-1 and scale-2 checks in `RenderingChecks` independently verify that labels start beyond that gutter. Do not enable continuous repainting or suppress the hierarchy to conceal this layout defect.
+
+## macOS fullscreen diagnostics
+
+The strict Creation viewport check passed in a fresh process. A separate probe reproduced a return to the original 932 × 545 client size when a fullscreen window was closed and the workspace requested fullscreen immediately afterward. AppKit emitted `NSWindowDidFailToEnterFullScreenNotification` while Avalonia still reported `FullScreen`. The recorded Width and Height changes followed the native resize callback. Waiting for the preceding window to exit fullscreen before closing it allowed the workspace to settle at 1512 × 949, within the existing one-point tolerance.
+
+Run `--check-fullscreen-probe FIXTURE REPORT CASE` in a fresh macOS process per case. The command writes the managed resize and AppKit notification trace to `REPORT.fullscreen.jsonl`. The report records completion of the diagnostics. Use the final `settled` row to compare the reported window state, AppKit fullscreen status, and actual client size.
+
+| Case | Setup |
+|---|---|
+| `plain-inactive`, `plain-managed`, `forms-managed` | Compare a plain Avalonia window and a generic compatibility-hosted window. |
+| `workspace-managed`, `workspace-native` | Compare an Avalonia state assignment and AppKit's `toggleFullScreen:` action on the empty workspace. |
+| `character-managed`, `character-native` | Repeat both entry routes with a Creation editor open. |
+| `handoff-managed`, `handoff-settled` | Compare closing the preceding window in fullscreen with waiting for it to exit first. |
+| `handoff-retry` | Trigger the rejected handoff and verify the window returns to Normal and can then enter fullscreen at the expected size. |
+| `creation-check` | Run the unchanged strict Creation viewport checks in isolation. |
+
+The Mac window host now observes AppKit’s failed-entry notification and reconciles a pending `FullScreen` state once AppKit confirms the window is windowed. The `handoff-retry` case verified recovery at 932 × 545 followed by a successful retry at 1512 × 949. The strict combined Mac run then passed 1,766 assertions, including Creation, Contacts and Knowledge fullscreen geometry. The final compact editor tab styling passed a separate strict Creation rerun.

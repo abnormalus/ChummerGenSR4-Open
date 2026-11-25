@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using Forms = Majorsilence.Forms;
 namespace Chummer;
 internal static class NativeVehiclePickerChecks
@@ -46,6 +47,30 @@ internal static class NativeVehiclePickerChecks
                 window.UsedInput.IsChecked = true; window.DiscountInput.Text = "35"; await Task.Delay(30); prompt.Model.Markup = 25;
                 check(prompt.Model.UsedVehicle && prompt.Model.UsedDiscount == 35 && prompt.Model.CanAccept,
                     "Native vehicle used controls update the shared purchase preview");
+                var root = (Grid)window.Content!;
+                var purchase = window.GetVisualDescendants().OfType<StackPanel>().Single(panel => panel.Name == "VehiclePurchaseOptions");
+                var caption = (TextBlock)purchase.Children[1];
+                string originalCaption = caption.Text!;
+                var previousWidth = window.Width;
+                try
+                {
+                    window.Width = 420;
+                    double enlarged = window.DiscountInput.FontSize * 1.5;
+                    Avalonia.Controls.Documents.TextElement.SetFontSize(root, enlarged);
+                    caption.Text = "Translated discount for purchasing this vehicle secondhand";
+                    await Task.Delay(100);
+                    check(window.DiscountInput.FontSize == enlarged && window.DiscountInput.Bounds.Width >= 100 &&
+                        window.UsedInput.Bounds.Bottom <= caption.Bounds.Top && caption.Bounds.Bottom <= purchase.Children[2].Bounds.Top &&
+                        purchase.Children[2].Bounds.Right <= purchase.Bounds.Width + 1 && prompt.Model.UsedDiscount == 35,
+                        "Narrow Vehicle picker keeps the used-vehicle option and discount clear at 150% text");
+                }
+                finally
+                {
+                    caption.Text = originalCaption;
+                    window.Width = previousWidth;
+                    root.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                }
+
                 var nativeOwner = Forms.AvaloniaHostInterop.ToAvaloniaWindow(owner); var previous = nativeOwner.RequestedThemeVariant;
                 try
                 {

@@ -27,9 +27,9 @@ namespace Chummer
         private string _html = "";
         private Task<CharacterSheetServer> _sheetServerTask;
         private Uri _sheetUri;
-        private readonly Button _openBrowser = new Button { Text = "Open in Browser", Enabled = false };
-        private readonly Button _savePdf = new Button { Text = "Save PDF", Width = 120 };
-        private readonly Button _saveJson = new Button { Text = "Foundry JSON", Enabled = false };
+        private readonly Button _openBrowser = new Button { Name = "OpenBrowser", Text = "Open in Browser", Enabled = false };
+        private readonly Button _savePdf = new Button { Name = "SavePdf", Text = "Save PDF", Width = 120 };
+        private readonly Button _saveJson = new Button { Name = "SaveJson", Text = "Foundry JSON", Enabled = false };
         private readonly Label _status = new Label { AutoSize = false };
 
 		
@@ -39,6 +39,7 @@ namespace Chummer
 			_strSelectedSheet = GlobalOptions.Instance.DefaultCharacterSheet;
 
 			InitializeComponent();
+            Load += (_, _) => InitializeNativePreviewLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
             MoveControls();
             cmdPrint.Image = null;

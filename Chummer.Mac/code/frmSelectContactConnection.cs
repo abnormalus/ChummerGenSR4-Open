@@ -24,6 +24,7 @@ namespace Chummer
 		public frmSelectContactConnection()
 		{
 			InitializeComponent();
+            Load += (_, _) => InitializeNativeLayout();
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			MoveControls();
 		}

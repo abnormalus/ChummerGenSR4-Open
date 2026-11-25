@@ -13,14 +13,14 @@ namespace Chummer;
 internal sealed class NativeInlineNumericBinding : IDisposable
 {
     private readonly Forms.NumericUpDown source;
-    private readonly Forms.ToolTip tips;
+    private readonly Forms.ToolTip? tips;
     private readonly bool wholeNumbers;
     private readonly Func<bool>? available;
     private readonly NativeControlObservation observation;
     private bool syncing, disposed;
     internal NumericUpDown Input { get; }
 
-    internal NativeInlineNumericBinding(Forms.NumericUpDown source, Forms.ToolTip tips, bool wholeNumbers, Func<bool>? available = null)
+    internal NativeInlineNumericBinding(Forms.NumericUpDown source, Forms.ToolTip? tips, bool wholeNumbers, Func<bool>? available = null)
     {
         this.source = source; this.tips = tips; this.wholeNumbers = wholeNumbers; this.available = available;
         Input = new NumericUpDown { Name = "native" + source.Name, Width = 120, MinHeight = 32, FontSize = 12,
@@ -42,7 +42,7 @@ internal sealed class NativeInlineNumericBinding : IDisposable
             Input.Increment = source.Increment;
             Input.FormatString = source.DecimalPlaces == 0 ? "0" : "F" + source.DecimalPlaces;
             Input.Value = source.Value; Input.IsEnabled = source.Enabled; Input.IsVisible = source.Visible;
-            ToolTip.SetTip(Input, tips.GetToolTip(source));
+            ToolTip.SetTip(Input, tips?.GetToolTip(source));
         }
         finally { syncing = false; }
     }

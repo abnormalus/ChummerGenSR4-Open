@@ -69,6 +69,29 @@ internal static class NativeCreationSkillGroupChecks
             finally { Application.Current.RequestedThemeVariant = originalTheme; }
             var controller = groups.Single(group => group.GroupName == "Athletics");
             var input = section.Inputs[controller];
+            var groupButton = section.GroupButtons[controller];
+            var groupLabel = (TextBlock)groupButton.Content!;
+            var nameController = controller.CreationNameInput;
+            var previousName = nameController.Text;
+            try
+            {
+                double enlargedFont = input.FontSize * 1.5;
+                Avalonia.Controls.Documents.TextElement.SetFontSize(section.Viewport, enlargedFont);
+                section.Viewport.MaxWidth = 150;
+                nameController.Text = "Long translated Athletics skill group name";
+                await Task.Delay(60);
+                check(input.FontSize == enlargedFont && groupLabel.FontSize == enlargedFont &&
+                    groupLabel.Text == nameController.Text && groupButton.Bounds.Bottom <= input.Bounds.Top &&
+                    input.Bounds.Width > 100 && input.Bounds.Right <= section.Viewport.Bounds.Width + 1,
+                    "Creation skill group names and ratings stack without clipping at 150% text");
+            }
+            finally
+            {
+                nameController.Text = previousName;
+                section.Viewport.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+                section.Viewport.ClearValue(ScrollViewer.MaxWidthProperty);
+                await Task.Delay(30);
+            }
             var members = character.Skills.Where(skill => skill.SkillGroup == controller.GroupName).ToArray();
             ControlExtensions.BringIntoView(input); input.Text = "2"; await Task.Delay(30);
             check(members.Length > 0 && controller.GroupRating == 2 && members.All(skill => skill.Rating == 2 && skill.IsGrouped) && Field<bool>(editor, "_blnIsDirty"),

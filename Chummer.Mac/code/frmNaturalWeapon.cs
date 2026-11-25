@@ -67,7 +67,7 @@ internal sealed class NaturalWeaponWindow : Window
         string Text(string key) => LanguageManager.Instance.GetString(key);
         ModifierInput.Value = 0; APInput.Value = 0; ReachInput.Value = 0;
         APInput.HorizontalAlignment = HorizontalAlignment.Left; ReachInput.HorizontalAlignment = HorizontalAlignment.Left;
-        Title = Text("Title_CreateNaturalWeapon"); Width = 560; MinWidth = 440; SizeToContent = SizeToContent.Height;
+        Title = Text("Title_CreateNaturalWeapon"); Width = 560; MinWidth = 280; MinHeight = 200; MaxHeight = 540; SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner; NativeControlPresentation.AddTheme(Styles);
         var skills = XmlManager.Instance.Load("skills.xml").SelectNodes("/chummer/skills/skill[category = 'Combat Active']")!.Cast<XmlNode>()
             .Select(node => new Choice(node["name"]!.InnerText, node["translate"]?.InnerText ?? node["name"]!.InnerText)).ToArray();
@@ -75,17 +75,23 @@ internal sealed class NaturalWeaponWindow : Window
         DamageBaseInput = new ComboBox { ItemsSource = new[] { new Choice("(STR/2)", "(" + Text("String_AttributeSTRShort") + "/2)") }
             .Concat(Enumerable.Range(1, 20).Select(n => new Choice(n.ToString(CultureInfo.InvariantCulture), n.ToString(CultureInfo.CurrentCulture)))).ToArray(), SelectedIndex = 0, MinWidth = 110 };
         DamageTypeInput = new ComboBox { ItemsSource = new[] { new Choice("P", Text("String_DamagePhysical")), new Choice("S", Text("String_DamageStun")) }, SelectedIndex = 0, MinWidth = 110 };
-        var layout = new StackPanel { Margin = new Avalonia.Thickness(20), Spacing = 12 };
-        void Add(string label, Control input) { layout.Children.Add(new TextBlock { Text = Text(label) }); layout.Children.Add(input); }
+        var layout = new StackPanel { Spacing = 8 };
+        void Add(string label, Control input)
+        {
+            var caption = new TextBlock { Text = Text(label), TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+            Avalonia.Automation.AutomationProperties.SetLabeledBy(input, caption);
+            layout.Children.Add(caption);
+            layout.Children.Add(input);
+        }
         Add("Label_Name", NameInput); Add("Label_ActiveSkill", SkillInput);
-        var damage = new WrapPanel();
+        var damage = new WrapPanel { ItemSpacing = 6, LineSpacing = 4 };
         foreach (var input in new Control[] { DamageBaseInput, ModifierInput, DamageTypeInput }) { input.Margin = new Avalonia.Thickness(0, 0, 10, 8); damage.Children.Add(input); }
+        NativeControlPresentation.ConstrainWrapItems(damage);
         Add("Label_DV", damage); Add("Label_AP", APInput); Add("Label_Reach", ReachInput);
         var cancel = new Button { Content = Text("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
         AcceptButton = new Button { Content = Text("String_OK"), IsDefault = true, IsEnabled = skills.Length != 0 }; AcceptButton.Click += (_, _) => Accept();
         SkillInput.SelectionChanged += (_, _) => AcceptButton.IsEnabled = SkillInput.SelectedItem is Choice;
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 };
-        buttons.Children.Add(cancel); buttons.Children.Add(AcceptButton); layout.Children.Add(buttons); Content = layout;
+        Content = NativeControlPresentation.CreatePromptLayout(layout, cancel, AcceptButton);
         Opened += (_, _) => NameInput.Focus();
     }
     internal void Accept()

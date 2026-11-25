@@ -128,3 +128,19 @@ same-version repair, uninstall and user-data preservation. Its new exact-source
 hosted results are pending; do not call modernization merged/released or Stable
 accepted until the current PR/master and package gates actually complete. The iOS
 companion remains a separate draft milestone and does not define desktop completion.
+
+## Shared character repository requirement
+
+The desktop File menu must support connecting a private character repository,
+searchable **Open from Repository…**, and **Save to Repository…**, with guided
+browser setup and shared desktop/PWA/mobile conflict rules. These are recorded
+requirements, not implemented/accepted functionality; see
+[Private repository character storage](REPOSITORY_CHARACTERS.md).
+
+## Deferred house rule after Stable
+
+**Capsule Rounds: 1/10 Toxin Cost**. Schedule this after Stable promotion.
+Add a house-rule checkbox that defaults to unchecked, including for existing
+settings where the option is absent. When enabled, capsule ammunition uses
+one-tenth of the normal chemical payload cost per round. The base ammunition
+cost stays unchanged. When unchecked, keep the current calculation.

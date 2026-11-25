@@ -80,22 +80,31 @@ internal sealed class BuildPointWindow : Window
     internal BuildPointWindow(BuildPointConfiguration configuration)
     {
         this.configuration = configuration;
-        Title = LanguageManager.Instance.GetString("Title_SelectBP"); Width = 520; MinWidth = 380; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = LanguageManager.Instance.GetString("Title_SelectBP"); Width = 520; MinWidth = 260; MinHeight = 180; MaxHeight = 500; SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         NativeControlPresentation.AddTheme(Styles);
         MethodInput = new ComboBox { ItemsSource = new[] { LanguageManager.Instance.GetString("String_BP"), LanguageManager.Instance.GetString("String_Karma") }, SelectedIndex = configuration.Method == CharacterBuildMethod.Karma ? 1 : 0, IsEnabled = !configuration.MethodLocked, HorizontalAlignment = HorizontalAlignment.Stretch };
         PointsInput.Value = configuration.Points; AvailabilityInput.Value = configuration.Availability;
-        IgnoreRulesInput = new CheckBox { Content = LanguageManager.Instance.GetString("Checkbox_SelectBP_IgnoreRules"), IsChecked = configuration.IgnoreRules };
+        IgnoreRulesInput = new CheckBox { Content = Caption("Checkbox_SelectBP_IgnoreRules"), IsChecked = configuration.IgnoreRules };
         ToolTip.SetTip(IgnoreRulesInput, LanguageManager.Instance.GetString("Tip_SelectBP_IgnoreRules"));
         MethodInput.SelectionChanged += (_, _) => { if (!configuration.MethodLocked) PointsInput.Value = configuration.DefaultPoints(Method); RefreshDescription(); };
-        var layout = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
-        layout.Children.Add(description); layout.Children.Add(MethodInput); layout.Children.Add(PointsInput);
-        layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_SelectBP_MaxAvail") }); layout.Children.Add(AvailabilityInput); layout.Children.Add(IgnoreRulesInput);
-        var cancel = new Button { Content = LanguageManager.Instance.GetString("String_Cancel"), IsCancel = true }; cancel.Click += (_, _) => Close();
-        var accept = new Button { Content = LanguageManager.Instance.GetString("String_OK"), IsDefault = true }; accept.Click += (_, _) => Accept();
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 };
-        buttons.Children.Add(cancel); buttons.Children.Add(accept); layout.Children.Add(buttons); Content = layout;
+        var availabilityCaption = Caption("Label_SelectBP_MaxAvail");
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(AvailabilityInput, availabilityCaption);
+        PointsInput.ClearValue(NumericUpDown.WidthProperty);
+        AvailabilityInput.ClearValue(NumericUpDown.WidthProperty);
+        var fields = new StackPanel { Spacing = 8, Children =
+            { description, MethodInput, PointsInput, availabilityCaption, AvailabilityInput, IgnoreRulesInput } };
+        var cancel = new Button { Content = Caption("String_Cancel"), IsCancel = true };
+        cancel.Click += (_, _) => Close();
+        var accept = new Button { Content = Caption("String_OK"), IsDefault = true };
+        accept.Click += (_, _) => Accept();
+        Content = NativeControlPresentation.CreatePromptLayout(fields, cancel, accept);
         Opened += (_, _) => PointsInput.Focus(); RefreshDescription();
     }
+    private static TextBlock Caption(string key) => new()
+    {
+        Text = LanguageManager.Instance.GetString(key),
+        TextWrapping = Avalonia.Media.TextWrapping.Wrap
+    };
     private void RefreshDescription() => description.Text = LanguageManager.Instance.GetString(Method == CharacterBuildMethod.BP ? "String_SelectBP_BPSummary" : "String_SelectBP_KarmaSummary").Replace("{0}", configuration.DefaultPoints(Method).ToString(GlobalOptions.Instance.CultureInfo));
     internal void Accept() => Close(new BuildPointSelection(Method, (int)(PointsInput.Value ?? 0), (int)(AvailabilityInput.Value ?? 0), IgnoreRulesInput.IsChecked == true));
 }

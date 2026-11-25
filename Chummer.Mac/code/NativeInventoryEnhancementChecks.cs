@@ -191,7 +191,9 @@ internal static class NativeInventoryEnhancementChecks
                     await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                     var host = main.Controls.OfType<Forms.NativeControlHost>()
                         .Single(item => item.Name == (career ? "NativeCareerWeapons" : "NativeCreationWeapons"));
-                    var tree = (TreeView)host.NativeControl!;
+                    var pane = (Grid)host.NativeControl!;
+                    var choices = (Grid)((Grid)pane.Children[0]).Children[0];
+                    var tree = choices.Children.OfType<TreeView>().Single();
                     var selected = (TreeViewItem)tree.SelectedItem!;
                     selected.RaiseEvent(new ContextRequestedEventArgs { RoutedEvent = InputElement.ContextRequestedEvent });
                     menu.Hide();

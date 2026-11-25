@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using Majorsilence.Forms;
+using Native = Avalonia.Controls;
 
 namespace Chummer;
 
@@ -31,5 +32,62 @@ internal sealed class FoundryExportDialog : Form
         var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel }; cancel.SetBounds(445, 214, 115, 28);
         Controls.AddRange(new Control[] { characterLabel, _character, versionLabel, _version, help, save, cancel });
         AcceptButton = save; CancelButton = cancel;
+        Load += (_, _) =>
+        {
+            if (Avalonia.Application.Current == null)
+                return;
+
+            var characterPicker = NativeListSelection.Attach(this, _character, characterLabel.Text, layoutManaged: true)!;
+            var versionPicker = NativeListSelection.Attach(this, _version, versionLabel.Text, layoutManaged: true)!;
+            var fields = new Native.StackPanel { Spacing = 6 };
+            fields.Children.Add(Wrapped(characterLabel.Text));
+            fields.Children.Add(characterPicker);
+            fields.Children.Add(Wrapped(versionLabel.Text));
+            fields.Children.Add(versionPicker);
+            fields.Children.Add(Wrapped(help.Text));
+            var content = new Native.ScrollViewer
+            {
+                Content = fields,
+                HorizontalScrollBarVisibility = Native.Primitives.ScrollBarVisibility.Disabled
+            };
+            NativeControlPresentation.AddTheme(content.Styles);
+            var commands = new Native.WrapPanel
+            {
+                ItemSpacing = 8, LineSpacing = 4, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
+            };
+            commands.Children.Add(Command(save, "NativeFoundryExport"));
+            commands.Children.Add(Command(cancel, "NativeFoundryCancel"));
+            var layout = new Native.DockPanel { LastChildFill = true };
+            Native.DockPanel.SetDock(commands, Native.Dock.Bottom);
+            commands.Margin = new Avalonia.Thickness(0, 8, 0, 0);
+            layout.Children.Add(commands);
+            layout.Children.Add(content);
+            var surface = new Native.Border { Child = layout, Padding = new Avalonia.Thickness(12) };
+            NativeControlPresentation.AddTheme(surface.Styles);
+            Control[] controllers = [characterLabel, _character, versionLabel, _version, help, save, cancel];
+            foreach (var controller in controllers)
+                Controls.Remove(controller);
+            Controls.Add(new NativeControlHost { Name = "NativeFoundryExportOptions", NativeControl = surface, Dock = DockStyle.Fill });
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MinimumSize = new Size(260, 200);
+            Disposed += (_, _) =>
+            {
+                foreach (var controller in controllers)
+                    controller.Dispose();
+            };
+        };
+
+        static Native.TextBlock Wrapped(string text) => new() { Text = text, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        Native.Button Command(Button source, string name)
+        {
+            var button = new Native.Button
+            {
+                Name = name, Content = Wrapped(source.Text),
+                IsDefault = source.DialogResult == DialogResult.OK,
+                IsCancel = source.DialogResult == DialogResult.Cancel
+            };
+            button.Click += (_, _) => DialogResult = source.DialogResult;
+            return button;
+        }
     }
 }

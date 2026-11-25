@@ -27,14 +27,14 @@ internal static class ContactRemovalChecks
             try
             {
                 editor.Show();
-                var panel = Field<Forms.Panel>(editor, enemy ? "panEnemies" : "panContacts");
-                var rows = panel.Controls.OfType<ContactControl>().ToArray();
+                var controllers = NativeContactInteractions.Controllers(editor, enemy);
+                var rows = controllers.ToArray();
                 var deleted = rows.Single(r => ReferenceEquals(r.ContactObject, records[index]));
                 character.Options.ConfirmDelete = false; character.Options.ConfirmKarmaExpense = false;
                 Field<Forms.Button>(deleted, "cmdDelete").PerformClick();
                 var expected = records.Where((_, i) => i != index).ToArray();
                 string label = " career=" + career + " enemy=" + enemy + " index=" + index;
-                check(character.Contacts.SequenceEqual(expected) && panel.Controls.OfType<ContactControl>()
+                check(character.Contacts.SequenceEqual(expected) && controllers
                     .Select(r => r.ContactObject).SequenceEqual(expected),
                     "Contact deletion removes only the selected model and row" + label);
                 check(deleted.IsDisposed && new[] { "ConnectionRatingChanged", "ConnectionGroupRatingChanged", "LoyaltyRatingChanged", "DeleteContact", "FileNameChanged", "ContactNameChanged" }

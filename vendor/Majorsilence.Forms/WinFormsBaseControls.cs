@@ -547,10 +547,9 @@ namespace Majorsilence.Forms
             // Opening is the cancellable point: a drop-down that populates itself lazily builds its
             // items there and cancels when there is nothing to show, so the open must really be
             // abandoned rather than merely notified.
-            if (HasDropDown && DropDown.RaiseOpeningCancelled ())
+            if (!PrepareHostedDropDown ())
                 return;
 
-            OnDropDownShow (EventArgs.Empty);
             base.ShowDropDown ();
 
             // Opened only when something opened. MenuItem.ShowDropDown does nothing for an item with no
@@ -574,6 +573,14 @@ namespace Majorsilence.Forms
 
         /// <summary>Raises the <see cref="DropDownOpening"/> event.</summary>
         protected virtual void OnDropDownShow (EventArgs e) => DropDownOpening?.Invoke (this, e);
+
+        internal bool PrepareHostedDropDown ()
+        {
+            if (HasDropDown && DropDown.RaiseOpeningCancelled ())
+                return false;
+            OnDropDownShow (EventArgs.Empty);
+            return true;
+        }
 
         /// <summary>Raises the <see cref="DropDownOpened"/> event.</summary>
         protected virtual void OnDropDownOpened (EventArgs e) => DropDownOpened?.Invoke (this, e);

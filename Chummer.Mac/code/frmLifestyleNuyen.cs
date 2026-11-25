@@ -3,7 +3,6 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Forms = Majorsilence.Forms;
 
 namespace Chummer;
@@ -56,23 +55,26 @@ internal sealed class StartingMoneyWindow : Window
     {
         this.roll = roll;
         Title = LanguageManager.Instance.GetString("Title_LifestyleNuyen");
-        Width = 500; MinWidth = 360; SizeToContent = SizeToContent.Height;
+        Width = 500; MinWidth = 260; MinHeight = 175; MaxHeight = 500; SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         NativeControlPresentation.AddTheme(Styles);
         RollInput = NativeIntegerInput.Create("startingMoneyRoll", roll.Minimum, roll.Maximum);
-        RollInput.Value = roll.Minimum; RollInput.HorizontalAlignment = HorizontalAlignment.Left;
+        RollInput.Value = roll.Minimum;
+        RollInput.ClearValue(NumericUpDown.WidthProperty);
         RollInput.ValueChanged += (_, _) => RefreshResult();
-        var layout = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
+        var layout = new StackPanel { Spacing = 10 };
         layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_LifestyleNuyen_Description"), TextWrapping = Avalonia.Media.TextWrapping.Wrap });
-        layout.Children.Add(new TextBlock { Text = LanguageManager.Instance.GetString("Label_LifestyleNuyen_ResultOf") + " " + roll.Dice + "D6:" });
+        var caption = new TextBlock { Text = LanguageManager.Instance.GetString("Label_LifestyleNuyen_ResultOf") + " " + roll.Dice + "D6:",
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        Avalonia.Automation.AutomationProperties.SetLabeledBy(RollInput, caption);
+        layout.Children.Add(caption);
         layout.Children.Add(RollInput); layout.Children.Add(ResultText);
         ResultText.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
         var cancel = new Button { Content = LanguageManager.Instance.GetString("String_Cancel"), IsCancel = true };
         cancel.Click += (_, _) => Close();
         var accept = new Button { Content = LanguageManager.Instance.GetString("String_OK"), IsDefault = true };
         accept.Click += (_, _) => Accept();
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 10 };
-        buttons.Children.Add(cancel); buttons.Children.Add(accept); layout.Children.Add(buttons); Content = layout;
+        Content = NativeControlPresentation.CreatePromptLayout(layout, cancel, accept);
         Opened += (_, _) => RollInput.Focus(); RefreshResult();
     }
     private void RefreshResult() => ResultText.Text = "(" + (RollInput.Value ?? RollInput.Minimum) + " + " + roll.Extra + ") × " + roll.Multiplier + " = " + string.Format(GlobalOptions.Instance.CultureInfo, "{0:###,###,##0¥}", Amount);

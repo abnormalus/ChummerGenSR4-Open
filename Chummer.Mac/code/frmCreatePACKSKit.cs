@@ -23,6 +23,11 @@ namespace Chummer
 			LanguageManager.Instance.Load(GlobalOptions.Instance.Language, this);
 			_objCharacter = objCharacter;
 			MoveControls();
+            Load += (_, _) => NativeCreationFormLayout.Attach(this, "NativePACKSCreation",
+                [(lblNameLabel, txtName, "NativePACKSName"), (lblFileNameLabel, txtFileName, "NativePACKSFile")],
+                cmdCancel, cmdOK, new System.Drawing.Size(420, 540),
+                [chkAttributes, chkQualities, chkStartingNuyen, chkActiveSkills, chkKnowledgeSkills, chkMartialArts,
+                    chkSpells, chkComplexForms, chkCyberware, chkLifestyle, chkArmor, chkWeapons, chkGear, chkVehicles]);
 		}
 
 		private void cmdOK_Click(object sender, EventArgs e)
@@ -743,7 +748,7 @@ namespace Chummer
 			objWriter.Close();
 			objStream.Close();
 
-			MessageBox.Show(LanguageManager.Instance.GetString("Message_CreatePACKSKit_SuiteCreated").Replace("{0}", txtName.Text), LanguageManager.Instance.GetString("MessageTitle_CreatePACKSKit_SuiteCreated"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show(this, LanguageManager.Instance.GetString("Message_CreatePACKSKit_SuiteCreated").Replace("{0}", txtName.Text), LanguageManager.Instance.GetString("MessageTitle_CreatePACKSKit_SuiteCreated"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 			this.DialogResult = DialogResult.OK;
 		}
 

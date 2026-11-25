@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Drawing;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -17,27 +16,39 @@ public partial class frmCreate
         ? _objFunctions.FindLifestyle(node.Tag.ToString(), _objCharacter.Lifestyles)
         : null;
 
-    private void InitializeCreationLifestyleMonths()
+    private Grid CreateLifestyleMonths()
     {
-        if (Avalonia.Application.Current == null || IsDisposed) return;
-
         var binding = new NativeInlineNumericBinding(nudLifestyleMonths, tipTooltip, wholeNumbers: true,
             available: () => SelectedLifestyle() != null);
-        binding.Input.Width = 90;
+        binding.Input.ClearValue(Layoutable.WidthProperty);
+        binding.Input.ClearValue(NumericUpDown.FontSizeProperty);
         var caption = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
-        var total = new TextBlock { Name = "nativeLifestyleTotalCost", VerticalAlignment = VerticalAlignment.Center };
+        var total = new TextBlock { Name = "nativeLifestyleTotalCost", VerticalAlignment = VerticalAlignment.Center, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
         foreach (TextBlock label in new[] { caption, total })
-        {
-            label.FontSize = 12;
             label.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("SystemControlForegroundBaseHighBrush"));
+        var row = new Grid { Name = "NativeLifestyleMonths", ColumnSpacing = 6, RowSpacing = 4,
+            Children = { binding.Input, caption, total } };
+        void Reflow()
+        {
+            bool stacked = row.Bounds.Width < Math.Max(290, binding.Input.FontSize * 20);
+            row.ColumnDefinitions = new ColumnDefinitions(stacked ? "*" : "2*,2*,3*");
+            if (!stacked) row.ColumnDefinitions[0].MinWidth = 104;
+            row.RowDefinitions = new RowDefinitions(stacked ? "Auto,Auto,Auto" : "Auto");
+            Grid.SetRow(binding.Input, stacked ? 1 : 0);
+            Grid.SetRow(caption, 0);
+            Grid.SetColumn(caption, stacked ? 0 : 1);
+            Grid.SetRow(total, stacked ? 2 : 0);
+            Grid.SetColumn(total, stacked ? 0 : 2);
         }
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 6, ClipToBounds = true };
-        Grid.SetColumn(caption, 1);
-        Grid.SetColumn(total, 2);
-        row.Children.Add(binding.Input);
-        row.Children.Add(caption);
-        row.Children.Add(total);
-        NativeControlPresentation.AddTheme(row.Styles);
+        row.SizeChanged += (_, args) =>
+        {
+            if (args.NewSize.Width != args.PreviousSize.Width) Reflow();
+        };
+        row.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == Avalonia.Controls.Documents.TextElement.FontSizeProperty) Reflow();
+        };
+        Reflow();
         AutomationProperties.SetLabeledBy(binding.Input, caption);
 
         void SyncCaption(object? sender, EventArgs args) => caption.Text = lblLifestyleMonthsLabel.Text;
@@ -51,12 +62,8 @@ public partial class frmCreate
         tabLifestyle.Controls.Remove(lblLifestyleMonthsLabel);
         tabLifestyle.Controls.Remove(lblLifestyleTotalCost);
         binding.Refresh();
-        var presenter = new CreationRegionPresenter(this, tabLifestyle, row, "nativeCreationLifestyleMonths",
-            () => new Rectangle(nudLifestyleMonths.Left, nudLifestyleMonths.Top,
-                Math.Max(0, tabLifestyle.ClientSize.Width - nudLifestyleMonths.Left - 6), 32));
         Disposed += (_, _) =>
         {
-            presenter.Dispose();
             binding.Dispose();
             lblLifestyleMonthsLabel.TextChanged -= SyncCaption;
             lblLifestyleTotalCost.TextChanged -= SyncTotal;
@@ -64,5 +71,6 @@ public partial class frmCreate
             lblLifestyleMonthsLabel.Dispose();
             lblLifestyleTotalCost.Dispose();
         };
+        return row;
     }
 }

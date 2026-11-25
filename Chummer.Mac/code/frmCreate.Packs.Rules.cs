@@ -317,17 +317,17 @@ public partial class frmCreate
 				if (objXmlKit["selectmartialart"].Attributes["rating"] != null)
 					intRating = Convert.ToInt32(objXmlKit["selectmartialart"].Attributes["rating"].InnerText);
 
-				frmSelectMartialArt frmPickMartialArt = new frmSelectMartialArt(_objCharacter);
-				frmPickMartialArt.ForcedValue = strForcedValue;
-				frmPickMartialArt.ShowDialog(_packsPromptOwner ?? this);
-                if (frmPickMartialArt.DialogResult != DialogResult.OK) throw new OperationCanceledException();
+				using var frmPickMartialArt = new MartialArtDetailPicker(_objCharacter, MartialArtDetailPicker.Kind.Art);
+				frmPickMartialArt.ForcedArt = strForcedValue;
+				var martialArtResult = frmPickMartialArt.ShowDialog(_packsPromptOwner ?? this);
+                if (martialArtResult != DialogResult.OK) throw new OperationCanceledException();
 
-				if (frmPickMartialArt.DialogResult != DialogResult.Cancel)
+				if (martialArtResult != DialogResult.Cancel)
 				{
 					// Open the Martial Arts XML file and locate the selected piece.
 					XmlDocument objXmlMartialArtDocument = XmlManager.Instance.Load("martialarts.xml");
 
-					XmlNode objXmlArt = RequirePacksEntry(objXmlMartialArtDocument.SelectSingleNode("/chummer/martialarts/martialart[name = \"" + frmPickMartialArt.SelectedMartialArt + "\"]"));
+					XmlNode objXmlArt = RequirePacksEntry(objXmlMartialArtDocument.SelectSingleNode("/chummer/martialarts/martialart[name = \"" + frmPickMartialArt.SelectedItem + "\"]"));
 
 					TreeNode objNode = new TreeNode();
 					MartialArt objMartialArt = new MartialArt(_objCharacter);
@@ -795,15 +795,9 @@ public partial class frmCreate
                 AppDiagnostics.Record("packs.phase-weapons");
 				XmlDocument objXmlWeaponDocument = XmlManager.Instance.Load("weapons.xml");
 
-				pgbProgress.Visible = true;
-				pgbProgress.Value = 0;
-				pgbProgress.Maximum = objXmlKit.SelectNodes("weapons/weapon").Count;
-				int i = 0;
 				foreach (XmlNode objXmlWeapon in objXmlKit.SelectNodes("weapons/weapon"))
 				{
 					await work.StepAsync();
-					i++;
-					pgbProgress.Value = i;
 					await work.CheckpointAsync();
 
 					XmlNode objXmlWeaponNode = RequirePacksEntry(objXmlWeaponDocument.SelectSingleNode("/chummer/weapons/weapon[name = \"" + objXmlWeapon["name"].InnerText + "\"]"));
@@ -890,15 +884,9 @@ public partial class frmCreate
 				XmlDocument objXmlCyberwareDocument = XmlManager.Instance.Load("cyberware.xml");
 				XmlDocument objXmlGearDocument = XmlManager.Instance.Load("gear.xml");
 
-				pgbProgress.Visible = true;
-				pgbProgress.Value = 0;
-				pgbProgress.Maximum = objXmlKit.SelectNodes("cyberwares/cyberware").Count;
-				int i = 0;
 				foreach (XmlNode objXmlCyberware in objXmlKit.SelectNodes("cyberwares/cyberware"))
 				{
 					await work.StepAsync();
-					i++;
-					pgbProgress.Value = i;
 					await work.CheckpointAsync();
 
 					List<Weapon> objWeapons = new List<Weapon>();
@@ -972,16 +960,10 @@ public partial class frmCreate
                 AppDiagnostics.Record("packs.phase-biowares");
 				XmlDocument objXmlBiowareDocument = XmlManager.Instance.Load("bioware.xml");
 
-				pgbProgress.Visible = true;
-				pgbProgress.Value = 0;
-				pgbProgress.Maximum = objXmlKit.SelectNodes("biowares/bioware").Count;
-				int i = 0;
 
 				foreach (XmlNode objXmlBioware in objXmlKit.SelectNodes("biowares/bioware"))
 				{
 					await work.StepAsync();
-					i++;
-					pgbProgress.Value = i;
 					await work.CheckpointAsync();
 
 					List<Weapon> objWeapons = new List<Weapon>();
@@ -1026,16 +1008,10 @@ public partial class frmCreate
                 AppDiagnostics.Record("packs.phase-gears");
 				XmlDocument objXmlGearDocument = XmlManager.Instance.Load("gear.xml");
 
-				pgbProgress.Visible = true;
-				pgbProgress.Value = 0;
-				pgbProgress.Maximum = objXmlKit.SelectNodes("gears/gear").Count;
-				int i = 0;
 
 				foreach (XmlNode objXmlGear in objXmlKit.SelectNodes("gears/gear"))
 				{
 					await work.StepAsync();
-					i++;
-					pgbProgress.Value = i;
 					await work.CheckpointAsync();
 
 					await AddPACKSGear(objXmlGearDocument, objXmlGear, treGear.Nodes[0], _objCharacter, cmsGear, blnCreateChildren);
@@ -1050,16 +1026,10 @@ public partial class frmCreate
                 AppDiagnostics.Record("packs.phase-vehicles");
 				XmlDocument objXmlVehicleDocument = XmlManager.Instance.Load("vehicles.xml");
 
-				pgbProgress.Visible = true;
-				pgbProgress.Value = 0;
-				pgbProgress.Maximum = objXmlKit.SelectNodes("vehicles/vehicle").Count;
-				int i = 0;
 
 				foreach (XmlNode objXmlVehicle in objXmlKit.SelectNodes("vehicles/vehicle"))
 				{
 					await work.StepAsync();
-					i++;
-					pgbProgress.Value = i;
 					await work.CheckpointAsync();
 
 					Gear objDefaultSensor = new Gear(_objCharacter);

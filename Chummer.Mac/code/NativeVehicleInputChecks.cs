@@ -28,12 +28,16 @@ internal static class NativeVehicleInputChecks
             var vehicleTab = Field<Forms.TabPage>("tabVehicles");
             tabs.SelectedTab = vehicleTab;
             await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var host = owner.Controls.OfType<Forms.NativeControlHost>().Single(item => item.Name == "nativeCreationVehicleInputs");
-            var panel = (StackPanel)host.NativeControl!;
-            var rating = (NumericUpDown)panel.Children[0];
-            var quantity = (NumericUpDown)panel.Children[1];
-            check(host.Visible && TopLevel.GetTopLevel(panel) != null && rating.Bounds.Width > 0 && quantity.Bounds.Width > 0 &&
-                !vehicleTab.Controls.OfType<Forms.NumericUpDown>().Any(), "The Vehicles tab presents both native spinners");
+            var host = owner.Controls.OfType<Forms.NativeControlHost>().Single(item => item.Name == "NativeCreationVehicles");
+            var layout = (Grid)((Grid)host.NativeControl!).Children[0];
+            var details = layout.Children.OfType<ScrollViewer>().Single();
+            var panel = (StackPanel)details.Content!;
+            var fields = panel.Children.OfType<WrapPanel>().SelectMany(row => row.Children).OfType<Grid>().ToArray();
+            var inputs = fields.SelectMany(field => field.Children).OfType<NumericUpDown>().ToArray();
+            var rating = inputs.Single(input => input.Name == "nativenudVehicleRating");
+            var quantity = inputs.Single(input => input.Name == "nativenudVehicleGearQty");
+            check(host.Visible && TopLevel.GetTopLevel(panel) != null && !panel.IsEffectivelyVisible &&
+                !vehicleTab.Controls.OfType<Forms.NumericUpDown>().Any(), "The Vehicles tab hides item details until a selection");
 
             var tree = Field<Forms.TreeView>("treVehicles");
             var vehicle = new Vehicle(character);
@@ -62,8 +66,25 @@ internal static class NativeVehicleInputChecks
             check(!rating.IsEnabled && !quantity.IsEnabled, "Selecting the vehicle disables item inputs");
 
             tree.SelectedNode = ratedNode;
-            check(rating.IsEnabled && rating.Maximum == 6 && rating.Value == 2 && quantity.IsEnabled && quantity.Value == 1,
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check(panel.IsEffectivelyVisible && rating.Bounds.Width > 0 && quantity.Bounds.Width > 0 &&
+                rating.IsEnabled && rating.Maximum == 6 && rating.Value == 2 && quantity.IsEnabled && quantity.Value == 1,
                 "Rated gear displays its catalog bounds and stored values");
+            var ratingField = fields.Single(field => field.Children.Contains(rating));
+            var ratingCaption = ratingField.Children.OfType<TextBlock>().Single();
+            var ratingController = Field<Forms.Label>("lblVehicleRatingLabel");
+            string originalRatingCaption = ratingController.Text;
+            details.Width = 145;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(details, rating.FontSize * 1.5);
+            ratingController.Text = "A translated vehicle equipment rating";
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check(Grid.GetRow(rating) == 1 && ratingCaption.Bounds.Bottom <= rating.Bounds.Top &&
+                rating.Bounds.Right <= ratingField.Bounds.Width + 1 && rating.FontSize == ratingCaption.FontSize,
+                "A long vehicle rating caption stacks above its input and inherits enlarged text at 145 logical pixels");
+            ratingController.Text = originalRatingCaption;
+            details.ClearValue(Control.WidthProperty);
+            details.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
+
             dirty.SetValue(editor, false);
             rating.Value = 9;
             check(rating.Value == 6 && rated.Rating == 6 && ratedNode.Text == rated.DisplayName && (bool)dirty.GetValue(editor)!,

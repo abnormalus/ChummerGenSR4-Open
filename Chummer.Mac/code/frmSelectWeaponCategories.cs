@@ -1,61 +1,106 @@
-using Majorsilence.Forms.Drawing;
+#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Drawing;
-using Majorsilence.Forms;
+using System.Linq;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Forms = Majorsilence.Forms;
 
+namespace Chummer;
 
-
-
-namespace Chummer
+public sealed class frmSelectWeaponCategories : IDisposable
 {
-	public class frmSelectWeaponCategories : Form
-	{
-		private readonly CheckedListBox _clbCategories = new CheckedListBox();
+    private readonly (string Name, string Value, bool Selected)[] categories;
+    private WeaponCategoriesWindow? window;
 
-		public frmSelectWeaponCategories(IEnumerable<ListItem> lstCategories, ICollection<string> setSelectedCategories)
-		{
-			Text = LanguageManager.Instance.GetString("Title_SelectWeaponCategories");
-			StartPosition = FormStartPosition.CenterParent;
-			MinimizeBox = false;
-			MaximizeBox = false;
-			ShowInTaskbar = false;
-			ClientSize = new Size(380, 440);
+    public frmSelectWeaponCategories(IEnumerable<ListItem> categories, ICollection<string> selectedCategories)
+    {
+        this.categories = categories.Select(item => (item.Name, item.Value, selectedCategories.Contains(item.Value))).ToArray();
+    }
 
-			_clbCategories.CheckOnClick = true;
-			_clbCategories.DisplayMember = "Name";
-			_clbCategories.ValueMember = "Value";
-			_clbCategories.Location = new Point(12, 12);
-			_clbCategories.Size = new Size(356, 380);
-			_clbCategories.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-			foreach (ListItem objItem in lstCategories)
-				_clbCategories.Items.Add(objItem, setSelectedCategories.Contains(objItem.Value));
-			Controls.Add(_clbCategories);
+    public IEnumerable<string> SelectedCategories { get; private set; } = [];
 
-			Button cmdOK = new Button();
-			cmdOK.Text = LanguageManager.Instance.GetString("String_OK");
-			cmdOK.DialogResult = DialogResult.OK;
-			cmdOK.Location = new Point(212, 405);
-			cmdOK.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-			Controls.Add(cmdOK);
-			AcceptButton = cmdOK;
+    public Forms.DialogResult ShowDialog(Forms.Form owner)
+    {
+        var pending = ShowDialogAsync(owner);
+        Forms.Backends.Platform.Backend.RunModalLoop(pending);
+        return pending.GetAwaiter().GetResult();
+    }
 
-			Button cmdCancel = new Button();
-			cmdCancel.Text = LanguageManager.Instance.GetString("String_Cancel");
-			cmdCancel.DialogResult = DialogResult.Cancel;
-			cmdCancel.Location = new Point(293, 405);
-			cmdCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-			Controls.Add(cmdCancel);
-			CancelButton = cmdCancel;
-		}
+    internal async Task<Forms.DialogResult> ShowDialogAsync(Forms.Form owner)
+    {
+        if (window != null)
+            throw new InvalidOperationException("Weapon category selection is already open.");
 
-		public IEnumerable<string> SelectedCategories
-		{
-			get
-			{
-				foreach (ListItem objItem in _clbCategories.CheckedItems)
-					yield return objItem.Value;
-			}
-		}
-	}
+        SelectedCategories = [];
+        window = new WeaponCategoriesWindow(categories);
+        try
+        {
+            var result = await NativeDialogHost.ShowAsync<string[]>(window, owner);
+            SelectedCategories = result ?? [];
+            return result == null ? Forms.DialogResult.Cancel : Forms.DialogResult.OK;
+        }
+        finally
+        {
+            window = null;
+        }
+    }
+
+    public void Dispose() => window?.Close();
+}
+
+internal sealed class WeaponCategoriesWindow : Window
+{
+    internal StackPanel Options { get; } = new() { Spacing = 4 };
+    internal Button AcceptButton { get; }
+    internal Button CancelButton { get; }
+
+    internal WeaponCategoriesWindow(IEnumerable<(string Name, string Value, bool Selected)> categories)
+    {
+        var language = LanguageManager.Instance;
+        Title = language.GetString("Title_SelectWeaponCategories");
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ShowInTaskbar = false;
+        Width = 380;
+        Height = 440;
+        MinWidth = 250;
+        MinHeight = 200;
+        NativeControlPresentation.AddTheme(Styles);
+
+        foreach (var (name, value, selected) in categories)
+        {
+            Options.Children.Add(new CheckBox
+            {
+                Tag = value,
+                IsChecked = selected,
+                Content = new TextBlock { Text = name, TextWrapping = TextWrapping.Wrap }
+            });
+        }
+
+        AcceptButton = new Button { Content = language.GetString("String_OK"), IsDefault = true };
+        AcceptButton.Click += (_, _) => Close(Options.Children.OfType<CheckBox>()
+            .Where(option => option.IsChecked == true).Select(option => (string)option.Tag!).ToArray());
+        CancelButton = new Button { Content = language.GetString("String_Cancel"), IsCancel = true };
+        CancelButton.Click += (_, _) => Close();
+
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, ItemSpacing = 8, LineSpacing = 4 };
+        actions.Children.Add(AcceptButton);
+        actions.Children.Add(CancelButton);
+        var list = new ScrollViewer
+        {
+            Content = Options,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            AllowAutoHide = false
+        };
+        var layout = new Grid { Margin = new Thickness(12), RowDefinitions = new RowDefinitions("*,Auto"), RowSpacing = 10 };
+        layout.Children.Add(list);
+        Grid.SetRow(actions, 1);
+        layout.Children.Add(actions);
+        Content = layout;
+    }
 }
