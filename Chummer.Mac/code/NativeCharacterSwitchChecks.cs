@@ -44,8 +44,12 @@ internal static class NativeCharacterSwitchChecks
             "Workspace presents its native toolbar and the platform-appropriate menu surface");
 
         var openLocal = Field<ToolStripButton>(main, "openToolStripButton");
-        var gitHub = nativeToolbar.Children.OfType<Avalonia.Controls.Button>().Single(button =>
-            button.Tag is ToolStripButton { Name: "openGitHubToolStripButton" });
+        var gitHubCommand = legacyToolbar.Items.OfType<ToolStripButton>()
+            .Single(button => button.Name == "openGitHubToolStripButton");
+        Avalonia.Controls.Button GitHubButton() => ((Avalonia.Controls.WrapPanel)((Avalonia.Controls.Border)
+            toolbarProjection.NativeControl!).Child!).Children.OfType<Avalonia.Controls.Button>()
+            .Single(button => ReferenceEquals(button.Tag, gitHubCommand));
+        var gitHub = GitHubButton();
         check(gitHub.IsEnabled && nativeToolbar.Children.IndexOf(gitHub) == nativeToolbar.Children.IndexOf(
                 nativeToolbar.Children.OfType<Avalonia.Controls.Button>().Single(button => ReferenceEquals(button.Tag, openLocal))) + 1,
             "Workspace keeps Open from GitHub available beside Open");
@@ -68,9 +72,27 @@ internal static class NativeCharacterSwitchChecks
             verifyPosition.Value.Y + verify.Bounds.Height <= setupScroll.Viewport.Height + 1 && setupScroll.Offset.Y > 0,
             $"Narrow repository setup scrolls to the verification command at 150% text [position={verifyPosition}, command={verify.Bounds}, viewport={setupScroll.Viewport}, offset={setupScroll.Offset}, scroll={setupScroll.Bounds}, window={repositorySetup.ClientSize}, extent={setupScroll.Extent}, presenter={setupScroll.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ScrollContentPresenter>().FirstOrDefault()?.Bounds}]");
         repositorySetup.Close();
-        await Task.Delay(60);
-        check(gitHub.IsEnabled && NativeDialogHost.ActiveWindow == null,
+        await WaitForRepositoryToolbarAsync();
+        var reopenedButton = GitHubButton();
+        check(main.Enabled && main.ToAvaloniaWindow().IsEnabled && gitHubCommand.Enabled &&
+            reopenedButton.IsEffectivelyEnabled && Avalonia.Controls.TopLevel.GetTopLevel(reopenedButton) != null && NativeDialogHost.ActiveWindow == null,
             "Cancelling repository setup restores the workspace toolbar");
+        reopenedButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+        var reopenedSetup = NativeDialogHost.ActiveWindow;
+        check(reopenedSetup != null && !ReferenceEquals(reopenedSetup, repositorySetup),
+            "The live repository toolbar command can reopen setup after cancellation");
+        reopenedSetup!.Close();
+        await WaitForRepositoryToolbarAsync();
+
+        async Task WaitForRepositoryToolbarAsync()
+        {
+            for (int attempt = 0; attempt < 100; attempt++)
+            {
+                if (NativeDialogHost.ActiveWindow == null && gitHubCommand.Enabled && GitHubButton().IsEffectivelyEnabled)
+                    return;
+                await Task.Delay(20);
+            }
+        }
 
         int menuInvocations = 0, toolInvocations = 0;
         var testMenu = new ToolStripMenuItem("&Synthetic menu") { ShortcutKeys = Keys.Control | Keys.F9 };
