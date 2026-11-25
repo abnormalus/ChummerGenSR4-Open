@@ -117,7 +117,12 @@ namespace Chummer
 
             try
             {
-                string installedPath = Path.GetFullPath(Uri.UnescapeDataString(relative), Application.StartupPath);
+                // Older builds prefixed every URI with "../", including absolute file
+                // URIs produced by MakeRelativeUri when the target was on another drive.
+                string link = relative.StartsWith("../file:", StringComparison.OrdinalIgnoreCase) ? relative[3..] : relative;
+                string installedPath = Uri.TryCreate(link, UriKind.Absolute, out var fileUri) && fileUri.IsFile
+                    ? fileUri.LocalPath
+                    : Path.GetFullPath(Uri.UnescapeDataString(relative), Application.StartupPath);
                 if (File.Exists(installedPath))
                     return installedPath;
 
@@ -158,9 +163,10 @@ namespace Chummer
             if (!pet.Load(false))
                 throw new InvalidDataException("Unable to read the selected character.");
 
-            var relativePath = new Uri(Application.StartupPath).MakeRelativeUri(new Uri(fullPath));
+            var directory = new Uri(Path.TrimEndingDirectorySeparator(Application.StartupPath) + Path.DirectorySeparatorChar);
+            var relativePath = directory.MakeRelativeUri(new Uri(fullPath));
             _objContact.FileName = fullPath;
-            _objContact.RelativeFileName = "../" + relativePath;
+            _objContact.RelativeFileName = relativePath.ToString();
             lblMetatype.Text = FormatMetatype(pet);
             tipTooltip.SetToolTip(imgLink, LanguageManager.Instance.GetString("Tip_Contact_OpenFile"));
             FileNameChanged?.Invoke(this);
