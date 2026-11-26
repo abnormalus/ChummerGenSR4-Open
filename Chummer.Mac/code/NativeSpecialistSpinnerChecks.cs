@@ -167,13 +167,25 @@ internal static class NativeSpecialistSpinnerChecks
         await CheckDialog(new frmCreateImprovement(character), async dialog =>
         {
             dialog.ClientSize = new System.Drawing.Size(270, 210);
-            var layout = (Grid)((Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!).Child!;
+            var surface = (Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!;
+            var layout = (Grid)surface.Child!;
             var scroll = (ScrollViewer)layout.Children[0];
             var source = Field<Forms.NumericUpDown>(dialog, "nudVal");
+            var value = Input(dialog, "nudVal");
             source.Visible = true;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, value.FontSize * 1.5);
+            for (int attempt = 0; attempt < 50 && (surface.Bounds.Width > 271 || surface.Bounds.Height > 211); attempt++)
+                await Task.Delay(20);
             await Idle();
-            check(scroll.Extent.Height > scroll.Viewport.Height && scroll.Bounds.Bottom <= layout.Children[1].Bounds.Top,
-                "Narrow improvement creation scrolls its fields above the confirmation row");
+            value.BringIntoView();
+            await Idle();
+            var position = value.TranslatePoint(default, scroll);
+            check(surface.Bounds.Width is > 0 and <= 271 && surface.Bounds.Height is > 0 and <= 211 &&
+                scroll.Extent.Height > scroll.Viewport.Height && scroll.Bounds.Bottom <= layout.Children[1].Bounds.Top &&
+                value.IsEffectivelyVisible && position is { } point && point.Y >= -1 &&
+                point.Y + value.Bounds.Height <= scroll.Viewport.Height + 1,
+                $"Narrow improvement creation scrolls its fields above the confirmation row [host={surface.Bounds}, extent={scroll.Extent}, viewport={scroll.Viewport}, value={position}/{value.Bounds}]");
+            layout.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
             source.Visible = false;
             await Idle();
             check(Input(dialog, "nudVal").Parent is StackPanel { IsVisible: false },
