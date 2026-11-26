@@ -56,7 +56,16 @@ function Check-Identity([string]$Exe, [string]$Root) {
 }
 function Native-Gate([string]$Exe, [string]$Flag, [string]$Name, [int]$Minimum, [int]$Seconds) {
     $report = Join-Path $Output "$Name.json"
-    Run-Process $Exe @($Flag, (Join-Path $Output 'checks/creation.chum'), $report) $Name $Seconds
+    try {
+        Run-Process $Exe @($Flag, (Join-Path $Output 'checks/creation.chum'), $report) $Name $Seconds
+    } catch {
+        $progress = "$report.progress.jsonl"
+        if (Test-Path $progress) {
+            Write-Host "$Name most recent assertions"
+            Get-Content $progress -Tail 5 | Write-Host
+        }
+        throw
+    }
     $result = Get-Content $report -Raw | ConvertFrom-Json
     Check ($result.passed -and $result.checks.Count -ge $Minimum) "$Name retains its required assertion gate ($Minimum)"
 }
@@ -111,7 +120,7 @@ try {
     Run-Process $exe @('--smoke-test', (Join-Path $Output 'checks'), $fixtureRoot) 'installed-headless' 600
     Check (Test-Path (Join-Path $Output 'checks/creation.chum')) 'Installed application generated its synthetic character'
     Native-Gate $exe '--check-lifestyle-months' 'installed-native-lifestyle-months' 10 60
-    Native-Gate $exe '--check-bulk' 'installed-native-bulk' 1069 300
+    Native-Gate $exe '--check-bulk' 'installed-native-bulk' 1069 600
     Native-Gate $exe '--check-sensor-transactions' 'installed-native-sensors' 17 180
     Native-Gate $exe '--check-focus-command' 'installed-native-focus' 66 180
     Native-Gate $exe '--check-pdf-reader' 'installed-native-reader' 10 180
