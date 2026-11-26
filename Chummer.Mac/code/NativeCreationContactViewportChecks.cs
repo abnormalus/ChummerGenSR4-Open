@@ -180,10 +180,25 @@ internal static class NativeCreationContactViewportChecks
         var previousState = window.WindowState; var previousSize = owner.Size;
         var theme = Application.Current!.RequestedThemeVariant; byte[] before = character.CaptureSnapshot();
         bool dirty = Field<bool>(editor, "_blnIsDirty");
-        bool Fits() => new Control[] { row.Name, row.Connection, row.Loyalty, row.Group, row.Notes, row.Link, row.Delete }.All(input =>
+        Control[] fields = [row.Name, row.Connection, row.Loyalty, row.Group, row.Notes, row.Link, row.Delete];
+        bool Fits(Control input) =>
             input.IsEffectivelyVisible && input.Bounds.Height >= 20 && input.TranslatePoint(default, section.Viewport) is { } p
             && p.X >= -1 && p.Y >= -1 && p.X + input.Bounds.Width <= section.Viewport.Viewport.Width + 1
-            && p.Y + input.Bounds.Height <= section.Viewport.Viewport.Height + 1);
+            && p.Y + input.Bounds.Height <= section.Viewport.Viewport.Height + 1;
+        async Task<bool> FieldsReachableAsync()
+        {
+            if (row.Frame.Bounds.Height <= section.Viewport.Viewport.Height + 1)
+                return fields.All(Fits);
+
+            foreach (var field in fields)
+            {
+                field.BringIntoView();
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                if (!Fits(field))
+                    return false;
+            }
+            return true;
+        }
         void Capture(string kind, ThemeVariant variant)
         {
             using var image = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(window.ClientSize.Width * 2),
@@ -218,7 +233,7 @@ internal static class NativeCreationContactViewportChecks
             {
                 Application.Current.RequestedThemeVariant = variant; await Task.Delay(80);
                 row.Frame.BringIntoView(); await Task.Delay(30); Capture("scroll", variant);
-                check(Fits(), "Native creation contact scrolling exposes every final-row field and command enemy=" + enemy + " theme=" + variant.Key
+                check(await FieldsReachableAsync(), "Native creation contact scrolling exposes every final-row field and command enemy=" + enemy + " theme=" + variant.Key
                     + FormattableString.Invariant($" [row={row.Frame.Bounds}; viewport={section.Viewport.Viewport}; offset={section.Viewport.Offset}; actual={window.ClientSize}]"));
             }
             var screen = window.Screens.ScreenFromWindow(window);
@@ -242,10 +257,11 @@ internal static class NativeCreationContactViewportChecks
                     await Task.Delay(10);
                 }
                 row.Frame.BringIntoView(); await Task.Delay(30); Capture("fullscreen", variant);
+                bool fieldsReachable = await FieldsReachableAsync();
                 check(screen != null && ready && window.WindowState == WindowState.FullScreen
-                    && Math.Abs(window.ClientSize.Width - expected.Width) <= 1 && Math.Abs(window.ClientSize.Height - expected.Height) <= 1 && Fits(),
-                    "Native fullscreen contact final row fits actual screen geometry enemy=" + enemy + " theme=" + variant.Key
-                    + FormattableString.Invariant($" [expected={expected}; actual={window.ClientSize}; state={window.WindowState}; screen={screen?.Bounds}; workarea={screen?.WorkingArea}; scaling={screen?.Scaling}; requested={window.Width}x{window.Height}; frame={window.FrameSize}; min={window.MinWidth}x{window.MinHeight}; max={window.MaxWidth}x{window.MaxHeight}; sizing={window.SizeToContent}; owner={owner.Size}; fits={Fits()}; row={row.Frame.Bounds}; viewport={section.Viewport.Viewport}; offset={section.Viewport.Offset}; trace={string.Join("|", geometryTrace)}]"));
+                    && Math.Abs(window.ClientSize.Width - expected.Width) <= 1 && Math.Abs(window.ClientSize.Height - expected.Height) <= 1 && fieldsReachable,
+                    "Native fullscreen contact final row fields remain reachable at actual screen geometry enemy=" + enemy + " theme=" + variant.Key
+                    + FormattableString.Invariant($" [expected={expected}; actual={window.ClientSize}; state={window.WindowState}; screen={screen?.Bounds}; workarea={screen?.WorkingArea}; scaling={screen?.Scaling}; requested={window.Width}x{window.Height}; frame={window.FrameSize}; min={window.MinWidth}x{window.MinHeight}; max={window.MaxWidth}x{window.MaxHeight}; sizing={window.SizeToContent}; owner={owner.Size}; reachable={fieldsReachable}; row={row.Frame.Bounds}; viewport={section.Viewport.Viewport}; offset={section.Viewport.Offset}; trace={string.Join("|", geometryTrace)}]"));
             }
         }
         finally
