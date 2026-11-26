@@ -74,6 +74,7 @@ public partial class frmSelectText
             HorizontalAlignment = HorizontalAlignment.Right, ItemSpacing = 8, LineSpacing = 4,
             Children = { Command(cmdCancel, cmdCancel.Text), Command(cmdOK, cmdOK.Text) }
         };
+        NativeControlPresentation.ConstrainWrapItems(actions);
         var layout = new Grid { Margin = new Thickness(12), RowDefinitions = new RowDefinitions("*,Auto"), RowSpacing = 10 };
         layout.Children.Add(scroll);
         Grid.SetRow(actions, 1);
@@ -99,14 +100,29 @@ public partial class frmSelectText
                 controller.Dispose();
         };
 
-        static Button Command(Forms.Button controller, string caption)
+        Button Command(Forms.Button controller, string caption)
         {
+            var label = Label(caption);
+            label.MaxLines = 3;
+            label.TextTrimming = TextTrimming.CharacterEllipsis;
             var command = new Button
             {
-                Name = "Native" + controller.Name, Content = Label(caption),
+                Name = "Native" + controller.Name, Content = label,
                 HorizontalAlignment = HorizontalAlignment.Left
             };
-            AutomationProperties.SetName(command, caption);
+            void SetCaption(string text)
+            {
+                label.Text = text;
+                AutomationProperties.SetName(command, text);
+                ToolTip.SetTip(command, text);
+            }
+            SetCaption(caption);
+            if (controller == cmdOK || controller == cmdCancel)
+            {
+                void RefreshCaption(object? sender, EventArgs args) => SetCaption(controller.Text);
+                controller.TextChanged += RefreshCaption;
+                Disposed += (_, _) => controller.TextChanged -= RefreshCaption;
+            }
             command.Click += (_, _) => controller.PerformClick();
             return command;
         }

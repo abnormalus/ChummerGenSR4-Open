@@ -294,6 +294,7 @@ internal static class NativeEditorLayoutChecks
                         await Idle();
                         var text = (TextBlock)addQualityView.Content!;
                         check(text.FontSize == enlarged && text.Text == addQuality.Text && text.Bounds.Height > enlarged * 2 &&
+                            text.TextLayout.TextLines.Count <= 3 && Equals(ToolTip.GetTip(addQualityView), text.Text) &&
                             addQualityView.Bounds.Right <= qualityActions.Bounds.Width + 1 &&
                             qualityActions.Bounds.Bottom <= qualityTree.Bounds.Top && qualityTree.Bounds.Height > 40,
                             Label($"Top-left Common quality toolbar wraps without covering the tree [text={text.Bounds}, button={addQualityView.Bounds}, toolbar={qualityActions.Bounds}, tree={qualityTree.Bounds}]"));
@@ -939,6 +940,12 @@ internal static class NativeEditorLayoutChecks
                         firstPet.FileName = System.IO.Path.Combine(petFiles.FullName, "moved pet.chum");
                         check(petController.ResolveLinkedCharacter() == linkedPath,
                             Label("Pet links resolve an escaped relative path when the absolute path is stale"));
+                        firstPet.RelativeFileName = linkedPath.Replace(" ", "%20", StringComparison.Ordinal);
+                        check(petController.ResolveLinkedCharacter() == linkedPath,
+                            Label("Pet links decode spaces in rooted paths"));
+                        firstPet.RelativeFileName = "../" + new Uri(linkedPath).AbsoluteUri;
+                        check(petController.ResolveLinkedCharacter() == linkedPath,
+                            Label("Pet links recover an escaped file URI stored by earlier versions for a different drive"));
                         firstPet.RelativeFileName = "";
                         check(petController.ResolveLinkedCharacter() == null,
                             Label("A missing pet link has no resolved character and leaves the pet editable"));

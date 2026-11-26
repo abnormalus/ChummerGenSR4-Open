@@ -44,8 +44,12 @@ internal static class NativeCharacterSwitchChecks
             "Workspace presents its native toolbar and the platform-appropriate menu surface");
 
         var openLocal = Field<ToolStripButton>(main, "openToolStripButton");
-        var gitHub = nativeToolbar.Children.OfType<Avalonia.Controls.Button>().Single(button =>
-            button.Tag is ToolStripButton { Name: "openGitHubToolStripButton" });
+        var gitHubCommand = legacyToolbar.Items.OfType<ToolStripButton>()
+            .Single(button => button.Name == "openGitHubToolStripButton");
+        Avalonia.Controls.Button GitHubButton() => ((Avalonia.Controls.WrapPanel)((Avalonia.Controls.Border)
+            toolbarProjection.NativeControl!).Child!).Children.OfType<Avalonia.Controls.Button>()
+            .Single(button => ReferenceEquals(button.Tag, gitHubCommand));
+        var gitHub = GitHubButton();
         check(gitHub.IsEnabled && nativeToolbar.Children.IndexOf(gitHub) == nativeToolbar.Children.IndexOf(
                 nativeToolbar.Children.OfType<Avalonia.Controls.Button>().Single(button => ReferenceEquals(button.Tag, openLocal))) + 1,
             "Workspace keeps Open from GitHub available beside Open");
@@ -68,9 +72,27 @@ internal static class NativeCharacterSwitchChecks
             verifyPosition.Value.Y + verify.Bounds.Height <= setupScroll.Viewport.Height + 1 && setupScroll.Offset.Y > 0,
             $"Narrow repository setup scrolls to the verification command at 150% text [position={verifyPosition}, command={verify.Bounds}, viewport={setupScroll.Viewport}, offset={setupScroll.Offset}, scroll={setupScroll.Bounds}, window={repositorySetup.ClientSize}, extent={setupScroll.Extent}, presenter={setupScroll.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ScrollContentPresenter>().FirstOrDefault()?.Bounds}]");
         repositorySetup.Close();
-        await Task.Delay(60);
-        check(gitHub.IsEnabled && NativeDialogHost.ActiveWindow == null,
+        await WaitForRepositoryToolbarAsync();
+        var reopenedButton = GitHubButton();
+        check(main.Enabled && main.ToAvaloniaWindow().IsEnabled && gitHubCommand.Enabled &&
+            reopenedButton.IsEffectivelyEnabled && Avalonia.Controls.TopLevel.GetTopLevel(reopenedButton) != null && NativeDialogHost.ActiveWindow == null,
             "Cancelling repository setup restores the workspace toolbar");
+        reopenedButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+        var reopenedSetup = NativeDialogHost.ActiveWindow;
+        check(reopenedSetup != null && !ReferenceEquals(reopenedSetup, repositorySetup),
+            "The live repository toolbar command can reopen setup after cancellation");
+        reopenedSetup!.Close();
+        await WaitForRepositoryToolbarAsync();
+
+        async Task WaitForRepositoryToolbarAsync()
+        {
+            for (int attempt = 0; attempt < 100; attempt++)
+            {
+                if (NativeDialogHost.ActiveWindow == null && gitHubCommand.Enabled && GitHubButton().IsEffectivelyEnabled)
+                    return;
+                await Task.Delay(20);
+            }
+        }
 
         int menuInvocations = 0, toolInvocations = 0;
         var testMenu = new ToolStripMenuItem("&Synthetic menu") { ShortcutKeys = Keys.Control | Keys.F9 };
@@ -148,6 +170,8 @@ internal static class NativeCharacterSwitchChecks
             check(!nativeEntry.IsEnabled && !nativeButton.IsEnabled && menuInvocations == 1 && toolInvocations == 1,
                 "Disabled workspace commands update immediately and reject queued clicks");
             fileHeader.IsSubMenuOpen = false;
+            await WaitForToolbarLayoutAsync(() => Math.Abs(toolbarProjection.Width - normalWorkspace.Width) <= 1 &&
+                Math.Abs(nativeToolbar.Bounds.Height - toolbarProjection.Height) <= 1);
             int originalToolbarHeight = toolbarProjection.Height;
             var extraTools = Enumerable.Range(1, 14).Select(index => new ToolStripButton
             {
@@ -157,20 +181,28 @@ internal static class NativeCharacterSwitchChecks
             {
                 foreach (var item in extraTools)
                     legacyToolbar.Items.Add(item);
-                await Task.Delay(60);
-                var wrapped = nativeToolbar.Children.OfType<Avalonia.Controls.Button>()
+                Avalonia.Controls.Button[] ExtraButtons() => nativeToolbar.Children.OfType<Avalonia.Controls.Button>()
                     .Where(button => button.Tag is ToolStripButton item && extraTools.Contains(item)).ToArray();
-                check(wrapped.Length == extraTools.Length && wrapped.Select(button => button.Bounds.Top).Distinct().Count() > 1 &&
-                    toolbarProjection.Height > originalToolbarHeight &&
-                    wrapped.All(button => button.Bounds.Right <= toolbarProjection.Width && button.Bounds.Bottom <= toolbarProjection.Height),
-                    "Workspace toolbar wraps all commands into visible rows when they overflow");
+                bool WrappedButtonsFit()
+                {
+                    var buttons = ExtraButtons();
+                    return buttons.Length == extraTools.Length && buttons.Select(button => button.Bounds.Top).Distinct().Count() > 1 &&
+                        toolbarProjection.Height > originalToolbarHeight &&
+                        buttons.All(button => button.Bounds.Right <= toolbarProjection.Width + 1 &&
+                            button.Bounds.Bottom <= toolbarProjection.Height + 1);
+                }
+                await WaitForToolbarLayoutAsync(WrappedButtonsFit);
+                check(WrappedButtonsFit(),
+                    $"Workspace toolbar wraps all commands into visible rows when they overflow [host={toolbarProjection.Bounds}, toolbar={nativeToolbar.Bounds}, baseline={originalToolbarHeight}, buttons={ExtraButtons().Length}]");
+                var wrapped = ExtraButtons();
                 int wrappedHeight = toolbarProjection.Height;
                 double normalFont = wrapped[0].FontSize;
                 Avalonia.Controls.Documents.TextElement.SetFontSize(nativeToolbar, normalFont * 1.5);
-                await Task.Delay(60);
-                check(toolbarProjection.Height > wrappedHeight && wrapped[0].FontSize >= normalFont * 1.5 &&
-                    wrapped.All(button => button.Bounds.Right <= toolbarProjection.Width &&
-                        button.Bounds.Bottom <= toolbarProjection.Height),
+                bool EnlargedButtonsFit() => toolbarProjection.Height > wrappedHeight && wrapped[0].FontSize >= normalFont * 1.5 &&
+                    wrapped.All(button => button.Bounds.Right <= toolbarProjection.Width + 1 &&
+                        button.Bounds.Bottom <= toolbarProjection.Height + 1);
+                await WaitForToolbarLayoutAsync(EnlargedButtonsFit);
+                check(EnlargedButtonsFit(),
                     "Workspace toolbar remeasures and keeps every wrapped command visible at 150% text");
 
             }
@@ -182,9 +214,12 @@ internal static class NativeCharacterSwitchChecks
                     legacyToolbar.Items.Remove(item);
                     item.Dispose();
                 }
-                await Task.Delay(60);
             }
-            check(toolbarProjection.Height == originalToolbarHeight, "Workspace releases the extra toolbar rows when commands are removed");
+            bool ToolbarRestored() => Math.Abs(toolbarProjection.Height - originalToolbarHeight) <= 1 &&
+                !nativeToolbar.Children.OfType<Avalonia.Controls.Button>().Any(button =>
+                    button.Tag is ToolStripButton item && extraTools.Contains(item));
+            await WaitForToolbarLayoutAsync(ToolbarRestored);
+            check(ToolbarRestored(), $"Workspace releases the extra toolbar rows when commands are removed [host={toolbarProjection.Bounds}, toolbar={nativeToolbar.Bounds}, baseline={originalToolbarHeight}, window={main.ClientSize}]");
         }
         finally
         {
@@ -192,6 +227,18 @@ internal static class NativeCharacterSwitchChecks
             legacyToolbar.Items.Remove(testTool);
             menuProjection.Visible = showMenus;
             await Task.Delay(30);
+        }
+
+        static async Task WaitForToolbarLayoutAsync(Func<bool> settled)
+        {
+            for (int attempt = 0; attempt < 100; attempt++)
+            {
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { },
+                    Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+                if (settled())
+                    return;
+                await Task.Delay(20);
+            }
         }
 
         Character Copy() { var copy = new Character(); copy.LoadSnapshot(original); return copy; }

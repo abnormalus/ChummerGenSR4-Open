@@ -49,7 +49,10 @@ internal static class CommonQualitySection
         foreach (var command in commands)
         {
             page.Controls.Remove(command);
-            var caption = new TextBlock { TextWrapping = TextWrapping.Wrap };
+            var caption = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap, MaxLines = 3, TextTrimming = TextTrimming.CharacterEllipsis
+            };
             var button = new Button { Name = "Native" + command.Name, Content = caption };
             button.Bind(Button.BackgroundProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("ControlFillColorSecondaryBrush"));
             button.Bind(Button.BorderBrushProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("ControlStrokeColorDefaultBrush"));
@@ -58,6 +61,7 @@ internal static class CommonQualitySection
             {
                 caption.Text = command.Text.Replace("&", "");
                 AutomationProperties.SetName(button, caption.Text);
+                ToolTip.SetTip(button, caption.Text);
                 button.IsEnabled = command.Enabled;
                 button.IsVisible = command.Visible;
             }

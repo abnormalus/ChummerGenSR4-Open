@@ -550,6 +550,17 @@ internal static class NativeLegacyControlChecks
             await Idle();
             check(fields.Extent.Height > fields.Viewport.Height && fields.Bounds.Bottom <= promptLayout.Children[1].Bounds.Top,
                 $"A long detail prompt scrolls above the confirmation buttons at narrow width [host={prompt.Bounds}, content={fields.Extent}, viewport={fields.Viewport}]");
+            var acceptDetail = prompt.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "NativecmdOK");
+            var acceptDetailCaption = (TextBlock)acceptDetail.Content!;
+            var acceptDetailController = Field<Forms.Button>(detail, "cmdOK");
+            acceptDetailController.Text = string.Join(" ", Enumerable.Repeat("Confirm this character detail", 6));
+            acceptDetailCaption.FontSize *= 1.5;
+            await Idle();
+            check(acceptDetailCaption.TextLayout.TextLines.Count is > 1 and <= 3 &&
+                Equals(ToolTip.GetTip(acceptDetail), acceptDetailController.Text) &&
+                acceptDetail.Bounds.Right <= promptLayout.Children[1].Bounds.Width + 1 &&
+                fields.Bounds.Height > 0 && fields.Bounds.Bottom <= promptLayout.Children[1].Bounds.Top,
+                "A narrow detail prompt keeps its form above a long enlarged confirmation caption");
             var input = prompt.GetVisualDescendants().OfType<ComboBox>().Single();
             check(input.IsEditable && input.Items.OfType<DetailChoice>().Any(choice => choice.Review),
                 "Native detail choices preserve review metadata");
@@ -1055,6 +1066,14 @@ internal static class NativeLegacyControlChecks
                         fields.Bounds.Bottom <= sidebar.Bounds.Top && sidebar.Bounds.Right <= pageLayout.Bounds.Width + 1,
                         editor.GetType().Name + " stacks the portrait and reputation below the fields in a narrow window");
                     var removePortrait = sidebar.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "NativecmdDeleteMugshot");
+                    var removeController = Field<Forms.Button>(editor, "cmdDeleteMugshot");
+                    var removeCaption = (TextBlock)removePortrait.Content!;
+                    removeController.Text = string.Join(" ", Enumerable.Repeat("Remove the current character portrait", 6));
+                    await Idle();
+                    check(removeCaption.FontSize == enlarged && removeCaption.TextLayout.TextLines.Count is > 1 and <= 3 &&
+                        Equals(ToolTip.GetTip(removePortrait), removeController.Text) &&
+                        removePortrait.Bounds.Right <= ((WrapPanel)removePortrait.Parent!).Bounds.Width + 1,
+                        editor.GetType().Name + " wraps the enlarged portrait command within the narrow sidebar");
                     var previousImage = portraitController.Image;
                     removePortrait.BringIntoView();
                     await Idle();

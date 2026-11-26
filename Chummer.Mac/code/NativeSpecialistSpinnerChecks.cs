@@ -32,8 +32,7 @@ internal static class NativeSpecialistSpinnerChecks
                 Field<Forms.NumericUpDown>(dialog, "nudThreshold").Value == 4 &&
                 Field<Forms.NumericUpDown>(dialog, "nudGremlins").Value == 2,
                 "The Dice Roller uses the native dice pool, threshold, and Gremlins inputs");
-            dialog.ClientSize = new System.Drawing.Size(280, 380);
-            await Idle();
+            await ResizeAsync(dialog, host, 280, 380);
             var layout = (Grid)host.Child!;
             check(layout.Children[0].Bounds.Bottom <= layout.Children[1].Bounds.Top &&
                 layout.Children[1].Bounds.Bottom <= layout.Children[2].Bounds.Top &&
@@ -67,29 +66,31 @@ internal static class NativeSpecialistSpinnerChecks
 
         await CheckDialog(new frmMetatype(character), async dialog =>
         {
-            dialog.ClientSize = new System.Drawing.Size(320, 340);
-            await Idle();
             var surface = (Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!;
+            await ResizeAsync(dialog, surface, 320, 340);
             var layout = (Grid)surface.Child!;
             var panes = (Grid)layout.Children[0];
             var details = (ScrollViewer)panes.Children[1];
-            check(Grid.GetRow(details) == 1 && details.Extent.Height > details.Viewport.Height &&
-                panes.Bounds.Bottom <= layout.Children[1].Bounds.Top,
-                "The narrow Metatype picker stacks scrollable details above OK and Cancel");
+            var fontSize = Avalonia.Controls.Documents.TextElement.GetFontSize(details);
+            Avalonia.Controls.Documents.TextElement.SetFontSize(details, fontSize * 1.5);
+            await Idle();
+            check(surface.Bounds.Width is > 0 and <= 321 && surface.Bounds.Height is > 0 and <= 341 &&
+                Grid.GetRow(details) == 1 && details.Viewport.Height > 0 &&
+                details.Extent.Height > details.Viewport.Height && panes.Bounds.Bottom <= layout.Children[1].Bounds.Top,
+                $"The narrow Metatype picker stacks scrollable details above OK and Cancel [host={surface.Bounds}, row={Grid.GetRow(details)}, extent={details.Extent}, viewport={details.Viewport}, panes={panes.Bounds}, actions={layout.Children[1].Bounds}]");
         }, "nudForce");
 
         await CheckDialog(new frmSelectAdvancedLifestyle(new Lifestyle(character), character), async dialog =>
         {
-            dialog.ClientSize = new System.Drawing.Size(350, 450);
-            await Idle();
             var surface = (Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!;
+            await ResizeAsync(dialog, surface, 350, 450);
             var layout = (Grid)surface.Child!;
             var panes = (Grid)layout.Children[0];
             var fields = (ScrollViewer)panes.Children[1];
             check(Grid.GetRow(fields) == 1 && fields.Extent.Height > fields.Viewport.Height &&
                 panes.Bounds.Bottom <= layout.Children[1].Bounds.Top &&
                 surface.GetVisualDescendants().OfType<TreeView>().All(tree => tree.Bounds.Height > 30),
-                "The narrow Advanced Lifestyle dialog keeps both quality trees and scrollable fields above the actions");
+                $"The narrow Advanced Lifestyle dialog keeps both quality trees and scrollable fields above the actions [host={surface.Bounds}, row={Grid.GetRow(fields)}, extent={fields.Extent}, viewport={fields.Viewport}, panes={panes.Bounds}, actions={layout.Children[1].Bounds}]");
             var comforts = surface.GetVisualDescendants().OfType<ComboBox>().Single(combo => combo.Name == "NativecboComforts");
             comforts.SelectedIndex = comforts.SelectedIndex == 1 ? 2 : 1;
             var total = Field<Forms.Label>(dialog, "lblCost");
@@ -118,11 +119,8 @@ internal static class NativeSpecialistSpinnerChecks
 
         await CheckDialog(new frmCreateSpell(character), async dialog =>
         {
-            dialog.ClientSize = new System.Drawing.Size(300, 340);
-            await Idle();
             var surface = (Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!;
-            for (int attempt = 0; attempt < 50 && (surface.Bounds.Width > 301 || surface.Bounds.Height > 341); attempt++)
-                await Task.Delay(20);
+            await ResizeAsync(dialog, surface, 300, 340);
             await Idle();
             var layout = (Grid)surface.Child!;
             var scroll = (ScrollViewer)layout.Children[0];
@@ -166,14 +164,24 @@ internal static class NativeSpecialistSpinnerChecks
 
         await CheckDialog(new frmCreateImprovement(character), async dialog =>
         {
-            dialog.ClientSize = new System.Drawing.Size(270, 210);
-            var layout = (Grid)((Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!).Child!;
+            var surface = (Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!;
+            await ResizeAsync(dialog, surface, 270, 210);
+            var layout = (Grid)surface.Child!;
             var scroll = (ScrollViewer)layout.Children[0];
             var source = Field<Forms.NumericUpDown>(dialog, "nudVal");
+            var value = Input(dialog, "nudVal");
             source.Visible = true;
+            Avalonia.Controls.Documents.TextElement.SetFontSize(layout, value.FontSize * 1.5);
             await Idle();
-            check(scroll.Extent.Height > scroll.Viewport.Height && scroll.Bounds.Bottom <= layout.Children[1].Bounds.Top,
-                "Narrow improvement creation scrolls its fields above the confirmation row");
+            value.BringIntoView();
+            await Idle();
+            var position = value.TranslatePoint(default, scroll);
+            check(surface.Bounds.Width is > 0 and <= 271 && surface.Bounds.Height is > 0 and <= 211 &&
+                scroll.Extent.Height > scroll.Viewport.Height && scroll.Bounds.Bottom <= layout.Children[1].Bounds.Top &&
+                value.IsEffectivelyVisible && position is { } point && point.Y >= -1 &&
+                point.Y + value.Bounds.Height <= scroll.Viewport.Height + 1,
+                $"Narrow improvement creation scrolls its fields above the confirmation row [host={surface.Bounds}, extent={scroll.Extent}, viewport={scroll.Viewport}, value={position}/{value.Bounds}]");
+            layout.ClearValue(Avalonia.Controls.Documents.TextElement.FontSizeProperty);
             source.Visible = false;
             await Idle();
             check(Input(dialog, "nudVal").Parent is StackPanel { IsVisible: false },
@@ -184,9 +192,8 @@ internal static class NativeSpecialistSpinnerChecks
         {
             var pending = picker.ShowDialogAsync(owner);
             await Idle();
-            picker.ClientSize = new System.Drawing.Size(340, 380);
-            await Idle();
             var surface = (Border)picker.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!;
+            await ResizeAsync(picker, surface, 340, 380);
             var layout = (Grid)surface.Child!;
             var panes = (Grid)layout.Children[0];
             var category = surface.GetVisualDescendants().OfType<ComboBox>().Single();
@@ -279,6 +286,20 @@ internal static class NativeSpecialistSpinnerChecks
                 dialog.Close();
             }
         }
+    }
+
+    private static async Task ResizeAsync(Forms.Form dialog, Border surface, int width, int height)
+    {
+        dialog.ClientSize = new System.Drawing.Size(width, height);
+        for (int attempt = 0; attempt < 100; attempt++)
+        {
+            await Idle();
+            if (Math.Abs(surface.Bounds.Width - width) <= 1 && Math.Abs(surface.Bounds.Height - height) <= 1)
+                return;
+            await Task.Delay(20);
+        }
+
+        throw new TimeoutException($"The native {dialog.GetType().Name} host did not reach {width}×{height} [measured={surface.Bounds}, client={dialog.ClientSize}].");
     }
 
     private static async Task Idle() => await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);

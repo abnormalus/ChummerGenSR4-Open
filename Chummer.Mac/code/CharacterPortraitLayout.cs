@@ -22,21 +22,40 @@ internal static class CharacterPortraitLayout
         foreach (var controller in new[] { add, edit, remove })
         {
             page.Controls.Remove(controller);
+            var buttonCaption = Label(controller.Text);
+            buttonCaption.MaxLines = 3;
+            buttonCaption.TextTrimming = TextTrimming.CharacterEllipsis;
             var button = new Button
             {
                 Name = "Native" + controller.Name,
-                Content = Label(controller.Text),
+                Content = buttonCaption,
                 Margin = new Thickness(0, 0, 4, 4)
             };
             button.Bind(Button.BorderBrushProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("ControlStrokeColorDefaultBrush"));
             button.BorderThickness = new Thickness(1);
             button.Click += (_, _) => controller.PerformClick();
-            void Refresh() { button.IsEnabled = controller.Enabled; button.IsVisible = controller.Visible; }
+            void Refresh()
+            {
+                buttonCaption.Text = controller.Text;
+                Avalonia.Automation.AutomationProperties.SetName(button, buttonCaption.Text);
+                ToolTip.SetTip(button, buttonCaption.Text);
+                button.IsEnabled = controller.Enabled;
+                button.IsVisible = controller.Visible;
+            }
+            void CaptionChanged(object? sender, EventArgs args) => Refresh();
+            controller.TextChanged += CaptionChanged;
             var observation = new NativeControlObservation(controller, Refresh);
             Refresh();
             commands.Children.Add(button);
-            editor.Disposed += (_, _) => { observation.Dispose(); controller.Dispose(); };
+            editor.Disposed += (_, _) =>
+            {
+                controller.TextChanged -= CaptionChanged;
+                observation.Dispose();
+                controller.Dispose();
+            };
         }
+
+        NativeControlPresentation.ConstrainWrapItems(commands);
 
         var image = new Image
         {
