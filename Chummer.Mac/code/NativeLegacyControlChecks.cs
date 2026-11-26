@@ -550,6 +550,17 @@ internal static class NativeLegacyControlChecks
             await Idle();
             check(fields.Extent.Height > fields.Viewport.Height && fields.Bounds.Bottom <= promptLayout.Children[1].Bounds.Top,
                 $"A long detail prompt scrolls above the confirmation buttons at narrow width [host={prompt.Bounds}, content={fields.Extent}, viewport={fields.Viewport}]");
+            var acceptDetail = prompt.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "NativecmdOK");
+            var acceptDetailCaption = (TextBlock)acceptDetail.Content!;
+            var acceptDetailController = Field<Forms.Button>(detail, "cmdOK");
+            acceptDetailController.Text = string.Join(" ", Enumerable.Repeat("Confirm this character detail", 6));
+            acceptDetailCaption.FontSize *= 1.5;
+            await Idle();
+            check(acceptDetailCaption.TextLayout.TextLines.Count is > 1 and <= 3 &&
+                Equals(ToolTip.GetTip(acceptDetail), acceptDetailController.Text) &&
+                acceptDetail.Bounds.Right <= promptLayout.Children[1].Bounds.Width + 1 &&
+                fields.Bounds.Height > 0 && fields.Bounds.Bottom <= promptLayout.Children[1].Bounds.Top,
+                "A narrow detail prompt keeps its form above a long enlarged confirmation caption");
             var input = prompt.GetVisualDescendants().OfType<ComboBox>().Single();
             check(input.IsEditable && input.Items.OfType<DetailChoice>().Any(choice => choice.Review),
                 "Native detail choices preserve review metadata");

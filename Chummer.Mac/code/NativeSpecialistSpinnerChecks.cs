@@ -68,14 +68,19 @@ internal static class NativeSpecialistSpinnerChecks
         await CheckDialog(new frmMetatype(character), async dialog =>
         {
             dialog.ClientSize = new System.Drawing.Size(320, 340);
-            await Idle();
             var surface = (Border)dialog.Controls.OfType<Forms.NativeControlHost>().Single().NativeControl!;
             var layout = (Grid)surface.Child!;
             var panes = (Grid)layout.Children[0];
             var details = (ScrollViewer)panes.Children[1];
-            check(Grid.GetRow(details) == 1 && details.Extent.Height > details.Viewport.Height &&
-                panes.Bounds.Bottom <= layout.Children[1].Bounds.Top,
-                "The narrow Metatype picker stacks scrollable details above OK and Cancel");
+            var fontSize = Avalonia.Controls.Documents.TextElement.GetFontSize(details);
+            Avalonia.Controls.Documents.TextElement.SetFontSize(details, fontSize * 1.5);
+            for (int attempt = 0; attempt < 50 && (surface.Bounds.Width > 321 || surface.Bounds.Height > 341); attempt++)
+                await Task.Delay(20);
+            await Idle();
+            check(surface.Bounds.Width is > 0 and <= 321 && surface.Bounds.Height is > 0 and <= 341 &&
+                Grid.GetRow(details) == 1 && details.Viewport.Height > 0 &&
+                details.Extent.Height > details.Viewport.Height && panes.Bounds.Bottom <= layout.Children[1].Bounds.Top,
+                $"The narrow Metatype picker stacks scrollable details above OK and Cancel [host={surface.Bounds}, row={Grid.GetRow(details)}, extent={details.Extent}, viewport={details.Viewport}, panes={panes.Bounds}, actions={layout.Children[1].Bounds}]");
         }, "nudForce");
 
         await CheckDialog(new frmSelectAdvancedLifestyle(new Lifestyle(character), character), async dialog =>
