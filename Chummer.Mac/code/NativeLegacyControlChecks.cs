@@ -1066,6 +1066,14 @@ internal static class NativeLegacyControlChecks
                         fields.Bounds.Bottom <= sidebar.Bounds.Top && sidebar.Bounds.Right <= pageLayout.Bounds.Width + 1,
                         editor.GetType().Name + " stacks the portrait and reputation below the fields in a narrow window");
                     var removePortrait = sidebar.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "NativecmdDeleteMugshot");
+                    var removeController = Field<Forms.Button>(editor, "cmdDeleteMugshot");
+                    var removeCaption = (TextBlock)removePortrait.Content!;
+                    removeController.Text = string.Join(" ", Enumerable.Repeat("Remove the current character portrait", 6));
+                    await Idle();
+                    check(removeCaption.FontSize == enlarged && removeCaption.TextLayout.TextLines.Count is > 1 and <= 3 &&
+                        Equals(ToolTip.GetTip(removePortrait), removeController.Text) &&
+                        removePortrait.Bounds.Right <= ((WrapPanel)removePortrait.Parent!).Bounds.Width + 1,
+                        editor.GetType().Name + " wraps the enlarged portrait command within the narrow sidebar");
                     var previousImage = portraitController.Image;
                     removePortrait.BringIntoView();
                     await Idle();
