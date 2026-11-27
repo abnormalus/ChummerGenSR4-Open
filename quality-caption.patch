@@ -1,0 +1,31 @@
+--- a/Chummer.Mac/code/CommonQualitySection.cs
++++ b/Chummer.Mac/code/CommonQualitySection.cs
+@@ -42,7 +42,15 @@
+             Setters =
+             {
+                 new Setter(TreeViewItem.HeaderTemplateProperty, new FuncDataTemplate<string>((text, _) =>
+-                    new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap }))
++                {
++                    var caption = new TextBlock
++                    {
++                        Text = text, TextWrapping = TextWrapping.Wrap, MaxLines = 2,
++                        TextTrimming = TextTrimming.CharacterEllipsis
++                    };
++                    ToolTip.SetTip(caption, text);
++                    return caption;
++                }))
+             }
+         });
+         var actions = new WrapPanel { ItemSpacing = 5, LineSpacing = 4 };
+--- a/Chummer.Mac/code/NativeEditorLayoutChecks.cs
++++ b/Chummer.Mac/code/NativeEditorLayoutChecks.cs
+@@ -295,7 +295,8 @@
+                         selectedItem.BringIntoView();
+                         await Idle();
+                         var captionPosition = selectedCaption.TranslatePoint(default, qualityTree);
+-                        check(selectedCaption.FontSize == enlarged && captionPosition.HasValue &&
++                        check(selectedCaption.FontSize == enlarged && Equals(ToolTip.GetTip(selectedCaption), selectedItem.Header) &&
++                            captionPosition.HasValue &&
+                             captionPosition.Value.X + selectedCaption.Bounds.Width <= qualityTree.Bounds.Width + 1 &&
+                             captionPosition.Value.Y >= -1 && captionPosition.Value.Y + selectedCaption.Bounds.Height <= qualityTree.Bounds.Height + 1 &&
+                             selectedCaption.Bounds.Height >= enlarged * 2,
