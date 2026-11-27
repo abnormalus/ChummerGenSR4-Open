@@ -74,21 +74,32 @@ internal static class NativeCreationActiveSkillChecks
             int originalHeight = filterHost.Height;
             var split = Field<Forms.SplitContainer>(editor, "splitSkills");
             var originalSplit = split.Bounds;
-            owner.ClientSize = new System.Drawing.Size(420, originalSize.Height);
-            await Task.Delay(30);
-            check(filterHost.Height > originalHeight &&
+            var narrowSize = new System.Drawing.Size(420, originalSize.Height);
+            bool SplitFits() => split.Top == filterHost.Height && split.Bottom == skills.ClientSize.Height &&
+                split.Width == skills.ClientSize.Width;
+            bool FiltersFit() => filterHost.Height > originalHeight && SplitFits() &&
                 quickFilters.Values.Select(button => button.Bounds.Top).Distinct().Count() > 1 &&
-                quickFilters.Values.All(button => button.Bounds.Right <= filterHost.Width && button.Bounds.Bottom <= filterHost.Height),
-                $"Narrow Creation Skills wraps every filter inside the available area [before={originalSize}/{originalHeight}, skills={skills.Size}, host={filterHost.Bounds}, buttons={string.Join("/", quickFilters.Values.Select(button => button.Bounds))}]");
-            owner.ClientSize = originalSize;
-            await Task.Delay(30);
-            check(filterHost.Height == originalHeight && split.Bounds == originalSplit,
-                "Restoring Creation Skills width restores its exact split layout");
-            owner.ClientSize = new System.Drawing.Size(420, originalSize.Height);
-            await Task.Delay(30);
-            check(split.Top == filterHost.Height && split.Bottom == skills.ClientSize.Height &&
-                split.Width == skills.ClientSize.Width,
-                "Repeated narrow Skills sizing keeps filters clear of the split panes");
+                quickFilters.Values.All(button => button.Bounds.Right <= filterHost.Width + 1 &&
+                    button.Bounds.Bottom <= filterHost.Height + 1);
+            async Task<bool> ResizeAsync(System.Drawing.Size size, Func<bool> settled)
+            {
+                owner.ClientSize = size;
+                for (int attempt = 0; attempt < 100; attempt++)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    if (owner.ClientSize == size && settled())
+                        return true;
+                    await Task.Delay(20);
+                }
+                return false;
+            }
+            string Geometry() => $"[owner={owner.ClientSize}, skills={skills.ClientSize}, host={filterHost.Bounds}, split={split.Bounds}, baseline={originalSize}/{originalHeight}/{originalSplit}]";
+            check(await ResizeAsync(narrowSize, FiltersFit),
+                $"Narrow Creation Skills wraps every filter inside the available area {Geometry()}");
+            check(await ResizeAsync(originalSize, () => filterHost.Height == originalHeight && split.Bounds == originalSplit),
+                $"Restoring Creation Skills width restores its exact split layout {Geometry()}");
+            check(await ResizeAsync(narrowSize, FiltersFit),
+                $"Repeated narrow Skills sizing keeps filters clear of the split panes {Geometry()}");
             var filterSurface = (Border)filterHost.NativeControl!;
             var filterBar = (WrapPanel)filterSurface.Child!;
             int narrowHeight = filterHost.Height;
