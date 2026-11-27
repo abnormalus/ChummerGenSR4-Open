@@ -1,0 +1,32 @@
+--- a/Chummer.Mac/code/CommonQualitySection.cs
++++ b/Chummer.Mac/code/CommonQualitySection.cs
+@@ -57,7 +57,10 @@
+         foreach (var command in commands)
+         {
+             page.Controls.Remove(command);
+-            var caption = new TextBlock { TextWrapping = TextWrapping.Wrap };
++            var caption = new TextBlock
++            {
++                TextWrapping = TextWrapping.Wrap, MaxLines = 3, TextTrimming = TextTrimming.CharacterEllipsis
++            };
+             var button = new Button { Name = "Native" + command.Name, Content = caption };
+             button.Bind(Button.BackgroundProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("ControlFillColorSecondaryBrush"));
+             button.Bind(Button.BorderBrushProperty, new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("ControlStrokeColorDefaultBrush"));
+@@ -66,6 +69,7 @@
+             {
+                 caption.Text = command.Text.Replace("&", "");
+                 AutomationProperties.SetName(button, caption.Text);
++                ToolTip.SetTip(button, caption.Text);
+                 button.IsEnabled = command.Enabled;
+                 button.IsVisible = command.Visible;
+             }
+--- a/Chummer.Mac/code/NativeEditorLayoutChecks.cs
++++ b/Chummer.Mac/code/NativeEditorLayoutChecks.cs
+@@ -286,6 +286,7 @@
+                         await Idle();
+                         var text = (TextBlock)addQualityView.Content!;
+                         check(text.FontSize == enlarged && text.Text == addQuality.Text && text.Bounds.Height > enlarged * 2 &&
++                            text.TextLayout.TextLines.Count <= 3 && Equals(ToolTip.GetTip(addQualityView), text.Text) &&
+                             addQualityView.Bounds.Right <= qualityActions.Bounds.Width + 1 &&
+                             qualityActions.Bounds.Bottom <= qualityTree.Bounds.Top && qualityTree.Bounds.Height > 40,
+                             Label($"Top-left Common quality toolbar wraps without covering the tree [text={text.Bounds}, button={addQualityView.Bounds}, toolbar={qualityActions.Bounds}, tree={qualityTree.Bounds}]"));
