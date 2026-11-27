@@ -1,14 +1,14 @@
-import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import * as db from './storage.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {GitHub} from './github.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {installController} from './install.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {existingCharacter,sameRemote} from './identity.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty,isGrenade,grenadeLots,ammunition,fireCounts,setActiveSlot,fireWeapon,reloadWeapon,useGrenade} from './weapons.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {armorRating,armorMods,armorProtections,defensePools} from './armor.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {augmentationEssence,augmentationEffects,augmentationChildren} from './augmentations.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {AutoSync} from './autosync.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {filteredSkills,magicSkillsApply,skillRating,perceptionSense,perceptionDifferences} from './skill-filters.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
+import {Character,demo,value,integer,truth,MAX_BYTES,fingerprint} from './core.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import * as db from './storage.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {GitHub} from './github.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {characterPreview,matchesCharacter} from './repository-browser.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {installController} from './install.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {existingCharacter,sameRemote} from './identity.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {weaponPool,weaponRanges,attachments,loadedAmmo,activeSlot,conditionPenalty,isGrenade,grenadeLots,ammunition,fireCounts,setActiveSlot,fireWeapon,reloadWeapon,useGrenade} from './weapons.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {armorRating,armorMods,armorProtections,defensePools} from './armor.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {augmentationEssence,augmentationEffects,augmentationChildren} from './augmentations.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {AutoSync} from './autosync.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {filteredSkills,magicSkillsApply,skillRating,perceptionSense,perceptionDifferences} from './skill-filters.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 let records=[],record,character,page='Character',positive=true,skillCategory='Active',client,remoteRows=[],saving=Promise.resolve(),timer;
@@ -179,7 +179,7 @@ function printCharacter(official){
   $('print-status').textContent='Preparing PDF…';
   for(const id of ['print-full','print-official'])$(id).disabled=true;
   try{
-   await flush();const {characterPDF}=await import('./printing.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1');const bytes=await characterPDF(snapshot,{official});
+   await flush();const {characterPDF}=await import('./printing.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6');const bytes=await characterPDF(snapshot,{official});
    if(printURL)URL.revokeObjectURL(printURL);
    printURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
    const filename=snapshot.title.replace(/[^\p{L}\p{N} ._-]/gu,'_')+(official?' - Official SR4A':' - Full character')+'.pdf';

@@ -1,5 +1,5 @@
-import {value as xmlValue,child,children,integer,truth} from './core.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
-import {ranges} from './weapon-ranges.mjs?v=f0c22eb4658216f295bf3dba670c3788820008d1';
+import {value as xmlValue,child,children,integer,truth} from './core.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
+import {ranges} from './weapon-ranges.mjs?v=4c727c878c1d270ca3834bb301bb9a4a277953d6';
 
 const value=(node,key)=>node?xmlValue(node,key):'';
 const groups={Archery:['Bows','Crossbows'],Automatics:['Assault Rifles','Machine Pistols','Submachine Guns','Battle Rifles'],Blades:['Blades','Cyberware Blades'],Clubs:['Clubs'],'Heavy Weapons':['Assault Cannons','Grenade Launchers','Missile Launchers','Mortar Launchers','Light Machine Guns','Medium Machine Guns','Heavy Machine Guns'],Longarms:['Shotguns','Sniper Rifles','Sports Rifles'],'Throwing Weapons':['Throwing Weapons','Cyberware Throwing Weapons'],'Unarmed Combat':['Unarmed','Cyberware Clubs','Cyberware']};
