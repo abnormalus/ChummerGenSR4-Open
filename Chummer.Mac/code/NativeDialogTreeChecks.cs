@@ -91,9 +91,9 @@ internal static class NativeDialogTreeChecks
                         const string path = "A long character file name for the batch print dialog that exceeds the available column width.chum";
                         node.Text = path;
                         node.ToolTipText = path;
-                        dialog.ClientSize = new System.Drawing.Size(280, 280);
-                        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                        var layout = (Grid)((Border)host.NativeControl!).Child!;
+                        var surface = (Border)host.NativeControl!;
+                        await ResizeAsync(dialog, surface, 280, 280);
+                        var layout = (Grid)surface.Child!;
                         var name = row.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == path);
                         check(name.TextTrimming == Avalonia.Media.TextTrimming.CharacterEllipsis && Equals(ToolTip.GetTip(row), path) &&
                             tree.Bounds.Bottom <= layout.Children[1].Bounds.Top,
@@ -101,17 +101,30 @@ internal static class NativeDialogTreeChecks
                     }
                     if (dialog is frmSelectPACKSKit)
                     {
-                        dialog.ClientSize = new System.Drawing.Size(380, 420);
-                        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                        var layout = (Grid)((Border)host.NativeControl!).Child!;
+                        var surface = (Border)host.NativeControl!;
+                        await ResizeAsync(dialog, surface, 380, 420);
+                        var layout = (Grid)surface.Child!;
                         var panes = (Grid)layout.Children[0];
                         check(Grid.GetRow(panes.Children[1]) == 1 && panes.Children[0].Bounds.Bottom <= panes.Children[1].Bounds.Top &&
                             panes.Bounds.Bottom <= layout.Children[1].Bounds.Top && tree.Bounds.Height > 0,
-                            "Narrow PACKS picker stacks its list and contents above the action buttons");
+                            $"Narrow PACKS picker stacks its list and contents above the action buttons [host={surface.Bounds}, panes={panes.Bounds}, tree={tree.Bounds}, details={panes.Children[1].Bounds}, actions={layout.Children[1].Bounds}]");
                     }
                 }
                 dialog.Close();
             }
+        }
+
+        static async Task ResizeAsync(Forms.Form dialog, Border surface, int width, int height)
+        {
+            dialog.ClientSize = new System.Drawing.Size(width, height);
+            for (int attempt = 0; attempt < 100; attempt++)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                if (Math.Abs(surface.Bounds.Width - width) <= 1 && Math.Abs(surface.Bounds.Height - height) <= 1)
+                    return;
+                await Task.Delay(20);
+            }
+            throw new TimeoutException($"The native {dialog.GetType().Name} host did not reach {width}×{height} [host={surface.Bounds}, client={dialog.ClientSize}].");
         }
 
         static System.Collections.Generic.IEnumerable<Forms.Control> Descendants(Forms.Control parent) =>
