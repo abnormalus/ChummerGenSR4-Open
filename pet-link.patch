@@ -1,0 +1,49 @@
+--- a/Chummer.Mac/code/NativeEditorLayoutChecks.cs
++++ b/Chummer.Mac/code/NativeEditorLayoutChecks.cs
+@@ -956,6 +956,12 @@
+                         firstPet.FileName = System.IO.Path.Combine(petFiles.FullName, "moved pet.chum");
+                         check(petController.ResolveLinkedCharacter() == linkedPath,
+                             Label("Pet links resolve an escaped relative path when the absolute path is stale"));
++                        firstPet.RelativeFileName = linkedPath.Replace(" ", "%20", StringComparison.Ordinal);
++                        check(petController.ResolveLinkedCharacter() == linkedPath,
++                            Label("Pet links decode spaces in rooted paths"));
++                        firstPet.RelativeFileName = "../" + new Uri(linkedPath).AbsoluteUri;
++                        check(petController.ResolveLinkedCharacter() == linkedPath,
++                            Label("Pet links recover an escaped file URI stored by earlier versions for a different drive"));
+                         firstPet.RelativeFileName = "";
+                         check(petController.ResolveLinkedCharacter() == null,
+                             Label("A missing pet link has no resolved character and leaves the pet editable"));
+--- a/Chummer.Mac/code/PetControl.cs
++++ b/Chummer.Mac/code/PetControl.cs
+@@ -117,7 +117,13 @@
+ 
+             try
+             {
+-                string installedPath = Path.GetFullPath(Uri.UnescapeDataString(relative), Application.StartupPath);
++                // Older builds prefixed every URI with "../", including absolute file
++                // URIs produced by MakeRelativeUri when the target was on another drive.
++                string link = relative.StartsWith("../file:", StringComparison.OrdinalIgnoreCase) ? relative[3..] : relative;
++                string installedPath = link.StartsWith("file:", StringComparison.OrdinalIgnoreCase) &&
++                    Uri.TryCreate(link, UriKind.Absolute, out var fileUri) && fileUri.IsFile
++                    ? fileUri.LocalPath
++                    : Path.GetFullPath(Uri.UnescapeDataString(relative), Application.StartupPath);
+                 if (File.Exists(installedPath))
+                     return installedPath;
+ 
+@@ -158,9 +164,14 @@
+             if (!pet.Load(false))
+                 throw new InvalidDataException("Unable to read the selected character.");
+ 
+-            var relativePath = new Uri(Application.StartupPath).MakeRelativeUri(new Uri(fullPath));
++            var directory = new Uri(Path.TrimEndingDirectorySeparator(Application.StartupPath) + Path.DirectorySeparatorChar);
++            var target = new Uri(fullPath);
++            var relativePath = directory.MakeRelativeUri(target);
++            string link = relativePath.ToString();
+             _objContact.FileName = fullPath;
+-            _objContact.RelativeFileName = "../" + relativePath;
++            _objContact.RelativeFileName = relativePath.IsAbsoluteUri || Path.IsPathFullyQualified(Uri.UnescapeDataString(link))
++                ? target.AbsoluteUri
++                : link;
+             lblMetatype.Text = FormatMetatype(pet);
+             tipTooltip.SetToolTip(imgLink, LanguageManager.Instance.GetString("Tip_Contact_OpenFile"));
+             FileNameChanged?.Invoke(this);
